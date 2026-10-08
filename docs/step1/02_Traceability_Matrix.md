@@ -236,35 +236,35 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-092 | Account mapping screen with status | M | M07 | PostingKeyMappings | PostingKeyService | SCR-71 | I E | ☐ |
-| FR-093 | Only active postable accounts; mapped account cannot be deactivated | M | M07/M08 | PostingKeyMappings, Accounts | PostingKeyService, AccountService | SCR-71, SCR-30 | I | ☐ |
-| FR-094 | Unmapped → invoicing/posting disabled; banner | M | M07 | PostingKeyMappings | PostingGuard | SCR-00 (banner), SCR-71 | I E | ☐ |
-| FR-095 | Mapping changes for new entries only; audited | M | M07 | PostingKeyMappings, AuditLogs | PostingKeyService | SCR-71 | I | ☐ |
-| FR-096 | Every financial event posts in the same operation | M | M07 | JournalEntries, EntryLines | PostingEngine | — (engine) | I (NFR-04) | ☐ |
-| FR-097 | Entry fields incl. source and party | M | M07 | JournalEntries, EntryLines | PostingEngine | SCR-34 | I | ☐ |
-| FR-098 | Balanced and open period, else refused | M | M07 | JournalEntries (CHECK debit = credit), Periods | PostingEngine | — | U I | ☐ |
-| FR-099 | Linked reversal; originals unchanged | M | M07 | JournalEntries.ReversesEntryId/ReversedByEntryId | PostingEngine.Reverse | SCR-34 | I | ☐ |
+| FR-092 | Account mapping screen with status | M | M07 | PostingKeyMappings | PostingKeyService | SCR-71 | I E | ◐ |
+| FR-093 | Only active postable accounts; mapped account cannot be deactivated | M | M07/M08 | PostingKeyMappings, Accounts | PostingKeyService, AccountService | SCR-71, SCR-30 | I | ◐ |
+| FR-094 | Unmapped → invoicing/posting disabled; banner | M | M07 | PostingKeyMappings | PostingGuard | SCR-00 (banner), SCR-71 | I E | ◐ |
+| FR-095 | Mapping changes for new entries only; audited | M | M07 | PostingKeyMappings, AuditLogs | PostingKeyService | SCR-71 | I | ◐ |
+| FR-096 | Every financial event posts in the same operation | M | M07 | JournalEntries, EntryLines | PostingEngine | — (engine) | I (NFR-04) | ◐ |
+| FR-097 | Entry fields incl. source and party | M | M07 | JournalEntries, EntryLines | PostingEngine | SCR-34 | I | ◐ |
+| FR-098 | Balanced and open period, else refused | M | M07 | JournalEntries (CHECK debit = credit), Periods | PostingEngine | — | U I | ◐ |
+| FR-099 | Linked reversal; originals unchanged | M | M07 | JournalEntries.ReversesEntryId/ReversedByEntryId | PostingEngine.Reverse | SCR-34 | I | ◐ |
 | FR-100 | Accrue driver wage setting | M | M07 | CompanySettings TRN.AccrueDriverWage | PostingEngine | SCR-70 | U I | ☐ |
-| FR-101 | Pending postings with retry | M | M07 | PendingPostings | PendingPostingJob | SCR-34, SCR-07 | I | ☐ |
-| FR-102 | Automatic entries list | M | M07 | JournalEntries, EntryLines | JournalQueries | SCR-34 | I | ☐ |
-| FR-103 | Journal voucher | M | M07 | JournalEntries, EntryLines | PrintService | SCR-09 | I | ☐ |
-| FR-104 | Journal export batches JSON/CSV | M | M07/M14 | JournalExportBatches, JournalEntries.ExportBatchId | JournalExportService | SCR-34 | I | ☐ |
+| FR-101 | Pending postings with retry | M | M07 | PendingPostings | PendingPostingJob | SCR-34, SCR-07 | I | ◐ |
+| FR-102 | Automatic entries list | M | M07 | JournalEntries, EntryLines | JournalQueries | SCR-34 | I | ◐ |
+| FR-103 | Journal voucher | M | M07 | JournalEntries, EntryLines | PrintService | SCR-09 | I | ◐ |
+| FR-104 | Journal export batches JSON/CSV | M | M07/M14 | JournalExportBatches, JournalEntries.ExportBatchId | JournalExportService | SCR-34 | I | ◐ |
 | FR-105 | Sub-ledger reconciliation | M | M12 | EntryLines (IX_EntryLines_Party), Accounts | Report RPT-23 | SCR-51 | I (TST-11) | ☐ |
-| FR-106 | Control-account lines need a party | M | M07/M08 | Accounts.IsControlAccount/ControlPartyType, EntryLines.Party* | JournalValidator (G-17) | SCR-32 | U | ☐ |
+| FR-106 | Control-account lines need a party | M | M07/M08 | Accounts.IsControlAccount/ControlPartyType, EntryLines.Party* | JournalValidator (G-17) | SCR-32 | U | ◐ |
 
 ### C.6 Accounting (7.6)
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-107 | Chart as tree; template for new companies | M | M08 | Accounts | AccountService, ChartTemplateSeeder (G-03) | SCR-30 | I E | ☐ |
-| FR-108 | Referenced account only deactivated; parent with children not postable | M | M08 | Accounts | AccountService | SCR-30 | I | ☐ |
-| FR-109 | Chart import/export with opening columns; preview | M | M08/M14 | Accounts, ImportBatches | ChartImportService | SCR-30 | I | ☐ |
-| FR-110 | Opening entry; difference account during setup only | M | M08 | Accounts.Opening*, Companies.MigrationCompletedAt, JournalEntries (SourceType Opening) | OpeningBalanceService (G-04) | SCR-30, SCR-07, SCR-36, SCR-38 | U I | ☐ |
-| FR-111 | Manual entries | M | M08 | JournalEntries (IsManual), EntryLines | ManualJournalService | SCR-32 | I E | ☐ |
-| FR-112 | Edit posted manual entries with history | M | M08 | JournalEntries, AuditLogs | ManualJournalService.Edit (C-06) | SCR-32 | I | ☐ |
-| FR-113 | Void manual entries by reversal | M | M08 | JournalEntries (Void*) | ManualJournalService.Void | SCR-32 | I | ☐ |
-| FR-114 | Import entries with preview checks | M | M08/M14 | JournalEntries, ImportBatches | JournalImportService | SCR-33 | U I | ☐ |
-| FR-115 | Journal list, export, voucher | M | M08 | JournalEntries, EntryLines | JournalQueries | SCR-31, SCR-09 | I | ☐ |
+| FR-107 | Chart as tree; template for new companies | M | M08 | Accounts | AccountService, ChartTemplateSeeder (G-03) | SCR-30 | I E | ◐ |
+| FR-108 | Referenced account only deactivated; parent with children not postable | M | M08 | Accounts | AccountService | SCR-30 | I | ◐ |
+| FR-109 | Chart import/export with opening columns; preview | M | M08/M14 | Accounts, ImportBatches | ChartImportService | SCR-30 | I | ◐ |
+| FR-110 | Opening entry; difference account during setup only | M | M08 | Accounts.Opening*, Companies.MigrationCompletedAt, JournalEntries (SourceType Opening) | OpeningBalanceService (G-04) | SCR-30, SCR-07, SCR-36, SCR-38 | U I | ◐ |
+| FR-111 | Manual entries | M | M08 | JournalEntries (IsManual), EntryLines | ManualJournalService | SCR-32 | I E | ◐ |
+| FR-112 | Edit posted manual entries with history | M | M08 | JournalEntries, AuditLogs | ManualJournalService.Edit (C-06) | SCR-32 | I | ◐ |
+| FR-113 | Void manual entries by reversal | M | M08 | JournalEntries (Void*) | ManualJournalService.Void | SCR-32 | I | ◐ |
+| FR-114 | Import entries with preview checks | M | M08/M14 | JournalEntries, ImportBatches | JournalImportService | SCR-33 | U I | ◐ |
+| FR-115 | Journal list, export, voucher | M | M08 | JournalEntries, EntryLines | JournalQueries | SCR-31, SCR-09 | I | ◐ |
 | FR-116 | General ledger | M | M08 | EntryLines, Accounts | GeneralLedgerReport | SCR-35 | I | ☐ |
 | FR-117 | Trial balance at tree level | M | M08 | EntryLines, Accounts | TrialBalanceReport | SCR-36 | I | ☐ |
 | FR-118 | Profit & loss; cost-centre filter | M | M08 | EntryLines, Accounts, CostCentres | ProfitLossReport | SCR-37 | I | ☐ |
@@ -278,12 +278,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-126 | Returns on AP/AR documents | M | M08 | ApArReturns | ApArReturnService | SCR-40, SCR-41 | I | ☐ |
 | FR-127 | Printed AP/AR documents; void rules | M | M08 | ApArDocuments, ApArPayments, ApArReturns | ApArDocumentService.Void, PrintService | SCR-40, SCR-41, SCR-09 | I | ☐ |
 | FR-128 | Payables and receivables ageing | M | M12 | ApArDocuments | Report RPT-17/18 | SCR-51 | U I | ☐ |
-| FR-129 | Cash boxes and bank accounts | M | M08 | CashBoxes, BankAccounts | CashBankService | SCR-42 | I | ☐ |
+| FR-129 | Cash boxes and bank accounts | M | M08 | CashBoxes, BankAccounts | CashBankService | SCR-42 | I | ◐ |
 | FR-130 | Cash/bank statement | M | M12 | EntryLines | Report RPT-16 | SCR-42, SCR-51 | I | ☐ |
-| FR-131 | Cost centres and report | M | M08 | CostCentres, EntryLines | CostCentreService | SCR-43 | I | ☐ |
-| FR-132 | Period list; close/reopen with reason | M | M08 | Periods | PeriodService | SCR-44 | I E | ☐ |
-| FR-133 | Closed period blocks everything everywhere | M | M08/X | Periods | PeriodGuard (used by every document service) | — (rule) | I | ☐ |
-| FR-134 | Pre-close check | S | M08 | PendingPostings, TRN_Invoices (Draft), EntryLines | PeriodService.PreCloseCheck | SCR-44 | I | ☐ |
+| FR-131 | Cost centres and report | M | M08 | CostCentres, EntryLines | CostCentreService | SCR-43 | I | ◐ |
+| FR-132 | Period list; close/reopen with reason | M | M08 | Periods | PeriodService | SCR-44 | I E | ◐ |
+| FR-133 | Closed period blocks everything everywhere | M | M08/X | Periods | PeriodGuard (used by every document service) | — (rule) | I | ◐ |
+| FR-134 | Pre-close check | S | M08 | PendingPostings, TRN_Invoices (Draft), EntryLines | PeriodService.PreCloseCheck | SCR-44 | I | ◐ |
 | FR-135 | Maintenance actions (soft deletions) | M | M08 | JournalEntries, EntryLines, Accounts, MaintenanceLogs | MaintenanceService | SCR-45 | I S | ☐ |
 | FR-136 | Maintenance protections and log | M | M08 | MaintenanceLogs | MaintenanceService | SCR-45 | I E | ☐ |
 
@@ -379,9 +379,9 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-15 | Driver advance | FR-072–075 | SCR-27 | E | ☐ |
 | US-16 | Driver settlement | FR-076–083 | SCR-27 | E | ☐ |
 | US-17 | Partner shipments and payments | FR-004, 084–088 | SCR-28 | E | ☐ |
-| US-18 | Automatic journal entries | FR-096–101 | SCR-34 | E | ☐ |
-| US-19 | Period closing | FR-132–134 | SCR-44 | E | ☐ |
-| US-20 | Accounting operations | FR-107–131 | SCR-30…43 | E | ☐ |
+| US-18 | Automatic journal entries | FR-096–101 | SCR-34 | E | ◐ |
+| US-19 | Period closing | FR-132–134 | SCR-44 | E | ◐ |
+| US-20 | Accounting operations | FR-107–131 | SCR-30…43 | E | ◐ |
 | US-21 | Dashboard | FR-137–141 | SCR-07 | E | ☐ |
 | US-22 | Account statements and ageing | RPT-12…18 | SCR-51 | E | ☐ |
 | US-23 | Report builder | FR-143–147 | SCR-52, SCR-53 | E | ☐ |
@@ -432,11 +432,11 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-012 | Downgrade refused while over limits (listed) | M01 | — | PlanChangeService | U | ☐ |
 | BR-013 | Limits never block view/print/export | M01 | — | PlanLimitGuard | U | ☐ |
 | BR-014 | Provider access only via approved window, logged | M01 | SupportAccessGrants (CHECK EndsAt > StartsAt) | SupportAccessGuard | S | ☐ |
-| BR-020 | Smallest currency unit; currency decimals | X | DECIMAL(18,3); Companies.CurrencyDecimals | Money type | U | ☐ |
-| BR-021 | Half-up rounding at each amount | X | — | Money.Round | U | ☐ |
+| BR-020 | Smallest currency unit; currency decimals | X | DECIMAL(18,3); Companies.CurrencyDecimals | Money type | U | ◐ |
+| BR-021 | Half-up rounding at each amount | X | — | Money.Round | U | ◐ |
 | BR-022 | Tax exclusive default 16 %; company setting | M03 | Companies.TaxRate/TaxInclusive defaults | InvoiceCalculator | U | ☐ |
 | BR-023 | Tax = round(base × rate) once | M09 | TRN_Invoices CHECKs | InvoiceCalculator | U (EX-2) | ☐ |
-| BR-024 | Amount in Arabic words | X | — | AmountInWords | U | ☐ |
+| BR-024 | Amount in Arabic words | X | — | AmountInWords | U | ◐ |
 | BR-025 | Credit-note proportional shares | M09 | — | CreditNoteCalculator | U (EX-3) | ☐ |
 | BR-026 | Credit note ≤ remaining | M09 | TRN_Invoices.RemainingAmount CHECK ≥ 0 | CreditNoteService | U I | ☐ |
 | BR-027 | Full return absorbs rounding → 0.000 | M09 | — | CreditNoteCalculator | U | ☐ |
@@ -446,15 +446,15 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-031 | Item in only one active settlement | M11 | TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService | I | ☐ |
 | BR-031a | Accrual off → settlement debits wage expense | M07 | CompanySettings TRN.AccrueDriverWage | PostingEngine | U I | ☐ |
 | BR-032 | Settled advance locked | M11 | TRN_Advances.SettlementId | AdvanceService | I | ☐ |
-| BR-033 | Entries balance | M07 | JournalEntries CHECK TotalDebit = TotalCredit | PostingEngine | U I | ☐ |
-| BR-034 | Entry dated with source date; closed period refused | M07 | Periods | PostingEngine, PeriodGuard | I | ☐ |
+| BR-033 | Entries balance | M07 | JournalEntries CHECK TotalDebit = TotalCredit | PostingEngine | U I | ◐ |
+| BR-034 | Entry dated with source date; closed period refused | M07 | Periods | PostingEngine, PeriodGuard | I | ◐ |
 | BR-035 | Edit trip/advance = reverse + new entry | M07 | JournalEntries reversal links | PostingEngine | I | ☐ |
-| BR-036 | Calendar-month periods; closed = no activity anywhere | M08 | Periods | PeriodGuard | I | ☐ |
+| BR-036 | Calendar-month periods; closed = no activity anywhere | M08 | Periods | PeriodGuard | I | ◐ |
 | BR-037 | Separate sequences with prefixes | M03 | NumberSequences (G-19) | NumberingService | I | ◐ |
 | BR-038 | Server numbers at approval, gap-free under concurrency | M03 | NumberSequences (UPDLOCK, ROWLOCK), UX numbers | NumberingService | I (TST-10) | ☑ |
 | BR-038a | Next number never ≤ issued | M03 | — | NumberingService | U | ☑ |
 | BR-039 | Lock on edit; release on close or 90 s idle | M13 | RecordLocks (UX active lock) | RecordLockService | I | ◐ |
-| BR-040 | No delete while referenced; counts; archive/void | X | All FKs ON DELETE NO ACTION | ReferenceGuard | I | ☐ |
+| BR-040 | No delete while referenced; counts; archive/void | X | All FKs ON DELETE NO ACTION | ReferenceGuard | I | ◐ |
 | BR-041 | Soft delete for all entities; restore; audited | X | IsDeleted/DeletedAt/DeletedBy/DeleteReason + CHECK; filtered UX | SoftDeleteInterceptor, global filters | I S | ☑ |
 
 Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-068, FR-050, FR-079, FR-085, FR-110, FR-155 (same tests).

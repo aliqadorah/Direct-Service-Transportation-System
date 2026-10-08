@@ -48,6 +48,44 @@ public static class ErrorCatalog
         [ErrorCodes.ReasonRequired] = ("يرجى ذكر السبب.", "Please give a reason."),
         [ErrorCodes.Antiforgery] = ("انتهت صلاحية الصفحة. أعد تحميلها وحاول مرة أخرى.", "The page has expired. Reload it and try again."),
         [ErrorCodes.ServerError] = ("حدث خطأ غير متوقع. رقم المتابعة: {0}", "An unexpected error occurred. Reference: {0}"),
+
+        // Accounting core and posting engine (B2)
+        [ErrorCodes.RecordInUse] = ("لا يمكن الحذف لأن السجل مستخدم في: {0}. يمكنك أرشفته أو إيقافه بدلاً من ذلك.", "It cannot be deleted because it is used by: {0}. Archive or deactivate it instead."),
+        [ErrorCodes.RecordArchived] = ("«{0}» مؤرشف ولا يمكن اختياره في عمليات جديدة.", "«{0}» is archived and cannot be chosen on new entries."),
+        [ErrorCodes.AccountHasChildren] = ("الحساب «{0}» له حسابات فرعية؛ الحسابات الفرعية فقط تقبل القيود.", "Account «{0}» has sub-accounts; only leaf accounts accept entries."),
+        [ErrorCodes.AccountParentInUse] = ("لا يمكن إضافة حساب فرعي تحت «{0}» لأنه يحمل قيوداً أو أرصدة افتتاحية أو ربطاً.", "A sub-account cannot be added under «{0}» because it carries entries, opening balances or links."),
+        [ErrorCodes.AccountTypeMismatch] = ("نوع الحساب يجب أن يطابق نوع الحساب الأب ({0}).", "The account type must match its parent's type ({0})."),
+        [ErrorCodes.AccountCycle] = ("لا يمكن نقل الحساب تحت أحد حساباته الفرعية.", "An account cannot be moved under one of its own sub-accounts."),
+        [ErrorCodes.AccountMapped] = ("الحساب «{0}» مربوط بمفتاح ترحيل أو صندوق أو حساب بنكي ولا يمكن إيقافه.", "Account «{0}» is linked to a posting key, cash box or bank account and cannot be deactivated."),
+        [ErrorCodes.AccountActiveChildren] = ("الحساب «{0}» له حسابات فرعية نشطة؛ أوقفها أولاً.", "Account «{0}» has active sub-accounts; deactivate them first."),
+        [ErrorCodes.AccountNotPostable] = ("الحساب «{0}» غير قابل للترحيل أو غير نشط.", "Account «{0}» is not postable or not active."),
+        [ErrorCodes.AccountNotAsset] = ("يجب أن يكون حساب الصندوق أو البنك حساب أصول قابلاً للترحيل.", "A cash box or bank account must use a postable asset account."),
+        [ErrorCodes.AccountLinkTaken] = ("الحساب «{0}» مربوط مسبقاً بصندوق أو حساب بنكي آخر.", "Account «{0}» is already linked to another cash box or bank account."),
+        [ErrorCodes.ControlPartyRequired] = ("السطر {0}: الحساب «{1}» حساب رقابة ويجب تحديد طرف من نوع {2}.", "Line {0}: account «{1}» is a control account and needs a party of type {2}."),
+        [ErrorCodes.ControlPartyMismatch] = ("السطر {0}: نوع الطرف لا يطابق نوع طرف حساب الرقابة «{1}» ({2}).", "Line {0}: the party does not match the control account «{1}» party type ({2})."),
+        [ErrorCodes.ChartNotEmpty] = ("يمكن إنشاء الدليل من النموذج فقط عندما يكون دليل الحسابات فارغاً.", "The template can only be used while the chart of accounts is empty."),
+        [ErrorCodes.JournalUnbalanced] = ("القيد غير متوازن: مدين {0} ودائن {1}.", "The entry does not balance: debit {0}, credit {1}."),
+        [ErrorCodes.JournalLineAmount] = ("السطر {0}: أدخل مبلغاً مديناً أو دائناً واحداً أكبر من صفر.", "Line {0}: enter one debit or one credit amount greater than zero."),
+        [ErrorCodes.JournalMinLines] = ("القيد يحتاج سطرين على الأقل.", "An entry needs at least two lines."),
+        [ErrorCodes.JournalNotManual] = ("القيود الآلية تتغير فقط من خلال المستند المصدر.", "Automatic entries change only through their source document."),
+        [ErrorCodes.JournalNotPosted] = ("القيد {0} معكوس أو ملغى مسبقاً.", "Entry {0} is already reversed or void."),
+        [ErrorCodes.PostingKeysMissing] = ("الترحيل والفوترة معطّلان حتى تُربط مفاتيح الترحيل: {0}.", "Posting and invoicing are disabled until these posting keys are mapped: {0}."),
+        [ErrorCodes.OpeningUnbalanced] = ("الأرصدة الافتتاحية غير متوازنة (الفرق {0}). بعد انتهاء الإعداد يجب أن تتوازن.", "The opening balances do not balance (difference {0}). After setup they must balance."),
+        [ErrorCodes.OpeningEmpty] = ("لا توجد أرصدة افتتاحية للترحيل.", "There are no opening balances to post."),
+        [ErrorCodes.PeriodAlreadyClosed] = ("الفترة {0} مغلقة مسبقاً.", "Period {0} is already closed."),
+        [ErrorCodes.PeriodNotClosed] = ("الفترة {0} مفتوحة.", "Period {0} is open."),
+        [ErrorCodes.PeriodChecksPending] = ("فحص ما قبل الإغلاق: {0} ترحيل معلّق، {1} مسودة غير معتمدة، {2} حساب رقابة غير مطابق. أكّد للإغلاق.", "Pre-close check: {0} pending posting(s), {1} unapproved draft(s), {2} unreconciled control account(s). Confirm to close."),
+        [ErrorCodes.ImportFileType] = ("نوع الملف غير مدعوم. استخدم ملف Excel (.xlsx) أو CSV.", "Unsupported file type. Use an Excel (.xlsx) or CSV file."),
+        [ErrorCodes.ImportTooLarge] = ("الملف كبير جداً (الحد {0}).", "The file is too large (limit {0})."),
+        [ErrorCodes.ImportEmpty] = ("الملف لا يحتوي على صفوف.", "The file has no rows."),
+        [ErrorCodes.ImportMissingColumn] = ("العمود «{0}» مطلوب في الملف.", "Column «{0}» is required in the file."),
+        [ErrorCodes.ImportHasErrors] = ("في الملف {0} صف مرفوض. صحّحها ثم أعد الاستيراد.", "{0} row(s) of the file are rejected. Correct them and import again."),
+        [ErrorCodes.ImportFormula] = ("الخلية {0} تحتوي معادلة؛ أدخل القيم فقط.", "Cell {0} contains a formula; enter values only."),
+        [ErrorCodes.ImportDuplicate] = ("القيمة «{0}» مكررة.", "«{0}» is duplicated."),
+        [ErrorCodes.ImportUnknown] = ("«{0}» غير معروف: {1}.", "Unknown {0}: «{1}»."),
+        [ErrorCodes.ImportInvalid] = ("قيمة «{0}» غير صحيحة: {1}.", "Invalid {0}: «{1}»."),
+        [ErrorCodes.JournalIsReversal] = ("القيد {0} قيد عكسي لقيد آخر ولا يمكن تعديله أو إلغاؤه.", "Entry {0} reverses another entry and cannot be edited or voided."),
+        [ErrorCodes.PendingNoHandler] = ("لا يمكن إعادة ترحيل هذا النوع من المستندات في هذا الإصدار.", "This document type cannot be re-posted in this version."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -56,7 +94,10 @@ public static class ErrorCatalog
         if (!Messages.TryGetValue(code, out var m))
             return code;
         var template = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? m.En : m.Ar;
-        return args.Length == 0 ? template : string.Format(CultureInfo.InvariantCulture, template, args);
+        if (args.Length == 0) return template;
+        // Missing arguments render as empty text instead of failing (messages take up to 5 placeholders).
+        var padded = args.Length >= 5 ? args : [.. args, .. Enumerable.Repeat<object?>(string.Empty, 5 - args.Length)];
+        return string.Format(CultureInfo.InvariantCulture, template, padded);
     }
 
     public static bool IsKnown(string code) => Messages.ContainsKey(code);
@@ -104,4 +145,41 @@ public static class ErrorCodes
     public const string ReasonRequired = "validation.reasonRequired";
     public const string Antiforgery = "auth.antiforgery";
     public const string ServerError = "server.error";
+
+    public const string RecordInUse = "record.inUse";
+    public const string RecordArchived = "record.archived";
+    public const string AccountHasChildren = "account.hasChildren";
+    public const string AccountParentInUse = "account.parentInUse";
+    public const string AccountTypeMismatch = "account.typeMismatch";
+    public const string AccountCycle = "account.cycle";
+    public const string AccountMapped = "account.linked";
+    public const string AccountActiveChildren = "account.activeChildren";
+    public const string AccountNotPostable = "account.notPostable";
+    public const string AccountNotAsset = "account.notAsset";
+    public const string AccountLinkTaken = "account.linkTaken";
+    public const string ControlPartyRequired = "journal.partyRequired";
+    public const string ControlPartyMismatch = "journal.partyMismatch";
+    public const string ChartNotEmpty = "chart.notEmpty";
+    public const string JournalUnbalanced = "journal.unbalanced";
+    public const string JournalLineAmount = "journal.lineAmount";
+    public const string JournalMinLines = "journal.minLines";
+    public const string JournalNotManual = "journal.notManual";
+    public const string JournalNotPosted = "journal.notPosted";
+    public const string PostingKeysMissing = "posting.keysMissing";
+    public const string OpeningUnbalanced = "opening.unbalanced";
+    public const string OpeningEmpty = "opening.empty";
+    public const string PeriodAlreadyClosed = "period.alreadyClosed";
+    public const string PeriodNotClosed = "period.notClosed";
+    public const string PeriodChecksPending = "period.checksPending";
+    public const string ImportFileType = "import.fileType";
+    public const string ImportTooLarge = "import.tooLarge";
+    public const string ImportEmpty = "import.empty";
+    public const string ImportMissingColumn = "import.missingColumn";
+    public const string ImportHasErrors = "import.hasErrors";
+    public const string ImportFormula = "import.formula";
+    public const string ImportDuplicate = "import.duplicate";
+    public const string ImportUnknown = "import.unknown";
+    public const string ImportInvalid = "import.invalid";
+    public const string PendingNoHandler = "pending.noHandler";
+    public const string JournalIsReversal = "journal.isReversal";
 }

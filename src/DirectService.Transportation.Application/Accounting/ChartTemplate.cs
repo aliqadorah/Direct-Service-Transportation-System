@@ -1,0 +1,87 @@
+namespace DirectService.Transportation.Application.Accounting;
+
+/// <summary>
+/// Built-in transport chart of accounts (FR-107), approved by the owner on 8 Oct 2026 as drafted in
+/// docs/step3/03_Chart_Of_Accounts_Template_DRAFT.md (D-10), including: discount allowed as contra-revenue (4104),
+/// driver deductions credited to revenue (4103), accumulated depreciation as an Asset-type account (1203).
+/// Codes by level: 1 digit class · 2 group · 4 account · 6 sub-account. Only leaf accounts are postable.
+/// </summary>
+public static class ChartTemplate
+{
+    public sealed record TemplateAccount(string Code, string NameAr, string NameEn, string Type, string? ParentCode, string? ControlPartyType);
+
+    public const string MainCashBoxNameAr = "الصندوق الرئيسي";
+    public const string MainCashBoxAccountCode = "110101";
+
+    public static readonly IReadOnlyList<TemplateAccount> Accounts =
+    [
+        new("1", "الأصول", "Assets", "Asset", null, null),
+        new("11", "الأصول المتداولة", "Current assets", "Asset", "1", null),
+        new("1101", "النقدية في الصناديق", "Cash on hand", "Asset", "11", null),
+        new("110101", "الصندوق الرئيسي", "Main cash box", "Asset", "1101", null),
+        new("1102", "النقدية لدى البنوك", "Cash at banks", "Asset", "11", null),
+        new("110201", "البنك – الحساب الجاري", "Bank – current account", "Asset", "1102", null),
+        new("1103", "الذمم المدينة", "Receivables", "Asset", "11", null),
+        new("110301", "ذمم عملاء النقل", "Trade receivables – transport customers", "Asset", "1103", "Customer"),
+        new("110302", "ذمم مدينة أخرى", "Other receivables", "Asset", "1103", "Customer"),
+        new("1104", "سلف السائقين", "Driver advances", "Asset", "11", "Driver"),
+        new("1105", "ضريبة المبيعات على المشتريات (مدخلات)", "Sales tax input", "Asset", "11", null),
+        new("1106", "مصاريف مدفوعة مقدماً", "Prepaid expenses", "Asset", "11", null),
+        new("12", "الأصول غير المتداولة", "Non-current assets", "Asset", "1", null),
+        new("1201", "الشاحنات والمركبات", "Trucks and vehicles", "Asset", "12", null),
+        new("1202", "الأثاث والأجهزة والمعدات", "Furniture and equipment", "Asset", "12", null),
+        new("1203", "مجمع الإهلاك", "Accumulated depreciation", "Asset", "12", null),
+        new("2", "الالتزامات", "Liabilities", "Liability", null, null),
+        new("21", "الالتزامات المتداولة", "Current liabilities", "Liability", "2", null),
+        new("2101", "ذمم الموردين", "Suppliers payable", "Liability", "21", "Supplier"),
+        new("2102", "ذمم السائقين الدائنة", "Driver payable", "Liability", "21", "Driver"),
+        new("2103", "ذمم شركات النقل الشريكة", "Partner payable", "Liability", "21", "Partner"),
+        new("2104", "ضريبة المبيعات المستحقة (مخرجات)", "Sales tax output", "Liability", "21", null),
+        new("2105", "مصاريف مستحقة", "Accrued expenses", "Liability", "21", null),
+        new("3", "حقوق الملكية", "Equity", "Equity", null, null),
+        new("3101", "رأس المال", "Capital", "Equity", "3", null),
+        new("3102", "الأرباح المحتجزة", "Retained earnings", "Equity", "3", null),
+        new("3103", "فرق الأرصدة الافتتاحية", "Opening balance difference", "Equity", "3", null),
+        new("4", "الإيرادات", "Revenue", "Revenue", null, null),
+        new("4101", "إيرادات النقل", "Transport revenue", "Revenue", "4", null),
+        new("4102", "إيرادات أخرى (رسوم إضافية)", "Other revenue (extra fees)", "Revenue", "4", null),
+        new("4103", "إيرادات خصومات السائقين", "Driver deductions income", "Revenue", "4", null),
+        new("4104", "الخصم المسموح به", "Discount allowed", "Revenue", "4", null),
+        new("5", "المصروفات", "Expenses", "Expense", null, null),
+        new("51", "تكاليف النقل المباشرة", "Direct transport costs", "Expense", "5", null),
+        new("5101", "أجور السائقين", "Driver wage expense", "Expense", "51", null),
+        new("5102", "تكلفة النقل لدى الشركاء", "Partner (subcontracted haulage) cost", "Expense", "51", null),
+        new("5103", "الوقود", "Fuel", "Expense", "51", null),
+        new("5104", "صيانة الشاحنات وقطع الغيار", "Truck maintenance and spare parts", "Expense", "51", null),
+        new("5105", "تأمين وترخيص الشاحنات", "Truck insurance and licensing", "Expense", "51", null),
+        new("52", "المصاريف الإدارية والعمومية", "General and administrative expenses", "Expense", "5", null),
+        new("5201", "الرواتب والأجور الإدارية", "Administrative salaries and wages", "Expense", "52", null),
+        new("5202", "الإيجارات", "Rent", "Expense", "52", null),
+        new("5203", "الاتصالات والإنترنت", "Communications and internet", "Expense", "52", null),
+        new("5204", "الرسوم والاشتراكات", "Fees and subscriptions", "Expense", "52", null),
+        new("5205", "مصروف الإهلاك", "Depreciation expense", "Expense", "52", null),
+        new("5206", "العمولات والمصاريف البنكية", "Bank charges", "Expense", "52", null),
+        new("5299", "مصاريف أخرى", "Other expenses", "Expense", "52", null),
+    ];
+
+    /// <summary>Default posting-key mapping (draft §2).</summary>
+    public static readonly IReadOnlyDictionary<string, string> Mapping = new Dictionary<string, string>
+    {
+        [PostingKeys.DriverWageExpense] = "5101",
+        [PostingKeys.DriverPayable] = "2102",
+        [PostingKeys.PartnerCostExpense] = "5102",
+        [PostingKeys.PartnerPayable] = "2103",
+        [PostingKeys.TradeReceivables] = "110301",
+        [PostingKeys.DiscountAllowed] = "4104",
+        [PostingKeys.TransportRevenue] = "4101",
+        [PostingKeys.OtherRevenue] = "4102",
+        [PostingKeys.SalesTaxOutput] = "2104",
+        [PostingKeys.SalesTaxInput] = "1105",
+        [PostingKeys.DriverAdvances] = "1104",
+        [PostingKeys.DriverDeductions] = "4103",
+        [PostingKeys.OpeningBalanceDifference] = "3103",
+    };
+
+    /// <summary>An account is postable when no other template account names it as parent.</summary>
+    public static bool IsLeaf(string code) => Accounts.All(a => a.ParentCode != code);
+}

@@ -1,6 +1,8 @@
 # Built-in Transport Chart of Accounts — DRAFT for owner approval (D-10)
 
-_Status: **waiting for owner approval. Not seeded.** Prepared 8 Oct 2026. FR-107 requires a built-in transport chart template for new companies (also offered in onboarding step 4 and REL-09). The PRD does not list its accounts; per D-10 I draft it here. After your approval it is created for a company when the Owner/Administrator picks "Start from the transport template" (it is per-company data, not a migration seed)._
+_Status: **APPROVED by the owner on 8 Oct 2026 as drafted, including the choices on points 1–3 (§3). Seeded as the built-in template in B2** (`src/DirectService.Transportation.Application/Accounting/ChartTemplate.cs`, applied by `POST /api/v1/companies/{company}/accounting/accounts/template`). The file name keeps "DRAFT" so existing links stay valid._
+
+_Original note:_ _Prepared 8 Oct 2026. FR-107 requires a built-in transport chart template for new companies (also offered in onboarding step 4 and REL-09). The PRD does not list its accounts; per D-10 I draft it here. After your approval it is created for a company when the Owner/Administrator picks "Start from the transport template" (it is per-company data, not a migration seed)._
 
 Conventions: numeric codes by level (1 digit class · 2 group · 4 account · 6 sub-account); only leaf accounts are postable (FR-107/108); a child has its parent's type (design rule); Arabic and English names both filled (D-07); control accounts carry the party type their lines must name (FR-106, G-17).
 

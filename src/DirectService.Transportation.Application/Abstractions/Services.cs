@@ -54,6 +54,12 @@ public interface INumberingService
     /// the sequence row until the caller's transaction ends. Throws when no transaction is active.
     /// </summary>
     Task<string> NextAsync(string documentType, CancellationToken ct);
+
+    /// <summary>
+    /// Takes the same update lock without issuing a number, so an operation (e.g. closing a period) waits for the
+    /// documents being issued and blocks new ones until its transaction ends.
+    /// </summary>
+    Task LockAsync(string documentType, CancellationToken ct);
 }
 
 /// <summary>Refuses activity dated in a closed period (BR-036, FR-133).</summary>

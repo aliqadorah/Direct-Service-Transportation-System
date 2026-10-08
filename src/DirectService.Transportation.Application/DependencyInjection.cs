@@ -1,4 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Identity;
@@ -36,6 +37,21 @@ public static class DependencyInjection
         services.AddScoped<RecordLockService>();
         services.AddScoped<IRecordLockGuard>(sp => sp.GetRequiredService<RecordLockService>());
         services.AddScoped<IPeriodGuard, PeriodGuard>();
+
+        // Accounting core and posting engine (B2)
+        services.AddScoped<PostingEngine>();
+        services.AddScoped<PostingSources>();
+        services.AddScoped<PendingPostingService>();
+        services.AddScoped<PartyResolver>();
+        services.AddScoped<ChartOfAccountsService>();
+        services.AddScoped<OpeningBalanceService>();
+        services.AddScoped<PostingKeyService>();
+        services.AddScoped<CashBankService>();
+        services.AddScoped<PeriodService>();
+        services.AddScoped<JournalService>();
+        services.AddScoped<JournalExportService>();
+        services.AddScoped<ChartImportService>();
+        services.AddScoped<JournalImportService>();
         return services;
     }
 }

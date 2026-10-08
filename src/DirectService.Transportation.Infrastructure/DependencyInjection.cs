@@ -1,6 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Infrastructure.Email;
+using DirectService.Transportation.Infrastructure.Files;
 using DirectService.Transportation.Infrastructure.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
@@ -55,6 +56,7 @@ public static class DependencyInjection
         services.AddSingleton<IUrlTokenService, UrlTokenService>();
         services.AddScoped<INumberingService, NumberingService>();
         services.AddScoped<IEntityResolver, EntityResolver>();
+        services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.Section));
         services.AddSingleton<IEmailSender, FileEmailSender>();
         return services;

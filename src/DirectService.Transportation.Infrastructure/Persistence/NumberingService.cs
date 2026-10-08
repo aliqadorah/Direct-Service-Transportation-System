@@ -34,4 +34,18 @@ public sealed class NumberingService(MasterDbContext db, IDataScope scope) : INu
 
         return DocumentTypes.Format(row.Prefix, row.Digits, row.NextNumber);
     }
+
+    public async Task LockAsync(string documentType, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("The sequence lock must be taken inside a transaction.");
+        var companyId = scope.CompanyId ?? throw new InvalidOperationException("No company in scope.");
+        var locked = await db.Database.SqlQuery<long>($"""
+            SELECT Id AS Value
+            FROM cfg.NumberSequences WITH (UPDLOCK, ROWLOCK)
+            WHERE CompanyId = {companyId} AND DocumentType = {documentType} AND IsDeleted = 0
+            """).ToListAsync(ct).ConfigureAwait(false);
+        if (locked.Count == 0)
+            throw new InvalidOperationException($"Number sequence {documentType} is missing for company {companyId}.");
+    }
 }

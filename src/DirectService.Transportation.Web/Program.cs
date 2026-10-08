@@ -66,7 +66,10 @@ builder.Services.AddRateLimiter(o =>
 });
 
 if (config.GetValue("Jobs:Enabled", true))
+{
     builder.Services.AddHostedService<LockExpiryWorker>();
+    builder.Services.AddHostedService<PendingPostingWorker>();
+}
 
 var app = builder.Build();
 
@@ -113,6 +116,7 @@ var company = api.MapGroup("/companies/{company}").AddEndpointFilter<WriteGuardF
 company.MapUserAdminEndpoints();
 company.MapSettingsEndpoints();
 company.MapLockEndpoints();
+company.MapAccountingEndpoints();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);
