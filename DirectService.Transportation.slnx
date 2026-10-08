@@ -4,8 +4,11 @@
     <Project Path="src/DirectService.Transportation.Contracts/DirectService.Transportation.Contracts.csproj" />
     <Project Path="src/DirectService.Transportation.Domain/DirectService.Transportation.Domain.csproj" />
     <Project Path="src/DirectService.Transportation.Infrastructure/DirectService.Transportation.Infrastructure.csproj" />
+    <Project Path="src/DirectService.Transportation.Web/DirectService.Transportation.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DirectService.Transportation.Api.Tests/DirectService.Transportation.Api.Tests.csproj" />
+    <Project Path="tests/DirectService.Transportation.Application.Tests/DirectService.Transportation.Application.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Domain.Tests/DirectService.Transportation.Domain.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Infrastructure.Tests/DirectService.Transportation.Infrastructure.Tests.csproj" />
   </Folder>

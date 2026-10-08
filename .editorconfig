@@ -3,6 +3,8 @@
 [*.cs]
 # Entity names follow the approved database design (core.Permissions, core.RolePermissions).
 dotnet_diagnostic.CA1711.severity = none
+# The solution is C# only; Visual Basic keyword conflicts (Set, Date) do not apply.
+dotnet_diagnostic.CA1716.severity = none
 # Entity and DTO collections are settable for EF Core materialisation.
 dotnet_diagnostic.CA2227.severity = none
 # Entities intentionally use mutable collections and arrays (RowVersion, binary columns) mapped by EF Core.
@@ -22,3 +24,7 @@ dotnet_diagnostic.CA1861.severity = none
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2007.severity = none
+
+# API tests: in-memory TestServer calls complete immediately; per-call cancellation tokens add noise.
+[tests/DirectService.Transportation.Api.Tests/**.cs]
+dotnet_diagnostic.xUnit1051.severity = none

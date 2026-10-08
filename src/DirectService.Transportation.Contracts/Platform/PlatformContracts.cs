@@ -1,0 +1,47 @@
+namespace DirectService.Transportation.Contracts.Platform;
+
+public sealed record TenantResponse(
+    string Name, string Status, string PlanCode, string PlanName, DateTime? TrialEndsAt, DateTime? CurrentPeriodEnd,
+    int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string RowVersion);
+
+public sealed record TenantSecurityRequest(int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string? RowVersion);
+
+public sealed record CompanyResponse(string Id, string Name, string? NameEn, string Status, bool IsDemo, DateTime CreatedAt, string RowVersion);
+public sealed record CreateCompanyRequest(string Name, string? NameEn);
+
+// ---- company settings (settings.manage, FR-168)
+
+public sealed record CompanyProfileResponse(
+    string Name, string? NameEn, string? TaxNumber, string? CommercialRegNo, string? Address, string? Phone, string? Email,
+    bool HasLogo, string RowVersion);
+
+public sealed record CompanyProfileRequest(
+    string Name, string? NameEn, string? TaxNumber, string? CommercialRegNo, string? Address, string? Phone, string? Email, string? RowVersion);
+
+public sealed record MarketSettingsResponse(
+    string CountryCode, string CurrencyCode, int CurrencyDecimals, decimal TaxRate, bool TaxInclusive, string TimeZone,
+    string PhonePattern, string IbanPattern, string RowVersion);
+
+public sealed record MarketSettingsRequest(
+    string CountryCode, string CurrencyCode, int CurrencyDecimals, decimal TaxRate, bool TaxInclusive, string TimeZone,
+    string PhonePattern, string IbanPattern, string? RowVersion);
+
+public sealed record OperationSettingsResponse(
+    bool BillOnUnloadedWeight, bool PayDriverOnLoadedWeight, decimal ShortageTolerancePct, bool LockTariffs,
+    bool InvoiceApproval, bool AccrueDriverWage, DateTime? MigrationCompletedAt);
+
+/// <summary>FR-170: changing a weight-basis setting requires <see cref="ConfirmWeightBasisChange"/> = true.</summary>
+public sealed record OperationSettingsRequest(
+    bool BillOnUnloadedWeight, bool PayDriverOnLoadedWeight, decimal ShortageTolerancePct, bool LockTariffs,
+    bool InvoiceApproval, bool AccrueDriverWage, bool ConfirmWeightBasisChange);
+
+public sealed record NumberSequenceResponse(string Id, string DocumentType, string Prefix, int Digits, long NextNumber, string NextFormatted, string RowVersion);
+public sealed record NumberSequenceRequest(string Prefix, int Digits, long NextNumber, string? RowVersion);
+
+/// <summary>FR-171: irreversible; <see cref="Confirm"/> must be true.</summary>
+public sealed record MigrationCompleteRequest(bool Confirm);
+
+// ---- record locks (FR-186)
+
+public sealed record AcquireLockRequest(string EntityType, string Id);
+public sealed record LockResponse(string Id, string HolderName, bool HeldByMe, DateTime AcquiredAt);

@@ -46,11 +46,13 @@ public sealed class DataScope : IDataScope
 /// <summary>Default implementation of <see cref="IChangeContext"/>.</summary>
 public sealed class ChangeContext : IChangeContext
 {
-    private readonly ConditionalWeakTable<object, string> _actions = [];
+    private readonly ConditionalWeakTable<object, Tuple<string, string?>> _actions = [];
 
-    public void SetAction(object entity, string action) => _actions.AddOrUpdate(entity, action);
+    public void SetAction(object entity, string action, string? reason = null) => _actions.AddOrUpdate(entity, Tuple.Create(action, reason));
 
-    public string? GetAction(object entity) => _actions.TryGetValue(entity, out var a) ? a : null;
+    public string? GetAction(object entity) => _actions.TryGetValue(entity, out var a) ? a.Item1 : null;
+
+    public string? GetReason(object entity) => _actions.TryGetValue(entity, out var a) ? a.Item2 : null;
 
     public void Reset() => _actions.Clear();
 }

@@ -14,7 +14,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence;
 /// <see cref="QueryFilters.Tenant"/> and (company-scoped tables) <see cref="QueryFilters.Company"/>.
 /// </summary>
 public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options, IDataScope scope)
-    : DbContext(options)
+    : DbContext(options), IAppDbContext
 {
     /// <summary>Database collation approved at checkpoint 1 (A-19 / Q-07).</summary>
     public const string Collation = "Arabic_100_CI_AI_SC_UTF8";

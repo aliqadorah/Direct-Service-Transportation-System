@@ -324,8 +324,9 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
 
     // ------------------------------------------------------------------ audit
 
-    private static void Track(EntityEntry entry, string action, State state)
+    private void Track(EntityEntry entry, string action, State state)
     {
+        var reason = changes.GetReason(entry.Entity);
         if (NotAudited.Contains(entry.Entity.GetType()) || entry.Entity is IAppendOnly) return;
         Dictionary<string, object?>? oldValues = null;
         Dictionary<string, object?> newValues = [];
@@ -346,6 +347,7 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
             }
         }
         if (entry.State != EntityState.Added && newValues.Count == 0) return;
+        if (!string.IsNullOrWhiteSpace(reason)) newValues["_reason"] = reason;
         state.Pending.Add((entry, action, oldValues, newValues));
     }
 

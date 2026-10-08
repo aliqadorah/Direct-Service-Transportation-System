@@ -1,0 +1,193 @@
+using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Contracts.Common;
+using DirectService.Transportation.Contracts.Errors;
+using DirectService.Transportation.Contracts.Identity;
+using DirectService.Transportation.Contracts.Security;
+using DirectService.Transportation.Domain.Core;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+namespace DirectService.Transportation.Application.Identity;
+
+/// <summary>
+/// User administration in the current company (core.users.manage; FR-174, US-32): assign/remove the
+/// company role, disable/enable, unlock, send password reset, archive, reset 2FA, sign out. Enforces
+/// BR-001 (a tenant always keeps an active Owner), BR-002 (each company keeps an active user with
+/// users.manage) and BR-003 (users are never deleted). Every action is audited with its reason.
+/// </summary>
+public sealed class UserAdminService(
+    IAppDbContext db, IRequestContext ctx, IChangeContext changes, AccessService access, SessionService sessions,
+    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard)
+{
+    private static readonly string[] TenantFilter = ["Tenant"];
+
+    public async Task<PagedResult<UserListItem>> ListAsync(string? search, PageRequest page, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        var companyId = ctx.CompanyId!.Value;
+        var q = db.Set<UserCompanyRole>().AsNoTracking().Where(r => r.CompanyId == companyId && !r.User.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            q = q.Where(r => r.User.FullName.Contains(s) || r.User.Email.Contains(s));
+        }
+        var total = await q.CountAsync(ct).ConfigureAwait(false);
+        var rows = await q.OrderBy(r => r.User.FullName).Skip(page.Skip).Take(page.SafePageSize)
+            .Select(r => new
+            {
+                r.User.PublicId, r.User.FullName, r.User.Email, r.User.Status, r.User.LockedUntil, r.User.TwoFactorEnabledAt,
+                r.User.EmailConfirmedAt, r.User.LastSignInAt, r.User.RowVersion, RolePublicId = r.Role.PublicId, RoleName = r.Role.Name,
+            })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var now = DateTime.UtcNow;
+        var items = rows.Select(u => new UserListItem(tokens.Encode<User>(u.PublicId), u.FullName, u.Email, u.Status,
+            new Ref(tokens.Encode<Role>(u.RolePublicId), u.RoleName), u.LockedUntil > now, u.TwoFactorEnabledAt is not null,
+            u.EmailConfirmedAt is not null, u.LastSignInAt, Convert.ToBase64String(u.RowVersion))).ToList();
+        return new PagedResult<UserListItem>(items, page.SafePage, page.SafePageSize, total);
+    }
+
+    public async Task AssignRoleAsync(string userToken, string roleToken, CancellationToken ct)
+    {
+        var (user, link) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        var role = await RoleByTokenAsync(roleToken, ct).ConfigureAwait(false);
+        if (link.RoleId == role.Id) return;
+        guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // no escalation (SR-01)
+        await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: link.CompanyId, ct, newRole: role).ConfigureAwait(false);
+        if (!role.RolePermissions.Any(p => p.Permission.PermissionKey == PermissionKeys.UsersManage))
+            await EnsureUserManagerKeptAsync(link.CompanyId, user.Id, ct).ConfigureAwait(false);
+        link.RoleId = role.Id;
+        changes.SetAction(link, "RoleChange");
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await AfterAccessChangeAsync(user.Id, "Role changed", ct).ConfigureAwait(false);
+    }
+
+    public async Task RemoveFromCompanyAsync(string userToken, string reason, CancellationToken ct)
+    {
+        RequireReason(reason);
+        var (user, link) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: link.CompanyId, ct).ConfigureAwait(false);
+        await EnsureUserManagerKeptAsync(link.CompanyId, user.Id, ct).ConfigureAwait(false);
+        link.DeleteReason = reason;
+        db.Set<UserCompanyRole>().Remove(link);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await AfterAccessChangeAsync(user.Id, "Removed from company", ct).ConfigureAwait(false);
+    }
+
+    public Task DisableAsync(string userToken, string reason, CancellationToken ct) => SetStatusAsync(userToken, "Disabled", "Disable", reason, ct);
+
+    public Task EnableAsync(string userToken, CancellationToken ct) => SetStatusAsync(userToken, "Active", "Enable", null, ct);
+
+    /// <summary>BR-003: users are archived, never deleted.</summary>
+    public Task ArchiveAsync(string userToken, string reason, CancellationToken ct) => SetStatusAsync(userToken, "Archived", "Archive", reason, ct);
+
+    public async Task UnlockAsync(string userToken, CancellationToken ct)
+    {
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        user.LockedUntil = null;
+        user.FailedSignInCount = 0;
+        changes.SetAction(user, "Unlock");
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task SendPasswordResetAsync(string userToken, CancellationToken ct)
+    {
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        await accounts.SendPasswordResetAsync(user, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>FR-177: resetting a user's 2FA requires users.manage and is audited; the user sets it up again at next sign-in.</summary>
+    public async Task ResetTwoFactorAsync(string userToken, string reason, CancellationToken ct)
+    {
+        RequireReason(reason);
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        changes.SetAction(user, "TwoFactorReset", reason);
+        user.TwoFactorEnabledAt = null;
+        user.TwoFactorSecret = null;
+        await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 0).ConfigureAwait(false); // soft-deletes the old codes
+        await users.UpdateSecurityStampAsync(user).ConfigureAwait(false);
+        await sessions.RevokeAllAsync(user.Id, "Two-factor authentication reset", null, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>FR-176: administrators can sign out any user.</summary>
+    public async Task SignOutAsync(string userToken, CancellationToken ct)
+    {
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        await sessions.RevokeAllAsync(user.Id, "Signed out by an administrator", null, ct).ConfigureAwait(false);
+    }
+
+    // ------------------------------------------------------------------ rules
+
+    private async Task SetStatusAsync(string userToken, string status, string action, string? reason, CancellationToken ct)
+    {
+        if (status != "Active") RequireReason(reason);
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        if (user.Status == status) return;
+        if (status != "Active")
+        {
+            await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: null, ct).ConfigureAwait(false);
+            var companies = await db.Set<UserCompanyRole>().AsNoTracking().Where(r => r.UserId == user.Id).Select(r => r.CompanyId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var c in companies) await EnsureUserManagerKeptAsync(c, user.Id, ct).ConfigureAwait(false);
+        }
+        user.Status = status;
+        changes.SetAction(user, action, reason);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (status != "Active") await AfterAccessChangeAsync(user.Id, action, ct).ConfigureAwait(false);
+        else access.Invalidate(user.Id);
+    }
+
+    /// <summary>BR-001: after the change at least one other active user must hold the Owner role in an active company.</summary>
+    private async Task EnsureOwnerKeptAsync(long userId, long? losingOwnerIn, CancellationToken ct, Role? newRole = null)
+    {
+        if (newRole is { IsPreset: true, Name: PresetRoles.Owner }) return;
+        var ownerLinks = await db.Set<UserCompanyRole>().AsNoTracking()
+            .Where(r => r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted && r.Company.Status == "Active")
+            .Select(r => new { r.UserId, r.CompanyId }).ToListAsync(ct).ConfigureAwait(false);
+        var isOwner = ownerLinks.Any(o => o.UserId == userId && (losingOwnerIn is null || o.CompanyId == losingOwnerIn));
+        if (!isOwner) return;
+        var remaining = ownerLinks.Where(o => !(o.UserId == userId && (losingOwnerIn is null || o.CompanyId == losingOwnerIn)));
+        if (!remaining.Any()) throw Fail.Rule(ErrorCodes.LastOwner);
+    }
+
+    /// <summary>BR-002: the company must keep another active user whose role has users.manage.</summary>
+    private async Task EnsureUserManagerKeptAsync(long companyId, long excludingUserId, CancellationToken ct)
+    {
+        var others = await db.Set<UserCompanyRole>().AsNoTracking()
+            .AnyAsync(r => r.CompanyId == companyId && r.UserId != excludingUserId && r.User.Status == "Active" && !r.User.IsDeleted
+                && r.Role.RolePermissions.Any(p => p.Permission.PermissionKey == PermissionKeys.UsersManage), ct).ConfigureAwait(false);
+        if (!others) throw Fail.Rule(ErrorCodes.LastUserManager);
+    }
+
+    private async Task AfterAccessChangeAsync(long userId, string reason, CancellationToken ct)
+    {
+        access.Invalidate(userId);
+        await sessions.RevokeAllAsync(userId, reason, null, ct).ConfigureAwait(false); // SEC-03
+    }
+
+    /// <summary>The target user must hold a role in the current company; otherwise 404.</summary>
+    private async Task<(User User, UserCompanyRole Link)> TargetAsync(string userToken, CancellationToken ct)
+    {
+        var publicId = tokens.Decode<User>(userToken) ?? throw Fail.NotFound();
+        var link = await db.Set<UserCompanyRole>().Include(r => r.User)
+            .SingleOrDefaultAsync(r => r.CompanyId == ctx.CompanyId && r.User.PublicId == publicId && !r.User.IsDeleted, ct).ConfigureAwait(false)
+            ?? throw Fail.NotFound();
+        await guard.EnsureCanManageUserAsync(link.UserId, ct).ConfigureAwait(false); // Owner-level users only by Owners (SR-01)
+        return (link.User, link);
+    }
+
+    private async Task<Role> RoleByTokenAsync(string roleToken, CancellationToken ct)
+    {
+        var publicId = tokens.Decode<Role>(roleToken) ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+        return await db.Set<Role>().Include(r => r.RolePermissions).ThenInclude(p => p.Permission)
+            .SingleOrDefaultAsync(r => r.PublicId == publicId, ct).ConfigureAwait(false)
+            ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+    }
+
+    private static void RequireReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) throw Fail.Field("reason", ErrorCodes.ReasonRequired);
+        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, "reason");
+    }
+
+    internal static void RequireReasonPublic(string? reason) => RequireReason(reason);
+}

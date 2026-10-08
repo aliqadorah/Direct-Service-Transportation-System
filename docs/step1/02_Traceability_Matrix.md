@@ -9,7 +9,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 - **Screens** — `SCR-xx` from the screen catalogue (§A). `—` = none (with reason).
 - **Tests** — U = unit · I = integration (database + transaction) · S = security/isolation · E = end-to-end UI (Playwright, Arabic RTL + English) · P = performance · O = operational/manual procedure (not automatable in code).
 - **N/A** is always given with a reason.
-- **St** — status: ☐ not started · ◐ in progress · ☑ done.
+- **St** — status: ☐ not started · ◐ backend implemented and tested (UI / E2E pending, steps 8–9) · ☑ done (no UI part, or fully done). Updated per block; see `docs/step4/B*_*.md` for the test names.
 
 ---
 
@@ -332,17 +332,17 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-168 | Settings screen; changes audited | M | M03 | Companies, CompanySettings, AuditLogs | CompanySettingsService | SCR-70 | I E | ☐ |
-| FR-169 | Next number never at/below issued; prefix for new docs | M | M03 | NumberSequences | NumberingService | SCR-72 | U I | ☐ |
-| FR-170 | Weight-basis change applies to new trips after confirmation | M | M03 | CompanySettings | CompanySettingsService | SCR-70 | I | ☐ |
-| FR-171 | Mark data migration complete (irreversible) | M | M03/M08 | Companies.MigrationCompletedAt | CompanySettingsService | SCR-70 | I | ☐ |
-| FR-172 | Invitations; 7-day expiry; resend/cancel | M | M02 | Invitations | InvitationService, IEmailSender | SCR-76 | I E | ☐ |
-| FR-173 | Preset/custom roles; delete rules | M | M02 | Roles, RolePermissions, UserCompanyRoles | RoleService | SCR-76 | I | ☐ |
-| FR-174 | Edit, disable, unlock, reset, archive users; BR-001…003 | M | M02 | Users, UserCompanyRoles | UserAdminService | SCR-76 | I S | ☐ |
-| FR-175 | Password policy; 5 failures → 15-min lock | M | M02 | Users.FailedSignInCount/LockedUntil (G-01) | Identity options, UserStore | SCR-01 | I S | ☐ |
-| FR-176 | Session expiry; active sessions; sign out all | M | M02 | UserSessions (G-01) | SessionService | SCR-08, SCR-76 | I S | ☐ |
-| FR-177 | Mandatory 2FA; recovery codes; reset audited | M | M02 | Users.TwoFactorSecret/TwoFactorEnabledAt, UserRecoveryCodes | TwoFactorService | SCR-01, SCR-05, SCR-76 | I S E | ☐ |
-| FR-178 | User preferences | M | M02 | Users.LanguageCode/DefaultCompanyId/DateFormat | UserProfileService | SCR-08 | I | ☐ |
+| FR-168 | Settings screen; changes audited | M | M03 | Companies, CompanySettings, AuditLogs | CompanySettingsService | SCR-70 | I E | ◐ |
+| FR-169 | Next number never at/below issued; prefix for new docs | M | M03 | NumberSequences | NumberingService | SCR-72 | U I | ◐ |
+| FR-170 | Weight-basis change applies to new trips after confirmation | M | M03 | CompanySettings | CompanySettingsService | SCR-70 | I | ◐ |
+| FR-171 | Mark data migration complete (irreversible) | M | M03/M08 | Companies.MigrationCompletedAt | CompanySettingsService | SCR-70 | I | ◐ |
+| FR-172 | Invitations; 7-day expiry; resend/cancel | M | M02 | Invitations | InvitationService, IEmailSender | SCR-76 | I E | ◐ |
+| FR-173 | Preset/custom roles; delete rules | M | M02 | Roles, RolePermissions, UserCompanyRoles | RoleService | SCR-76 | I | ◐ |
+| FR-174 | Edit, disable, unlock, reset, archive users; BR-001…003 | M | M02 | Users, UserCompanyRoles | UserAdminService | SCR-76 | I S | ◐ |
+| FR-175 | Password policy; 5 failures → 15-min lock | M | M02 | Users.FailedSignInCount/LockedUntil (G-01) | Identity options, UserStore | SCR-01 | I S | ◐ |
+| FR-176 | Session expiry; active sessions; sign out all | M | M02 | UserSessions (G-01) | SessionService | SCR-08, SCR-76 | I S | ◐ |
+| FR-177 | Mandatory 2FA; recovery codes; reset audited | M | M02 | Users.TwoFactorSecret/TwoFactorEnabledAt, UserRecoveryCodes | TwoFactorService | SCR-01, SCR-05, SCR-76 | I S E | ◐ |
+| FR-178 | User preferences | M | M02 | Users.LanguageCode/DefaultCompanyId/DateFormat | UserProfileService | SCR-08 | I | ◐ |
 | FR-179 | Custom fields definition | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☐ |
 | FR-180 | Custom fields appear everywhere | M | M03 | CustomFieldDefinitions, *.CustomValues | CustomFieldService | SCR-10…12, SCR-60, SCR-61, SCR-52, SCR-09 | I E | ☐ |
 | FR-181 | Field with data: hide only, type fixed | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☐ |
@@ -350,7 +350,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-183 | Default and personal column views | M | M03 | TableColumnViews | ColumnViewService | SCR-10, SCR-75 | I | ☐ |
 | FR-184 | Preview configured form | S | M03 | — | — (UI) | SCR-75 | E | ☐ |
 | FR-185 | Live changes within seconds | M | M13 | — | RealtimeHub (SignalR) | SCR-00, all lists | I E | ☐ |
-| FR-186 | Record locking; read-only for others | M | M13 | RecordLocks | RecordLockService | All edit forms | I E | ☐ |
+| FR-186 | Record locking; read-only for others | M | M13 | RecordLocks | RecordLockService | All edit forms | I E | ◐ |
 | FR-187 | Global search with Arabic variants; respects permissions | M | M13 | TRN_Trips, TRN_Drivers, TRN_Customers, TRN_Partners, document tables | GlobalSearchService (A-12) | SCR-00 | U I S | ☐ |
 | FR-188 | Company audit log of all listed actions | M | M13/X | AuditLogs | AuditInterceptor, AuditService | SCR-77 | I | ☐ |
 | FR-189 | Audit log read-only; filters; export | M | M13 | AuditLogs | AuditQueries | SCR-77 | I S | ☐ |
@@ -393,7 +393,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-29 | Global search | FR-187 | SCR-00 | E | ☐ |
 | US-30 | Record history and audit | FR-015, 166, 188, 189 | SCR-77, history panels | E | ☐ |
 | US-31 | Sign-up and guided setup | 5.4, G-10 | SCR-02, SCR-03, SCR-05, SCR-06 | E | ☐ |
-| US-32 | Invite users and assign roles | FR-172–174 | SCR-76 | E | ☐ |
+| US-32 | Invite users and assign roles | FR-172–174 | SCR-76 | E | ◐ |
 | US-33 | Manage subscription | 5.3, BR-012 | SCR-80 | E | ☐ |
 | US-34 | Multiple companies | 5.1 | SCR-00, SCR-81 | E S | ☐ |
 
@@ -401,7 +401,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|
-| P-01 | Tenant → companies → users; tenant and company isolation; company switcher (5.1) | M01/X | Tenants, Companies, UserCompanyRoles; TenantId/CompanyId on every table | TenantContext, global query filters | SCR-00, SCR-81 | S I | ☐ |
+| P-01 | Tenant → companies → users; tenant and company isolation; company switcher (5.1) | M01/X | Tenants, Companies, UserCompanyRoles; TenantId/CompanyId on every table | TenantContext, global query filters | SCR-00, SCR-81 | S I | ◐ |
 | P-02 | Tenant lifecycle Trial 14 d / Active / PastDue 7 d / Suspended / Cancelled 30 d → retention 90 d / Deleted (5.2) | M01 | Tenants (Status, TrialEndsAt, GraceEndsAt, CancelledAt, RetentionEndsAt) | TenantLifecycleJob (G-07, G-18) | SCR-80, SCR-90 | U I | ☐ |
 | P-03 | Plans with limits, defined in the console (5.3) | M01 | Plans | PlanService | SCR-91 | I | ☐ |
 | P-04 | Billing monthly/annual in advance via gateway (5.3) | M01 | Tenants.BillingCycle, SubscriptionInvoices | BillingService, IPaymentGateway (dev fake) | SCR-80 | I | ☐ |
@@ -417,17 +417,17 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | P-14 | Service announcements (5.5) | M01 | Announcements | AnnouncementService | SCR-93, SCR-00 | I | ☐ |
 | P-15 | Platform health metrics (5.5) | M01 | — (metrics, health checks) | HealthEndpoints | SCR-94 | I | ☐ |
 | P-16 | Full company export: Excel + JSON package (5.6, DX-04) | M14 | all company tables | CompanyExportJob | SCR-82 | I | ☐ |
-| P-17 | Sign-up creates tenant, Owner, first company; trial starts (9.1) | M01/M02 | Tenants, Users, Companies, Roles, RolePermissions, UserCompanyRoles, TermsAcceptances | SignUpService | SCR-02 | I E | ☐ |
+| P-17 | Sign-up creates tenant, Owner, first company; trial starts (9.1) | M01/M02 | Tenants, Users, Companies, Roles, RolePermissions, UserCompanyRoles, TermsAcceptances | SignUpService | SCR-02 | I E | ◐ |
 
 ## F. Business rules
 
 | ID | Rule | Mod | DB enforcement | Code | Tests | St |
 |---|---|---|---|---|---|---|
-| BR-001 | ≥ 1 active Owner per tenant | M02 | — | UserAdminService | U I | ☐ |
-| BR-002 | ≥ 1 active user with users.manage per company | M02 | — | UserAdminService | U I | ☐ |
-| BR-003 | Users with actions never deleted; disable/archive | M02 | Users.Status | UserAdminService | I | ☐ |
+| BR-001 | ≥ 1 active Owner per tenant | M02 | — | UserAdminService | U I | ☑ |
+| BR-002 | ≥ 1 active user with users.manage per company | M02 | — | UserAdminService | U I | ☑ |
+| BR-003 | Users with actions never deleted; disable/archive | M02 | Users.Status | UserAdminService | I | ☑ |
 | BR-004 | Manual rate / tariff deviation under lock need masters.manage | M06 | — | TripValidator | U S | ☐ |
-| BR-010 | Suspended tenant read-only | M01 | — | TenantStatusGuard | I S | ☐ |
+| BR-010 | Suspended tenant read-only | M01 | — | TenantStatusGuard | I S | ◐ |
 | BR-011 | Reactivation restores access, no data change | M01 | — | TenantLifecycleService | I | ☐ |
 | BR-012 | Downgrade refused while over limits (listed) | M01 | — | PlanChangeService | U | ☐ |
 | BR-013 | Limits never block view/print/export | M01 | — | PlanLimitGuard | U | ☐ |
@@ -450,12 +450,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-034 | Entry dated with source date; closed period refused | M07 | Periods | PostingEngine, PeriodGuard | I | ☐ |
 | BR-035 | Edit trip/advance = reverse + new entry | M07 | JournalEntries reversal links | PostingEngine | I | ☐ |
 | BR-036 | Calendar-month periods; closed = no activity anywhere | M08 | Periods | PeriodGuard | I | ☐ |
-| BR-037 | Separate sequences with prefixes | M03 | NumberSequences (G-19) | NumberingService | I | ☐ |
-| BR-038 | Server numbers at approval, gap-free under concurrency | M03 | NumberSequences (UPDLOCK, ROWLOCK), UX numbers | NumberingService | I (TST-10) | ☐ |
-| BR-038a | Next number never ≤ issued | M03 | — | NumberingService | U | ☐ |
-| BR-039 | Lock on edit; release on close or 90 s idle | M13 | RecordLocks (UX active lock) | RecordLockService | I | ☐ |
+| BR-037 | Separate sequences with prefixes | M03 | NumberSequences (G-19) | NumberingService | I | ◐ |
+| BR-038 | Server numbers at approval, gap-free under concurrency | M03 | NumberSequences (UPDLOCK, ROWLOCK), UX numbers | NumberingService | I (TST-10) | ☑ |
+| BR-038a | Next number never ≤ issued | M03 | — | NumberingService | U | ☑ |
+| BR-039 | Lock on edit; release on close or 90 s idle | M13 | RecordLocks (UX active lock) | RecordLockService | I | ◐ |
 | BR-040 | No delete while referenced; counts; archive/void | X | All FKs ON DELETE NO ACTION | ReferenceGuard | I | ☐ |
-| BR-041 | Soft delete for all entities; restore; audited | X | IsDeleted/DeletedAt/DeletedBy/DeleteReason + CHECK; filtered UX | SoftDeleteInterceptor, global filters | I S | ☐ |
+| BR-041 | Soft delete for all entities; restore; audited | X | IsDeleted/DeletedAt/DeletedBy/DeleteReason + CHECK; filtered UX | SoftDeleteInterceptor, global filters | I S | ☑ |
 
 Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-068, FR-050, FR-079, FR-085, FR-110, FR-155 (same tests).
 
@@ -492,46 +492,46 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | NFR-08 | Browsers; A4 Arabic print/PDF; Excel compatibility | X | PdfRenderer, ExcelWriter | SCR-09 | E | ☐ |
 | NFR-09 | New market = configuration + connector | X | Companies market fields, EInvoiceSettings.Connector | SCR-70, SCR-73 | U | ☐ |
 | NFR-10 | Audit and financial records ≥ 7 years, unalterable | X | AuditLogs append-only; soft delete only | N/A | I | ☐ |
-| NFR-11 | .NET 10, latest C#/ASP.NET Core | X | solution targets net10.0 | N/A | build | ☐ |
+| NFR-11 | .NET 10, latest C#/ASP.NET Core | X | solution targets net10.0 | N/A | build | ☑ |
 | NFR-12 | Blazor Web App, RTL + English | X | Blazor Web App | all | E | ☐ |
-| NFR-13 | SQL Server 2025 + latest EF Core, versioned migrations | X | EF Core 10 migrations | N/A | I | ☐ |
-| NFR-14 | Layered architecture; rules in domain/application | X | step 2 | N/A | review | ☐ |
-| NFR-15 | Versioned API with OpenAPI | X | /api/v1, OpenAPI document | N/A | I | ☐ |
-| NFR-16 | SignalR live updates and locks | M13 | RealtimeHub | SCR-00 | I E | ☐ |
-| NFR-17 | Background jobs never block entry | X | hosted background job runner | N/A | I | ☐ |
-| NFR-18 | Structured logging, health checks, metrics; no secrets/PII in logs | X | logging setup, HealthEndpoints | SCR-94 | I | ☐ |
+| NFR-13 | SQL Server 2025 + latest EF Core, versioned migrations | X | EF Core 10 migrations | N/A | I | ☑ |
+| NFR-14 | Layered architecture; rules in domain/application | X | step 2 | N/A | review | ◐ |
+| NFR-15 | Versioned API with OpenAPI | X | /api/v1, OpenAPI document | N/A | I | ◐ |
+| NFR-16 | SignalR live updates and locks | M13 | RealtimeHub | SCR-00 | I E | ◐ |
+| NFR-17 | Background jobs never block entry | X | hosted background job runner | N/A | I | ◐ |
+| NFR-18 | Structured logging, health checks, metrics; no secrets/PII in logs | X | logging setup, HealthEndpoints | SCR-94 | I | ◐ |
 | NFR-19 | Every Section 8 rule tested on every build | X | test projects | N/A | U I | ☐ |
-| NFR-20 | Single Master Database; shared tables reused | X | schemas core/acc/cfg/trn | N/A | I (step 3 verification) | ☐ |
-| NFR-21 | Soft delete via global filter | X | SoftDeleteInterceptor, filters | N/A | I | ☐ |
+| NFR-20 | Single Master Database; shared tables reused | X | schemas core/acc/cfg/trn | N/A | I (step 3 verification) | ☑ |
+| NFR-21 | Soft delete via global filter | X | SoftDeleteInterceptor, filters | N/A | I | ☑ |
 | NFR-22 | Provider-neutral, container-ready, configuration-driven | X | Dockerfile, options pattern, interfaces | N/A | build | ☐ |
 
 ## I. Security
 
 | ID | Requirement | Mod | DB / Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|
-| SEC-01 | Email + password; Identity salted hash | M02 | Users.PasswordHash; custom UserStore | SCR-01 | I S | ☐ |
-| SEC-02 | Policy, lockout, mandatory 2FA | M02 | FR-175, FR-177 | SCR-01, SCR-05 | S E | ☐ |
-| SEC-03 | HTTP-only cookies, idle timeout, server session end, other sessions ended on reset/role change | M02 | UserSessions, SecurityStamp | SCR-08 | S | ☐ |
-| SEC-04 | Single-use, expiring links | M02 | Invitations.TokenHash/ExpiresAt; A-17 | SCR-03, SCR-04 | S | ☐ |
-| SEC-05 | Server-side tenant/company/permission check on every request | X | permission policies; TenantContext | N/A | S | ☐ |
-| SEC-06 | Data-layer filtering; cross-tenant tests every release | X | global query filters | N/A | S (TST-06) | ☐ |
+| SEC-01 | Email + password; Identity salted hash | M02 | Users.PasswordHash; custom UserStore | SCR-01 | I S | ◐ |
+| SEC-02 | Policy, lockout, mandatory 2FA | M02 | FR-175, FR-177 | SCR-01, SCR-05 | S E | ◐ |
+| SEC-03 | HTTP-only cookies, idle timeout, server session end, other sessions ended on reset/role change | M02 | UserSessions, SecurityStamp | SCR-08 | S | ◐ |
+| SEC-04 | Single-use, expiring links | M02 | Invitations.TokenHash/ExpiresAt; A-17 | SCR-03, SCR-04 | S | ◐ |
+| SEC-05 | Server-side tenant/company/permission check on every request | X | permission policies; TenantContext | N/A | S | ◐ |
+| SEC-06 | Data-layer filtering; cross-tenant tests every release | X | global query filters | N/A | S (TST-06) | ◐ |
 | SEC-07 | Provider access only via window | M01 | SupportAccessGrants | SCR-92, SCR-83 | S | ☐ |
 | SEC-08 | TLS 1.2+; encryption at rest | X | HTTPS config; TDE/backup encryption at deployment (DEF-01) | N/A | O | ☐ |
 | SEC-09 | Secrets in secret store / encrypted columns; never shown or logged | M10/X | EInvoiceSettings.*Encrypted, Users.TwoFactorSecret; Data Protection; user-secrets | SCR-73 | S | ☐ |
 | SEC-10 | Card data only at gateway | M01 | IPaymentGateway (hosted page) | SCR-80 | review | ☐ |
 | SEC-11 | Driver details in full to drv.view/masters.manage; exports audited | M04 | AuditLogs (export) | SCR-60 | S | ☐ |
-| SEC-12 | OWASP Top 10 protections | X | validation, EF parameters, encoding, antiforgery, headers | N/A | S | ☐ |
+| SEC-12 | OWASP Top 10 protections | X | validation, EF parameters, encoding, antiforgery, headers | N/A | S | ◐ |
 | SEC-13 | Upload type/size checks; formulas not executed | M14 | ImportService | SCR-12, SCR-30, SCR-33 | U S | ☐ |
-| SEC-14 | Rate limiting on sign-in, reset, API | X | ASP.NET Core rate limiter | N/A | I | ☐ |
+| SEC-14 | Rate limiting on sign-in, reset, API | X | ASP.NET Core rate limiter | N/A | I | ◐ |
 | SEC-15 | Dependency scanning every build; pen test before launch | X | `dotnet list package --vulnerable` in build | N/A | O | ☐ |
-| SEC-16 | Append-only audit log incl. sign-ins and support sessions | M13 | AuditLogs | SCR-77 | I S | ☐ |
+| SEC-16 | Append-only audit log incl. sign-ins and support sessions | M13 | AuditLogs | SCR-77 | I S | ◐ |
 | SEC-17 | Financial integrity server-side | M07 | CHECKs + services | N/A | U I | ☐ |
 | SEC-18 | Tenant owns data | M01 | P-16 export | SCR-82 | O | ☐ |
 | SEC-19 | Jordan PDPL; anonymise in place | M02/M04 | AnonymisationService (legal check deferred to owner) | SCR-60, SCR-76 | I | ☐ |
 | SEC-20 | Tax compliance (16 %, gap-free, e-invoicing, QR, 7 years) | M09/M10 | FR-043, FR-059…066 | — | I | ☐ |
-| SEC-21 | Terms and Privacy acceptance recorded | M01 | TermsAcceptances (G-20) | SCR-02 | I | ☐ |
-| SEC-22 | Hashed opaque ids in URLs; unknown → not found | X | PublicId + URL token encoder | all | S | ☐ |
-| SEC-23 | No hard deletes | X | SoftDeleteInterceptor | N/A | I S | ☐ |
+| SEC-21 | Terms and Privacy acceptance recorded | M01 | TermsAcceptances (G-20) | SCR-02 | I | ◐ |
+| SEC-22 | Hashed opaque ids in URLs; unknown → not found | X | PublicId + URL token encoder | all | S | ◐ |
+| SEC-23 | No hard deletes | X | SoftDeleteInterceptor | N/A | I S | ☑ |
 
 ## J. UI/UX
 
@@ -569,19 +569,19 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 |---|---|---|---|---|---|
 | INT-01 | National e-invoicing (JoFotara, UBL 2.1) | M10 | IEInvoiceConnector, JoFotaraConnector, simulated dev connector (A-15) | U I, TST-04 | ☐ |
 | INT-02 | Payment gateway (provider deferred) | M01 | IPaymentGateway + webhook endpoint; dev fake (A-14) | I | ☐ |
-| INT-03 | Email service (provider deferred), AR/EN templates | M02/X | IEmailSender; dev file sender (A-14) | I | ☐ |
-| API-01 | Every Section 7 feature via REST API for own UI | X | Minimal API / controllers per module | I | ☐ |
-| API-02 | /api/v1 + OpenAPI | X | API versioning, OpenAPI | I | ☐ |
-| API-03 | Every request authenticated, one tenant + company, permission checked | X | auth + policies | S | ☐ |
-| API-04 | Paging, sorting, filtering; no foreign ids | X | list contract | I S | ☐ |
-| API-05 | Idempotency on create/approve | X | G-13 | I | ☐ |
-| API-06 | Problem details in user language with field and code | X | error middleware | I | ☐ |
-| API-07 | Rate limiting per tenant | X | rate limiter partitioned by tenant | I | ☐ |
+| INT-03 | Email service (provider deferred), AR/EN templates | M02/X | IEmailSender; dev file sender (A-14) | I | ◐ |
+| API-01 | Every Section 7 feature via REST API for own UI | X | Minimal API / controllers per module | I | ◐ |
+| API-02 | /api/v1 + OpenAPI | X | API versioning, OpenAPI | I | ◐ |
+| API-03 | Every request authenticated, one tenant + company, permission checked | X | auth + policies | S | ◐ |
+| API-04 | Paging, sorting, filtering; no foreign ids | X | list contract | I S | ◐ |
+| API-05 | Idempotency on create/approve | X | G-13 | I | ◐ |
+| API-06 | Problem details in user language with field and code | X | error middleware | I | ◐ |
+| API-07 | Rate limiting per tenant | X | rate limiter partitioned by tenant | I | ◐ |
 | DX-01 | Import xlsx/CSV (trips, master data, chart, entries) | M14 | ImportService | I | ☐ |
 | DX-02 | Export lists/reports Excel, PDF | M14 | ExportService | I | ☐ |
 | DX-03 | Journal export JSON/CSV | M07 | JournalExportService | I | ☐ |
 | DX-04 | Company export Excel + JSON | M14 | CompanyExportJob | I | ☐ |
-| RT-01 | SignalR pushes to same-company users only | M13 | RealtimeHub (company groups) | S I | ☐ |
+| RT-01 | SignalR pushes to same-company users only | M13 | RealtimeHub (company groups) | S I | ◐ |
 | RT-02 | Auto-reconnect and refresh | M13 | client reconnect handler | E | ☐ |
 
 ## L. Testing, release, goals, confirmed values — N/A for code mapping (process items)

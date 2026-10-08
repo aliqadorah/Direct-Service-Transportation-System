@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 8 Oct 2026 (step 3 done; next: step 4 block B1 Foundation & identity)_
+_Last updated: 8 Oct 2026 (step 4 · B1 done; next: B2 Accounting core + posting engine)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -24,6 +24,8 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 2 | `docs/step2/01_Architecture_and_Build_Plan.md` (ADR-01…18, API design, security model, build order), `02_Owner_Decisions_Step2.md` |
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (waiting for approval) |
 | Design | `docs/design/Database_Design_Revision5.md` |
+| 4 | `docs/step4/B1_Foundation_and_Identity.md` (delivery, tests, code + security review) |
+| API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
 
 ## Completed steps
 - **Step 0 — Confirm inputs: done (8 Oct 2026).**
@@ -31,9 +33,17 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - **Step 2 — Architecture and build plan: approved (8 Oct 2026)** with Q-01…Q-10 answers.
 - **Step 3 — Database implementation: done (8 Oct 2026).** 66 entities + 66 Fluent configurations, `MasterDbContext` (named filters SoftDelete/Tenant/Company), `AuditSaveChangesInterceptor`, migration `InitialMasterDatabase` (rev. 5) applied to `localhost/DirectServiceMaster`, idempotent script `database/MasterDatabase_Idempotent.sql`, seed (22 permissions, TRIAL plan), verification report with **no differences** (66 tables, 1,410 columns, 302 defaults, 66 PKs, 418 FKs, 111 unique + 141 other indexes, 246 checks), 17 integration tests passing. Commit: see git log "Step 3".
 
+- **Step 4 · B1 — Foundation & identity: done (8 Oct 2026).** Web host (`src/DirectService.Transportation.Web`), Identity on `core.Users` with mandatory 2FA, server sessions, tenant/company context, permission policies, URL tokens, sign-up + company provisioning, users/roles/invitations (BR-001…003, no escalation), tenant & companies (plan limit, archive), company settings (FR-168…171), numbering (UPDLOCK), period guard, record locks + expiry worker, SignalR hub, OpenAPI (`docs/api/openapi-v1.json`, Redocly clean). 85 tests passing (Domain 4, Application 27, Infrastructure 22, Api 32). Code + security review: `docs/step4/B1_Foundation_and_Identity.md` (SR-01 High fixed). Backend only — UI waits for steps 5–6.
+
 ## Current step
-- **Step 4, block B1 — Foundation & identity** (build order in step 2 §10): request context, URL tokens, problem details, localisation, OpenAPI; sign-up, email verification, sign-in, mandatory 2FA, recovery codes, sessions, lockout, password reset, tenant password/idle settings; users, roles, invitations; companies (create/archive/switch); company settings; numbering service; period guard; record-lock API + SignalR hub skeleton; background-worker host; dev email/file implementations; isolation/permission test harness.
-- Waiting for the owner (not blocking): **chart-of-accounts template approval (D-10)** — `docs/step3/03_Chart_Of_Accounts_Template_DRAFT.md`.
+- **Step 4 · B2 — Accounting core + posting engine** (step 2 §10): chart of accounts (tree, import/export, opening balances + difference account), cost centres, cash boxes, bank accounts, periods (close/reopen, pre-close check); posting-key mapping, posting engine (8.6) with reversal and pending postings, automatic-entries list, journal voucher data, journal export; manual journal create/edit (reverse + re-post, D-05)/void/import.
+- Waiting for the owner (not blocking): **chart-of-accounts template approval (D-10)** — `docs/step3/03_Chart_Of_Accounts_Template_DRAFT.md`. B2 builds the template mechanism; the approved content is seeded afterwards.
+- Also waiting (the build will stop there): **step 5 design directions** — not started yet; backend blocks continue first.
+
+## How to run (development)
+- API host: `dotnet run --project src/DirectService.Transportation.Web` (Development; needs user-secret `UrlTokens:Key` — set on this machine). Health: `/health/ready`; OpenAPI: `/openapi/v1.json`; API reference: `/scalar` (Development only).
+- Tests: `dotnet test` (needs local SQL Server; creates `DirectServiceMaster_Tests` and `DirectServiceMaster_ApiTests`).
+- OpenAPI lint: export `/openapi/v1.json` to `docs/api/openapi-v1.json`, then `npx @redocly/cli lint docs/api/openapi-v1.json`.
 
 ## Environment
 - Owner's computer (Windows, `D:\Direct Service Transportation System`). .NET SDK 10.0.401 (`global.json` pins 10.0.401, roll forward latestFeature; tests use Microsoft.Testing.Platform); `dotnet-ef` 10.0.12 global tool; SQL Server 2025 Developer on `localhost` (Windows auth); Node.js 24.20.0 LTS + npm 11.19.0 (installed 8 Oct 2026 via winget); git 2.56 — local repository `main`, author "Direct Service Company <info@directservicetech.com>" (repository-local config), never pushed.
@@ -65,6 +75,12 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | DT-11 | READ_COMMITTED_SNAPSHOT | (a) ON (readers never block writers; 25 concurrent users); (b) server default | (a) — in `00_CreateDatabase.sql`, local and test databases. Numbering still uses `UPDLOCK, ROWLOCK` |
 | DT-12 | Audit rows of inserted records need their identity values | (a) audit rows saved right after the main save inside the same transaction (the interceptor starts one if the caller has not); (b) a separate transaction | (a) — the document and its audit rows commit or roll back together |
 | DT-13 | Rows not written to `core.AuditLogs` | `core.UserSessions` (LastSeenAt every minute) and `cfg.RecordLocks` (heartbeats) — technical, high-frequency, not business events; sign-ins/sign-outs are audited explicitly by the identity services | as stated |
+| DT-15 | Names of preset roles and of the built-in ownership type (stored values) | (a) fixed English codes (`Owner`, `Administrator`, `Accountant`, `Dispatcher`, `Viewer`; ownership type `Company`) translated by the UI; (b) Arabic text in the database | (a) — presets cannot be renamed (FR-173, C-08); the UI shows them in the user's language |
+| DT-16 | Notification text for "invitation accepted" (FR-190) | Bilingual message stored in `core.Notifications.Message` ("… قبل الدعوة / accepted the invitation") until the notifications module (B11) renders per language | as stated |
+| DT-17 | Tenant-level permission (core.tenant.manage) on `/api/v1/tenant/*` | (a) held in at least one active company of the tenant; (b) a separate tenant role | (a) — no schema change; Owner preset holds it |
+| DT-18 | Privilege boundaries in user administration (security review SR-01) | (a) a caller can grant only keys it holds; only tenant.manage holders act on Owner-level users; (b) PRD wording only ("users.manage can … assign roles") | (a) — prevents an Administrator from making itself Owner; the PRD does not allow escalation explicitly or implicitly |
+| DT-19 | Archived company visibility | Visible (read-only) only to users holding core.tenant.manage; others get 404 | as stated (D-09: "only the Owner sees it") |
+| DT-20 | Authenticator code replay within its 30 s window (SR-04) | (a) accept ASP.NET Identity default for now; (b) store the last used time-step (needs a column — schema change) | (a) — listed as a Suggestion in the B1 review |
 | DT-14 | Audit JSON for secret columns | `PasswordHash`, `SecurityStamp`, `TwoFactorSecret`, `CodeHash`, `TokenHash`, `ClientIdEncrypted`, `SecretKeyEncrypted` written as `"***"`; binary columns (logo) omitted | as stated |
 
 ## Extra indexes / constraints added beyond the design
@@ -76,7 +92,8 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | `database/00_CreateDatabase.sql` | Create the database with collation `Arabic_100_CI_AI_SC_UTF8` and READ_COMMITTED_SNAPSHOT (EF applies the model collation only when it creates the database itself, not in a migration script) |
 | `database/90_ApplicationUser.sql` | Application database user `dst_app`: read/write, `DENY DELETE` on core/acc/cfg/trn, `DENY UPDATE` on `core.AuditLogs`, `core.MaintenanceLogs`, `trn.TRN_RateHistory`, `DENY ALTER` on the schemas (verified 8 Oct 2026 on the test database) |
 | `tests/…/DatabaseFixture.cs` | `ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON` on the disposable test database |
-| Planned (B1) | Number-sequence and e-invoice-counter reads `WITH (UPDLOCK, ROWLOCK)`; worker queue claims `WITH (UPDLOCK, READPAST)` |
+| `Infrastructure/Persistence/NumberingService.cs` | `SELECT … FROM cfg.NumberSequences WITH (UPDLOCK, ROWLOCK)` inside the document transaction (BR-038); the increment uses EF `ExecuteUpdate` |
+| Planned (B7, B10) | E-invoice counter read `WITH (UPDLOCK, ROWLOCK)`; worker queue claims `WITH (UPDLOCK, READPAST)` |
 
 ## Tools (development only)
 `tools/design/parse_design.py` (design → model), `checks.py` (check constraints), `gen_efcore.py` (one-off source generation — do not re-run over hand-edited files), `verify_database.py` + `catalog.sql` (verification report), `selftest_verify.py`.

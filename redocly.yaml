@@ -1,0 +1,8 @@
+# Redocly CLI configuration for linting docs/api/openapi-v1.json (API-02).
+extends:
+  - recommended
+rules:
+  # The document is exported from the local development host (https://localhost); production URLs are set at deployment (DEF-01).
+  no-server-example.com: off
+  # Proprietary internal API: no SPDX identifier or public licence URL exists.
+  info-license-strict: off
