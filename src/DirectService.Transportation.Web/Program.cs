@@ -117,6 +117,7 @@ company.MapUserAdminEndpoints();
 company.MapSettingsEndpoints();
 company.MapLockEndpoints();
 company.MapAccountingEndpoints();
+company.MapMasterDataEndpoints();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);

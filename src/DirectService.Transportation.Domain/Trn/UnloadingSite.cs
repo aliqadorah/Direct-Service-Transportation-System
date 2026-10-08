@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_UnloadingSites â€” Company-scoped.
 /// </summary>
-public class UnloadingSite : AuditableEntity, ITenantScoped, ICompanyScoped
+public class UnloadingSite : AuditableEntity, ITenantScoped, ICompanyScoped, ISite
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

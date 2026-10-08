@@ -311,21 +311,21 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-152 | Drivers with truck fields | M | M04 | TRN_Drivers | DriverService | SCR-60 | U I E | ☐ |
-| FR-153 | Truck changes in history; trips keep fleet and partner | M | M04 | AuditLogs, TRN_Trips.FleetClass/PartnerId/TruckPlateAtSave | DriverService | SCR-60 | I | ☐ |
-| FR-154 | Document expiry alerts (30 days) | M | M04/M12 | TRN_Drivers (IX_TRN_Drivers_Expiry) | DriverQueries, DashboardQueries | SCR-60, SCR-07 | I | ☐ |
-| FR-155 | Expired document warning on trip; save allowed | M | M06 | TRN_Drivers | TripValidator | SCR-10, SCR-11 | U | ☐ |
-| FR-156 | Driver profile with account summary | M | M04/M11 | TRN_Drivers, TRN_Trips, TRN_Advances, TRN_Settlements | DriverQueries.Profile | SCR-60 | I | ☐ |
-| FR-157 | Customers and profile | M | M04 | TRN_Customers | CustomerService | SCR-61 | I E | ☐ |
-| FR-158 | Partners and profile | M | M04 | TRN_Partners | PartnerService | SCR-62 | I | ☐ |
-| FR-159 | Materials | M | M04 | TRN_Materials | MaterialService | SCR-63 | I | ☐ |
-| FR-160 | Loading and unloading sites | M | M04 | TRN_LoadingSites, TRN_UnloadingSites | SiteService | SCR-64, SCR-65 | I | ☐ |
-| FR-161 | Ownership types; built-in Company protected | M | M04 | TRN_OwnershipTypes.IsBuiltIn | OwnershipTypeService (C-08) | SCR-66 | I | ☐ |
-| FR-162 | Referenced records not deleted; counts; archive; restore | M | M04/X | All master tables (FKs NO ACTION), Status | ReferenceGuard | SCR-60…66 | I E | ☐ |
-| FR-163 | Rename cascade; issued documents keep names | M | M04 | (FK by Id; printed snapshots) | PrintService | SCR-63…65 | I | ☐ |
-| FR-164 | Master-data import/export with matching and duplicates | M | M04/M14 | ImportBatches | MasterDataImportService | SCR-60…68 | I | ☐ |
-| FR-165 | Lists with search, filters, sort, columns, export | M | M04 | TableColumnViews | MasterDataQueries | SCR-60…68 | I E | ☐ |
-| FR-166 | History of every master record | M | M04/M13 | AuditLogs | HistoryQueries | SCR-60…68 | I | ☐ |
+| FR-152 | Drivers with truck fields | M | M04 | TRN_Drivers | DriverService | SCR-60 | U I E | ☑ |
+| FR-153 | Truck changes in history; trips keep fleet and partner | M | M04 | AuditLogs, TRN_Trips.FleetClass/PartnerId/TruckPlateAtSave | DriverService | SCR-60 | I | ◐ |
+| FR-154 | Document expiry alerts (30 days) | M | M04/M12 | TRN_Drivers (IX_TRN_Drivers_Expiry) | DriverQueries, DashboardQueries | SCR-60, SCR-07 | I | ◐ |
+| FR-155 | Expired document warning on trip; save allowed | M | M06 | TRN_Drivers | TripValidator | SCR-10, SCR-11 | U | ◐ |
+| FR-156 | Driver profile with account summary | M | M04/M11 | TRN_Drivers, TRN_Trips, TRN_Advances, TRN_Settlements | DriverQueries.Profile | SCR-60 | I | ◐ |
+| FR-157 | Customers and profile | M | M04 | TRN_Customers | CustomerService | SCR-61 | I E | ◐ |
+| FR-158 | Partners and profile | M | M04 | TRN_Partners | PartnerService | SCR-62 | I | ◐ |
+| FR-159 | Materials | M | M04 | TRN_Materials | MaterialService | SCR-63 | I | ☑ |
+| FR-160 | Loading and unloading sites | M | M04 | TRN_LoadingSites, TRN_UnloadingSites | SiteService | SCR-64, SCR-65 | I | ☑ |
+| FR-161 | Ownership types; built-in Company protected | M | M04 | TRN_OwnershipTypes.IsBuiltIn | OwnershipTypeService (C-08) | SCR-66 | I | ☑ |
+| FR-162 | Referenced records not deleted; counts; archive; restore | M | M04/X | All master tables (FKs NO ACTION), Status | ReferenceGuard | SCR-60…66 | I E | ☑ |
+| FR-163 | Rename cascade; issued documents keep names | M | M04 | (FK by Id; printed snapshots) | PrintService | SCR-63…65 | I | ◐ |
+| FR-164 | Master-data import/export with matching and duplicates | M | M04/M14 | ImportBatches | MasterDataImportService | SCR-60…68 | I | ☑ |
+| FR-165 | Lists with search, filters, sort, columns, export | M | M04 | TableColumnViews | MasterDataQueries | SCR-60…68 | I E | ◐ |
+| FR-166 | History of every master record | M | M04/M13 | AuditLogs | HistoryQueries | SCR-60…68 | I | ☑ |
 | FR-167 | Trip form selects only existing active master data | M | M06 | — | TripValidator | SCR-10, SCR-11 | U E | ☐ |
 
 ### C.9 Administration & configuration (7.9)
@@ -343,12 +343,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-176 | Session expiry; active sessions; sign out all | M | M02 | UserSessions (G-01) | SessionService | SCR-08, SCR-76 | I S | ◐ |
 | FR-177 | Mandatory 2FA; recovery codes; reset audited | M | M02 | Users.TwoFactorSecret/TwoFactorEnabledAt, UserRecoveryCodes | TwoFactorService | SCR-01, SCR-05, SCR-76 | I S E | ◐ |
 | FR-178 | User preferences | M | M02 | Users.LanguageCode/DefaultCompanyId/DateFormat | UserProfileService | SCR-08 | I | ◐ |
-| FR-179 | Custom fields definition | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☐ |
-| FR-180 | Custom fields appear everywhere | M | M03 | CustomFieldDefinitions, *.CustomValues | CustomFieldService | SCR-10…12, SCR-60, SCR-61, SCR-52, SCR-09 | I E | ☐ |
-| FR-181 | Field with data: hide only, type fixed | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☐ |
-| FR-182 | Standard fields rename/hide/require/reorder; core fields never hidden | M | M03 | StandardFieldConfigs | FieldConfigService | SCR-75 | U I | ☐ |
-| FR-183 | Default and personal column views | M | M03 | TableColumnViews | ColumnViewService | SCR-10, SCR-75 | I | ☐ |
-| FR-184 | Preview configured form | S | M03 | — | — (UI) | SCR-75 | E | ☐ |
+| FR-179 | Custom fields definition | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☑ |
+| FR-180 | Custom fields appear everywhere | M | M03 | CustomFieldDefinitions, *.CustomValues | CustomFieldService | SCR-10…12, SCR-60, SCR-61, SCR-52, SCR-09 | I E | ◐ |
+| FR-181 | Field with data: hide only, type fixed | M | M03 | CustomFieldDefinitions | CustomFieldService | SCR-75 | I | ☑ |
+| FR-182 | Standard fields rename/hide/require/reorder; core fields never hidden | M | M03 | StandardFieldConfigs | FieldConfigService | SCR-75 | U I | ☑ |
+| FR-183 | Default and personal column views | M | M03 | TableColumnViews | ColumnViewService | SCR-10, SCR-75 | I | ☑ |
+| FR-184 | Preview configured form | S | M03 | — | — (UI) | SCR-75 | E | ◐ |
 | FR-185 | Live changes within seconds | M | M13 | — | RealtimeHub (SignalR) | SCR-00, all lists | I E | ☐ |
 | FR-186 | Record locking; read-only for others | M | M13 | RecordLocks | RecordLockService | All edit forms | I E | ◐ |
 | FR-187 | Global search with Arabic variants; respects permissions | M | M13 | TRN_Trips, TRN_Drivers, TRN_Customers, TRN_Partners, document tables | GlobalSearchService (A-12) | SCR-00 | U I S | ☐ |
@@ -385,10 +385,10 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-21 | Dashboard | FR-137–141 | SCR-07 | E | ☐ |
 | US-22 | Account statements and ageing | RPT-12…18 | SCR-51 | E | ☐ |
 | US-23 | Report builder | FR-143–147 | SCR-52, SCR-53 | E | ☐ |
-| US-24 | Driver records with truck details | FR-152–156 | SCR-60 | E | ☐ |
-| US-25 | Protected deletion | FR-162, 163 | SCR-60…66 | E | ☐ |
-| US-26 | Custom fields | FR-179–181 | SCR-75 | E | ☐ |
-| US-27 | Configure standard fields | FR-182, 183 | SCR-75 | E | ☐ |
+| US-24 | Driver records with truck details | FR-152–156 | SCR-60 | E | ◐ |
+| US-25 | Protected deletion | FR-162, 163 | SCR-60…66 | E | ☑ |
+| US-26 | Custom fields | FR-179–181 | SCR-75 | E | ☑ |
+| US-27 | Configure standard fields | FR-182, 183 | SCR-75 | E | ☑ |
 | US-28 | Real-time teamwork | FR-185, 186, BR-038 | SCR-00 | E | ☐ |
 | US-29 | Global search | FR-187 | SCR-00 | E | ☐ |
 | US-30 | Record history and audit | FR-015, 166, 188, 189 | SCR-77, history panels | E | ☐ |

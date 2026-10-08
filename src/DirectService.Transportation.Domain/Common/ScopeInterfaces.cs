@@ -29,3 +29,16 @@ public interface ICompanyScoped
 
 /// <summary>Append-only log (core.AuditLogs, core.MaintenanceLogs): rows are never updated or deleted.</summary>
 public interface IAppendOnly;
+
+/// <summary>Master-data record that is archived instead of deleted once referenced (Status 'Active' | 'Archived', FR-162).</summary>
+public interface IArchivable
+{
+    string Status { get; set; }
+}
+
+/// <summary>Loading or unloading site (two separate lists with the same fields, FR-160).</summary>
+public interface ISite : IArchivable
+{
+    string Name { get; set; }
+    string? Area { get; set; }
+}

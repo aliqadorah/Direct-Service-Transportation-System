@@ -393,4 +393,54 @@ public sealed class DataRulesTests(DatabaseFixture db)
             await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync(Ct));
         }
     }
+
+    [Fact]
+    public async Task An_update_through_a_modified_entry_is_audited_as_update_and_only_a_real_undelete_as_restore()
+    {
+        var t = await db.CreateTenantAsync();
+        var (ctx, _) = db.ContextFor(t);
+        await using (ctx)
+        {
+            var m = new Material { Name = "Gypsum" };
+            ctx.Add(m);
+            await ctx.SaveChangesAsync(Ct);
+
+            // The row-version check marks the whole entry Modified (every property flagged, IsDeleted included).
+            ctx.Entry(m).State = EntityState.Modified;
+            m.Name = "Gypsum (fine)";
+            await ctx.SaveChangesAsync(Ct);
+
+            m.DeleteReason = "Duplicate";
+            ctx.Remove(m);
+            await ctx.SaveChangesAsync(Ct);
+
+            var deleted = await ctx.Set<Material>().IgnoreQueryFilters([QueryFilters.SoftDelete]).SingleAsync(x => x.Id == m.Id, Ct);
+            deleted.IsDeleted = false;
+            deleted.DeletedAt = null;
+            deleted.DeletedBy = null;
+            deleted.DeleteReason = null;
+            await ctx.SaveChangesAsync(Ct);
+
+            var audit = await ctx.Set<AuditLog>().AsNoTracking()
+                .Where(a => a.EntityType == "TRN.Material" && a.EntityId == m.Id)
+                .OrderBy(a => a.Id).Select(a => a.Action).ToListAsync(Ct);
+            Assert.Equal(["Create", "Update", "Delete", "Restore"], audit);
+        }
+    }
+
+    [Fact]
+    public async Task Customer_name_is_unique_among_active_customers_only()
+    {
+        var t = await db.CreateTenantAsync();
+        var (ctx, _) = db.ContextFor(t);
+        await using (ctx)
+        {
+            ctx.Add(new Customer { Name = "Al-Hayat", Status = "Archived" });
+            ctx.Add(new Customer { Name = "Al-Hayat" });
+            await ctx.SaveChangesAsync(Ct);
+
+            ctx.Add(new Customer { Name = "al-hayat" });
+            await Assert.ThrowsAsync<DbUpdateException>(() => ctx.SaveChangesAsync(Ct));
+        }
+    }
 }

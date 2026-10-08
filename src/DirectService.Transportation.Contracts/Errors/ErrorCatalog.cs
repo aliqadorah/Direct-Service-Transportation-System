@@ -85,6 +85,19 @@ public static class ErrorCatalog
         [ErrorCodes.ImportUnknown] = ("«{0}» غير معروف: {1}.", "Unknown {0}: «{1}»."),
         [ErrorCodes.ImportInvalid] = ("قيمة «{0}» غير صحيحة: {1}.", "Invalid {0}: «{1}»."),
         [ErrorCodes.JournalIsReversal] = ("القيد {0} قيد عكسي لقيد آخر ولا يمكن تعديله أو إلغاؤه.", "Entry {0} reverses another entry and cannot be edited or voided."),
+        // Master data and field configuration (B3)
+        [ErrorCodes.BuiltInFixed] = ("نوع الملكية المدمج «{0}» لا يمكن تغيير اسمه أو تصنيفه أو حذفه.", "The built-in ownership type «{0}» cannot be renamed, reclassified or deleted."),
+        [ErrorCodes.FieldCore] = ("الحقل «{0}» حقل أساسي ولا يمكن إخفاؤه.", "Field «{0}» is a core field and cannot be hidden."),
+        [ErrorCodes.FieldAlwaysRequired] = ("الحقل «{0}» مطلوب بحكم قواعد العمل ولا يمكن إخفاؤه أو جعله اختيارياً.", "Field «{0}» is required by the business rules and cannot be hidden or made optional."),
+        [ErrorCodes.FieldUnknown] = ("الحقل «{0}» غير معروف.", "Unknown field «{0}»."),
+        [ErrorCodes.CustomFieldHasData] = ("الحقل «{0}» يحتوي بيانات؛ يمكن إخفاؤه فقط.", "Field «{0}» has data; it can only be hidden."),
+        [ErrorCodes.CustomFieldTypeFixed] = ("لا يمكن تغيير نوع الحقل «{0}» لأنه يحتوي بيانات.", "The type of field «{0}» cannot change because it has data."),
+        [ErrorCodes.CustomFieldOptions] = ("حقل القائمة «{0}» يحتاج خياراً واحداً على الأقل، دون تكرار.", "List field «{0}» needs at least one option, without duplicates."),
+        [ErrorCodes.CustomFieldOptionInUse] = ("الخيار «{0}» مستخدم في سجلات محفوظة ولا يمكن حذفه.", "Option «{0}» is used by saved records and cannot be removed."),
+        [ErrorCodes.DriverPartnerOwnFleet] = ("سائق أسطول الشركة الخاص لا يمكن ربطه بشريك ({0}). اختر نوع ملكية خارجياً.", "A driver of the company's own fleet cannot be linked to a partner ({0}). Choose an external ownership type."),
+        [ErrorCodes.FieldConditional] = ("الحقل «{0}» مطلوب في بعض الحالات بحكم قواعد العمل ولا يمكن إخفاؤه.", "Field «{0}» is required in some cases by the business rules and cannot be hidden."),
+        [ErrorCodes.FieldCannotRequire] = ("الحقل «{0}» لا يمكن جعله مطلوباً دائماً لأن قواعد العمل تمنعه في بعض الحالات.", "Field «{0}» cannot be made always required because the business rules forbid it in some cases."),
+        [ErrorCodes.OwnershipFleetInUse] = ("لا يمكن تحويل نوع الملكية إلى أسطول خاص لأن {0} سائقاً عليه مرتبطون بشركاء.", "The ownership type cannot become own fleet because {0} of its drivers are linked to partners."),
         [ErrorCodes.PendingNoHandler] = ("لا يمكن إعادة ترحيل هذا النوع من المستندات في هذا الإصدار.", "This document type cannot be re-posted in this version."),
     };
 
@@ -182,4 +195,17 @@ public static class ErrorCodes
     public const string ImportInvalid = "import.invalid";
     public const string PendingNoHandler = "pending.noHandler";
     public const string JournalIsReversal = "journal.isReversal";
+
+    public const string BuiltInFixed = "masters.builtInFixed";
+    public const string FieldCore = "field.core";
+    public const string FieldAlwaysRequired = "field.alwaysRequired";
+    public const string FieldUnknown = "field.unknown";
+    public const string CustomFieldHasData = "customField.hasData";
+    public const string CustomFieldTypeFixed = "customField.typeFixed";
+    public const string CustomFieldOptions = "customField.options";
+    public const string CustomFieldOptionInUse = "customField.optionInUse";
+    public const string DriverPartnerOwnFleet = "driver.partnerOwnFleet";
+    public const string FieldConditional = "field.conditional";
+    public const string FieldCannotRequire = "field.cannotRequire";
+    public const string OwnershipFleetInUse = "ownership.fleetInUse";
 }

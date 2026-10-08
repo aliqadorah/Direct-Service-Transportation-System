@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 8 Oct 2026 (step 4 · B2 done; next: B3 Master data)_
+_Last updated: 8 Oct 2026 (step 4 · B3 done; next: B4 Pricing)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -24,7 +24,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 2 | `docs/step2/01_Architecture_and_Build_Plan.md` (ADR-01…18, API design, security model, build order), `02_Owner_Decisions_Step2.md` |
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (**approved 8 Oct 2026**, seeded in B2) |
 | Design | `docs/design/Database_Design_Revision5.md` |
-| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md` (delivery, tests, code + security review) |
+| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md` (delivery, tests, code + security review) |
 | API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
 
 ## Completed steps
@@ -37,13 +37,15 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 
 - **Step 4 · B2 — Accounting core + posting engine: done (8 Oct 2026).** Posting engine (8.6: keys → accounts, balance, period checked before/after the journal-number lock, control parties, reversal, savepoint → pending postings + worker retry, `IPostingSourceHandler` registry for document modules), chart of accounts (tree rules, approved transport template D-10 with cash box + 13 mappings, Excel import/export), opening balances (difference account during setup), account mapping + banner status, cost centres, cash boxes, bank accounts, periods (pre-close check, close/reopen), manual journal (create, edit = reverse + re-post D-05, void, import), journal and automatic-entries lists, voucher data with amount in words, journal export batches (JSON/CSV). 57 endpoints. 143 tests passing (85 before B2; counts include theory cases). Code review (CR-B2-01 High fixed) + security review (SR-B2-01/02 Medium fixed): `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`. OpenAPI re-exported, Redocly clean.
 
+- **Step 4 · B3 — Master data: done (8 Oct 2026).** Drivers with truck (national ID/plate unique with Arabic digits folded, payment details by method, document-expiry alerts), customers and partners (name unique among active), materials, loading/unloading sites, ownership types (built-in Company protected); reference counts with protected deletion, archive/restore, rename by id, history old → new; import/export of every list (column matching, duplicates, strict); custom fields (trips/drivers/customers), standard-field configuration, form configuration, column views; idempotent creates by `clientId`. 100 endpoints. 181 tests passing. Independent code + security review: no High; M1–M4 and L2/L3/L5/L6 fixed (`docs/step4/B3_Master_Data.md`). Also fixed a B1 audit bug: updates through the row-version check were logged as "Restore". OpenAPI re-exported (182 paths), Redocly clean.
+
 ## Current step
-- **Step 4 · B3 — Master data** (step 2 §10): drivers with truck, customers, partners, materials, sites, ownership types; archive/restore, reference counts, rename, history, import/export, custom fields on drivers/customers, standard-field config (FR-152…167, FR-179…183).
+- **Step 4 · B4 — Pricing** (step 2 §10): tariffs (customer and partner), specificity resolution, rate history; monthly loading-site driver rates with month strip (FR-019…037; PRD 7.2, 8.4).
 - Waiting (the build will stop there): **step 5 design directions** — not started yet; backend blocks continue first.
 
 ## Resume here (for a new session)
 1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
-2. Next block: **B3** (see "Current step"). Requirements: PRD 7.8, 7.9.3, 8.8, 8.9 and the FR-152…167, FR-179…183 rows of `docs/step1/02_Traceability_Matrix.md`. Read `docs/step4/B2_*.md` for the accounting services that later blocks call.
+2. Next block: **B4** (see "Current step"). Requirements: PRD 7.2, 8.4, 6.2 and the FR-019…037 rows of `docs/step1/02_Traceability_Matrix.md`; tables trn.TRN_Tariffs (Specificity computed column, A-07/DT-07), trn.TRN_MonthlySiteRates, trn.TRN_RateHistory (append-only). Read `docs/step4/B2_*.md` (accounting services) and `docs/step4/B3_Master_Data.md` (master-data patterns: `MasterDataSupport`, `FieldRules`, `CustomFieldService`, idempotent creates, `RequireAnyPermission`/`RequireMember`). Tariff/rate writes need masters.manage (BR-004); manual rate overrides too.
 3. Module pattern (follow B1):
    - Services in `src/…Application/<Module>/` using `IAppDbContext`, `IRequestContext`, `IChangeContext.SetAction(entity, action, reason)` for audited business actions, `db.InTransactionAsync` for multi-save operations, `db.ExpectRowVersion` for updates, `Fail.*` / `Validator` for problems (codes + AR/EN messages in `Contracts/Errors/ErrorCatalog.cs` — a unit test requires every code to have both messages).
    - DTOs in `src/…Contracts/<Module>/` — identifiers are always URL tokens (`IUrlTokenService.Encode<T>`), never internal ids.
@@ -51,11 +53,13 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
    - Use `GrantGuard`, `IPeriodGuard`, `INumberingService` (inside a transaction), `IRecordLockGuard` where the PRD requires.
    - Financial documents (B5 trips, B6 invoices/credit notes, B8 cash documents, B9 AP/AR) post through `PostingEngine.PostOrPendAsync` inside their transaction (`PostingLine.DebitKey/CreditKey` with `PostingKeys.*`, cash/bank by `AccountId`), reverse with `ReverseAsync`, and register an `IPostingSourceHandler` (rebuild entry for retries, attach `JournalEntryId`, describe number + token for links). Parties: `PostingParty("TRN","Customer"|"Driver"|"Partner", id)`. Invoicing must call `PostingEngine.EnsurePostingReadyAsync` (FR-094).
    - Imports: `ISpreadsheetService` + `ImportProblems` / `ImportParse` (`Application/Accounting/ImportSupport.cs`), strict preview/commit, `cfg.ImportBatches` row.
+   - Master-data style (B3): `MasterDataSupport` (find by token, `ChooseAsync` for active links, `SaveCreateAsync` for idempotent creates with `clientId`, list status/sort/paging, reference counts + `EnsureUnreferenced`, history from the audit log, market phone/IBAN checks, company-local `TodayAsync`); `StandardFieldService.RulesAsync(entity)` → `FieldRules` (labels, required, hidden → `Keep` stored value); `CustomFieldService.ValidateValuesAsync` for CustomValues (trips will use FieldCatalog.Trip). Avoid public instance methods named `BindAsync`/`TryParse` on services: minimal APIs treat them as parameter binders and every endpoint fails at start-up.
    - Tests: unit (Application.Tests), DB rules (Infrastructure.Tests), API flows + isolation (Api.Tests — the generic isolation and coverage tests pick up new endpoints automatically).
    - After the block: code review + security review (money modules), all tests green, export + lint OpenAPI, `python tools/trace/set_status.py partial|done <IDs>`, a `docs/step4/B<n>_*.md` report, update this file, commit (never push).
 4. Pitfalls already met: never edit files containing Arabic with PowerShell `Get-Content/Set-Content` (use the Edit/Write tools); `sqlcmd` needs `-I`; do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities/configurations); `UserManager.Set*` persists the user (do not call on unsaved users); creating an authenticator key changes the security stamp.
 5. Stops still required: step 5 design directions, step 6 mockups (no UI code before approval), real blockers. (D-10 chart template: approved and seeded in B2.)
-6. Shell pitfall: multi-line `python - <<'EOF'` heredocs containing quotes sometimes fail in the Bash tool ("unexpected EOF"); write the script to the scratchpad with the Write tool and run it.
+6. Shell pitfall: multi-line `python - <<'EOF'` heredocs containing quotes sometimes fail in the Bash tool ("unexpected EOF"); write the script to the scratchpad with the Write tool and run it. `sed -i` in Git Bash turns CRLF files into LF — restore CRLF afterwards (source files are CRLF).
+7. OpenAPI export: `dotnet run --project src/DirectService.Transportation.Web --launch-profile DirectService.Transportation.Web` (the only profile; any other name silently runs as Production without a connection string), then `curl -sk https://localhost:52233/openapi/v1.json -o docs/api/openapi-v1.json` (HTTP redirects to HTTPS); stop the host afterwards.
 
 ## How to run (development)
 - API host: `dotnet run --project src/DirectService.Transportation.Web` (Development; needs user-secret `UrlTokens:Key` — set on this machine). Health: `/health/ready`; OpenAPI: `/openapi/v1.json`; API reference: `/scalar` (Development only).
@@ -71,6 +75,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 ## Decisions made
 - All items listed as settled in `Build_Brief.md`; `core.Users.Email` unique platform-wide.
 - Step 1 decisions D-01…D-18 (`docs/step1/03_Owner_Decisions.md`): D-01 namespaced permission keys; D-02 LayoutType default 'Claim'; D-03 tariff price / deduction > 0; D-04 rejected e-invoices resubmittable, Failed = Rejected + LastError; D-05 manual-entry edit = reverse + re-post; D-06 tariff lock lets masters.manage deviate; D-07 C-08…C-11 recommendations; D-08 tenant settings columns; D-09 Companies.Status; D-10 chart template drafted for approval; D-11 credits reduce only their invoice; D-12 TRIAL plan, trial end → Suspended → Cancelled; D-13 provider console for all staff, support window read-only; D-14 G-recommendations; D-15 AR documents e-invoiced; D-16 prefixes TRP-, CRN-, RCV-, ADV-, STL-, PPY-, JV-, BIL-, ARD-, PAY-, RTN-, JEX- (5 digits); D-17 assumptions accepted; D-18 help pages at the end.
+- DT-21 … DT-35 (B2 decisions taken without asking): **accepted by the owner on 8 Oct 2026.**
 - Step 2 decisions Q-01…Q-10 (`docs/step2/02_Owner_Decisions_Step2.md`): architecture approved; revision 5 option R5-A; idle timeout 30 min (5–1,440); absolute session lifetime 12 h (platform setting); password length 8–64; only Active companies count toward the plan; collation `Arabic_100_CI_AI_SC_UTF8`; PDF via HTML + headless Chromium; build order as proposed; git + Node.js yes, commit locally after each module, never push.
 
 ## Database design revision 5 (implemented)
@@ -113,6 +118,20 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | DT-33 | Pending-posting worker | Every 5 min, back-off 2^attempts min (max 60), oldest first, skips suspended tenants and archived companies; acts as a system job | as stated |
 | DT-34 | Account changes once entries exist | Changing type, control flag or control party type is refused once the account has entry lines; deactivation refused with openings, links or active children | as stated |
 | DT-35 | Reversal entries of manual entries | Cannot be edited or voided themselves (CR-B2-01) | as stated |
+| DT-36 | Read access to master data (PRD 3.4 has no masters.view) | (a) driver and partner records need drv.view or masters.manage; customer, material, site and ownership-type lists, every pick list ("options") and the form configuration are open to company members; writes masters.manage; field configuration and company default column views settings.manage; personal column views any member; (b) masters.manage for all reads | (a) — every role needs names to read trips, invoices and reports; personal data (national ID, IBAN) stays behind drv.view |
+| DT-37 | Normalisation of keys | Names, national IDs, phones, IBANs, plates stored with ASCII digits; plates upper case without spaces; phones/IBANs without spaces or dashes; uniqueness checked on the stored values (collation CI_AI) | as stated |
+| DT-38 | Ownership types have no Status column | Not archived; deleted (soft) only while unreferenced; built-in Company cannot be renamed, reclassified or deleted (design + FR-161) | as stated |
+| DT-39 | Profile account figures (FR-156…158) | Filled when the documents exist (B6 invoices/credit notes, B8 receipts/advances/settlements/partner payments); B3 profile = record + reference counts + history | as stated |
+| DT-40 | Restoring an archived customer/partner whose name an active record now uses | Refused (duplicate.key) until one is renamed | as stated |
+| DT-41 | Custom values storage | Only non-empty values stored; hidden fields keep stored values (client value ignored); unknown keys refused; default applied on create when absent; "has data" = a non-deleted record stores the key; FieldKey fixed after creation | as stated |
+| DT-42 | Deleting a custom field | Without data → soft delete with reason; with data → refused, hide offered (flow 9.14); a used List option cannot be removed | as stated |
+| DT-43 | Standard-field rules | Core trip fields (US-27) and business-required fields cannot be hidden or made optional; conditional fields (driver bank name, IBAN, CliQ alias) cannot be hidden; partner cannot be made always required; optional fields can be renamed, hidden, required, reordered; hidden optional fields keep their stored values on edit; one replacement label (design has one Label column) shown in both languages | as stated |
+| DT-44 | Master-data imports | Strict (any bad row blocks) and add-only (existing keys = duplicates), like DT-26; column matching by header aliases (Arabic, English, field key, company label) or an explicit `mapping` (field key → header); links (ownership type, partner) by name, active only | as stated |
+| DT-45 | PDF export of lists (FR-165) | With the print engine in B6; Excel/CSV now | as stated |
+| DT-46 | Driver payment details when Cash | Bank/IBAN/CliQ kept as entered and format-checked when given; required only for their method | as stated |
+| DT-47 | Expiry alert window | Expired = before today; expiring = today … today + 30 days inclusive; "today" in the company time zone | as stated |
+| DT-48 | Partner on an own-fleet driver | Refused (a partner's truck is external fleet, BR-029); an ownership type with partner-linked drivers cannot become own fleet | as stated |
+| DT-49 | Idempotent create (API-05) | Implemented from B3 on: `clientId` GUID → PublicId; repeat → 200 with the record, new → 201; a client id that exists outside the company → 400 | as stated |
 | DT-14 | Audit JSON for secret columns | `PasswordHash`, `SecurityStamp`, `TwoFactorSecret`, `CodeHash`, `TokenHash`, `ClientIdEncrypted`, `SecretKeyEncrypted` written as `"***"`; binary columns (logo) omitted | as stated |
 
 ## Extra indexes / constraints added beyond the design
@@ -131,6 +150,8 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 `tools/design/parse_design.py` (design → model), `checks.py` (check constraints), `gen_efcore.py` (one-off source generation — do not re-run over hand-edited files), `verify_database.py` + `catalog.sql` (verification report), `selftest_verify.py`.
 
 ## Open issues
+- B3 review suggestions not built: import preview should fold Arabic diacritics like the CI_AI collation (L1); make `rowVersion` required on PUT once the UI exists (L4); per-row queries in large driver imports (L7).
+- Development database: audit rows of B1/B2 updates written before the interceptor fix carry Action "Restore" instead of "Update" (test data only).
 - Posting source handlers to register in B5/B6/B8/B9 (`IPostingSourceHandler`); until then pending postings of those types report "cannot be re-posted in this version".
 - Voucher PDF / journal-list PDF with the print engine (B6); financial reports, statements, reconciliation RPT-23 and cost-centre report (B9/B10); dashboard cards for pending postings and opening difference (B10).
 - System-job soft deletes: `DeletedBy` is required by CHECK, but the tenant-retention job (G-18) has no acting user. To be decided in B12 (likely a seeded platform "system" account); record-lock expiry will attribute the release to the lock holder.

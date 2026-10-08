@@ -235,8 +235,10 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
                     GuardScopeColumns(entry);
                     StampModified(entry, now);
                     var action = changes.GetAction(entity);
-                    if (action is null && entity is ISoftDeletable { IsDeleted: false }
-                        && entry.Property(nameof(ISoftDeletable.IsDeleted)).IsModified)
+                    // A restore flips IsDeleted from 1 to 0. Marking the whole entry Modified (row-version check) flags every
+                    // property as modified, so the original value decides, not the IsModified flag.
+                    var deletedFlag = entry.Property(nameof(ISoftDeletable.IsDeleted));
+                    if (action is null && entity is ISoftDeletable { IsDeleted: false } && deletedFlag.IsModified && Equals(deletedFlag.OriginalValue, true))
                         action = "Restore";
                     Track(entry, action ?? "Update", state);
                     break;

@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Identity;
+using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -52,6 +53,22 @@ public static class DependencyInjection
         services.AddScoped<JournalExportService>();
         services.AddScoped<ChartImportService>();
         services.AddScoped<JournalImportService>();
+
+        // Master data and field configuration (B3)
+        services.AddScoped<CustomFieldService>();
+        services.AddScoped<StandardFieldService>();
+        services.AddScoped<ColumnViewService>();
+        services.AddScoped<MasterDataSupport>();
+        services.AddScoped<DriverService>();
+        services.AddScoped<CustomerService>();
+        services.AddScoped<PartnerService>();
+        services.AddScoped<MaterialService>();
+        services.AddScoped<LoadingSiteService>();
+        services.AddScoped<SiteService<Domain.Trn.LoadingSite>>(sp => sp.GetRequiredService<LoadingSiteService>());
+        services.AddScoped<UnloadingSiteService>();
+        services.AddScoped<SiteService<Domain.Trn.UnloadingSite>>(sp => sp.GetRequiredService<UnloadingSiteService>());
+        services.AddScoped<OwnershipTypeService>();
+        services.AddScoped<MasterExchangeService>();
         return services;
     }
 }
