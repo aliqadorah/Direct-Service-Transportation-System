@@ -40,6 +40,19 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - Waiting for the owner (not blocking): **chart-of-accounts template approval (D-10)** — `docs/step3/03_Chart_Of_Accounts_Template_DRAFT.md`. B2 builds the template mechanism; the approved content is seeded afterwards.
 - Also waiting (the build will stop there): **step 5 design directions** — not started yet; backend blocks continue first.
 
+## Resume here (for a new session)
+1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
+2. Next block: **B2** (see "Current step"). Requirements: PRD 7.5, 7.6, 8.6, 8.7 and FR-092…136 rows of `docs/step1/02_Traceability_Matrix.md`.
+3. Module pattern (follow B1):
+   - Services in `src/…Application/<Module>/` using `IAppDbContext`, `IRequestContext`, `IChangeContext.SetAction(entity, action, reason)` for audited business actions, `db.InTransactionAsync` for multi-save operations, `db.ExpectRowVersion` for updates, `Fail.*` / `Validator` for problems (codes + AR/EN messages in `Contracts/Errors/ErrorCatalog.cs` — a unit test requires every code to have both messages).
+   - DTOs in `src/…Contracts/<Module>/` — identifiers are always URL tokens (`IUrlTokenService.Encode<T>`), never internal ids.
+   - Endpoints in `src/…Web/Endpoints/` under the `/companies/{company}` group with `.RequirePermission(PermissionKeys.X)` (or member metadata); add every route to `Web/Pipeline/ApiSummaries.cs` (test-enforced) and register the services in `Application/DependencyInjection.cs`.
+   - Use `GrantGuard`, `IPeriodGuard`, `INumberingService` (inside a transaction), `IRecordLockGuard` where the PRD requires.
+   - Tests: unit (Application.Tests), DB rules (Infrastructure.Tests), API flows + isolation (Api.Tests — the generic isolation and coverage tests pick up new endpoints automatically).
+   - After the block: code review + security review (money modules), all tests green, export + lint OpenAPI, `python tools/trace/set_status.py partial|done <IDs>`, a `docs/step4/B<n>_*.md` report, update this file, commit (never push).
+4. Pitfalls already met: never edit files containing Arabic with PowerShell `Get-Content/Set-Content` (use the Edit/Write tools); `sqlcmd` needs `-I`; do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities/configurations); `UserManager.Set*` persists the user (do not call on unsaved users); creating an authenticator key changes the security stamp.
+5. Stops still required: step 5 design directions, step 6 mockups (no UI code before approval), D-10 chart template approval (seed only after "chart approved"), real blockers.
+
 ## How to run (development)
 - API host: `dotnet run --project src/DirectService.Transportation.Web` (Development; needs user-secret `UrlTokens:Key` — set on this machine). Health: `/health/ready`; OpenAPI: `/openapi/v1.json`; API reference: `/scalar` (Development only).
 - Tests: `dotnet test` (needs local SQL Server; creates `DirectServiceMaster_Tests` and `DirectServiceMaster_ApiTests`).
