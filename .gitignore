@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+artifacts/
+publish/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# Test results / coverage
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# Node
+node_modules/
+
+# Local runtime data (dev email drop, file store, data-protection keys, logs)
+.local/
+*.log
+
+# Secrets — never commit (use dotnet user-secrets / environment variables)
+appsettings.*.local.json
+*.pfx
+*.key
+.env
