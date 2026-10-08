@@ -1,0 +1,24 @@
+﻿root = true
+
+[*.cs]
+# Entity names follow the approved database design (core.Permissions, core.RolePermissions).
+dotnet_diagnostic.CA1711.severity = none
+# Entity and DTO collections are settable for EF Core materialisation.
+dotnet_diagnostic.CA2227.severity = none
+# Entities intentionally use mutable collections and arrays (RowVersion, binary columns) mapped by EF Core.
+dotnet_diagnostic.CA1819.severity = none
+dotnet_diagnostic.CA1002.severity = none
+# EF Core migrations are tool-generated.
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
+
+# Model configuration runs once at start-up; constant index-column arrays are fine there.
+[src/DirectService.Transportation.Infrastructure/Persistence/Configurations/**.cs]
+dotnet_diagnostic.CA1861.severity = none
+
+# Test method names use underscores for readability (Given_When_Then style).
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2007.severity = none

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DirectService.Transportation.Application/DirectService.Transportation.Application.csproj" />
+    <Project Path="src/DirectService.Transportation.Contracts/DirectService.Transportation.Contracts.csproj" />
+    <Project Path="src/DirectService.Transportation.Domain/DirectService.Transportation.Domain.csproj" />
+    <Project Path="src/DirectService.Transportation.Infrastructure/DirectService.Transportation.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DirectService.Transportation.Domain.Tests/DirectService.Transportation.Domain.Tests.csproj" />
+    <Project Path="tests/DirectService.Transportation.Infrastructure.Tests/DirectService.Transportation.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
