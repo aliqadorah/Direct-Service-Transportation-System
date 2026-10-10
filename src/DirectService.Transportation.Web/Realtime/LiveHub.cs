@@ -55,9 +55,13 @@ public sealed class LiveHub(AccessService access, IUrlTokenService tokens, IAppD
 /// <summary>Publishes record and lock changes to the company group (no internal ids in messages).</summary>
 public sealed class SignalRNotifier(IHubContext<LiveHub> hub, IRequestContext ctx) : IRealtimeNotifier
 {
-    public Task RecordChangedAsync(long companyId, string entityType, string token, string action, CancellationToken ct) =>
+    public Task RecordChangedAsync(long companyId, string entityType, string? token, string action, CancellationToken ct) =>
         hub.Clients.Group(LiveHub.Group(companyId)).SendAsync("recordChanged", new { entityType, id = token, action, by = ctx.UserName }, ct);
 
     public Task LockChangedAsync(long companyId, string entityType, string token, string? holderName, CancellationToken ct) =>
         hub.Clients.Group(LiveHub.Group(companyId)).SendAsync("lockChanged", new { entityType, id = token, holder = holderName }, ct);
+
+    /// <summary>SignalR addresses users by the name identifier claim (the user's public id, "N" format).</summary>
+    public Task NotifyUserAsync(Guid userPublicId, object notification, CancellationToken ct) =>
+        hub.Clients.User(userPublicId.ToString("N")).SendAsync("notification", notification, ct);
 }

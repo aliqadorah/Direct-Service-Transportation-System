@@ -305,7 +305,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-148 | Period/as-of, filters, selected company, totals | M | M12 | — | ReportBase | SCR-50, SCR-51 | I | ☑ |
 | FR-149 | Drill-down from every line | M | M12 | — | ReportDrillDown | SCR-50, SCR-51 | E | ☑ |
 | FR-150 | Excel/PDF of every screen and report; print header/footer, RTL | M | M14 | — | ExportService, PdfRenderer | All list/report screens, SCR-09 | I E | ☑ |
-| FR-151 | Large exports in background with notification | S | M14 | Notifications | ExportJob | SCR-00 (notifications) | I | ☐ |
+| FR-151 | Large exports in background with notification | S | M14 | Notifications | ExportJob | SCR-00 (notifications) | I | ☑ |
 
 ### C.8 Master data (7.8)
 
@@ -349,12 +349,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-182 | Standard fields rename/hide/require/reorder; core fields never hidden | M | M03 | StandardFieldConfigs | FieldConfigService | SCR-75 | U I | ☑ |
 | FR-183 | Default and personal column views | M | M03 | TableColumnViews | ColumnViewService | SCR-10, SCR-75 | I | ☑ |
 | FR-184 | Preview configured form | S | M03 | — | — (UI) | SCR-75 | E | ◐ |
-| FR-185 | Live changes within seconds | M | M13 | — | RealtimeHub (SignalR) | SCR-00, all lists | I E | ☐ |
-| FR-186 | Record locking; read-only for others | M | M13 | RecordLocks | RecordLockService | All edit forms | I E | ◐ |
-| FR-187 | Global search with Arabic variants; respects permissions | M | M13 | TRN_Trips, TRN_Drivers, TRN_Customers, TRN_Partners, document tables | GlobalSearchService (A-12) | SCR-00 | U I S | ☐ |
-| FR-188 | Company audit log of all listed actions | M | M13/X | AuditLogs | AuditInterceptor, AuditService | SCR-77 | I | ☐ |
-| FR-189 | Audit log read-only; filters; export | M | M13 | AuditLogs | AuditQueries | SCR-77 | I S | ☐ |
-| FR-190 | In-app notifications | S | M13 | Notifications | NotificationService | SCR-00 | I | ☐ |
+| FR-185 | Live changes within seconds | M | M13 | — | RealtimeHub (SignalR) | SCR-00, all lists | I E | ☑ |
+| FR-186 | Record locking; read-only for others | M | M13 | RecordLocks | RecordLockService | All edit forms | I E | ☑ |
+| FR-187 | Global search with Arabic variants; respects permissions | M | M13 | TRN_Trips, TRN_Drivers, TRN_Customers, TRN_Partners, document tables | GlobalSearchService (A-12) | SCR-00 | U I S | ☑ |
+| FR-188 | Company audit log of all listed actions | M | M13/X | AuditLogs | AuditInterceptor, AuditService | SCR-77 | I | ☑ |
+| FR-189 | Audit log read-only; filters; export | M | M13 | AuditLogs | AuditQueries | SCR-77 | I S | ☑ |
+| FR-190 | In-app notifications | S | M13 | Notifications | NotificationService | SCR-00 | I | ☑ |
 
 ---
 
@@ -389,8 +389,8 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-25 | Protected deletion | FR-162, 163 | SCR-60…66 | E | ☑ |
 | US-26 | Custom fields | FR-179–181 | SCR-75 | E | ☑ |
 | US-27 | Configure standard fields | FR-182, 183 | SCR-75 | E | ☑ |
-| US-28 | Real-time teamwork | FR-185, 186, BR-038 | SCR-00 | E | ☐ |
-| US-29 | Global search | FR-187 | SCR-00 | E | ☐ |
+| US-28 | Real-time teamwork | FR-185, 186, BR-038 | SCR-00 | E | ☑ |
+| US-29 | Global search | FR-187 | SCR-00 | E | ☑ |
 | US-30 | Record history and audit | FR-015, 166, 188, 189 | SCR-77, history panels | E | ☐ |
 | US-31 | Sign-up and guided setup | 5.4, G-10 | SCR-02, SCR-03, SCR-05, SCR-06 | E | ☐ |
 | US-32 | Invite users and assign roles | FR-172–174 | SCR-76 | E | ◐ |

@@ -144,6 +144,13 @@ public static class DependencyInjection
         services.AddScoped<ReportBuilderService>();
         services.AddScoped<SavedReportService>();
         services.AddScoped<DashboardService>();
+
+        // Collaboration (B11)
+        services.AddScoped<NotificationService>();
+        services.AddScoped<GlobalSearchService>();
+        services.AddScoped<AuditLogService>();
+        services.AddScoped<ExportLimits>();
+        services.AddScoped<ExportService>();
         services.AddScoped<SupplierBillPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());
         services.AddScoped<ReceivablePostingHandler>();

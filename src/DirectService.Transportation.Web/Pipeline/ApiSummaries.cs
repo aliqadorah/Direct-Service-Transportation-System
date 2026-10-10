@@ -409,6 +409,17 @@ internal static class ApiSummaries
         ["POST /api/v1/companies/{company}/reports/saved/{report}/delete"] = "Delete a saved report and its pins (FR-145)",
         ["POST /api/v1/companies/{company}/reports/saved/{report}/run"] = "Run a saved report, optionally for another period (FR-146)",
         ["POST /api/v1/companies/{company}/reports/saved/{report}/export"] = "Export a saved report as Excel, CSV or PDF (FR-146)",
+
+        // Collaboration (B11)
+        ["GET /api/v1/companies/{company}/search"] = "Global search across document numbers, drivers, customers and partners with Arabic spelling variants; results by permission (FR-187)",
+        ["GET /api/v1/companies/{company}/notifications/"] = "The caller's notifications in the reader's language with the unread count (FR-190)",
+        ["POST /api/v1/companies/{company}/notifications/{notification}/read"] = "Mark a notification read",
+        ["POST /api/v1/companies/{company}/notifications/read-all"] = "Mark all the caller's notifications read",
+        ["GET /api/v1/companies/{company}/audit-log/"] = "Company audit log with filters: user, action, record type, period, text (FR-188, FR-189)",
+        ["GET /api/v1/companies/{company}/audit-log/facets"] = "Record types and actions present in the audit log (filter choices)",
+        ["GET /api/v1/companies/{company}/audit-log/export"] = "Export the audit log as Excel, CSV or PDF (FR-189)",
+        ["POST /api/v1/companies/{company}/exports/"] = "Queue a large export in the background; a notification links to the file when ready (FR-151)",
+        ["GET /api/v1/companies/{company}/exports/{export}"] = "Download a finished background export (its requester only)",
     };
 
     public static string Key(string method, string? route) => $"{method} /{route?.TrimStart('/')}";

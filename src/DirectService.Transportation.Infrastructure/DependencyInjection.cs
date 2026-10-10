@@ -29,9 +29,11 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("ConnectionStrings:MasterDb is not configured.");
 
         services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddScoped<LiveChangeInterceptor>();
+        services.AddScoped<IAfterCommit>(sp => sp.GetRequiredService<LiveChangeInterceptor>());
         services.AddDbContext<MasterDbContext>((sp, o) => o
             .UseSqlServer(cs, sql => sql.CommandTimeout(60))
-            .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>(), sp.GetRequiredService<LiveChangeInterceptor>()));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<MasterDbContext>());
 
         services.AddIdentityCore<User>(o =>
@@ -70,6 +72,8 @@ public static class DependencyInjection
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<IEInvoiceStore, EInvoiceStore>();
         services.AddSingleton<EInvoiceSignal>();
+        services.AddSingleton<Application.Collaboration.IFileStore, Files.LocalFileStore>();
+        services.AddSingleton<Application.Collaboration.IExportQueue, Files.ChannelExportQueue>();
         services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
         services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();

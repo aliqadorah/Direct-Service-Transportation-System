@@ -54,10 +54,11 @@ public sealed class GroupRow(string? s1, long? n1, Guid? g1, string? s2, long? n
 /// top-N; detail mode. Grouping and aggregation run in SQL (expression trees over the source query, NFR-01); the column grouping is pivoted
 /// from the SQL result. Sources with a status show active documents unless the definition filters on status (DT-115).
 /// </summary>
-public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, LedgerReportService ledger)
+public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, LedgerReportService ledger, Collaboration.ExportLimits limits)
 {
     public const int MaxGroups = 5000;
     public const int MaxDetailRows = 5000;
+    public const int MaxBackgroundRows = 100_000;
     public const int MaxMeasures = 6;
     public const int MaxFilters = 20;
     public const int MaxColumns = 30;
@@ -558,7 +559,8 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
         var orderBy = Expression.Call(typeof(Queryable), descending ? nameof(Queryable.OrderByDescending) : nameof(Queryable.OrderBy), [typeof(T), sortBody.Type], q.Expression,
             Expression.Quote(sortLambda));
         q = q.Provider.CreateQuery<T>(orderBy);
-        var take = Math.Min(p.Definition.Top ?? MaxDetailRows, MaxDetailRows);
+        var max = limits.Background ? MaxBackgroundRows : MaxDetailRows;   // FR-151
+        var take = Math.Min(p.Definition.Top ?? max, max);
         var rows = await q.Select(projection).Take(take + 1).ToListAsync(ct).ConfigureAwait(false);
         var resultRows = rows.Take(take).Select(r => new ResultRow(r.Take(columns.Count).Select(Cell).ToList(),
             new DrillLink(p.Source.RowLink, r[^1] is Guid g ? tokens.Encode(Entity(p.Source), g) : null, null))).ToList();

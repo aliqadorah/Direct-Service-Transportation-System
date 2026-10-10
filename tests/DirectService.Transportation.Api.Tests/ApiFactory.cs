@@ -26,6 +26,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public CapturingEmailSender Emails { get; } = new();
 
+    /// <summary>Live messages the application published (record changes, locks, notifications), recorded instead of SignalR.</summary>
+    public RecordingNotifier Live { get; } = new();
+
     private readonly string _keysPath = Path.Combine(Path.GetTempPath(), "dst-api-tests-keys-" + Guid.NewGuid().ToString("N"));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -44,6 +47,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             s.RemoveAll<IEmailSender>();
             s.AddSingleton<IEmailSender>(Emails);
+            s.RemoveAll<IRealtimeNotifier>();
+            s.AddSingleton<IRealtimeNotifier>(Live);
         });
     }
 
@@ -218,5 +223,27 @@ public static class ApiHelpers
     {
         var doc = await r.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
         return doc.TryGetProperty("code", out var c) ? c.GetString()! : string.Empty;
+    }
+}
+
+/// <summary>Records what would be pushed to connected users (FR-185, FR-190).</summary>
+public sealed class RecordingNotifier : IRealtimeNotifier
+{
+    public ConcurrentQueue<(long CompanyId, string EntityType, string? Token, string Action)> Records { get; } = new();
+
+    public ConcurrentQueue<(Guid User, object Payload)> Notifications { get; } = new();
+
+    public Task RecordChangedAsync(long companyId, string entityType, string? token, string action, CancellationToken ct)
+    {
+        Records.Enqueue((companyId, entityType, token, action));
+        return Task.CompletedTask;
+    }
+
+    public Task LockChangedAsync(long companyId, string entityType, string token, string? holderName, CancellationToken ct) => Task.CompletedTask;
+
+    public Task NotifyUserAsync(Guid userPublicId, object notification, CancellationToken ct)
+    {
+        Notifications.Enqueue((userPublicId, notification));
+        return Task.CompletedTask;
     }
 }

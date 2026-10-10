@@ -32,7 +32,7 @@ public interface IEInvoiceSignal
 /// </summary>
 public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
     EInvoiceSettingsService settings, EInvoiceDocumentBuilder builder, ISpreadsheetService sheets, IEInvoiceSignal signal, IOptions<EInvoicingOptions> options,
-    TimeProvider clock)
+    TimeProvider clock, Collaboration.NotificationService notifications)
 {
     public const string EntityType = "TRN.EInvoiceSubmission";
     private const string ValidationPrefix = "validation:";
@@ -147,7 +147,8 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
     /// 5 minutes with the same UUID (the national system answers ALREADY_SUBMITTED if it has it) and cannot be voided meanwhile.
     /// </summary>
     public Task<bool> ProcessAsync(long id, bool manual, CancellationToken ct) => ProcessCoreAsync(id, manual, new SubmissionKind<EInvoiceSubmission>(
-        store.TryClaimAsync, store.LockAsync, DocumentAsync,
+        store.TryClaimAsync, store.LockAsync, DocumentAsync, Contracts.Security.PermissionKeys.InvIssue,
+        s => "/einvoice-submissions/" + support.Token<EInvoiceSubmission>(s.PublicId),
         async (s, c) =>
         {
             if (s.InvoiceId is not long invoiceId) return;
@@ -158,7 +159,8 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
 
     /// <summary>Processes one AP/AR receivable submission (D-15) exactly like an invoice or credit note.</summary>
     public Task<bool> ProcessApArAsync(long id, bool manual, CancellationToken ct) => ProcessCoreAsync(id, manual, new SubmissionKind<ApArEInvoiceSubmission>(
-        store.TryClaimApArAsync, store.LockApArAsync, ApArDocumentAsync,
+        store.TryClaimApArAsync, store.LockApArAsync, ApArDocumentAsync, Contracts.Security.PermissionKeys.AcctApar,
+        s => "/apar/e-invoice-submissions/" + support.Token<ApArEInvoiceSubmission>(s.PublicId),
         async (s, c) =>
         {
             if (s.ApArDocumentId is not long documentId) return;
@@ -170,7 +172,8 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
     /// <summary>The table-specific parts of processing: row claim and lock, the document to send, what an acceptance releases.</summary>
     private sealed record SubmissionKind<T>(
         Func<long, CancellationToken, Task<bool>> TryClaim, Func<long, CancellationToken, Task> Lock,
-        Func<T, EInvoiceSettings, CancellationToken, Task<EInvoiceDocument?>> Document, Func<T, CancellationToken, Task> Accepted) where T : AuditableEntity, IEInvoiceSubmission;
+        Func<T, EInvoiceSettings, CancellationToken, Task<EInvoiceDocument?>> Document, string Permission, Func<T, string> Link, Func<T, CancellationToken, Task> Accepted)
+        where T : AuditableEntity, IEInvoiceSubmission;
 
     private async Task<bool> ProcessCoreAsync<T>(long id, bool manual, SubmissionKind<T> kind, CancellationToken ct) where T : AuditableEntity, IEInvoiceSubmission
     {
@@ -255,6 +258,7 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
         }
 
         var accepted = false;
+        var rejected = false;
         await db.InTransactionAsync(async c =>
         {
             await kind.Lock(id, c).ConfigureAwait(false);
@@ -278,6 +282,7 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
                     s.Status = EInvoiceCodes.Rejected;
                     s.LastError = Truncate(outcome.Message);
                     changes.SetAction(s, "Rejected", s.LastError);
+                    rejected = true;
                     break;
                 default:
                     // The request may have arrived: kept as "outcome unknown" until a later attempt answers (review H1).
@@ -286,11 +291,19 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
                     {
                         s.Status = EInvoiceCodes.Rejected;
                         changes.SetAction(s, "Failed", outcome.Message);
+                        rejected = true;
                     }
                     break;
             }
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             if (accepted) await kind.Accepted(s, c).ConfigureAwait(false);
+            if (rejected && ctx.CompanyId is long companyId)
+            {
+                // FR-190: the users who can submit are told (with the reason, as returned).
+                await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, kind.Permission, c).ConfigureAwait(false), companyId,
+                    Collaboration.NotificationService.EInvoiceRejected, "رُفضت فاتورة إلكترونية: " + prepared.Document.Number + " — " + (s.LastError ?? string.Empty),
+                    "An e-invoice was rejected: " + prepared.Document.Number + " — " + (s.LastError ?? string.Empty), kind.Link(s), c).ConfigureAwait(false);
+            }
         }, ct).ConfigureAwait(false);
         if (accepted) signal.Notify();
         return accepted;

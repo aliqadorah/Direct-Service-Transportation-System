@@ -10,6 +10,8 @@ namespace DirectService.Transportation.Application.Common;
 /// </summary>
 public sealed class AuditTrail(IAppDbContext db, IRequestContext ctx)
 {
+    private static readonly JsonSerializerOptions Readable = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     public void Record(string entityType, long entityId, string action, string? reason = null, IReadOnlyDictionary<string, object?>? values = null)
     {
         var newValues = new Dictionary<string, object?>(values ?? new Dictionary<string, object?>());
@@ -23,7 +25,7 @@ public sealed class AuditTrail(IAppDbContext db, IRequestContext ctx)
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            NewValues = newValues.Count == 0 ? null : JsonSerializer.Serialize(newValues),
+            NewValues = newValues.Count == 0 ? null : JsonSerializer.Serialize(newValues, Readable),
             IpAddress = ctx.IpAddress,
         });
     }

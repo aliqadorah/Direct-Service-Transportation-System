@@ -40,7 +40,7 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 /// </list>
 /// </summary>
 public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IRequestContext ctx,
-    IChangeContext changes, TimeProvider clock, ILogger<PostingEngine>? log = null)
+    IChangeContext changes, TimeProvider clock, Collaboration.NotificationService? notifications = null, ILogger<PostingEngine>? log = null)
 {
     public const int DescriptionMax = 500;
     public const int NoteMax = 300;
@@ -225,6 +225,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             // One open pending row per document (UX_PendingPostings_Source): a repeated failure updates it (CR-B2-03).
             var open = await db.Set<PendingPosting>().SingleOrDefaultAsync(p => p.SourceModule == request.SourceModule
                 && p.SourceType == request.SourceType && p.SourceId == request.SourceId && p.ResolvedAt == null, ct).ConfigureAwait(false);
+            var first = open is null;
             if (open is null)
             {
                 db.Set<PendingPosting>().Add(new PendingPosting
@@ -244,6 +245,13 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 open.LastAttemptAt = now;
             }
             await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (first && notifications is not null && ctx.CompanyId is long companyId)
+            {
+                // FR-190: the users who retry postings (je.export) learn that an entry waits.
+                await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, Contracts.Security.PermissionKeys.JeExport, ct).ConfigureAwait(false), companyId,
+                    Collaboration.NotificationService.PostingFailed, "تعذّر ترحيل قيد وينتظر في الترحيلات المعلّقة: " + request.Description,
+                    "An entry could not be posted and waits in pending postings: " + request.Description, "/ledger/pending-postings", ct).ConfigureAwait(false);
+            }
             return null;
         }
     }

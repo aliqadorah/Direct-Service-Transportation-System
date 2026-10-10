@@ -37,9 +37,9 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
 
     /// <summary>High-frequency technical rows whose changes are not business events.</summary>
     // trn.TRN_RateHistory is itself the change log of tariffs and monthly rates (their rows are also audited in core.AuditLogs).
-    private static readonly HashSet<Type> NotAudited = [typeof(UserSession), typeof(RecordLock), typeof(AuditLog), typeof(RateHistory)];
+    private static readonly HashSet<Type> NotAudited = [typeof(UserSession), typeof(RecordLock), typeof(AuditLog), typeof(RateHistory), typeof(Notification)];
 
-    private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private sealed class State
     {

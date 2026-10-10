@@ -70,6 +70,7 @@ if (config.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<LockExpiryWorker>();
     builder.Services.AddHostedService<PendingPostingWorker>();
     builder.Services.AddHostedService<EInvoiceWorker>();
+    builder.Services.AddHostedService<ExportWorker>();
 }
 
 var app = builder.Build();
@@ -113,7 +114,7 @@ var api = app.MapGroup("/api/v1").AddEndpointFilter<AntiforgeryFilter>();
 api.MapAuthEndpoints();
 api.MapMeEndpoints();
 api.MapTenantEndpoints();
-var company = api.MapGroup("/companies/{company}").AddEndpointFilter<WriteGuardFilter>();
+var company = api.MapGroup("/companies/{company}").AddEndpointFilter<WriteGuardFilter>().AddEndpointFilter<ExportAuditFilter>();
 company.MapUserAdminEndpoints();
 company.MapSettingsEndpoints();
 company.MapLockEndpoints();
@@ -127,6 +128,7 @@ company.MapCashEndpoints();
 company.MapApArEndpoints();
 company.MapLedgerReportEndpoints();
 company.MapReportEndpoints();
+company.MapCollaborationEndpoints();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);

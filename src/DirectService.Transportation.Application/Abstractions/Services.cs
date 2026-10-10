@@ -88,9 +88,18 @@ public interface IRecordLockGuard
 }
 
 /// <summary>Pushes changes to connected users of the same company (RT-01).</summary>
+/// <summary>Actions run once the current database transaction commits (none on rollback); at once when no transaction is open.</summary>
+public interface IAfterCommit
+{
+    void Add(Func<Task> action);
+}
+
 public interface IRealtimeNotifier
 {
-    Task RecordChangedAsync(long companyId, string entityType, string token, string action, CancellationToken ct);
+    Task RecordChangedAsync(long companyId, string entityType, string? token, string action, CancellationToken ct);
+
+    /// <summary>A new in-app notification for one user (FR-190): pushed to that user's connections.</summary>
+    Task NotifyUserAsync(Guid userPublicId, object notification, CancellationToken ct);
     Task LockChangedAsync(long companyId, string entityType, string token, string? holderName, CancellationToken ct);
 }
 

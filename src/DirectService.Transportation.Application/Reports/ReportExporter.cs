@@ -73,7 +73,7 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
         return clean.Length <= 31 ? clean : clean[..31];
     }
 
-    private static string Safe(string name) => new(name.Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch : '_').ToArray());
+    private static string Safe(string name) => new(name.Select(ch => char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_' ? ch : '_').ToArray());
 
     private string Html(ReportTable t, Company company)
     {
