@@ -21,7 +21,7 @@ _Decided by the owner on 8 Oct 2026. Answers to D-01 … D-18 in `docs/step1/01_
 | D-13 | G-08, G-09 provider staff | **Agree:** every platform-staff user can use the provider console; tenant data only inside an approved support window, read-only, every request audited. |
 | D-14 | G-04, G-10 … G-18, G-20, G-21 | **Agree** with the recommendations in §7 (incl. G-04 `ACC.OpeningBalanceDifference` posting key; G-16 option (c)). |
 | D-15 | E-invoicing of AR receivable documents | **Agree: include.** |
-| D-16 | G-19 number prefixes | **Approved:** TRP-, CRN-, RCV-, ADV-, STL-, PPY-, JV-, BIL-, ARD-, PAY-, RTN-, JEX-; 5 digits each. |
+| D-16 | G-19 number prefixes | **Approved:** INV- (invoices; changed from TRP- by the owner on 10 Oct 2026 at step 6 approval), CRN-, RCV-, ADV-, STL-, PPY-, JV-, BIL-, ARD-, PAY-, RTN-, JEX-; 5 digits each. |
 | D-17 | Assumptions A-01 … A-22 | **Agree.** A-19 collation is proposed in step 2. |
 | D-18 | REL-10 user guide and help pages (Arabic + English) | **In scope:** a short help page per main flow, written at the end of the build. |
 

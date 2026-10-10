@@ -35,7 +35,7 @@ public sealed class FoundationUnitTests
     }
 
     [Theory]
-    [InlineData("TRP-", 5, 45, "TRP-00045")]
+    [InlineData("INV-", 5, 45, "INV-00045")]
     [InlineData("STL-", 5, 1, "STL-00001")]
     [InlineData("", 3, 1234, "1234")]
     [InlineData("JV-", 10, 7, "JV-0000000007")]
@@ -46,7 +46,7 @@ public sealed class FoundationUnitTests
     public void Approved_number_prefixes_D16()
     {
         Assert.Equal(12, DocumentTypes.DefaultPrefixes.Count);
-        Assert.Equal(["ADV-", "ARD-", "BIL-", "CRN-", "JEX-", "JV-", "PAY-", "PPY-", "RCV-", "RTN-", "STL-", "TRP-"],
+        Assert.Equal(["ADV-", "ARD-", "BIL-", "CRN-", "INV-", "JEX-", "JV-", "PAY-", "PPY-", "RCV-", "RTN-", "STL-"],
             DocumentTypes.DefaultPrefixes.Values.Order(StringComparer.Ordinal).ToArray());
     }
 

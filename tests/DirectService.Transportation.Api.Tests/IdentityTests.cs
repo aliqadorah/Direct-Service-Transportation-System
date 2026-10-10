@@ -46,7 +46,7 @@ public sealed class IdentityTests(ApiFactory f)
             Assert.Equal(8, await db.Set<CompanySetting>().IgnoreQueryFilters(AllFilters).CountAsync(s => s.CompanyId == company.Id));
             var seqs = await db.Set<NumberSequence>().IgnoreQueryFilters(AllFilters).Where(s => s.CompanyId == company.Id).ToListAsync();
             Assert.Equal(12, seqs.Count);
-            Assert.Equal("TRP-", seqs.Single(s => s.DocumentType == "TRN.Invoice").Prefix);
+            Assert.Equal("INV-", seqs.Single(s => s.DocumentType == "TRN.Invoice").Prefix);
             Assert.Equal("STL-", seqs.Single(s => s.DocumentType == "TRN.Settlement").Prefix);
             Assert.Equal(2, await db.Set<InvoiceLayout>().IgnoreQueryFilters(AllFilters).CountAsync(l => l.CompanyId == company.Id));
             Assert.False((await db.Set<EInvoiceSettings>().IgnoreQueryFilters(AllFilters).SingleAsync(e => e.CompanyId == company.Id)).IsEnabled);

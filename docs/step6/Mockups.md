@@ -1,6 +1,12 @@
 # Step 6 — Full mockups (checkpoint 3)
 
-_10 Oct 2026. **Waiting for the owner's approval.** No UI code is written before approval._
+_10 Oct 2026. **Approved by the owner on 10 Oct 2026 as the basis for steps 7–8**, with the fixes below (applied to the board; carried into the design system in step 7)._
+
+## Owner fixes applied (10 Oct 2026)
+1. **Bidi isolation everywhere:** every left-to-right run inside Arabic text (codes such as TRP-10481 / INV-02210, dates, amounts, IBANs, Latin words) is isolated as one unit; joined Latin tokens stay together. The board applies it to every rendered text node; the Blazor components will use `<bdi>`/isolated spans the same way (step 7).
+2. **Invoice prefix INV-** (D-16 updated; the default sequence in code changed from TRP- to INV-); sample data consistent.
+3. **SCR-11 trip form:** three columns, calculation and history stacked in one side column, shorter price-source notes on one line; no clipped field.
+4. **SCR-10 quick entry:** a focused selection widens to show the full name, the dropdown lists full names (new variant "Quick entry: customer dropdown"), and clipped values show in full on hover.
 
 **Mockup board:** `docs/step6/index.html` (serve the `docs` folder, e.g. `py -m http.server 8765 --directory docs`, then open `/step6/`; the page loads its screens from the `.js` files next to it). The same board is published as a private artifact (link in the session message and in `BUILD_STATUS.md`).
 
@@ -14,7 +20,7 @@ _10 Oct 2026. **Waiting for the owner's approval.** No UI code is written before
 Ledger kept as chosen: dark side menu on the right with the PRD groups (UX-11), dense tables, 3 px corners, hairline borders, no shadows, square status tags with icon + text (UX-05), quick-entry strip on the trips page.
 
 ## Coverage
-69 screens: SCR-00 (shell) and every screen of PRD 13.5 numbered in the traceability matrix (SCR-01 … SCR-94, including the five G-21 placements). Each screen has five states — **default, loading, empty, error, success** — and 32 screens have variants for their modes (for example sign-in password / authenticator code / recovery code; invoice draft / approved / void / e-invoice rejected; trips quick entry / Created Trips list; settlement; pre-close check; typed confirmation). 580 screen × state × variant combinations, all rendered and checked for missing text and overflow.
+69 screens: SCR-00 (shell) and every screen of PRD 13.5 numbered in the traceability matrix (SCR-01 … SCR-94, including the five G-21 placements). Each screen has five states — **default, loading, empty, error, success** — and 32 screens have variants (SCR-10 now has three) for their modes (for example sign-in password / authenticator code / recovery code; invoice draft / approved / void / e-invoice rejected; trips quick entry / Created Trips list; settlement; pre-close check; typed confirmation). 580 screen × state × variant combinations, all rendered and checked for missing text and overflow.
 
 | Group | Screens |
 |---|---|
@@ -41,5 +47,3 @@ Ledger kept as chosen: dark side menu on the right with the PRD groups (UX-11), 
 - DT-68 Saved views storage (no schema change): stored as rows of `cfg.TableColumnViews` under namespaced keys (`<list>#view:<name>`), with the Columns JSON holding columns + filters + name; personal (UserId) or company-shared (UserId NULL, settings.manage). Built-in views ("Unbilled", "Needs review"…) are defined in code.
 - DT-69 Density preference: stored per device in the browser (no column in `core.Users`); shown in the profile as "saved on this device".
 
-## Question for the owner
-Approve the mockups as the basis for steps 7–8 (design system and UI implementation)? Comments per screen are welcome — refer to the SCR number and state.

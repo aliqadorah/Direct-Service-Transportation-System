@@ -53,7 +53,7 @@ public static class DocumentTypes
 
     public static readonly IReadOnlyDictionary<string, string> DefaultPrefixes = new Dictionary<string, string>
     {
-        [Invoice] = "TRP-",
+        [Invoice] = "INV-",
         [CreditNote] = "CRN-",
         [Receipt] = "RCV-",
         [Advance] = "ADV-",
@@ -69,7 +69,7 @@ public static class DocumentTypes
 
     public const byte DefaultDigits = 5;
 
-    /// <summary>Formats a number: prefix + zero-padded counter, e.g. TRP-00045.</summary>
+    /// <summary>Formats a number: prefix + zero-padded counter, e.g. INV-00045.</summary>
     public static string Format(string prefix, byte digits, long number) =>
         prefix + number.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(digits, '0');
 }

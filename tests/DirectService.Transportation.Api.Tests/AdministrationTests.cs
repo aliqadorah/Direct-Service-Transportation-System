@@ -223,7 +223,7 @@ public sealed class AdministrationTests(ApiFactory f)
 
         var seqs = await owner.Client.GetFromJsonAsync<List<NumberSequenceResponse>>(U(owner, "/settings/number-sequences"));
         var inv = seqs!.Single(s => s.DocumentType == "TRN.Invoice");
-        Assert.Equal("TRP-00001", inv.NextFormatted);
+        Assert.Equal("INV-00001", inv.NextFormatted);
         var updated = await owner.Client.PutAsJsonAsync(U(owner, $"/settings/number-sequences/{inv.Id}"), new NumberSequenceRequest("INV-", 6, 100, inv.RowVersion));
         await updated.EnsureOkAsync();
         var seq = (await updated.Content.ReadFromJsonAsync<NumberSequenceResponse>())!;

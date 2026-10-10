@@ -125,6 +125,13 @@ table.grid input[type=checkbox]{margin:0;accent-color:var(--primary)}
 .field>label b{color:var(--err);font-weight:600}
 .input{height:var(--ctl);border:1px solid #CDD5D3;border-radius:var(--r);background:var(--surface);display:flex;align-items:center;padding:0 9px;gap:6px;font-size:13.5px;min-width:0;overflow:hidden;white-space:nowrap}
 .input.num{justify-content:flex-end}
+.input .v{overflow:hidden;text-overflow:ellipsis;min-width:0;white-space:nowrap}
+.input.ta .v{white-space:normal}
+.input.expand{position:relative;z-index:6;width:max-content;min-width:100%;max-width:340px}
+.ddlist{position:absolute;z-index:7;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);box-shadow:0 8px 24px rgba(10,53,64,.16);min-width:300px;font-size:13.5px}
+.ddlist div{display:flex;justify-content:space-between;gap:14px;padding:6px 10px;white-space:nowrap}
+.ddlist div.on{background:var(--tint)}
+.ddlist small{color:var(--muted);font-size:12px}
 .input.ta{height:auto;min-height:56px;align-items:flex-start;padding-top:6px;white-space:normal}
 .input.focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(15,76,92,.22)}
 .input.bad{border-color:var(--err);background:#FFFBFA}

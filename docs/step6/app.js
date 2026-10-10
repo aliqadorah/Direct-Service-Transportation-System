@@ -6,8 +6,14 @@ window.DS = (function () {
   // ------------------------------------------------------------------ primitives
   const ic = (n, cls = "") => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
   const N = (v) => `<span class="num">${v}</span>`;
-  /** Wraps digit runs inside Arabic text so dates and amounts keep their order. */
-  const T = (s) => String(s).replace(/([0-9][0-9.,:\/%٪+\-−]*[0-9%٪]|[0-9])/g, '<span class="num">$1</span>');
+  /**
+   * Isolates every left-to-right run inside Arabic text (codes such as TRP-10481 or INV-02210, dates, amounts, IBANs,
+   * "Volvo FH", "Ctrl K") as ONE unit, so the run keeps its internal order in RTL. Runs of Latin tokens joined by spaces,
+   * "·" or "/" stay together. Markup inside the string is left untouched.
+   */
+  const TOKEN = "[A-Za-z0-9](?:[A-Za-z0-9.,:%٪+\\-−–_@']*[A-Za-z0-9%٪])?";
+  const RUN = new RegExp(`(${TOKEN}(?:(?:\\s*[·/]\\s*|\\s+)${TOKEN})*)`, "g");
+  const T = (s) => String(s).split(/(<[^>]*>|&[a-z#0-9]+;)/i).map((part, i) => (i % 2 ? part : part.replace(RUN, '<span class="num">$1</span>'))).join("");
   const badge = (k, text, icon) => `<span class="badge b-${k}">${icon ? ic(icon) : ""}${T(text)}</span>`;
   const STATUS = {
     unbilled: ["info", "غير مفوترة", "clock"], invoiced: ["ok", "مفوترة", "check"], settled: ["mute", "مسوّاة", "check"], void: ["err", "ملغاة", "x"],
@@ -60,7 +66,7 @@ window.DS = (function () {
   function field(label, value, o = {}) {
     const v = value === undefined || value === null || value === "" ? (o.ph ? `<span class="ph">${o.ph}</span>` : "") : (o.num ? N(value) : T(value));
     return `<div class="field" style="${o.span ? `grid-column:span ${o.span}` : ""}"><label>${label}${o.req ? ' <b aria-hidden="true">*</b>' : ""}</label>
-      <div class="input ${o.num ? "num" : ""} ${o.focus ? "focus" : ""} ${o.err ? "bad" : ""} ${o.ro ? "ro" : ""} ${o.ta ? "ta" : ""}" ${o.err ? 'aria-invalid="true"' : ""}>${o.icon ? ic(o.icon) : ""}${v}${o.dd ? `<span class="dd">${ic("down")}</span>` : ""}${o.cal ? `<span class="dd">${ic("calendar")}</span>` : ""}</div>
+      <div class="input ${o.num ? "num" : ""} ${o.focus ? "focus" : ""} ${o.err ? "bad" : ""} ${o.ro ? "ro" : ""} ${o.ta ? "ta" : ""} ${o.expand ? "expand" : ""}" ${o.err ? 'aria-invalid="true"' : ""} ${value ? `title="${String(value).replace(/"/g, "&quot;")}"` : ""}>${o.icon ? ic(o.icon) : ""}<span class="v">${v}</span>${o.dd ? `<span class="dd">${ic("down")}</span>` : ""}${o.cal ? `<span class="dd">${ic("calendar")}</span>` : ""}</div>
       ${o.err ? `<span class="help err">${ic("alert")}${T(o.err)}</span>` : o.help ? `<span class="help">${T(o.help)}</span>` : ""}${o.src ? `<span class="src">${ic("check")}${T(o.src)}</span>` : ""}</div>`;
   }
   const fg = (cols, inner, style = "") => `<div class="fg" style="grid-template-columns:repeat(${cols},minmax(0,1fr));${style}">${inner}</div>`;
@@ -219,10 +225,29 @@ window.DS = (function () {
     document.querySelectorAll("#seg-density button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === density)));
     const scr = document.getElementById("screen");
     scr.innerHTML = `<div class="app ${density === "comfy" ? "comfy" : ""}">${compose(s, state, variant)}</div>`;
+    isolate(scr);
     document.getElementById("url").textContent = "app.directservice.jo/" + (s.url || "c/7kQ2m9/" + s.id.toLowerCase());
     document.getElementById("meta").innerHTML = `<span><b>${s.id}</b> · ${s.en} · <span lang="ar" dir="rtl">${s.ar}</span></span><span>${s.group}</span>${s.reqs ? `<span>Covers: ${s.reqs}</span>` : ""}`;
     document.getElementById("notes").innerHTML = `<b>${STATES.find((x) => x[0] === state)[1]} state.</b> ${(s.notes && s.notes[state]) || (s.notes && s.notes.default) || ""}`;
     scr.querySelectorAll("[data-go]").forEach((el) => el.addEventListener("click", () => { if (BYID[el.dataset.go]) { cur = el.dataset.go; state = "default"; save(); render(); } }));
+  }
+
+  /**
+   * Bidi safety net over the rendered screen: every text node that still holds a left-to-right run (code, number, date,
+   * Latin word) outside an isolate gets its runs wrapped, the same rule the Blazor components apply with &lt;bdi&gt;.
+   */
+  function isolate(root) {
+    const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (/[A-Za-z0-9]/.test(n.nodeValue) && !n.parentElement.closest(".num,.kbd,svg,style,script,select,option,textarea")) nodes.push(n);
+    }
+    for (const n of nodes) {
+      const span = document.createElement("span");
+      span.innerHTML = esc(n.nodeValue).replace(RUN, '<span class="num">$1</span>');
+      n.replaceWith(...span.childNodes);
+    }
   }
 
   function boot() {
