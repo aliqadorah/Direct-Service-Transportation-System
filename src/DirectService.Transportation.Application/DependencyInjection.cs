@@ -138,6 +138,12 @@ public static class DependencyInjection
         services.AddScoped<LedgerReportService>();
         services.AddScoped<LedgerReportExports>();
         services.AddScoped<MaintenanceService>();
+
+        // Reports and dashboard (B10)
+        services.AddScoped<StandardReportService>();
+        services.AddScoped<ReportBuilderService>();
+        services.AddScoped<SavedReportService>();
+        services.AddScoped<DashboardService>();
         services.AddScoped<SupplierBillPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());
         services.AddScoped<ReceivablePostingHandler>();

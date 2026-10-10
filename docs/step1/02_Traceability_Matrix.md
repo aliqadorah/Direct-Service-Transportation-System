@@ -291,20 +291,20 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-137 | Today / month-to-date figures | M | M12 | TRN_Trips, TRN_Invoices, TRN_Receipts | DashboardQueries | SCR-07 | I P | ☐ |
-| FR-138 | Alert cards opening filtered lists | M | M12 | TRN_Drivers (IX_TRN_Drivers_Expiry), TRN_Trips, TRN_Invoices, TRN_EInvoiceSubmissions, PendingPostings, TRN_MonthlySiteRates | DashboardQueries | SCR-07 | I E | ☐ |
-| FR-139 | Cash/bank balance cards | M | M12 | EntryLines, CashBoxes, BankAccounts | DashboardQueries | SCR-07 | I | ☐ |
-| FR-140 | Pins with thresholds | M | M12 | DashboardPins, SavedReports | DashboardPinService | SCR-07 | I E | ☐ |
-| FR-141 | Cards by permission; live refresh | M | M12/M13 | — | DashboardQueries, RealtimeHub | SCR-07 | S E | ☐ |
-| FR-142 | All standard reports RPT-01…23 | M | M12 | (per report) | ReportCatalog | SCR-50, SCR-51 | I | ☐ |
-| FR-143 | Report builder data sources incl. custom fields | M | M12 | SavedReports, CustomFieldDefinitions | ReportBuilderEngine | SCR-52 | I | ☐ |
-| FR-144 | Grouping, measures, filters, sort, top-N, detail | M | M12 | SavedReports.Definition | ReportBuilderEngine | SCR-52 | U I | ☐ |
-| FR-145 | Private/shared; edit rights | M | M12 | SavedReports.IsShared/OwnerUserId | SavedReportService | SCR-53 | I S | ☐ |
-| FR-146 | Run, export, pin | M | M12 | SavedReports, DashboardPins | SavedReportService | SCR-53 | E | ☐ |
-| FR-147 | Data source needs its view permission | M | M12 | — | ReportBuilderEngine | SCR-52 | S | ☐ |
-| FR-148 | Period/as-of, filters, selected company, totals | M | M12 | — | ReportBase | SCR-50, SCR-51 | I | ☐ |
-| FR-149 | Drill-down from every line | M | M12 | — | ReportDrillDown | SCR-50, SCR-51 | E | ☐ |
-| FR-150 | Excel/PDF of every screen and report; print header/footer, RTL | M | M14 | — | ExportService, PdfRenderer | All list/report screens, SCR-09 | I E | ☐ |
+| FR-137 | Today / month-to-date figures | M | M12 | TRN_Trips, TRN_Invoices, TRN_Receipts | DashboardQueries | SCR-07 | I P | ☑ |
+| FR-138 | Alert cards opening filtered lists | M | M12 | TRN_Drivers (IX_TRN_Drivers_Expiry), TRN_Trips, TRN_Invoices, TRN_EInvoiceSubmissions, PendingPostings, TRN_MonthlySiteRates | DashboardQueries | SCR-07 | I E | ☑ |
+| FR-139 | Cash/bank balance cards | M | M12 | EntryLines, CashBoxes, BankAccounts | DashboardQueries | SCR-07 | I | ☑ |
+| FR-140 | Pins with thresholds | M | M12 | DashboardPins, SavedReports | DashboardPinService | SCR-07 | I E | ☑ |
+| FR-141 | Cards by permission; live refresh | M | M12/M13 | — | DashboardQueries, RealtimeHub | SCR-07 | S E | ☑ |
+| FR-142 | All standard reports RPT-01…23 | M | M12 | (per report) | ReportCatalog | SCR-50, SCR-51 | I | ☑ |
+| FR-143 | Report builder data sources incl. custom fields | M | M12 | SavedReports, CustomFieldDefinitions | ReportBuilderEngine | SCR-52 | I | ☑ |
+| FR-144 | Grouping, measures, filters, sort, top-N, detail | M | M12 | SavedReports.Definition | ReportBuilderEngine | SCR-52 | U I | ☑ |
+| FR-145 | Private/shared; edit rights | M | M12 | SavedReports.IsShared/OwnerUserId | SavedReportService | SCR-53 | I S | ☑ |
+| FR-146 | Run, export, pin | M | M12 | SavedReports, DashboardPins | SavedReportService | SCR-53 | E | ☑ |
+| FR-147 | Data source needs its view permission | M | M12 | — | ReportBuilderEngine | SCR-52 | S | ☑ |
+| FR-148 | Period/as-of, filters, selected company, totals | M | M12 | — | ReportBase | SCR-50, SCR-51 | I | ☑ |
+| FR-149 | Drill-down from every line | M | M12 | — | ReportDrillDown | SCR-50, SCR-51 | E | ☑ |
+| FR-150 | Excel/PDF of every screen and report; print header/footer, RTL | M | M14 | — | ExportService, PdfRenderer | All list/report screens, SCR-09 | I E | ☑ |
 | FR-151 | Large exports in background with notification | S | M14 | Notifications | ExportJob | SCR-00 (notifications) | I | ☐ |
 
 ### C.8 Master data (7.8)
@@ -382,9 +382,9 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-18 | Automatic journal entries | FR-096–101 | SCR-34 | E | ◐ |
 | US-19 | Period closing | FR-132–134 | SCR-44 | E | ◐ |
 | US-20 | Accounting operations | FR-107–131 | SCR-30…43 | E | ◐ |
-| US-21 | Dashboard | FR-137–141 | SCR-07 | E | ☐ |
+| US-21 | Dashboard | FR-137–141 | SCR-07 | E | ☑ |
 | US-22 | Account statements and ageing | RPT-12…18 | SCR-51 | E | ☐ |
-| US-23 | Report builder | FR-143–147 | SCR-52, SCR-53 | E | ☐ |
+| US-23 | Report builder | FR-143–147 | SCR-52, SCR-53 | E | ☑ |
 | US-24 | Driver records with truck details | FR-152–156 | SCR-60 | E | ◐ |
 | US-25 | Protected deletion | FR-162, 163 | SCR-60…66 | E | ☑ |
 | US-26 | Custom fields | FR-179–181 | SCR-75 | E | ☑ |

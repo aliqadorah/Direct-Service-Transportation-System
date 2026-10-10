@@ -126,6 +126,7 @@ company.MapEInvoicingEndpoints();
 company.MapCashEndpoints();
 company.MapApArEndpoints();
 company.MapLedgerReportEndpoints();
+company.MapReportEndpoints();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);

@@ -388,6 +388,27 @@ internal static class ApiSummaries
         ["POST /api/v1/companies/{company}/accounting/maintenance/backup"] = "JSON backup of the accounting data before maintenance (FR-136)",
         ["POST /api/v1/companies/{company}/accounting/maintenance/{action}/preview"] = "Preview a maintenance action: records affected, linked entries kept, blockers, confirmation word (FR-135, FR-136)",
         ["POST /api/v1/companies/{company}/accounting/maintenance/{action}"] = "Run a maintenance action with the typed confirmation word; soft deletions, logged (FR-135, FR-136)",
+
+        // Reports and dashboard (B10)
+        ["GET /api/v1/companies/{company}/dashboard/"] = "Dashboard: today or month-to-date figures, alert cards, cash and bank balances, pinned reports — each by permission (FR-137 … FR-141)",
+        ["GET /api/v1/companies/{company}/dashboard/pins"] = "The user's pinned reports with value and normal / warning / exceeded state (FR-140)",
+        ["POST /api/v1/companies/{company}/dashboard/pins"] = "Pin a saved report with a measure and thresholds (FR-140)",
+        ["PUT /api/v1/companies/{company}/dashboard/pins/{pin}"] = "Change a pin's measure or thresholds (FR-140)",
+        ["POST /api/v1/companies/{company}/dashboard/pins/order"] = "Reorder the user's pins (FR-140)",
+        ["POST /api/v1/companies/{company}/dashboard/pins/{pin}/delete"] = "Remove a pin from the dashboard (FR-140)",
+        ["GET /api/v1/companies/{company}/reports/catalog"] = "Standard reports the caller may run, with the API path of those served by their module (FR-142)",
+        ["GET /api/v1/companies/{company}/reports/standard/{key}"] = "Run a standard report (RPT-02 … RPT-12, RPT-19, RPT-20) with its filters and totals (FR-142, FR-148, FR-149)",
+        ["GET /api/v1/companies/{company}/reports/standard/{key}/export"] = "Export a standard report as Excel, CSV or PDF (FR-150)",
+        ["GET /api/v1/companies/{company}/reports/builder/sources"] = "Data sources and fields of the report builder, custom fields included, by permission (FR-143, FR-147)",
+        ["POST /api/v1/companies/{company}/reports/builder/run"] = "Run a report definition: grouping, measures, filters, sort, top-N or detail (FR-144)",
+        ["POST /api/v1/companies/{company}/reports/builder/export"] = "Export a report definition's result as Excel, CSV or PDF (FR-146)",
+        ["GET /api/v1/companies/{company}/reports/saved/"] = "Saved reports: mine, shared, pinned (FR-145)",
+        ["GET /api/v1/companies/{company}/reports/saved/{report}"] = "A saved report with its definition (FR-145)",
+        ["POST /api/v1/companies/{company}/reports/saved/"] = "Save a report, private or shared with the company (FR-145)",
+        ["PUT /api/v1/companies/{company}/reports/saved/{report}"] = "Edit a saved report (owner, or an administrator for shared ones) (FR-145)",
+        ["POST /api/v1/companies/{company}/reports/saved/{report}/delete"] = "Delete a saved report and its pins (FR-145)",
+        ["POST /api/v1/companies/{company}/reports/saved/{report}/run"] = "Run a saved report, optionally for another period (FR-146)",
+        ["POST /api/v1/companies/{company}/reports/saved/{report}/export"] = "Export a saved report as Excel, CSV or PDF (FR-146)",
     };
 
     public static string Key(string method, string? route) => $"{method} /{route?.TrimStart('/')}";

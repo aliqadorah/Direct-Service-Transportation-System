@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 10 Oct 2026 (step 6 approved; step 4 · B1–B9 done; DT-70…DT-100 accepted; next: B10 reports & dashboard, then B11–B12, then steps 7–8)_
+_Last updated: 10 Oct 2026 (step 6 approved; step 4 · B1–B10 done; DT-70…DT-100 accepted; next: B11 collaboration, then B12, then steps 7–8)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -24,7 +24,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 2 | `docs/step2/01_Architecture_and_Build_Plan.md` (ADR-01…18, API design, security model, build order), `02_Owner_Decisions_Step2.md` |
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (**approved 8 Oct 2026**, seeded in B2) |
 | Design | `docs/design/Database_Design_Revision5.md` |
-| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md`, `docs/step4/B4_Pricing.md`, `docs/step4/B5_Trips.md` … `docs/step4/B9_ApAr_and_Financial_Reports.md` (delivery, tests, code + security review) |
+| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md`, `docs/step4/B4_Pricing.md`, `docs/step4/B5_Trips.md` … `docs/step4/B10_Reports_and_Dashboard.md` (delivery, tests, code + security review) |
 | 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions; **owner chose A · Ledger + C parts**; https://claude.ai/artifact/JkisN139zLE9tGYCGKmDit) |
 | 6 | `docs/step6/Mockups.md` + `docs/step6/index.html` (+ `app.js`, `screens-*.js`; serve `docs/` over HTTP to view locally — `.claude/launch.json` config "mockups") — **waiting for approval** |
 | API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
@@ -53,13 +53,15 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 
 - **Step 4 · B9 — AP/AR, financial reports & maintenance: done (10 Oct 2026).** Accounting parties (control account per role, transport customers as receivable parties), supplier bills and receivable documents (BIL-/ARD-, posted, tax rounded once), payments/collections (PAY-), returns with the mirror entry (RTN-), voids and printouts, ageing with unapplied receipts; receivables e-invoiced through a generic `EInvoiceService` (both submission tables, one ICV); general ledger, account statement, trial balance at a tree level, P&L (cost centre, comparison), balance sheet with the current result, cost-centre report, cash/bank statements and balances, sub-ledger reconciliation (ledger lines and documents); shared `ReportExporter` (Excel/CSV/PDF/HTML); maintenance zone (preview, typed confirmation, backup, soft deletions, log). 60 operations. 279 tests. Independent review: no High; M1, M2, L1–L8 fixed (`docs/step4/B9_ApAr_and_Financial_Reports.md`). OpenAPI 307 paths, Redocly clean.
 
+- **Step 4 · B10 — Reports & dashboard: done (10 Oct 2026).** Dashboard (figures, alert cards with filtered-list links, cash/bank cards, pins, by permission), standard reports catalog RPT-01…23 with 13 reports computed in `StandardReportService`, report builder over ten sources with custom fields (SQL-side grouping through expression trees, pivot, filters, top-N, detail), saved reports (private/shared), pins with thresholds. 19 operations. 289 tests. Independent review: no High; B10-1…5, 7…12 fixed, B10-6 decided (DT-117) (`docs/step4/B10_Reports_and_Dashboard.md`). OpenAPI 323 paths, Redocly clean.
+
 ## Current step
 - **Step 6 — full mockups: approved 10 Oct 2026 as the basis for steps 7–8**, with fixes applied to the board: bidi isolation of codes/numbers, invoice prefix INV-, wider trip-form fields, full names in the quick-entry row on focus/dropdown (`docs/step6/Mockups.md`, board `docs/step6/index.html`, private artifact https://claude.ai/artifact/A9UDCp84GdEqF3qYtmn5Mr): 69 screens (SCR-00…SCR-94) in A · Ledger + C parts, Arabic RTL, five states each, 32 screens with variants. **No UI code before approval.** After approval: step 7 (tokens + Blazor components from the board's CSS), then step 8.
-- **Step 4 · B10 — Reports & dashboard** (FR-137…151): dashboard figures/alerts/cash cards/pins, standard reports RPT-01…23 (catalog; B9 and earlier modules serve RPT-01, 13–18, 21–23), report builder with saved reports and pins, exports through `ReportExporter`. Started: `Contracts/Reports/ReportContracts.cs` and `Application/Reports/StandardReportService.cs` (not yet registered or tested). Then B11, B12, then steps 7–8.
+- **Step 4 · B11 — Collaboration** (FR-185…190, FR-151): live record changes after commit (SignalR, RT-01/02), global search with Arabic folding (started: `Application/Collaboration/GlobalSearchService.cs`, `Abstractions/SqlText.cs` with the `TRANSLATE` mapping, `Contracts/Collaboration/CollaborationContracts.cs` — not yet registered or tested), notifications, audit-log viewer and export, background exports. Then B12, then steps 7–8.
 
 ## Resume here (for a new session)
 1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
-2. Step 6 is approved (with fixes applied). Next backend block: **B10** (see "Current step"); requirements PRD 7.7, FR-137…151, RPT-01…23 of the traceability matrix; mockups SCR-07, SCR-50…53. Read `docs/step4/B9_ApAr_and_Financial_Reports.md` (`LedgerReportService`, `ReportExporter`, ageing). After B12: step 7 (design tokens and reusable Blazor components from the board `docs/step6/`), step 8 (screens), step 9.
+2. Step 6 is approved (with fixes applied). Next backend block: **B11** (see "Current step"); requirements PRD 7.9.4–7.9.5, 12.4, FR-151, FR-185…190; mockups SCR-00, SCR-77. Read `docs/step4/B10_Reports_and_Dashboard.md` and `Web/Realtime/LiveHub.cs` (`IRealtimeNotifier`). After B12: step 7 (design tokens and reusable Blazor components from the board `docs/step6/`), step 8 (screens), step 9.
 3. Module pattern (follow B1):
    - Services in `src/…Application/<Module>/` using `IAppDbContext`, `IRequestContext`, `IChangeContext.SetAction(entity, action, reason)` for audited business actions, `db.InTransactionAsync` for multi-save operations, `db.ExpectRowVersion` for updates, `Fail.*` / `Validator` for problems (codes + AR/EN messages in `Contracts/Errors/ErrorCatalog.cs` — a unit test requires every code to have both messages).
    - DTOs in `src/…Contracts/<Module>/` — identifiers are always URL tokens (`IUrlTokenService.Encode<T>`), never internal ids.
@@ -215,6 +217,11 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | DT-112 | AP/AR numbering | One PAY- sequence for payments and collections, one RTN- for both return kinds (the design has one unique number per company) | as stated |
 | DT-113 | Account statement vs general ledger | Same engine; the statement adds the party filter and is also open to reports.view | as stated |
 | DT-114 | Tonnage in operational reports and the dashboard | Loaded weight of active trips by trip date | as stated (B10) |
+| DT-115 | Default status in the report builder | Sources with a status show active (approved/closed invoices, posted credit notes, active documents and records) unless the definition filters on status | as stated |
+| DT-116 | Shared saved reports (FR-145 "owner or administrator") | Administrator = holder of settings.manage; private reports only for their owner | as stated |
+| DT-117 | Report permissions | reports.view ("all reports", PRD 3.4) opens every standard report and the cash/bank cards; without it a report needs its module's view key; builder sources always need their own view key (FR-147); dashboard parts each need their key | as stated (review B10-6) |
+| DT-118 | Global search by permission | Trips trips.view; invoices/credit notes inv.view; receipts rcpt.manage/inv.view; advances, settlements, partner payments drv.*; AP/AR documents and parties acct.apar/acct.view; journal entries acct.view/je.view; drivers and partners drv.view/masters.manage (national ID only with drv.view); customers every member | as stated (B11) |
+| DT-119 | Tariff breach "by partner" (FR-024) | Trips store the customer tariff only (FR-022/023): the breach is customer price vs tariff; the partner option lists the breaches of that partner's trips | as stated (review B10-1) |
 | DT-14 | Audit JSON for secret columns | `PasswordHash`, `SecurityStamp`, `TwoFactorSecret`, `CodeHash`, `TokenHash`, `ClientIdEncrypted`, `SecretKeyEncrypted` written as `"***"`; binary columns (logo) omitted | as stated |
 
 ## Extra indexes / constraints added beyond the design

@@ -97,7 +97,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         : null;
 
     /// <summary>The opening-balance difference still to clear (FR-110): balance of the mapped difference account, or null when zero or unmapped.</summary>
-    private async Task<decimal?> OpeningDifferenceAsync(DateOnly asOf, CancellationToken ct)
+    internal async Task<decimal?> OpeningDifferenceAsync(DateOnly asOf, CancellationToken ct)
     {
         var accountId = await db.Set<PostingKeyMapping>().AsNoTracking().Where(m => m.PostingKey == PostingKeys.OpeningBalanceDifference)
             .Select(m => (long?)m.AccountId).SingleOrDefaultAsync(ct).ConfigureAwait(false);

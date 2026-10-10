@@ -45569,6 +45569,2419 @@
           }
         ]
       }
+    },
+    "/api/v1/companies/{company}/dashboard": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Dashboard: today or month-to-date figures, alert cards, cash and bank balances, pinned reports — each by permission (FR-137 … FR-141)",
+        "operationId": "getCompaniesDashboard",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/dashboard/pins": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "The user's pinned reports with value and normal / warning / exceeded state (FR-140)",
+        "operationId": "getCompaniesDashboardPins",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardPinResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Pin a saved report with a measure and thresholds (FR-140)",
+        "operationId": "postCompaniesDashboardPins",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardPinResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/dashboard/pins/{pin}": {
+      "put": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Change a pin's measure or thresholds (FR-140)",
+        "operationId": "putCompaniesDashboardPinsById",
+        "parameters": [
+          {
+            "name": "pin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardPinResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/dashboard/pins/order": {
+      "post": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Reorder the user's pins (FR-140)",
+        "operationId": "postCompaniesDashboardPinsOrder",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardPinResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/dashboard/pins/{pin}/delete": {
+      "post": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Remove a pin from the dashboard (FR-140)",
+        "operationId": "postCompaniesDashboardPinsDelete",
+        "parameters": [
+          {
+            "name": "pin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/catalog": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Standard reports the caller may run, with the API path of those served by their module (FR-142)",
+        "operationId": "getCompaniesReportsCatalog",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportCatalogEntry"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/standard/{key}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Run a standard report (RPT-02 … RPT-12, RPT-19, RPT-20) with its filters and totals (FR-142, FR-148, FR-149)",
+        "operationId": "getCompaniesReportsStandardById",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "From",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "To",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "AsOf",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "Customer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Driver",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Partner",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "LoadingSite",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "UnloadingSite",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Material",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "GroupBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/standard/{key}/export": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Export a standard report as Excel, CSV or PDF (FR-150)",
+        "operationId": "getCompaniesReportsStandardExport",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "From",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "To",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "AsOf",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "Customer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Driver",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Partner",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "LoadingSite",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "UnloadingSite",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Material",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "GroupBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/builder/sources": {
+      "get": {
+        "tags": [
+          "Report builder"
+        ],
+        "summary": "Data sources and fields of the report builder, custom fields included, by permission (FR-143, FR-147)",
+        "operationId": "getCompaniesReportsBuilderSources",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataSourceInfo"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/builder/run": {
+      "post": {
+        "tags": [
+          "Report builder"
+        ],
+        "summary": "Run a report definition: grouping, measures, filters, sort, top-N or detail (FR-144)",
+        "operationId": "postCompaniesReportsBuilderRun",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/builder/export": {
+      "post": {
+        "tags": [
+          "Report builder"
+        ],
+        "summary": "Export a report definition's result as Excel, CSV or PDF (FR-146)",
+        "operationId": "postCompaniesReportsBuilderExport",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved": {
+      "get": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Saved reports: mine, shared, pinned (FR-145)",
+        "operationId": "getCompaniesReportsSaved",
+        "parameters": [
+          {
+            "name": "Scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfSavedReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Save a report, private or shared with the company (FR-145)",
+        "operationId": "postCompaniesReportsSaved",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved/{report}": {
+      "get": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "A saved report with its definition (FR-145)",
+        "operationId": "getCompaniesReportsSavedById",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Edit a saved report (owner, or an administrator for shared ones) (FR-145)",
+        "operationId": "putCompaniesReportsSavedById",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved/{report}/delete": {
+      "post": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Delete a saved report and its pins (FR-145)",
+        "operationId": "postCompaniesReportsSavedDelete",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved/{report}/run": {
+      "post": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Run a saved report, optionally for another period (FR-146)",
+        "operationId": "postCompaniesReportsSavedRun",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved/{report}/export": {
+      "post": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Export a saved report as Excel, CSV or PDF (FR-146)",
+        "operationId": "postCompaniesReportsSavedExport",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -48811,6 +51224,378 @@
           }
         }
       },
+      "DashboardAlert": {
+        "required": [
+          "key",
+          "severity",
+          "title",
+          "count",
+          "value",
+          "detail",
+          "link"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "value": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "link": {
+            "$ref": "#/components/schemas/DrillLink"
+          }
+        }
+      },
+      "DashboardCashCard": {
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "balance"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DashboardFigures": {
+        "required": [
+          "from",
+          "to",
+          "trips",
+          "tonnage",
+          "revenue",
+          "driverWages",
+          "partnerCosts",
+          "margin",
+          "invoiced",
+          "collections"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "trips": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "tonnage": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "revenue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "driverWages": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "partnerCosts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "margin": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "invoiced": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "collections": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DashboardPinRequest": {
+        "required": [
+          "savedReportId",
+          "measure",
+          "warningThreshold",
+          "criticalThreshold"
+        ],
+        "type": "object",
+        "properties": {
+          "savedReportId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "measure": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "warningThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "criticalThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DashboardPinResponse": {
+        "required": [
+          "id",
+          "report",
+          "measure",
+          "measureLabel",
+          "value",
+          "warningThreshold",
+          "criticalThreshold",
+          "state",
+          "sortOrder",
+          "problem"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "measure": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "measureLabel": {
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "warningThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "criticalThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "state": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "problem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DashboardResponse": {
+        "required": [
+          "period",
+          "figures",
+          "alerts",
+          "cashAndBanks",
+          "pins",
+          "openingDifference",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string"
+          },
+          "figures": {
+            "$ref": "#/components/schemas/DashboardFigures"
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardAlert"
+            }
+          },
+          "cashAndBanks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DashboardCashCard"
+            }
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardPinResponse"
+            }
+          },
+          "openingDifference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DataSourceInfo": {
+        "required": [
+          "key",
+          "label",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceField"
+            }
+          }
+        }
+      },
       "DeleteRequest": {
         "required": [
           "reason"
@@ -48860,6 +51645,34 @@
           },
           "expired": {
             "type": "boolean"
+          }
+        }
+      },
+      "DrillLink": {
+        "required": [
+          "type",
+          "id",
+          "filters"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filters": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },
@@ -53463,6 +56276,47 @@
           }
         }
       },
+      "PagedResultOfSavedReportResponse": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedReportResponse"
+            }
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "PagedResultOfSettlementResponse": {
         "required": [
           "items",
@@ -54329,6 +57183,23 @@
           },
           "descriptionEn": {
             "type": "string"
+          }
+        }
+      },
+      "PinOrderRequest": {
+        "required": [
+          "pinIds"
+        ],
+        "type": "object",
+        "properties": {
+          "pinIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -55258,6 +58129,353 @@
           }
         }
       },
+      "ReportCatalogEntry": {
+        "required": [
+          "key",
+          "code",
+          "group",
+          "title",
+          "path",
+          "parameters"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReportDefinition": {
+        "required": [
+          "rows",
+          "column",
+          "measures",
+          "filters",
+          "sort",
+          "top",
+          "detail",
+          "columns"
+        ],
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ReportGrouping"
+            }
+          },
+          "column": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportGrouping"
+              }
+            ]
+          },
+          "measures": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ReportMeasure"
+            }
+          },
+          "filters": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ReportFilter"
+            }
+          },
+          "sort": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportSort"
+              }
+            ]
+          },
+          "top": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": "boolean"
+          },
+          "columns": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReportFilter": {
+        "required": [
+          "field",
+          "operator",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "values": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReportFilterValue": {
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportGrouping": {
+        "required": [
+          "field",
+          "dateUnit"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "dateUnit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReportMeasure": {
+        "required": [
+          "function",
+          "field"
+        ],
+        "type": "object",
+        "properties": {
+          "function": {
+            "type": "string"
+          },
+          "field": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReportResult": {
+        "required": [
+          "key",
+          "title",
+          "filters",
+          "columns",
+          "rows",
+          "totals",
+          "note",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportFilterValue"
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultColumn"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultRow"
+            }
+          },
+          "totals": {
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReportRunRequest": {
+        "required": [
+          "source",
+          "definition",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "definition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportDefinition"
+              }
+            ]
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        }
+      },
+      "ReportSort": {
+        "required": [
+          "by",
+          "descending"
+        ],
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string"
+          },
+          "descending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ResultColumn": {
+        "required": [
+          "key",
+          "header",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "header": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "ResultRow": {
+        "required": [
+          "values",
+          "link"
+        ],
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array"
+          },
+          "link": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DrillLink"
+              }
+            ]
+          }
+        }
+      },
       "RetryResult": {
         "required": [
           "posted",
@@ -55341,6 +58559,105 @@
               "string"
             ],
             "format": "int32"
+          },
+          "rowVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "SavedReportRequest": {
+        "required": [
+          "name",
+          "source",
+          "definition",
+          "isShared",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "definition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportDefinition"
+              }
+            ]
+          },
+          "isShared": {
+            "type": "boolean"
+          },
+          "rowVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SavedReportResponse": {
+        "required": [
+          "id",
+          "name",
+          "source",
+          "definition",
+          "isShared",
+          "owner",
+          "canEdit",
+          "pinned",
+          "lastRunAt",
+          "createdAt",
+          "rowVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ReportDefinition"
+          },
+          "isShared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/Ref"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "lastRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "rowVersion": {
             "type": "string"
@@ -56129,6 +59446,37 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "SourceField": {
+        "required": [
+          "key",
+          "label",
+          "type",
+          "groupable",
+          "measurable",
+          "custom"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "groupable": {
+            "type": "boolean"
+          },
+          "measurable": {
+            "type": "boolean"
+          },
+          "custom": {
+            "type": "boolean"
           }
         }
       },
@@ -58258,6 +61606,22 @@
     {
       "name": "Maintenance zone",
       "description": "Maintenance zone"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard"
+    },
+    {
+      "name": "Reports",
+      "description": "Reports"
+    },
+    {
+      "name": "Report builder",
+      "description": "Report builder"
+    },
+    {
+      "name": "Saved reports",
+      "description": "Saved reports"
     }
   ]
 }
