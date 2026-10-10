@@ -43,6 +43,25 @@ public sealed class LocalFileStore(IConfiguration config) : IFileStore
         return File.Exists(path) ? await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false) : null;
     }
 
+    public Task<long> SizeAsync(string prefix, CancellationToken ct)
+    {
+        var dir = PathOf(prefix.TrimEnd('/'));
+        return Task.FromResult(Directory.Exists(dir) ? Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Sum(Length) : 0L);
+    }
+
+    /// <summary>A file's size, 0 when the purge removed it meanwhile.</summary>
+    private static long Length(string path)
+    {
+        try
+        {
+            return new FileInfo(path).Length;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return 0;
+        }
+    }
+
     public Task<int> PurgeAsync(string prefix, TimeSpan age, CancellationToken ct)
     {
         var dir = PathOf(prefix.TrimEnd('/'));

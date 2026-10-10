@@ -145,6 +145,18 @@ public static class DependencyInjection
         services.AddScoped<SavedReportService>();
         services.AddScoped<DashboardService>();
 
+        // Platform (B12)
+        services.AddScoped<PlanLimits>();
+        services.AddScoped<BillingService>();
+        services.AddScoped<SubscriptionService>();
+        services.AddScoped<ConsoleService>();
+        services.AddScoped<SupportAccessService>();
+        services.AddScoped<TenantLifecycleService>();
+        services.AddScoped<SetupChecklistService>();
+        services.AddScoped<DemoCompanyService>();
+        services.AddScoped<CompanyExportService>();
+        services.AddScoped<PersonalDataService>();
+
         // Collaboration (B11)
         services.AddScoped<NotificationService>();
         services.AddScoped<GlobalSearchService>();

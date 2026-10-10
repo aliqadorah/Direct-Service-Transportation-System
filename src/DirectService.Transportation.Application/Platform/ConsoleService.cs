@@ -1,0 +1,357 @@
+using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Collaboration;
+using DirectService.Transportation.Application.Common;
+using DirectService.Transportation.Application.MasterData;
+using DirectService.Transportation.Contracts.Common;
+using DirectService.Transportation.Contracts.Errors;
+using DirectService.Transportation.Contracts.Platform;
+using DirectService.Transportation.Contracts.Security;
+using DirectService.Transportation.Domain.Acc;
+using DirectService.Transportation.Domain.Core;
+using DirectService.Transportation.Domain.Trn;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace DirectService.Transportation.Application.Platform;
+
+/// <summary>
+/// The provider console (5.5, D-13: every platform-staff user): tenants with status, plan, usage and dates; plans (create, edit, retire,
+/// delete when unused — BR-040); account actions — extend a trial, apply a credit to an invoice (D-11), suspend, reactivate (BR-011) — each
+/// audited in the tenant's log; support-access requests (approved by the tenant's Owner, BR-014); announcements; platform health. Staff never
+/// read tenant business data here.
+/// </summary>
+public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PlanLimits limits, SubscriptionService subscriptions,
+    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock)
+{
+    private static readonly DateTime Started = DateTime.UtcNow;
+
+    private long StaffId => ctx.IsPlatformStaff && ctx.UserId is long id ? id : throw Fail.NotFound();
+
+    private DateTime Now => clock.GetUtcNow().UtcDateTime;
+
+    private static DateTime? Utc(DateTime? d) => d is DateTime v ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : null;
+
+    // ============================================================ plans (P-03)
+
+    public async Task<IReadOnlyList<PlanResponse>> PlansAsync(CancellationToken ct)
+    {
+        _ = StaffId;
+        var plans = await db.Set<Plan>().AsNoTracking().OrderBy(p => p.Price).ToListAsync(ct).ConfigureAwait(false);
+        var used = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted).GroupBy(t => t.PlanId).Select(g => new { g.Key, N = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.N, ct).ConfigureAwait(false);
+        return plans.Select(p => subscriptions.Plan(p, used.GetValueOrDefault(p.Id))).ToList();
+    }
+
+    public async Task<PlanResponse> SavePlanAsync(string? token, PlanRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        _ = StaffId;
+        var code = TextNormalizer.CleanCode(r.Code)?.ToUpperInvariant();
+        var nameAr = TextNormalizer.CleanText(r.NameAr);
+        var nameEn = TextNormalizer.CleanText(r.NameEn);
+        var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", ErrorCodes.ValidationFormat, "billingCycle");
+        new Validator().Require("code", code).MaxLength("code", code, 30).Require("nameAr", nameAr).MaxLength("nameAr", nameAr, 100).Require("nameEn", nameEn).MaxLength("nameEn", nameEn, 100)
+            .Check(r.Price is >= 0 && Accounting.Money.IsValidAmount(r.Price.Value), "price", ErrorCodes.ValidationRange)
+            .Check(r.MaxCompanies is > 0, "maxCompanies", ErrorCodes.ValidationRange).Check(r.MaxActiveUsers is > 0, "maxActiveUsers", ErrorCodes.ValidationRange)
+            .Check(r.MaxTripsPerMonth is > 0, "maxTripsPerMonth", ErrorCodes.ValidationRange).Check(r.MaxStorageMb is > 0, "maxStorageMb", ErrorCodes.ValidationRange)
+            .ThrowIfInvalid();
+        Plan plan;
+        if (token is null)
+        {
+            plan = new Plan();
+            db.Set<Plan>().Add(plan);
+        }
+        else
+        {
+            plan = await support.FindAsync<Plan>(token, ct).ConfigureAwait(false);
+            db.ExpectRowVersion(plan, r.RowVersion);
+        }
+        // The code is unique among all plans that are not deleted, retired ones included (UX_Plans_Code, review F11).
+        if (await db.Set<Plan>().AnyAsync(p => p.Id != plan.Id && p.Code == code, ct).ConfigureAwait(false))
+            throw Fail.Field("code", ErrorCodes.DuplicateKey, code);
+        // Changing a plan never changes invoices already issued (design).
+        plan.Code = code!;
+        plan.NameAr = nameAr!;
+        plan.NameEn = nameEn!;
+        plan.Price = r.Price!.Value;
+        plan.BillingCycle = cycle;
+        plan.MaxCompanies = r.MaxCompanies!.Value;
+        plan.MaxActiveUsers = r.MaxActiveUsers!.Value;
+        plan.MaxTripsPerMonth = r.MaxTripsPerMonth!.Value;
+        plan.MaxStorageMb = r.MaxStorageMb!.Value;
+        plan.IsActive = r.IsActive;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return (await PlansAsync(ct).ConfigureAwait(false)).Single(p => p.Code == plan.Code && p.Id == support.Token<Plan>(plan.PublicId));
+    }
+
+    /// <summary>A plan used by any tenant cannot be deleted; retire it (IsActive = 0) instead (BR-040).</summary>
+    public async Task DeletePlanAsync(string token, string? reason, CancellationToken ct)
+    {
+        _ = StaffId;
+        var why = MasterIds.Reason(reason);
+        var plan = await support.FindAsync<Plan>(token, ct).ConfigureAwait(false);
+        var used = await db.Set<Tenant>().IgnoreQueryFilters().CountAsync(t => t.PlanId == plan.Id && !t.IsDeleted, ct).ConfigureAwait(false);
+        if (used > 0) throw Fail.Rule(ErrorCodes.RecordInUse, used);
+        plan.DeleteReason = why;
+        db.Set<Plan>().Remove(plan);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ============================================================ tenants (P-11, P-12)
+
+    private async Task<ConsoleTenantResponse> TenantAsync(Tenant t, CancellationToken ct)
+    {
+        var owner = await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
+            .Where(r => r.TenantId == t.Id && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active")
+            .Select(r => r.User.Email).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return new ConsoleTenantResponse(support.Token<Tenant>(t.PublicId), t.Name, t.Status, new PlanSummary(support.Token<Plan>(t.Plan.PublicId), t.Plan.Code, t.Plan.NameEn),
+            t.BillingCycle, await limits.UsageAsync(t.Id, ct).ConfigureAwait(false), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Utc(t.TrialEndsAt), Utc(t.CurrentPeriodEnd),
+            Utc(t.GraceEndsAt), Utc(t.CancelledAt), Utc(t.RetentionEndsAt), owner, Convert.ToBase64String(t.RowVersion));
+    }
+
+    public async Task<PagedResult<ConsoleTenantResponse>> TenantsAsync(ConsoleTenantQuery q, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(q);
+        _ = StaffId;
+        var query = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted).Include(t => t.Plan).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q.Status)) query = query.Where(t => t.Status == q.Status);
+        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(t => t.Name.Contains(text));
+        var paging = new PageRequest(q.Page, q.PageSize);
+        var total = await query.CountAsync(ct).ConfigureAwait(false);
+        var rows = await query.OrderByDescending(t => t.Id).Skip(paging.Skip).Take(paging.SafePageSize).ToListAsync(ct).ConfigureAwait(false);
+        var items = new List<ConsoleTenantResponse>();
+        foreach (var t in rows) items.Add(await TenantAsync(t, ct).ConfigureAwait(false));
+        return new PagedResult<ConsoleTenantResponse>(items, paging.SafePage, paging.SafePageSize, total);
+    }
+
+    private async Task<Tenant> FindTenantAsync(string token, CancellationToken ct)
+    {
+        _ = StaffId;
+        var pid = support.Decode<Tenant>(token) ?? throw Fail.NotFound();
+        var t = await db.Set<Tenant>().IgnoreQueryFilters().Include(x => x.Plan).SingleOrDefaultAsync(x => x.PublicId == pid && !x.IsDeleted, ct).ConfigureAwait(false)
+            ?? throw Fail.NotFound();
+        // The tenant's audit log receives the action (P-12): the scope carries the tenant for the audit rows.
+        scope.Set(t.Id, null, ctx.UserId, ctx.IpAddress);
+        return t;
+    }
+
+    public async Task<ConsoleTenantDetails> TenantDetailsAsync(string token, CancellationToken ct)
+    {
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        var invoices = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().Where(i => i.TenantId == t.Id && !i.IsDeleted).OrderByDescending(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var grants = await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.TenantId == t.Id && !g.IsDeleted), ct).ConfigureAwait(false);
+        return new ConsoleTenantDetails(await TenantAsync(t, ct).ConfigureAwait(false), invoices.Select(subscriptions.Invoice).ToList(), grants);
+    }
+
+    /// <summary>Extends a trial (days 1–90); a tenant suspended at the end of its trial returns to Trial.</summary>
+    public async Task<ConsoleTenantResponse> ExtendTrialAsync(string token, ExtendTrialRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var why = MasterIds.Reason(r.Reason);
+        if (r.Days is not (>= 1 and <= 90)) throw Fail.Field("days", ErrorCodes.ValidationRange, "days");
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        var suspendedTrial = t.Status == LifecycleCodes.Suspended && t.CurrentPeriodEnd is null;
+        if (t.Status != LifecycleCodes.Trial && !suspendedTrial) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        var from = t.TrialEndsAt is DateTime e && e > Now ? e : Now;
+        t.TrialEndsAt = from.AddDays(r.Days.Value);
+        t.Status = LifecycleCodes.Trial;
+        t.GraceEndsAt = null;
+        changes.SetAction(t, "ExtendTrial", why);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await TenantAsync(t, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A credit reduces only the invoice it is applied to (D-11): the full amount marks it Credited; a part lowers its amount and tax in
+    /// proportion (Total = Amount + Tax kept).
+    /// </summary>
+    public async Task<SubscriptionInvoiceResponse> CreditAsync(string token, ApplyCreditRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var why = MasterIds.Reason(r.Reason);
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        var pid = support.Decode<SubscriptionInvoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
+        var invoice = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid && i.TenantId == t.Id && !i.IsDeleted, ct).ConfigureAwait(false)
+            ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
+        if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) throw Fail.Rule(ErrorCodes.SubscriptionInvoiceNotDue, invoice.Number);
+        var decimals = options.Value.CurrencyDecimals;
+        if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Accounting.Money.IsValidAmount(credit, decimals))
+            throw Fail.Field("amount", ErrorCodes.ValidationRange, "amount");
+        if (credit == invoice.Total)
+        {
+            invoice.Status = LifecycleCodes.Credited;
+        }
+        else
+        {
+            var total = invoice.Total - credit;
+            var tax = Accounting.Money.Round(invoice.Tax * total / invoice.Total, decimals);
+            invoice.Tax = tax;
+            invoice.Amount = total - tax;
+            invoice.Total = total;
+        }
+        changes.SetAction(invoice, "Credit", why + " · " + Accounting.Money.Format(credit));
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return subscriptions.Invoice(invoice);
+    }
+
+    /// <summary>Suspends a tenant (read-only, BR-010); the suspension date is kept in GraceEndsAt for the 30-day cancellation (DT-125).</summary>
+    public async Task<ConsoleTenantResponse> SuspendAsync(string token, TenantStatusRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var why = MasterIds.Reason(r.Reason);
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        if (t.Status is LifecycleCodes.Suspended or LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        t.Status = LifecycleCodes.Suspended;
+        t.GraceEndsAt = Now;
+        changes.SetAction(t, "Suspend", why);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await TenantAsync(t, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reactivates a suspended, past-due or cancelled tenant (BR-011): full access at once, no data change. A running trial goes back to Trial;
+    /// a paid period still running goes back to Active; otherwise the tenant is PastDue with the usual grace to pay — never a free period
+    /// (review F4). A tenant on the free trial plan whose trial has ended needs a trial extension or a paid subscription instead.
+    /// </summary>
+    public async Task<ConsoleTenantResponse> ReactivateAsync(string token, TenantStatusRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var why = MasterIds.Reason(r.Reason);
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        if (t.Status is not (LifecycleCodes.Suspended or LifecycleCodes.PastDue or LifecycleCodes.Cancelled)) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        if (t.CurrentPeriodEnd is null && t.TrialEndsAt is DateTime e && e > Now)
+        {
+            t.Status = LifecycleCodes.Trial;
+            t.GraceEndsAt = null;
+        }
+        else if (t.Plan.Price == 0)
+        {
+            throw Fail.Rule(ErrorCodes.SubscriptionFreePlan);
+        }
+        else if (t.CurrentPeriodEnd is DateTime end && end > Now)
+        {
+            t.Status = LifecycleCodes.Active;
+            t.GraceEndsAt = null;
+        }
+        else
+        {
+            t.Status = LifecycleCodes.PastDue;
+            t.GraceEndsAt = Now.AddDays(options.Value.GraceDays);
+        }
+        t.CancelledAt = null;
+        t.RetentionEndsAt = null;
+        changes.SetAction(t, "Reactivate", why);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await TenantAsync(t, ct).ConfigureAwait(false);
+    }
+
+    // ============================================================ support access (P-13, BR-014)
+
+    private async Task<List<SupportAccessResponse>> SupportRowsAsync(IQueryable<SupportAccessGrant> q, CancellationToken ct)
+    {
+        var rows = await q.OrderByDescending(g => g.Id).Take(200)
+            .Select(g => new { G = g, Tenant = db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).FirstOrDefault(),
+                Requester = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy).Select(u => u.FullName).FirstOrDefault(), Decider = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.ApprovedBy).Select(u => u.FullName).FirstOrDefault() })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var now = Now;
+        return rows.Select(x => new SupportAccessResponse(support.Token<SupportAccessGrant>(x.G.PublicId), x.Tenant ?? string.Empty, x.Requester ?? string.Empty, x.G.Reason,
+            x.G.Status == LifecycleCodes.Approved && x.G.EndsAt <= now ? LifecycleCodes.Expired : x.G.Status, Utc(x.G.StartsAt), Utc(x.G.EndsAt), x.Decider,
+            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion))).ToList();
+    }
+
+    /// <summary>A staff request for access to a tenant; its Owners are notified (FR-190) and decide.</summary>
+    public async Task<SupportAccessResponse> RequestSupportAsync(SupportAccessRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var reason = TextNormalizer.CleanText(r.Reason);
+        new Validator().Require("reason", reason).MaxLength("reason", reason, 500).ThrowIfInvalid();
+        var t = await FindTenantAsync(r.TenantId ?? throw Fail.Field("tenantId", ErrorCodes.ValidationRequired, "tenantId"), ct).ConfigureAwait(false);
+        var grant = new SupportAccessGrant { TenantId = t.Id, RequestedBy = StaffId, Reason = reason!, Status = LifecycleCodes.Requested };
+        db.Set<SupportAccessGrant>().Add(grant);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        var owners = await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
+            .Where(x => x.TenantId == t.Id && !x.IsDeleted && x.User.Status == "Active"
+                && db.Set<RolePermission>().IgnoreQueryFilters().Any(p => p.RoleId == x.RoleId && !p.IsDeleted && p.Permission.PermissionKey == PermissionKeys.TenantManage))
+            .Select(x => x.UserId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        await notifications.NotifyAsync(owners, null, "CORE.SupportRequested", "طلب دعم فني للوصول إلى بياناتكم: " + reason,
+            "Provider support requests access to your data: " + reason, "/tenant/support-access", ct, t.Id).ConfigureAwait(false);
+        return (await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.Id == grant.Id), ct).ConfigureAwait(false))[0];
+    }
+
+    public async Task<IReadOnlyList<SupportAccessResponse>> MySupportAsync(CancellationToken ct)
+    {
+        var me = StaffId;
+        return await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.RequestedBy == me && !g.IsDeleted), ct).ConfigureAwait(false);
+    }
+
+    // ============================================================ announcements and health (P-14, P-15)
+
+    public async Task<IReadOnlyList<AnnouncementResponse>> AnnouncementsAsync(bool currentOnly, CancellationToken ct)
+    {
+        var now = Now;
+        var q = db.Set<Announcement>().AsNoTracking();
+        if (currentOnly) q = q.Where(a => a.StartsAt <= now && a.EndsAt > now);
+        else _ = StaffId;
+        return (await q.OrderByDescending(a => a.StartsAt).Take(100).ToListAsync(ct).ConfigureAwait(false))
+            .Select(a => new AnnouncementResponse(support.Token<Announcement>(a.PublicId), a.Title, a.Message, DateTime.SpecifyKind(a.StartsAt, DateTimeKind.Utc),
+                DateTime.SpecifyKind(a.EndsAt, DateTimeKind.Utc), Convert.ToBase64String(a.RowVersion))).ToList();
+    }
+
+    public async Task<AnnouncementResponse> SaveAnnouncementAsync(string? token, AnnouncementRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        _ = StaffId;
+        var title = TextNormalizer.CleanText(r.Title);
+        var message = TextNormalizer.CleanText(r.Message);
+        new Validator().Require("title", title).MaxLength("title", title, 200).Require("message", message).MaxLength("message", message, 1000)
+            .Check(r.StartsAt is not null && r.EndsAt is not null && r.EndsAt > r.StartsAt, "endsAt", ErrorCodes.ValidationRange).ThrowIfInvalid();
+        Announcement a;
+        if (token is null)
+        {
+            a = new Announcement();
+            db.Set<Announcement>().Add(a);
+        }
+        else
+        {
+            a = await support.FindAsync<Announcement>(token, ct).ConfigureAwait(false);
+            db.ExpectRowVersion(a, r.RowVersion);
+        }
+        a.Title = title!;
+        a.Message = message!;
+        a.StartsAt = r.StartsAt!.Value.ToUniversalTime();
+        a.EndsAt = r.EndsAt!.Value.ToUniversalTime();
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new AnnouncementResponse(support.Token<Announcement>(a.PublicId), a.Title, a.Message, DateTime.SpecifyKind(a.StartsAt, DateTimeKind.Utc),
+            DateTime.SpecifyKind(a.EndsAt, DateTimeKind.Utc), Convert.ToBase64String(a.RowVersion));
+    }
+
+    public async Task DeleteAnnouncementAsync(string token, CancellationToken ct)
+    {
+        _ = StaffId;
+        var a = await support.FindAsync<Announcement>(token, ct).ConfigureAwait(false);
+        a.DeleteReason = "Removed by provider staff";
+        db.Set<Announcement>().Remove(a);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Platform health (P-15): database reachable, tenants by status, totals, queues, process memory and uptime.</summary>
+    public async Task<HealthResponse> HealthAsync(CancellationToken ct)
+    {
+        _ = StaffId;
+        var ok = await db.Database.CanConnectAsync(ct).ConfigureAwait(false);
+        var byStatus = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted).GroupBy(t => t.Status).Select(g => new { g.Key, N = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.N, ct).ConfigureAwait(false);
+        string[] all = ["Tenant", "Company", "SoftDelete"];
+        var users = await db.Set<User>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(u => !u.IsDeleted && u.Status == "Active", ct).ConfigureAwait(false);
+        var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(c => !c.IsDeleted && c.Status == "Active", ct).ConfigureAwait(false);
+        var month = new DateTime(Now.Year, Now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var trips = await db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(t => !t.IsDeleted && t.CreatedAt >= month, ct).ConfigureAwait(false);
+        var pending = await db.Set<PendingPosting>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(p => p.ResolvedAt == null && !p.IsDeleted, ct).ConfigureAwait(false);
+        var einv = await db.Set<EInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
+            .ConfigureAwait(false)
+            + await db.Set<ApArEInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
+                .ConfigureAwait(false);
+        return new HealthResponse(ok, byStatus, users, companies, trips, pending, einv, Environment.WorkingSet / 1048576, DateTime.UtcNow - Started, Now);
+    }
+}

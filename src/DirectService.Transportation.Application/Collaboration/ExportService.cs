@@ -19,6 +19,9 @@ public interface IFileStore
 
     /// <summary>Removes files under the prefix older than the age; returns how many.</summary>
     Task<int> PurgeAsync(string prefix, TimeSpan age, CancellationToken ct);
+
+    /// <summary>Total bytes of the files under the prefix (storage usage, P-07).</summary>
+    Task<long> SizeAsync(string prefix, CancellationToken ct);
 }
 
 /// <summary>What a background export produces: report builder, saved report, standard report or audit log, in a format.</summary>
@@ -50,7 +53,7 @@ public sealed class ExportLimits
 /// seven days and sends a notification with the download link; only that user can download it, in that company.
 /// </summary>
 public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, ReportBuilderService builder, SavedReportService saved,
-    StandardReportService standard, AuditLogService audit, ReportExporter exporter, NotificationService notifications)
+    StandardReportService standard, AuditLogService audit, ReportExporter exporter, NotificationService notifications, Platform.CompanyExportService company)
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);
 
@@ -59,6 +62,8 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
     public async Task<ExportJobResponse> EnqueueAsync(ExportRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
+        // A support session is read-only and its grants are not the worker's to use: no exports from it (review F14).
+        if (ctx.IsSupportSession) throw Fail.Forbidden();
         var kind = Kind(r.Kind);
         // Checked now with the caller's permissions, so a refused request fails at once (the worker checks again).
         switch (kind)
@@ -75,6 +80,10 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
             case "standard":
                 if (!standard.CatalogFor().Any(c => c.Key == r.Key && c.Path is null)) throw Fail.Forbidden();
                 break;
+            case "company":
+                // The full copy of the company is the Owner's (5.6): tenant.manage, also while cancelled (retention).
+                if (!ctx.HasPermission(PermissionKeys.TenantManage)) throw Fail.Forbidden();
+                break;
             default:
                 if (!ctx.HasPermission(PermissionKeys.SettingsManage) && !ctx.HasPermission(PermissionKeys.UsersManage)) throw Fail.Forbidden();
                 break;
@@ -89,7 +98,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
 
     private static string Kind(string? kind) => (kind?.Trim().ToLowerInvariant()) switch
     {
-        "builder" or "saved" or "standard" or "audit-log" => kind.Trim().ToLowerInvariant(),
+        "builder" or "saved" or "standard" or "audit-log" or "company" => kind.Trim().ToLowerInvariant(),
         _ => throw Fail.Field("kind", ErrorCodes.ValidationFormat, "kind"),
     };
 
@@ -103,6 +112,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
             "builder" => await exporter.ExportAsync(StandardReportService.ToTable(await builder.RunAsync(r.Source, r.Definition, r.From, r.To, null, ct).ConfigureAwait(false)),
                 r.Format, "report", ct).ConfigureAwait(false),
             "saved" => await saved.ExportAsync(r.Report!, r.From, r.To, r.Format, ct).ConfigureAwait(false),
+            "company" => ctx.HasPermission(PermissionKeys.TenantManage) ? await company.ExportAsync(ct).ConfigureAwait(false) : throw Fail.Forbidden(),
             "standard" => await standard.ExportAsync(r.Key!, r.Query ?? new StandardReportQuery(r.From, r.To, null, null, null, null, null, null, null, null, null), r.Format, ct)
                 .ConfigureAwait(false),
             _ => await audit.ExportAsync(r.Audit ?? new AuditLogQuery(null, null, null, r.From, r.To, null), r.Format, ct).ConfigureAwait(false),
@@ -136,6 +146,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
             ".pdf" => "application/pdf",
             ".html" => "text/html; charset=utf-8",
             ".json" => "application/json",
+            ".zip" => "application/zip",
             _ => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         };
         return new GeneratedFile(name, type, content);

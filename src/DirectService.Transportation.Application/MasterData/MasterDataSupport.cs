@@ -206,6 +206,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
 
         var parsed = rows.Select(r => (Row: r, Old: Parse(r.OldValues), New: Parse(r.NewValues))).ToList();
         var names = await LinkNamesAsync(parsed.SelectMany(p => p.Old.Concat(p.New)), ct).ConfigureAwait(false);
+        var erased = (await ErasedRecords.FindAsync(db, [(entityType, entityId)], ct).ConfigureAwait(false)).Count > 0;
 
         return parsed.Select(p =>
         {
@@ -216,7 +217,8 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
                 {
                     var oldValue = p.Old.GetValueOrDefault(key);
                     var newValue = p.New[key];
-                    if (key == "CustomValues") changes.AddRange(CustomChanges(oldValue, newValue));
+                    if (erased && ErasedRecords.IsPersonal(entityType, key)) changes.Add(new FieldChange(Camel(key), ErasedRecords.Masked, ErasedRecords.Masked));
+                    else if (key == "CustomValues") changes.AddRange(CustomChanges(oldValue, newValue));
                     else changes.Add(new FieldChange(Camel(key), Display(key, oldValue, names), Display(key, newValue, names)));
                 }
             }

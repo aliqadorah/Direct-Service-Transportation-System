@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
@@ -53,7 +54,9 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
         if (!string.IsNullOrWhiteSpace(q.EntityType)) query = query.Where(a => a.EntityType == q.EntityType);
         if (q.From is DateOnly from) query = query.Where(a => a.OccurredAt >= from.ToDateTime(TimeOnly.MinValue));
         if (q.To is DateOnly to) query = query.Where(a => a.OccurredAt < to.AddDays(1).ToDateTime(TimeOnly.MinValue));
-        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(a => (a.NewValues != null && a.NewValues.Contains(text)) || (a.OldValues != null && a.OldValues.Contains(text)));
+        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(a => ((a.NewValues != null && a.NewValues.Contains(text)) || (a.OldValues != null && a.OldValues.Contains(text)))
+            // Erased personal data cannot be found again through the text of the log (SEC-19).
+            && !db.Set<AuditLog>().Any(e => e.Action == ErasedRecords.EraseAction && e.EntityType == a.EntityType && e.EntityId == a.EntityId));
         return query;
     }
 
@@ -99,14 +102,17 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
         foreach (var g in rows.Where(r => r.EntityType is not null && r.EntityId is not null).GroupBy(r => r.EntityType!))
             foreach (var (id, name) in await NamesAsync(g.Key, g.Select(r => r.EntityId!.Value).Distinct().ToList(), ct).ConfigureAwait(false))
                 names[(g.Key, id)] = name;
+        var erased = await ErasedRecords.FindAsync(db, rows.Where(r => r.EntityType is not null && r.EntityId is not null).Select(r => (r.EntityType!, r.EntityId!.Value)), ct)
+            .ConfigureAwait(false);
         return rows.Select(r =>
         {
             var oldValues = Parse(r.OldValues);
             var newValues = Parse(r.NewValues);
             var reason = newValues.GetValueOrDefault("_reason");
             var mask = r.EntityType == "TRN.Driver" && !ctx.HasPermission(Contracts.Security.PermissionKeys.DrvView);
+            var isErased = r.EntityType is not null && r.EntityId is long eid && erased.Contains((r.EntityType, eid));
             var changes = oldValues.Keys.Union(newValues.Keys).Where(k => !Hidden.Contains(k) && oldValues.GetValueOrDefault(k) != newValues.GetValueOrDefault(k))
-                .Select(k => mask && DriverPersonal.Contains(k) ? new AuditChange(k, "***", "***")
+                .Select(k => (mask && DriverPersonal.Contains(k)) || (isErased && ErasedRecords.IsPersonal(r.EntityType, k)) ? new AuditChange(k, ErasedRecords.Masked, ErasedRecords.Masked)
                     : new AuditChange(k, oldValues.GetValueOrDefault(k), newValues.GetValueOrDefault(k))).ToList();
             var record = r.EntityType is not null && r.EntityId is long id ? names.GetValueOrDefault((r.EntityType, id)) : null;
             return new AuditLogEntry(DateTime.SpecifyKind(r.OccurredAt, DateTimeKind.Utc), r.User, r.Action, r.EntityType, record, reason, changes, r.IpAddress);

@@ -10,6 +10,7 @@ public interface IAppDbContext
     DbSet<TEntity> Set<TEntity>() where TEntity : class;
     DatabaseFacade Database { get; }
     ChangeTracker ChangeTracker { get; }
+    Microsoft.EntityFrameworkCore.Metadata.IModel Model { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

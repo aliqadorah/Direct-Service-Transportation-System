@@ -55,8 +55,12 @@ public sealed record TripDraft(
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
     IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, StandardFieldService fields, CustomFieldService customFields,
-    CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering)
+    CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, Platform.PlanLimits? limits = null)
 {
+    /// <summary>Trips saved this month must fit the plan (P-07); viewing and exporting are never limited (BR-013).</summary>
+    internal Task EnsureTripLimitAsync(int adding, CancellationToken ct) =>
+        limits is null || ctx.TenantId is not long tenant ? Task.CompletedTask : limits.EnsureTripsAsync(tenant, adding, ct);
+
     public const string EntityType = "TRN.Trip";
     public const string SourceType = "Trip";
     public const string Active = "Active";
@@ -97,6 +101,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         var clientId = MasterIds.ClientId(r.ClientId);
         if (await support.ExistingAsync<Trip>(clientId, ct).ConfigureAwait(false) is { } again)
             return (new TripSaveResult(await ResponseAsync(again.Id, ct).ConfigureAwait(false), []), false);
+        await EnsureTripLimitAsync(1, ct).ConfigureAwait(false);
         var s = await SettingsAsync(ct).ConfigureAwait(false);
         var draft = await DraftAsync(r, null, ct).ConfigureAwait(false);
         var t = new Trip();

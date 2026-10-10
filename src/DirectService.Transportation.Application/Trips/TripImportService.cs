@@ -68,6 +68,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             var (prepared, preview) = await AnalyseAsync(buffer, fileName, length, mode, mapping, locking: true, c).ConfigureAwait(false);
             if (preview.Mode == "Strict" && preview.RejectedRows > 0) throw Fail.Rule(ErrorCodes.ImportHasErrors, preview.RejectedRows);
             if (prepared.Count == 0) throw Fail.Rule(ErrorCodes.ImportHasErrors, preview.RejectedRows);
+            await trips.EnsureTripLimitAsync(prepared.Count, c).ConfigureAwait(false);
             var batch = ImportParse.Batch(TripService.EntityType, fileName, preview.TotalRows, prepared.Count, ctx.UserId!.Value, preview.Mode);
             db.Set<ImportBatch>().Add(batch);
             await db.SaveChangesAsync(c).ConfigureAwait(false);

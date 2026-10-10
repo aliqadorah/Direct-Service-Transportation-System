@@ -20,7 +20,8 @@ namespace DirectService.Transportation.Application.Identity;
 /// </summary>
 public sealed class InvitationService(
     IAppDbContext db, IRequestContext ctx, IDataScope scope, IChangeContext changes, UserManager<User> users,
-    AccessService access, IUrlTokenService tokens, IEmailSender email, TimeProvider clock, IOptions<AppOptions> options, GrantGuard guard)
+    AccessService access, IUrlTokenService tokens, IEmailSender email, TimeProvider clock, IOptions<AppOptions> options, GrantGuard guard,
+    Platform.PlanLimits? limits = null)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
@@ -124,6 +125,8 @@ public sealed class InvitationService(
         {
             using var _ = scope.Use(inv.TenantId, null, null);
             // The invitation link proves the email address.
+            // One more active user must fit the plan (P-07).
+            if (limits is not null) await limits.EnsureUserAsync(inv.TenantId, ct).ConfigureAwait(false);
             var user = new User { FullName = fullName!, TenantId = inv.TenantId, EmailConfirmedAt = Now, Email = inv.Email };
             var created = await users.CreateAsync(user, r.Password!).ConfigureAwait(false);
             if (!created.Succeeded) throw AccountService.PolicyError(policy);

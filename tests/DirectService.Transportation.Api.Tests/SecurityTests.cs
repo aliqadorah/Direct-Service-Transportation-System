@@ -43,7 +43,8 @@ public sealed class SecurityTests(ApiFactory f)
         Assert.Empty(open);
         var anonymous = ApiEndpoints(f).Where(e => e.Metadata.GetMetadata<IAllowAnonymous>() is not null)
             .Select(e => e.RoutePattern.RawText!).ToList();
-        Assert.All(anonymous, p => Assert.StartsWith("/api/v1/auth/", p, StringComparison.Ordinal));
+        // The payment-gateway webhook is the only other anonymous endpoint: it is verified by its signature (B12, SEC-10).
+        Assert.All(anonymous.Where(p => p != "/api/v1/billing/webhook"), p => Assert.StartsWith("/api/v1/auth/", p, StringComparison.Ordinal));
     }
 
     [Fact]

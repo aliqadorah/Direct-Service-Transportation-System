@@ -24,6 +24,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string ConnectionString =
         "Server=localhost;Database=DirectServiceMaster_ApiTests;Integrated Security=true;TrustServerCertificate=true;Encrypt=true";
 
+    public const string WebhookSecret = "test-webhook-secret";
+
     public CapturingEmailSender Emails { get; } = new();
 
     /// <summary>Live messages the application published (record changes, locks, notifications), recorded instead of SignalR.</summary>
@@ -43,6 +45,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("App:PublicBaseUrl", "https://app.test");
         builder.UseSetting("EInvoicing:AllowSimulator", "true");
         builder.UseSetting("EInvoicing:MaxAttempts", "2");
+        builder.UseSetting("Billing:WebhookSecret", WebhookSecret);
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<IEmailSender>();

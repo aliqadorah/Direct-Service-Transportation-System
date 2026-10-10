@@ -392,9 +392,9 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | US-28 | Real-time teamwork | FR-185, 186, BR-038 | SCR-00 | E | ☑ |
 | US-29 | Global search | FR-187 | SCR-00 | E | ☑ |
 | US-30 | Record history and audit | FR-015, 166, 188, 189 | SCR-77, history panels | E | ☐ |
-| US-31 | Sign-up and guided setup | 5.4, G-10 | SCR-02, SCR-03, SCR-05, SCR-06 | E | ☐ |
+| US-31 | Sign-up and guided setup | 5.4, G-10 | SCR-02, SCR-03, SCR-05, SCR-06 | E | ☑ |
 | US-32 | Invite users and assign roles | FR-172–174 | SCR-76 | E | ◐ |
-| US-33 | Manage subscription | 5.3, BR-012 | SCR-80 | E | ☐ |
+| US-33 | Manage subscription | 5.3, BR-012 | SCR-80 | E | ☑ |
 | US-34 | Multiple companies | 5.1 | SCR-00, SCR-81 | E S | ☐ |
 
 ## E. Tenancy, subscription & platform (Section 5 — no FR numbers in the PRD; numbered here as P-xx)
@@ -402,22 +402,22 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | ID | Requirement | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|
 | P-01 | Tenant → companies → users; tenant and company isolation; company switcher (5.1) | M01/X | Tenants, Companies, UserCompanyRoles; TenantId/CompanyId on every table | TenantContext, global query filters | SCR-00, SCR-81 | S I | ◐ |
-| P-02 | Tenant lifecycle Trial 14 d / Active / PastDue 7 d / Suspended / Cancelled 30 d → retention 90 d / Deleted (5.2) | M01 | Tenants (Status, TrialEndsAt, GraceEndsAt, CancelledAt, RetentionEndsAt) | TenantLifecycleJob (G-07, G-18) | SCR-80, SCR-90 | U I | ☐ |
-| P-03 | Plans with limits, defined in the console (5.3) | M01 | Plans | PlanService | SCR-91 | I | ☐ |
-| P-04 | Billing monthly/annual in advance via gateway (5.3) | M01 | Tenants.BillingCycle, SubscriptionInvoices | BillingService, IPaymentGateway (dev fake) | SCR-80 | I | ☐ |
-| P-05 | Subscription tax invoice per charge; history downloadable (5.3) | M01 | SubscriptionInvoices | BillingService | SCR-80 | I | ☐ |
-| P-06 | Upgrade immediately pro-rated; downgrade at renewal if usage fits (5.3) | M01 | Tenants, Plans (G-05) | PlanChangeService | SCR-80 | U I | ☐ |
-| P-07 | Limit reached → creation blocked with message and upgrade option (5.3) | M01 | Plans | PlanLimitGuard | SCR-00 | U I | ☐ |
-| P-08 | Onboarding checklist, 8 steps, any order, resumable (5.4) | M01 | CompanySettings CORE.Setup.* (G-10) | SetupChecklistService | SCR-06 | I E | ☐ |
-| P-09 | Demo company with sample data (5.4) | M01 | Companies, CompanySettings CORE.IsDemo (G-11) | DemoCompanySeeder | SCR-81 | I | ☐ |
-| P-10 | Historical import and opening balances (5.4) | M14/M08 | ImportBatches | (FR-013, FR-109) | SCR-12, SCR-30 | I | ☐ |
-| P-11 | Provider console: tenants with usage (5.5) | M01 | Tenants, Plans | ProviderTenantQueries | SCR-90 | I S | ☐ |
-| P-12 | Account actions: extend trial, apply credit, suspend/reactivate, audited (5.5) | M01 | Tenants, SubscriptionInvoices, AuditLogs | ProviderTenantService | SCR-90 | I | ☐ |
-| P-13 | Support access requests, Owner approval, time-limited, logged (5.5) | M01 | SupportAccessGrants, AuditLogs | SupportAccessService (G-08, G-09) | SCR-92, SCR-83 | I S | ☐ |
-| P-14 | Service announcements (5.5) | M01 | Announcements | AnnouncementService | SCR-93, SCR-00 | I | ☐ |
-| P-15 | Platform health metrics (5.5) | M01 | — (metrics, health checks) | HealthEndpoints | SCR-94 | I | ☐ |
-| P-16 | Full company export: Excel + JSON package (5.6, DX-04) | M14 | all company tables | CompanyExportJob | SCR-82 | I | ☐ |
-| P-17 | Sign-up creates tenant, Owner, first company; trial starts (9.1) | M01/M02 | Tenants, Users, Companies, Roles, RolePermissions, UserCompanyRoles, TermsAcceptances | SignUpService | SCR-02 | I E | ◐ |
+| P-02 | Tenant lifecycle Trial 14 d / Active / PastDue 7 d / Suspended / Cancelled 30 d → retention 90 d / Deleted (5.2) | M01 | Tenants (Status, TrialEndsAt, GraceEndsAt, CancelledAt, RetentionEndsAt) | TenantLifecycleJob (G-07, G-18) | SCR-80, SCR-90 | U I | ☑ |
+| P-03 | Plans with limits, defined in the console (5.3) | M01 | Plans | PlanService | SCR-91 | I | ☑ |
+| P-04 | Billing monthly/annual in advance via gateway (5.3) | M01 | Tenants.BillingCycle, SubscriptionInvoices | BillingService, IPaymentGateway (dev fake) | SCR-80 | I | ☑ |
+| P-05 | Subscription tax invoice per charge; history downloadable (5.3) | M01 | SubscriptionInvoices | BillingService | SCR-80 | I | ☑ |
+| P-06 | Upgrade immediately pro-rated; downgrade at renewal if usage fits (5.3) | M01 | Tenants, Plans (G-05) | PlanChangeService | SCR-80 | U I | ☑ |
+| P-07 | Limit reached → creation blocked with message and upgrade option (5.3) | M01 | Plans | PlanLimitGuard | SCR-00 | U I | ☑ |
+| P-08 | Onboarding checklist, 8 steps, any order, resumable (5.4) | M01 | CompanySettings CORE.Setup.* (G-10) | SetupChecklistService | SCR-06 | I E | ☑ |
+| P-09 | Demo company with sample data (5.4) | M01 | Companies, CompanySettings CORE.IsDemo (G-11) | DemoCompanySeeder | SCR-81 | I | ☑ |
+| P-10 | Historical import and opening balances (5.4) | M14/M08 | ImportBatches | (FR-013, FR-109) | SCR-12, SCR-30 | I | ☑ |
+| P-11 | Provider console: tenants with usage (5.5) | M01 | Tenants, Plans | ProviderTenantQueries | SCR-90 | I S | ☑ |
+| P-12 | Account actions: extend trial, apply credit, suspend/reactivate, audited (5.5) | M01 | Tenants, SubscriptionInvoices, AuditLogs | ProviderTenantService | SCR-90 | I | ☑ |
+| P-13 | Support access requests, Owner approval, time-limited, logged (5.5) | M01 | SupportAccessGrants, AuditLogs | SupportAccessService (G-08, G-09) | SCR-92, SCR-83 | I S | ☑ |
+| P-14 | Service announcements (5.5) | M01 | Announcements | AnnouncementService | SCR-93, SCR-00 | I | ☑ |
+| P-15 | Platform health metrics (5.5) | M01 | — (metrics, health checks) | HealthEndpoints | SCR-94 | I | ☑ |
+| P-16 | Full company export: Excel + JSON package (5.6, DX-04) | M14 | all company tables | CompanyExportJob | SCR-82 | I | ☑ |
+| P-17 | Sign-up creates tenant, Owner, first company; trial starts (9.1) | M01/M02 | Tenants, Users, Companies, Roles, RolePermissions, UserCompanyRoles, TermsAcceptances | SignUpService | SCR-02 | I E | ☑ |
 
 ## F. Business rules
 
@@ -427,11 +427,11 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-002 | ≥ 1 active user with users.manage per company | M02 | — | UserAdminService | U I | ☑ |
 | BR-003 | Users with actions never deleted; disable/archive | M02 | Users.Status | UserAdminService | I | ☑ |
 | BR-004 | Manual rate / tariff deviation under lock need masters.manage | M06 | — | TripValidator | U S | ☐ |
-| BR-010 | Suspended tenant read-only | M01 | — | TenantStatusGuard | I S | ◐ |
-| BR-011 | Reactivation restores access, no data change | M01 | — | TenantLifecycleService | I | ☐ |
-| BR-012 | Downgrade refused while over limits (listed) | M01 | — | PlanChangeService | U | ☐ |
-| BR-013 | Limits never block view/print/export | M01 | — | PlanLimitGuard | U | ☐ |
-| BR-014 | Provider access only via approved window, logged | M01 | SupportAccessGrants (CHECK EndsAt > StartsAt) | SupportAccessGuard | S | ☐ |
+| BR-010 | Suspended tenant read-only | M01 | — | TenantStatusGuard | I S | ☑ |
+| BR-011 | Reactivation restores access, no data change | M01 | — | TenantLifecycleService | I | ☑ |
+| BR-012 | Downgrade refused while over limits (listed) | M01 | — | PlanChangeService | U | ☑ |
+| BR-013 | Limits never block view/print/export | M01 | — | PlanLimitGuard | U | ☑ |
+| BR-014 | Provider access only via approved window, logged | M01 | SupportAccessGrants (CHECK EndsAt > StartsAt) | SupportAccessGuard | S | ☑ |
 | BR-020 | Smallest currency unit; currency decimals | X | DECIMAL(18,3); Companies.CurrencyDecimals | Money type | U | ◐ |
 | BR-021 | Half-up rounding at each amount | X | — | Money.Round | U | ◐ |
 | BR-022 | Tax exclusive default 16 %; company setting | M03 | Companies.TaxRate/TaxInclusive defaults | InvoiceCalculator | U | ☑ |
@@ -515,10 +515,10 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | SEC-04 | Single-use, expiring links | M02 | Invitations.TokenHash/ExpiresAt; A-17 | SCR-03, SCR-04 | S | ◐ |
 | SEC-05 | Server-side tenant/company/permission check on every request | X | permission policies; TenantContext | N/A | S | ◐ |
 | SEC-06 | Data-layer filtering; cross-tenant tests every release | X | global query filters | N/A | S (TST-06) | ◐ |
-| SEC-07 | Provider access only via window | M01 | SupportAccessGrants | SCR-92, SCR-83 | S | ☐ |
+| SEC-07 | Provider access only via window | M01 | SupportAccessGrants | SCR-92, SCR-83 | S | ☑ |
 | SEC-08 | TLS 1.2+; encryption at rest | X | HTTPS config; TDE/backup encryption at deployment (DEF-01) | N/A | O | ☐ |
 | SEC-09 | Secrets in secret store / encrypted columns; never shown or logged | M10/X | EInvoiceSettings.*Encrypted, Users.TwoFactorSecret; Data Protection; user-secrets | SCR-73 | S | ☐ |
-| SEC-10 | Card data only at gateway | M01 | IPaymentGateway (hosted page) | SCR-80 | review | ☐ |
+| SEC-10 | Card data only at gateway | M01 | IPaymentGateway (hosted page) | SCR-80 | review | ☑ |
 | SEC-11 | Driver details in full to drv.view/masters.manage; exports audited | M04 | AuditLogs (export) | SCR-60 | S | ☐ |
 | SEC-12 | OWASP Top 10 protections | X | validation, EF parameters, encoding, antiforgery, headers | N/A | S | ◐ |
 | SEC-13 | Upload type/size checks; formulas not executed | M14 | ImportService | SCR-12, SCR-30, SCR-33 | U S | ☐ |
@@ -527,7 +527,7 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | SEC-16 | Append-only audit log incl. sign-ins and support sessions | M13 | AuditLogs | SCR-77 | I S | ◐ |
 | SEC-17 | Financial integrity server-side | M07 | CHECKs + services | N/A | U I | ☐ |
 | SEC-18 | Tenant owns data | M01 | P-16 export | SCR-82 | O | ☐ |
-| SEC-19 | Jordan PDPL; anonymise in place | M02/M04 | AnonymisationService (legal check deferred to owner) | SCR-60, SCR-76 | I | ☐ |
+| SEC-19 | Jordan PDPL; anonymise in place | M02/M04 | AnonymisationService (legal check deferred to owner) | SCR-60, SCR-76 | I | ☑ |
 | SEC-20 | Tax compliance (16 %, gap-free, e-invoicing, QR, 7 years) | M09/M10 | FR-043, FR-059…066 | — | I | ☐ |
 | SEC-21 | Terms and Privacy acceptance recorded | M01 | TermsAcceptances (G-20) | SCR-02 | I | ◐ |
 | SEC-22 | Hashed opaque ids in URLs; unknown → not found | X | PublicId + URL token encoder | all | S | ◐ |
@@ -580,7 +580,7 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | DX-01 | Import xlsx/CSV (trips, master data, chart, entries) | M14 | ImportService | I | ☐ |
 | DX-02 | Export lists/reports Excel, PDF | M14 | ExportService | I | ☐ |
 | DX-03 | Journal export JSON/CSV | M07 | JournalExportService | I | ☐ |
-| DX-04 | Company export Excel + JSON | M14 | CompanyExportJob | I | ☐ |
+| DX-04 | Company export Excel + JSON | M14 | CompanyExportJob | I | ☑ |
 | RT-01 | SignalR pushes to same-company users only | M13 | RealtimeHub (company groups) | S I | ◐ |
 | RT-02 | Auto-reconnect and refresh | M13 | client reconnect handler | E | ☐ |
 

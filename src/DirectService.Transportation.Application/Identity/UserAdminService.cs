@@ -17,7 +17,7 @@ namespace DirectService.Transportation.Application.Identity;
 /// </summary>
 public sealed class UserAdminService(
     IAppDbContext db, IRequestContext ctx, IChangeContext changes, AccessService access, SessionService sessions,
-    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard)
+    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard, Platform.PlanLimits? limits = null)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
 
@@ -122,6 +122,7 @@ public sealed class UserAdminService(
         if (status != "Active") RequireReason(reason);
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
         if (user.Status == status) return;
+        if (status == "Active" && limits is not null && user.TenantId is long tenant) await limits.EnsureUserAsync(tenant, ct).ConfigureAwait(false);   // P-07
         if (status != "Active")
         {
             await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: null, ct).ConfigureAwait(false);

@@ -32,12 +32,12 @@ public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, I
             .Select(r => r.UserId).Distinct().ToListAsync(ct).ConfigureAwait(false);
 
     /// <summary>Adds a notification for each user and saves (inside the caller's transaction when there is one), then pushes it.</summary>
-    public async Task NotifyAsync(IEnumerable<long> userIds, long? companyId, string type, string ar, string en, string? link, CancellationToken ct)
+    public async Task NotifyAsync(IEnumerable<long> userIds, long? companyId, string type, string ar, string en, string? link, CancellationToken ct, long? tenant = null)
     {
         ArgumentNullException.ThrowIfNull(userIds);
         var ids = userIds.Distinct().ToList();
         if (ids.Count == 0) return;
-        var tenantId = ctx.TenantId ?? await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => c.Id == companyId).Select(c => (long?)c.TenantId)
+        var tenantId = tenant ?? ctx.TenantId ?? await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => c.Id == companyId).Select(c => (long?)c.TenantId)
             .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw new InvalidOperationException("A notification needs a tenant.");
         var message = Message(ar, en);
         var rows = ids.Select(u => new Notification { TenantId = tenantId, UserId = u, CompanyId = companyId, NotificationType = type, Message = message, Link = link }).ToList();

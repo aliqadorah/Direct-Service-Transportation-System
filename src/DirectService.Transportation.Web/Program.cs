@@ -71,6 +71,7 @@ if (config.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<PendingPostingWorker>();
     builder.Services.AddHostedService<EInvoiceWorker>();
     builder.Services.AddHostedService<ExportWorker>();
+    builder.Services.AddHostedService<TenantLifecycleWorker>();
 }
 
 var app = builder.Build();
@@ -129,6 +130,9 @@ company.MapApArEndpoints();
 company.MapLedgerReportEndpoints();
 company.MapReportEndpoints();
 company.MapCollaborationEndpoints();
+api.MapPlatformEndpoints();
+company.MapOnboardingEndpoints();
+app.MapBillingWebhook();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);

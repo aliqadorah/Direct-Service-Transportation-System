@@ -65,6 +65,10 @@ public static class DependencyInjection
         services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
         // E-invoicing (B7): connectors, credentials, locks, worker signal.
         services.AddOptions<EInvoicingOptions>().Bind(configuration.GetSection(EInvoicingOptions.Section));
+        services.AddOptions<Application.Platform.PlatformOptions>().Bind(configuration.GetSection(Application.Platform.PlatformOptions.Section));
+        services.AddSingleton<Application.Platform.IPaymentGateway, Billing.FakePaymentGateway>();
+        services.AddScoped<Application.Platform.IPlatformNumbers, Billing.PlatformNumbers>();
+        services.AddScoped<Application.Platform.IPlatformLock, Billing.SqlPlatformLock>();
         services.AddOptions<JoFotaraOptions>().Bind(configuration.GetSection(JoFotaraOptions.Section));
         services.AddHttpClient(JoFotaraConnector.HttpClientName).RedactLoggedHeaders(["Client-Id", "Secret-Key"]);
         services.AddScoped<IEInvoiceConnector, JoFotaraConnector>();

@@ -179,6 +179,14 @@ public static class ErrorCatalog
         [ErrorCodes.MaintenanceNothing] = ("لا توجد قيود يمكن حذفها.", "There are no entries to delete."),
         [ErrorCodes.MaintenanceChartInUse] = ("لا يمكن استبدال دليل الحسابات: {0}.", "The chart of accounts cannot be replaced: {0}."),
         [ErrorCodes.MaintenanceRefused] = ("لم يُنفَّذ الإجراء: {0}", "The action was not run: {0}"),
+        [ErrorCodes.SubscriptionNotUpgrade] = ("للترقية الآن اختر باقة أعلى سعراً؛ الباقات الأدنى تُطبَّق بطلب تخفيض.", "To upgrade now choose a plan with a higher price; lower plans apply through a downgrade."),
+        [ErrorCodes.SubscriptionNotDowngrade] = ("التخفيض إلى باقة أرخص بنفس دورة الفوترة وحدود لا تزيد على الحالية فقط؛ غير ذلك يتم بالدفع.", "A downgrade is to a cheaper plan of the same billing cycle with no higher limits; other changes go through checkout."),
+        [ErrorCodes.SubscriptionFreePlan] = ("المستأجر على باقة التجربة؛ مدّد التجربة أو يشترك المالك في باقة مدفوعة.", "The tenant is on the trial plan; extend the trial or the Owner subscribes to a paid plan."),
+        [ErrorCodes.SubscriptionDowngradeExceeds] = ("لا يمكن التخفيض: الاستخدام الحالي يتجاوز حدود الباقة ({0}).", "The downgrade is refused: current usage exceeds the plan's limits ({0})."),
+        [ErrorCodes.SubscriptionClosed] = ("الاشتراك ملغى؛ البيانات متاحة للتصدير فقط حتى نهاية فترة الاحتفاظ.", "The subscription is cancelled; data is available for export only until the end of the retention period."),
+        [ErrorCodes.SubscriptionInvoiceNotDue] = ("الفاتورة {0} ليست مستحقة.", "Invoice {0} is not due."),
+        [ErrorCodes.SupportWindow] = ("نافذة الدعم يجب أن تبدأ قبل نهايتها وألا تتجاوز 7 أيام.", "The support window must start before it ends and last at most 7 days."),
+        [ErrorCodes.SupportNotRequested] = ("طلب الدعم {0} ليس بانتظار القرار.", "Support request {0} is not waiting for a decision."),
         [ErrorCodes.MaintenanceResetBlocked] = ("رُفضت إعادة الضبط الكاملة: {0}.", "Full reset refused: {0}."),
     };
 
@@ -370,4 +378,12 @@ public static class ErrorCodes
     public const string MaintenanceChartInUse = "maintenance.chartInUse";
     public const string MaintenanceResetBlocked = "maintenance.resetBlocked";
     public const string MaintenanceRefused = "maintenance.refused";
+    public const string SubscriptionNotUpgrade = "subscription.notUpgrade";
+    public const string SubscriptionNotDowngrade = "subscription.notDowngrade";
+    public const string SubscriptionFreePlan = "subscription.freePlan";
+    public const string SubscriptionDowngradeExceeds = "subscription.downgradeExceeds";
+    public const string SubscriptionClosed = "subscription.closed";
+    public const string SubscriptionInvoiceNotDue = "subscription.invoiceNotDue";
+    public const string SupportWindow = "support.window";
+    public const string SupportNotRequested = "support.notRequested";
 }
