@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 10 Oct 2026 (step 4 · B4 done; step 5 design directions presented — waiting for the owner's choice; next backend block: B5 Trips)_
+_Last updated: 10 Oct 2026 (step 4 · B4 done; step 6 full mockups presented — waiting for the owner's approval; next backend block: B5 Trips)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -25,7 +25,8 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (**approved 8 Oct 2026**, seeded in B2) |
 | Design | `docs/design/Database_Design_Revision5.md` |
 | 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md`, `docs/step4/B4_Pricing.md` (delivery, tests, code + security review) |
-| 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions within the brand — **waiting for the owner's choice**; published privately at https://claude.ai/artifact/JkisN139zLE9tGYCGKmDit) |
+| 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions; **owner chose A · Ledger + C parts**; https://claude.ai/artifact/JkisN139zLE9tGYCGKmDit) |
+| 6 | `docs/step6/Mockups.md` + `docs/step6/index.html` (+ `app.js`, `screens-*.js`; serve `docs/` over HTTP to view locally — `.claude/launch.json` config "mockups") — **waiting for approval** |
 | API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
 
 ## Completed steps
@@ -43,12 +44,12 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - **Step 4 · B4 — Pricing: done (10 Oct 2026).** Tariffs (customer/partner; keys or All; price > 0 with the currency's decimals; validity; add/edit/archive/restore; unique per keys + start incl. archived; import/export), resolution (specificity 8/4/2/1, tie → latest Valid from) in `PricingRules` + `PricingResolver`, rate history on every change (`RateHistoryLog`, trn.TRN_RateHistory), monthly site rates (month strip None/Partial/Complete, month entry for all active sites, no inheritance, warning when the month has trips, clearing refused while trips use the site, required row versions), missing-rates data for the dashboard, trip-form price quote, FR-030 driver-rate rules ready for B5. 17 endpoints. 208 tests passing. Independent code + security review: no High; M1–M4, L5–L7, L9 fixed (`docs/step4/B4_Pricing.md`). OpenAPI re-exported (196 paths), Redocly clean.
 
 ## Current step
-- **Step 5 — design directions: presented 10 Oct 2026, waiting for the owner's choice** (A Ledger, B Dispatch board, C Command — `docs/step5/Design_Directions.md`). Step 6 mockups follow the choice; no UI code before mockup approval.
+- **Step 6 — full mockups: presented 10 Oct 2026, waiting for the owner's approval** (`docs/step6/Mockups.md`, board `docs/step6/index.html`, private artifact https://claude.ai/artifact/A9UDCp84GdEqF3qYtmn5Mr): 69 screens (SCR-00…SCR-94) in A · Ledger + C parts, Arabic RTL, five states each, 32 screens with variants. **No UI code before approval.** After approval: step 7 (tokens + Blazor components from the board's CSS), then step 8.
 - Backend may continue meanwhile with **Step 4 · B5 — Trips** (step 2 §10): trip form/quick entry, calculations, validation, pricing via `PricingResolver`/`PricingRules`, wage/partner-cost posting, edit/void, import, history (FR-001…018, FR-022…025, FR-031…033; PRD 7.1, 8.2).
 
 ## Resume here (for a new session)
 1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
-2. First check whether the owner has chosen a design direction (step 5, `docs/step5/Design_Directions.md`); if so, record the choice and do step 6 (full mockups of every PRD 13.5 screen in Arabic RTL with loading/empty/error/success states) and stop for approval. Backend next block: **B5 Trips** (see "Current step"). Requirements: PRD 7.1, 8.2, 6.1, 9.3–9.5 and the FR-001…018 rows of `docs/step1/02_Traceability_Matrix.md` plus the B5 parts of FR-022…025 and FR-031…033. Read `docs/step4/B4_Pricing.md`: use `PricingResolver.TariffAsync`/`MonthlyRateAsync` and `PricingRules.ResolveDriverRate`/`MustResolveAgain`; **read the monthly rate row WITH (UPDLOCK) inside the trip transaction** (B4 review M2); store tariff price, breach flag, rate/source/month at save (BR-030); partner trips: driver rate 0, RateSource 'Monthly' (DT-54); tariff lock (FR-025) via `PricingResolver.TariffLockAsync`, deviations audited; manual rate needs masters.manage (`rate.manualNotAllowed`).
+2. First check whether the owner has approved the step 6 mockups (`docs/step6/Mockups.md`); apply any per-screen comments to the board (`docs/step6/*.js`, republish the artifact with the same file path or its URL) and record the approval. After approval: step 7 (design tokens and reusable Blazor components taken from the board's CSS/components) and step 8 (screens), interleaved with the remaining backend blocks. Backend next block: **B5 Trips** (see "Current step"). Requirements: PRD 7.1, 8.2, 6.1, 9.3–9.5 and the FR-001…018 rows of `docs/step1/02_Traceability_Matrix.md` plus the B5 parts of FR-022…025 and FR-031…033. Read `docs/step4/B4_Pricing.md`: use `PricingResolver.TariffAsync`/`MonthlyRateAsync` and `PricingRules.ResolveDriverRate`/`MustResolveAgain`; **read the monthly rate row WITH (UPDLOCK) inside the trip transaction** (B4 review M2); store tariff price, breach flag, rate/source/month at save (BR-030); partner trips: driver rate 0, RateSource 'Monthly' (DT-54); tariff lock (FR-025) via `PricingResolver.TariffLockAsync`, deviations audited; manual rate needs masters.manage (`rate.manualNotAllowed`).
 3. Module pattern (follow B1):
    - Services in `src/…Application/<Module>/` using `IAppDbContext`, `IRequestContext`, `IChangeContext.SetAction(entity, action, reason)` for audited business actions, `db.InTransactionAsync` for multi-save operations, `db.ExpectRowVersion` for updates, `Fail.*` / `Validator` for problems (codes + AR/EN messages in `Contracts/Errors/ErrorCatalog.cs` — a unit test requires every code to have both messages).
    - DTOs in `src/…Contracts/<Module>/` — identifiers are always URL tokens (`IUrlTokenService.Encode<T>`), never internal ids.
@@ -79,7 +80,8 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - All items listed as settled in `Build_Brief.md`; `core.Users.Email` unique platform-wide.
 - Step 1 decisions D-01…D-18 (`docs/step1/03_Owner_Decisions.md`): D-01 namespaced permission keys; D-02 LayoutType default 'Claim'; D-03 tariff price / deduction > 0; D-04 rejected e-invoices resubmittable, Failed = Rejected + LastError; D-05 manual-entry edit = reverse + re-post; D-06 tariff lock lets masters.manage deviate; D-07 C-08…C-11 recommendations; D-08 tenant settings columns; D-09 Companies.Status; D-10 chart template drafted for approval; D-11 credits reduce only their invoice; D-12 TRIAL plan, trial end → Suspended → Cancelled; D-13 provider console for all staff, support window read-only; D-14 G-recommendations; D-15 AR documents e-invoiced; D-16 prefixes TRP-, CRN-, RCV-, ADV-, STL-, PPY-, JV-, BIL-, ARD-, PAY-, RTN-, JEX- (5 digits); D-17 assumptions accepted; D-18 help pages at the end.
 - DT-21 … DT-35 (B2 decisions taken without asking): **accepted by the owner on 8 Oct 2026.**
-- DT-36 … DT-49 (B3 decisions taken without asking): **accepted by the owner on 10 Oct 2026.** DT-50 … DT-64 (B4): open for owner review.
+- DT-36 … DT-49 (B3 decisions taken without asking): **accepted by the owner on 10 Oct 2026.** DT-50 … DT-64 (B4): **accepted by the owner on 10 Oct 2026.**
+- **Step 5 design direction (owner, 10 Oct 2026): A · Ledger**, adding from C: saved views above lists, the filter row under table headers, the Ctrl+K command bar for global search, and the compact/comfortable density switch.
 - Step 2 decisions Q-01…Q-10 (`docs/step2/02_Owner_Decisions_Step2.md`): architecture approved; revision 5 option R5-A; idle timeout 30 min (5–1,440); absolute session lifetime 12 h (platform setting); password length 8–64; only Active companies count toward the plan; collation `Arabic_100_CI_AI_SC_UTF8`; PDF via HTML + headless Chromium; build order as proposed; git + Node.js yes, commit locally after each module, never push.
 
 ## Database design revision 5 (implemented)
@@ -151,6 +153,11 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | DT-62 | Archived loading sites in the month grid | Keep and show their rates in months where they have them; get no new rates; the grid lists active sites | as stated |
 | DT-63 | "Save and print" of monthly rates (FR-028) | Excel/CSV now; PDF with the print engine in B6 (like DT-45) | as stated |
 | DT-64 | Concurrency on the monthly grid (B4 review M1) | Changing or clearing stored rates requires the row version (400 missing, 409 stale) | as stated — stricter than other PUTs (B3 L4 still open for those) |
+| DT-65 | Digits and dates in the Arabic UI | Western digits isolated as LTR runs; default date format YYYY-MM-DD (user preference can change it, FR-178) | as stated |
+| DT-66 | Menu placement of setup checklist, tenant group, provider console | Setup checklist top-level while setup is incomplete; Tenant group only for core.tenant.manage; provider console in its own shell | as stated |
+| DT-67 | Default table density | Compact (32 px rows / 32 px controls); comfortable 40 / 36 px | as stated |
+| DT-68 | Storage of saved views (owner chose C's saved views; no table in the design) | (a) rows of cfg.TableColumnViews under namespaced keys `<list>#view:<name>`, Columns JSON = columns + filters + name; personal (UserId) or company-shared (UserId NULL, settings.manage); built-in views defined in code; (b) new table (schema change) | (a) — no schema change |
+| DT-69 | Storage of the density preference (no column in core.Users) | (a) per device in browser storage; (b) new column (schema change) | (a) — shown in the profile as "saved on this device" |
 | DT-14 | Audit JSON for secret columns | `PasswordHash`, `SecurityStamp`, `TwoFactorSecret`, `CodeHash`, `TokenHash`, `ClientIdEncrypted`, `SecretKeyEncrypted` written as `"***"`; binary columns (logo) omitted | as stated |
 
 ## Extra indexes / constraints added beyond the design
