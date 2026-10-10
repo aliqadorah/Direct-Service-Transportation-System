@@ -130,6 +130,24 @@ public static class ErrorCatalog
         [ErrorCodes.CreditIsVoid] = ("الإشعار الدائن {0} ملغى.", "Credit note {0} is void."),
         [ErrorCodes.CreditTripReinvoiced] = ("لا يمكن إلغاء الإشعار: الرحلة {0} فُوترت مرة أخرى أو أُلغيت.", "The credit note cannot be voided: trip {0} was invoiced again or voided."),
         [ErrorCodes.CreditTripChanged] = ("لا يمكن إلغاء الإشعار: الرحلة {0} عُدّلت بعد إرجاعها.", "The credit note cannot be voided: trip {0} was changed after it was returned."),
+        [ErrorCodes.EInvoiceNotEnabled] = ("الفوترة الإلكترونية غير مفعّلة لهذه الشركة؛ فعّلها من الإعدادات.", "E-invoicing is not enabled for this company; enable it in the settings."),
+        [ErrorCodes.EInvoiceSellerTaxNumber] = ("الرقم الضريبي للبائع في إعدادات الفوترة الإلكترونية مفقود أو غير صحيح (أرقام فقط).", "The seller tax number in the e-invoicing settings is missing or invalid (digits only)."),
+        [ErrorCodes.EInvoiceIncomeSource] = ("تسلسل مصدر الدخل في إعدادات الفوترة الإلكترونية مفقود أو غير صحيح (أرقام فقط).", "The income-source sequence in the e-invoicing settings is missing or invalid (digits only)."),
+        [ErrorCodes.EInvoiceCredentials] = ("بيانات الربط (معرّف العميل والمفتاح السري) غير محفوظة في إعدادات الفوترة الإلكترونية.", "The API credentials (client id and secret key) are not saved in the e-invoicing settings."),
+        [ErrorCodes.EInvoiceSellerName] = ("اسم الشركة مطلوب للفوترة الإلكترونية.", "The company name is required for e-invoicing."),
+        [ErrorCodes.EInvoiceBuyerName] = ("اسم العميل مطلوب للفوترة الإلكترونية.", "The customer name is required for e-invoicing."),
+        [ErrorCodes.EInvoiceBuyerTaxNumber] = ("الرقم الضريبي للعميل غير صحيح (أرقام فقط)؛ صحّحه في بطاقة العميل ثم أعد الإرسال.", "The customer tax number is invalid (digits only); correct it on the customer and submit again."),
+        [ErrorCodes.EInvoiceIncomeWithTax] = ("نوع التسجيل «دخل» لا يسمح بفواتير عليها ضريبة مبيعات؛ راجع نوع التسجيل أو نسبة الضريبة.", "The income registration type cannot issue invoices with sales tax; check the registration type or the tax rate."),
+        [ErrorCodes.EInvoiceSpecialNotSupported] = ("فواتير الضريبة الخاصة غير مدعومة في هذا الإصدار.", "Special sales tax invoices are not supported in this version."),
+        [ErrorCodes.EInvoiceNoLines] = ("لا يحتوي المستند على بنود قابلة للإرسال.", "The document has no lines to submit."),
+        [ErrorCodes.EInvoiceTotals] = ("مجاميع المستند لا تطابق بنوده؛ لم يُرسل.", "The document totals do not match its lines; it was not sent."),
+        [ErrorCodes.EInvoiceWaitingForInvoice] = ("يُرسل الإشعار الدائن بعد قبول الفاتورة الأصلية في نظام الفوترة الإلكترونية.", "The credit note is sent after the original invoice is accepted by the e-invoicing system."),
+        [ErrorCodes.EInvoiceNotSubmittable] = ("لا يمكن إرسال مستند حالته {0}.", "A document with status {0} cannot be submitted."),
+        [ErrorCodes.EInvoiceBusy] = ("المستند قيد الإرسال الآن؛ أعد المحاولة بعد قليل.", "The document is being submitted now; try again shortly."),
+        [ErrorCodes.EInvoiceConnectorUnavailable] = ("الموصل المختار غير متاح في هذه البيئة.", "The selected connector is not available in this environment."),
+        [ErrorCodes.CreditEInvoiced] = ("قبل نظام الفوترة الإلكترونية الإشعار الدائن {0}؛ لا يمكن إلغاؤه.", "Credit note {0} was accepted by the e-invoicing system; it cannot be voided."),
+        [ErrorCodes.EInvoiceOutcomeUnknown] = ("قد يكون نظام الفوترة الإلكترونية استلم هذا المستند (انقطاع أو مهلة أثناء الإرسال). أعد الإرسال أولاً لمعرفة النتيجة ثم ألغِ إن لزم.", "The e-invoicing system may have received this document (a failure or timeout during sending). Submit it again first to learn the outcome, then void if needed."),
+        [ErrorCodes.EInvoicePendingDocuments] = ("لا يمكن تغيير الموصل أو البيئة ومستندات بانتظار الإرسال أو مرفوضة؛ أرسلها أو ألغها أولاً.", "The connector or environment cannot change while documents are queued or rejected; submit or cancel them first."),
         [ErrorCodes.PrintUnavailable] = ("محرك الطباعة غير متاح الآن. أعد المحاولة؛ لم يُسجَّل أي طباعة.", "The print engine is not available now. Try again; no print was recorded."),
     };
 
@@ -271,5 +289,23 @@ public static class ErrorCodes
     public const string CreditIsVoid = "credit.void";
     public const string CreditTripReinvoiced = "credit.tripReinvoiced";
     public const string CreditTripChanged = "credit.tripChanged";
+    public const string EInvoiceNotEnabled = "einvoice.notEnabled";
+    public const string EInvoiceSellerTaxNumber = "einvoice.sellerTaxNumber";
+    public const string EInvoiceIncomeSource = "einvoice.incomeSource";
+    public const string EInvoiceCredentials = "einvoice.credentials";
+    public const string EInvoiceSellerName = "einvoice.sellerName";
+    public const string EInvoiceBuyerName = "einvoice.buyerName";
+    public const string EInvoiceBuyerTaxNumber = "einvoice.buyerTaxNumber";
+    public const string EInvoiceIncomeWithTax = "einvoice.incomeWithTax";
+    public const string EInvoiceSpecialNotSupported = "einvoice.specialNotSupported";
+    public const string EInvoiceNoLines = "einvoice.noLines";
+    public const string EInvoiceTotals = "einvoice.totals";
+    public const string EInvoiceWaitingForInvoice = "einvoice.waitingForInvoice";
+    public const string EInvoiceNotSubmittable = "einvoice.notSubmittable";
+    public const string EInvoiceBusy = "einvoice.busy";
+    public const string EInvoiceConnectorUnavailable = "einvoice.connectorUnavailable";
+    public const string CreditEInvoiced = "credit.eInvoiced";
+    public const string EInvoiceOutcomeUnknown = "einvoice.outcomeUnknown";
+    public const string EInvoicePendingDocuments = "einvoice.pendingDocuments";
     public const string PrintUnavailable = "print.unavailable";
 }

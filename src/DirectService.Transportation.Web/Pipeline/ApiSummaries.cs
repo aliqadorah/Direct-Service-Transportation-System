@@ -286,6 +286,14 @@ internal static class ApiSummaries
         ["GET /api/v1/companies/{company}/invoice-layouts/{layoutType}"] = "The company's claim-statement or tax-invoice layout (default when none is saved) with the available annex columns (FR-055)",
         ["PUT /api/v1/companies/{company}/invoice-layouts/{layoutType}"] = "Save a print layout: title, band, grouping, annex columns, labels, footer, signatures, logo, QR (FR-055, FR-056)",
         ["GET /api/v1/companies/{company}/invoice-layouts/{layoutType}/preview"] = "Preview a layout as HTML with sample data (FR-055)",
+        ["GET /api/v1/companies/{company}/settings/e-invoicing/"] = "E-invoicing settings without credentials, counter and available connectors (FR-059, FR-066)",
+        ["PUT /api/v1/companies/{company}/settings/e-invoicing/"] = "Save e-invoicing settings; credentials are encrypted and write-only (FR-059, SEC-09)",
+        ["GET /api/v1/companies/{company}/einvoice-submissions/"] = "E-invoicing list and report: status, document type, customer, period, totals by status (FR-061, FR-065)",
+        ["GET /api/v1/companies/{company}/einvoice-submissions/export"] = "Export the e-invoicing report as Excel or CSV (FR-065)",
+        ["GET /api/v1/companies/{company}/einvoice-submissions/{submission}"] = "Submission with problems to fix, identifiers, document sent and response (FR-062, FR-063)",
+        ["POST /api/v1/companies/{company}/einvoice-submissions/{submission}/submit"] = "Submit now or resubmit a corrected rejected document (FR-061, FR-063, D-04)",
+        ["GET /api/v1/companies/{company}/invoices/{invoice}/e-invoice"] = "The invoice's e-invoice submission (FR-048, FR-062)",
+        ["GET /api/v1/companies/{company}/credit-notes/{creditNote}/e-invoice"] = "The credit note's e-invoice submission (FR-064)",
         ["GET /api/v1/companies/{company}/pricing/quote"] = "Prices for the trip form: customer price and partner rate from the tariffs, driver rate from the monthly site rates (FR-006, FR-022, FR-030)",
     };
 

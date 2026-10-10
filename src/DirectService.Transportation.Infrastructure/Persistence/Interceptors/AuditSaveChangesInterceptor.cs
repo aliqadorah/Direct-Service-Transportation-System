@@ -31,6 +31,8 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
     {
         "PasswordHash", "SecurityStamp", "TwoFactorSecret", "CodeHash", "TokenHash",
         "ClientIdEncrypted", "SecretKeyEncrypted",
+        // E-invoice documents and responses are kept on the submission row itself; the audit log only notes that they changed (B7).
+        "RequestPayload", "ResponsePayload", "QrCode",
     };
 
     /// <summary>High-frequency technical rows whose changes are not business events.</summary>

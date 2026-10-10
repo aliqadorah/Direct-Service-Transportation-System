@@ -26,7 +26,7 @@ public sealed record InvoiceCompany(decimal TaxRate, bool TaxInclusive, int Deci
 /// (FR-041); void with reversal, number kept and trips released (FR-045, FR-046); list with filters and totals (FR-047); view (FR-048).
 /// </summary>
 public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, CompanySettingsService settings, TripService trips)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, CompanySettingsService settings, TripService trips, EInvoicing.EInvoiceService einvoice)
 {
     public const string EntityType = "TRN.Invoice";
     public const string SourceType = "Invoice";
@@ -282,7 +282,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     /// <summary>
     /// Approval (FR-043, FR-044): refused while account mapping is incomplete, the date is in a closed period, a trip is no longer
     /// active and on this invoice, or the total is not above 0. Assigns the next gap-free number, posts the revenue entry, marks the
-    /// trips invoiced. E-invoicing is queued by B7.
+    /// trips invoiced, e-invoicing queued with the next counter when enabled (FR-043, FR-061).
     /// </summary>
     private async Task ApproveCoreAsync(Invoice inv, CancellationToken ct)
     {
@@ -309,6 +309,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         var entry = await posting.PostOrPendAsync(BuildEntry(inv)!, ct).ConfigureAwait(false);
         inv.JournalEntryId = entry?.Id;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await einvoice.QueueInvoiceAsync(inv, ct).ConfigureAwait(false);
     }
 
     // ============================================================ void (FR-045, FR-046)
@@ -329,10 +330,11 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             var credits = await db.Set<CreditNote>().CountAsync(x => x.InvoiceId == inv.Id && x.Status == InvoiceCodes.Posted, c).ConfigureAwait(false);
             var receipts = await db.Set<Receipt>().CountAsync(x => x.InvoiceId == inv.Id && x.Status != InvoiceCodes.Void, c).ConfigureAwait(false);
             if (credits > 0 || receipts > 0 || inv.PaidAmount > 0 || inv.ReturnedAmount > 0) throw Fail.Rule(ErrorCodes.InvoiceHasPayments, inv.Number, receipts, credits);
-            // An invoice accepted by the national e-invoicing system is cancelled only by a full credit note (FR-046).
-            if (await db.Set<EInvoiceSubmission>().AnyAsync(s => s.InvoiceId == inv.Id && s.Status == "Submitted", c).ConfigureAwait(false))
-                throw Fail.Rule(ErrorCodes.InvoiceEInvoiced, inv.Number);
             await periods.EnsureOpenAsync(inv.InvoiceDate, c).ConfigureAwait(false);
+            // An invoice accepted by the national e-invoicing system is cancelled only by a full credit note (FR-046); a queued or
+            // rejected submission is cancelled (waits for a submission in progress).
+            if (!await einvoice.CancelAsync(inv.Id, null, why, c).ConfigureAwait(false))
+                throw Fail.Rule(ErrorCodes.InvoiceEInvoiced, inv.Number);
             inv.Status = InvoiceCodes.Void;
             inv.VoidReason = why;
             inv.VoidedBy = ctx.UserId ?? throw new InvalidOperationException("A void needs a user.");

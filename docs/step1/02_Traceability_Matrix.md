@@ -177,10 +177,10 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-040 | Totals live and stored at approval (8.3) | M | M09 | TRN_Invoices | InvoiceCalculator | SCR-21, SCR-22 | U (EX-2) | ☑ |
 | FR-041 | Approval setting: Draft vs direct approve; Save & approve | M | M09 | CompanySettings TRN.InvoiceApproval | InvoiceService | SCR-21, SCR-22 | I E | ☑ |
 | FR-042 | Draft reserves trips; edit, DRAFT print, approve, delete (soft) | M | M09 | TRN_Invoices, TRN_Trips.InvoiceId | InvoiceService | SCR-23, SCR-09 | I E | ☑ |
-| FR-043 | Approval: gap-free number, post entry, trips invoiced, queue e-invoice | M | M09/M07/M10 | NumberSequences, JournalEntries, TRN_EInvoiceSubmissions | InvoiceService.Approve, NumberingService | SCR-23 | I (TST-10) | ◐ |
+| FR-043 | Approval: gap-free number, post entry, trips invoiced, queue e-invoice | M | M09/M07/M10 | NumberSequences, JournalEntries, TRN_EInvoiceSubmissions | InvoiceService.Approve, NumberingService | SCR-23 | I (TST-10) | ☑ |
 | FR-044 | Approval blocks (mapping, closed period, trip state, total ≤ 0) | M | M09 | PostingKeyMappings, Periods | InvoiceService.Approve | SCR-23 | U I | ☑ |
 | FR-045 | Void invoice with reason; reversal; trips released; VOID stamp | M | M09/M07 | TRN_Invoices (Void*), JournalEntries | InvoiceService.Void | SCR-23 | I E | ☑ |
-| FR-046 | Accepted e-invoice cannot be voided — full credit note | M | M09/M10 | TRN_EInvoiceSubmissions | InvoiceService.Void | SCR-23 | I | ◐ |
+| FR-046 | Accepted e-invoice cannot be voided — full credit note | M | M09/M10 | TRN_EInvoiceSubmissions | InvoiceService.Void | SCR-23 | I | ☑ |
 | FR-047 | Invoice list filters, totals, export | M | M09 | TRN_Invoices | InvoiceQueries.List | SCR-20 | I E | ☑ |
 | FR-048 | Invoice view incl. receipts, credit notes, e-invoice status, history | M | M09 | TRN_Invoices, TRN_Receipts, TRN_CreditNotes, TRN_EInvoiceSubmissions, AuditLogs | InvoiceQueries.Detail | SCR-23 | I E | ◐ |
 | FR-049 | Credit note from approved invoice; reason | M | M09 | TRN_CreditNotes, TRN_CreditNoteLines | CreditNoteService | SCR-24 | I E | ☑ |
@@ -191,16 +191,16 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-054 | Two layouts: claim statement (with annex) and tax invoice | M | M09 | TRN_InvoiceLayouts | InvoicePrintService | SCR-09 | I E | ☑ |
 | FR-055 | Layout designer with live preview | M | M09 | TRN_InvoiceLayouts | InvoiceLayoutService | SCR-74 | I E | ☑ |
 | FR-056 | Annex columns incl. custom trip fields | M | M09 | TRN_InvoiceLayouts.AnnexColumns, CustomFieldDefinitions | InvoicePrintService | SCR-74, SCR-09 | I | ☑ |
-| FR-057 | Printed invoice content (parties, tax numbers, words, page X/Y, QR, signatures) | M | M09 | TRN_Invoices, Companies, TRN_Customers, TRN_EInvoiceSubmissions.QrCode | InvoicePrintService | SCR-09 | I E | ◐ |
+| FR-057 | Printed invoice content (parties, tax numbers, words, page X/Y, QR, signatures) | M | M09 | TRN_Invoices, Companies, TRN_Customers, TRN_EInvoiceSubmissions.QrCode | InvoicePrintService | SCR-09 | I E | ☑ |
 | FR-058 | Print/PDF for draft/approved/void; every print logged | M | M09/M13 | AuditLogs (A-04) | PrintService | SCR-09 | I | ☑ |
-| FR-059 | E-invoicing company settings; credentials encrypted | M | M10 | EInvoiceSettings | EInvoiceSettingsService | SCR-73 | I S | ☐ |
-| FR-060 | Build national format and validate before submission | M | M10 | TRN_EInvoiceSubmissions.RequestPayload | JoFotaraConnector (UBL 2.1) | SCR-25 | U | ☐ |
-| FR-061 | Automatic and manual submission; retries; Rejected/Failed list | M | M10 | TRN_EInvoiceSubmissions | EInvoiceSubmissionJob | SCR-25 | I | ☐ |
-| FR-062 | Store unique ID, system number, QR, time; QR printed | M | M10 | TRN_EInvoiceSubmissions | EInvoiceSubmissionJob | SCR-25, SCR-09 | I | ☐ |
-| FR-063 | Status values; reason; correct and resubmit | M | M10 | TRN_EInvoiceSubmissions.Status | EInvoiceService (C-04, C-05) | SCR-25, SCR-23 | I E | ☐ |
-| FR-064 | Credit notes reference original; only after acceptance | M | M10 | TRN_EInvoiceSubmissions | EInvoiceService | SCR-24, SCR-25 | U I | ☐ |
-| FR-065 | E-invoicing report | M | M12 | TRN_EInvoiceSubmissions, ApArEInvoiceSubmissions | Report RPT-22 | SCR-25, SCR-51 | I | ☐ |
-| FR-066 | Connector per company | S | M10 | EInvoiceSettings.Connector | IEInvoiceConnector | SCR-73 | U | ☐ |
+| FR-059 | E-invoicing company settings; credentials encrypted | M | M10 | EInvoiceSettings | EInvoiceSettingsService | SCR-73 | I S | ☑ |
+| FR-060 | Build national format and validate before submission | M | M10 | TRN_EInvoiceSubmissions.RequestPayload | JoFotaraConnector (UBL 2.1) | SCR-25 | U | ☑ |
+| FR-061 | Automatic and manual submission; retries; Rejected/Failed list | M | M10 | TRN_EInvoiceSubmissions | EInvoiceSubmissionJob | SCR-25 | I | ☑ |
+| FR-062 | Store unique ID, system number, QR, time; QR printed | M | M10 | TRN_EInvoiceSubmissions | EInvoiceSubmissionJob | SCR-25, SCR-09 | I | ☑ |
+| FR-063 | Status values; reason; correct and resubmit | M | M10 | TRN_EInvoiceSubmissions.Status | EInvoiceService (C-04, C-05) | SCR-25, SCR-23 | I E | ☑ |
+| FR-064 | Credit notes reference original; only after acceptance | M | M10 | TRN_EInvoiceSubmissions | EInvoiceService | SCR-24, SCR-25 | U I | ☑ |
+| FR-065 | E-invoicing report | M | M12 | TRN_EInvoiceSubmissions, ApArEInvoiceSubmissions | Report RPT-22 | SCR-25, SCR-51 | I | ☑ |
+| FR-066 | Connector per company | S | M10 | EInvoiceSettings.Connector | IEInvoiceConnector | SCR-73 | U | ☑ |
 
 ### C.4 Cash, drivers & partners (7.4)
 
@@ -567,7 +567,7 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 
 | ID | Requirement | Mod | Code | Tests | St |
 |---|---|---|---|---|---|
-| INT-01 | National e-invoicing (JoFotara, UBL 2.1) | M10 | IEInvoiceConnector, JoFotaraConnector, simulated dev connector (A-15) | U I, TST-04 | ☐ |
+| INT-01 | National e-invoicing (JoFotara, UBL 2.1) | M10 | IEInvoiceConnector, JoFotaraConnector, simulated dev connector (A-15) | U I, TST-04 | ◐ |
 | INT-02 | Payment gateway (provider deferred) | M01 | IPaymentGateway + webhook endpoint; dev fake (A-14) | I | ☐ |
 | INT-03 | Email service (provider deferred), AR/EN templates | M02/X | IEmailSender; dev file sender (A-14) | I | ◐ |
 | API-01 | Every Section 7 feature via REST API for own UI | X | Minimal API / controllers per module | I | ◐ |

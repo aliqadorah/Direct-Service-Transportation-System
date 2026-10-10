@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Invoicing;
 /// unless a trip was invoiced again or the period is closed.
 /// </summary>
 public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, InvoiceService invoices)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, InvoiceService invoices, EInvoicing.EInvoiceService einvoice)
 {
     public const string EntityType = "TRN.CreditNote";
     public const string SourceType = "CreditNote";
@@ -122,6 +122,8 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             var entry = await posting.PostOrPendAsync(BuildEntry(cn, inv)!, c).ConfigureAwait(false);
             cn.JournalEntryId = entry?.Id;
             await db.SaveChangesAsync(c).ConfigureAwait(false);
+            // Submitted once the invoice is accepted (FR-064, 9.8).
+            await einvoice.QueueCreditNoteAsync(cn, c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         }
         catch (RacedCreate r2)
@@ -155,6 +157,9 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
                 throw Fail.Rule(ErrorCodes.CreditTripChanged, changed.ReceiptNo);
             var inv = await db.Set<Invoice>().SingleAsync(i => i.Id == cn.InvoiceId, c).ConfigureAwait(false);
             if (inv.Status == InvoiceCodes.Void) throw Fail.Rule(ErrorCodes.InvoiceIsVoid, inv.Number);
+            // A credit note accepted by the national system stays (cancelled only by a new invoice); a pending one is cancelled.
+            if (!await einvoice.CancelAsync(null, cn.Id, why, c).ConfigureAwait(false))
+                throw Fail.Rule(ErrorCodes.CreditEInvoiced, cn.Number);
             cn.Status = InvoiceCodes.Void;
             cn.VoidReason = why;
             cn.VoidedBy = ctx.UserId ?? throw new InvalidOperationException("A void needs a user.");

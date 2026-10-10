@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
+using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Application.Invoicing;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
@@ -98,6 +99,11 @@ public static class DependencyInjection
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<InvoicePostingHandler>());
         services.AddScoped<CreditNotePostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<CreditNotePostingHandler>());
+
+        // E-invoicing (B7)
+        services.AddScoped<EInvoiceSettingsService>();
+        services.AddScoped<EInvoiceDocumentBuilder>();
+        services.AddScoped<EInvoiceService>();
         return services;
     }
 }

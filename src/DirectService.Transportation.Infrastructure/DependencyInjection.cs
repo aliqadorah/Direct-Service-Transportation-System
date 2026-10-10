@@ -1,4 +1,6 @@
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.EInvoicing;
+using DirectService.Transportation.Infrastructure.EInvoicing;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Infrastructure.Email;
 using DirectService.Transportation.Infrastructure.Files;
@@ -59,6 +61,16 @@ public static class DependencyInjection
         services.AddScoped<IMonthlyRateLock, MonthlyRateLock>();
         services.AddSingleton<IPdfRenderer, ChromiumPdfRenderer>();
         services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
+        // E-invoicing (B7): connectors, credentials, locks, worker signal.
+        services.AddOptions<EInvoicingOptions>().Bind(configuration.GetSection(EInvoicingOptions.Section));
+        services.AddOptions<JoFotaraOptions>().Bind(configuration.GetSection(JoFotaraOptions.Section));
+        services.AddHttpClient(JoFotaraConnector.HttpClientName).RedactLoggedHeaders(["Client-Id", "Secret-Key"]);
+        services.AddScoped<IEInvoiceConnector, JoFotaraConnector>();
+        services.AddScoped<IEInvoiceConnector, SimulatorConnector>();
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
+        services.AddScoped<IEInvoiceStore, EInvoiceStore>();
+        services.AddSingleton<EInvoiceSignal>();
+        services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
         services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.Section));

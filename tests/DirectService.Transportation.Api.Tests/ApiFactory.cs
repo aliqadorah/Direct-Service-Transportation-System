@@ -38,6 +38,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimits:AuthPerMinutePerIp", "100000");
         builder.UseSetting("RateLimits:ApiPerMinutePerUser", "100000");
         builder.UseSetting("App:PublicBaseUrl", "https://app.test");
+        builder.UseSetting("EInvoicing:AllowSimulator", "true");
+        builder.UseSetting("EInvoicing:MaxAttempts", "2");
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<IEmailSender>();
