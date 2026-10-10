@@ -22,7 +22,8 @@ public sealed class TripPostingHandler(IAppDbContext db, TripService trips, IUrl
         var t = await db.Set<Trip>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == sourceId, ct).ConfigureAwait(false);
         if (t is null || t.JournalEntryId is not null) return null;
         var s = await trips.SettingsAsync(ct).ConfigureAwait(false);
-        return trips.BuildEntry(t, s.AccrueDriverWage);
+        // A settlement counted this waiting wage as accrued (debited driver payable): it must accrue whatever the setting is now (B8 review M1).
+        return trips.BuildEntry(t, s.AccrueDriverWage || t.SettlementId is not null);
     }
 
     public async Task AttachAsync(long sourceId, JournalEntry entry, CancellationToken ct)

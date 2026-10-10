@@ -182,7 +182,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-045 | Void invoice with reason; reversal; trips released; VOID stamp | M | M09/M07 | TRN_Invoices (Void*), JournalEntries | InvoiceService.Void | SCR-23 | I E | ☑ |
 | FR-046 | Accepted e-invoice cannot be voided — full credit note | M | M09/M10 | TRN_EInvoiceSubmissions | InvoiceService.Void | SCR-23 | I | ☑ |
 | FR-047 | Invoice list filters, totals, export | M | M09 | TRN_Invoices | InvoiceQueries.List | SCR-20 | I E | ☑ |
-| FR-048 | Invoice view incl. receipts, credit notes, e-invoice status, history | M | M09 | TRN_Invoices, TRN_Receipts, TRN_CreditNotes, TRN_EInvoiceSubmissions, AuditLogs | InvoiceQueries.Detail | SCR-23 | I E | ◐ |
+| FR-048 | Invoice view incl. receipts, credit notes, e-invoice status, history | M | M09 | TRN_Invoices, TRN_Receipts, TRN_CreditNotes, TRN_EInvoiceSubmissions, AuditLogs | InvoiceQueries.Detail | SCR-23 | I E | ☑ |
 | FR-049 | Credit note from approved invoice; reason | M | M09 | TRN_CreditNotes, TRN_CreditNoteLines | CreditNoteService | SCR-24 | I E | ☑ |
 | FR-050 | Proportional shares; ≤ remaining | M | M09 | TRN_CreditNotes | CreditNoteCalculator | SCR-24 | U (EX-3) | ☑ |
 | FR-051 | Own sequence; mirror entry; trips unbilled | M | M09/M07 | NumberSequences, JournalEntries, TRN_Trips.InvoiceId | CreditNoteService | SCR-24 | I | ☑ |
@@ -206,31 +206,31 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-067 | Record receipt; numbered; posts Dr cash/bank Cr receivables | M | M11/M07 | TRN_Receipts, NumberSequences, JournalEntries | ReceiptService | SCR-26 | I E | ☐ |
-| FR-068 | Against invoice / on account | M | M11 | TRN_Receipts.InvoiceId, TRN_Invoices.Paid/Remaining | ReceiptService | SCR-26 | U I | ☐ |
-| FR-069 | Void receipt; balance restored | M | M11 | TRN_Receipts (Void*) | ReceiptService.Void | SCR-26 | I | ☐ |
-| FR-070 | Receipt voucher | M | M11 | TRN_Receipts | PrintService, AmountInWords | SCR-09 | U I | ☐ |
-| FR-071 | Receipts list | M | M11 | TRN_Receipts | ReceiptQueries | SCR-26 | I | ☐ |
-| FR-072 | Record advance; numbered; posts | M | M11/M07 | TRN_Advances, NumberSequences, JournalEntries | AdvanceService | SCR-27 | I E | ☐ |
-| FR-073 | Edit advance while unsettled; reverse + re-post | M | M11 | TRN_Advances | AdvanceService.Edit | SCR-27 | I | ☐ |
-| FR-074 | Void advance | M | M11 | TRN_Advances | AdvanceService.Void | SCR-27 | I | ☐ |
-| FR-075 | Payment voucher | M | M11 | TRN_Advances | PrintService | SCR-09 | I | ☐ |
-| FR-076 | Driver account view | M | M11 | TRN_Trips, TRN_Advances, TRN_Settlements | DriverAccountQueries | SCR-27 | I | ☐ |
-| FR-077 | Create settlement; pre-select open items up to date | M | M11 | TRN_Settlements, TRN_Trips (IX_TRN_Trips_Unsettled), TRN_Advances | SettlementService | SCR-27 | I E | ☐ |
-| FR-078 | Deduction lines; shortage suggestion (G-16) | M | M11 | TRN_SettlementDeductions | SettlementService | SCR-27 | U I | ☐ |
-| FR-079 | Net ≥ 0; method, cash box/bank | M | M11 | TRN_Settlements (CHECK net) | SettlementCalculator | SCR-27 | U (EX-4) | ☐ |
-| FR-080 | Confirm: number, link/lock items, post | M | M11/M07 | TRN_Settlements, NumberSequences, JournalEntries | SettlementService.Confirm | SCR-27 | I | ☐ |
-| FR-081 | Void settlement; release items | M | M11 | TRN_Settlements, TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService.Void | SCR-27 | I | ☐ |
-| FR-082 | Settlement statement + payment voucher | M | M11 | TRN_Settlements | PrintService | SCR-09 | I | ☐ |
-| FR-083 | Driver statement | M | M12 | TRN_Trips, TRN_Advances, TRN_Settlements, TRN_SettlementDeductions | Report RPT-13 | SCR-27, SCR-51 | I | ☐ |
-| FR-084 | Partner account view | M | M11 | TRN_Trips, TRN_PartnerPayments | PartnerAccountQueries | SCR-28 | I | ☐ |
-| FR-085 | Partner payment; ≤ balance due | M | M11/M07 | TRN_PartnerPayments, JournalEntries | PartnerPaymentService | SCR-28 | U I E | ☐ |
-| FR-086 | Void partner payment | M | M11 | TRN_PartnerPayments | PartnerPaymentService.Void | SCR-28 | I | ☐ |
-| FR-087 | Partner payment voucher | M | M11 | TRN_PartnerPayments | PrintService | SCR-09 | I | ☐ |
-| FR-088 | Partner statement | M | M12 | TRN_Trips, TRN_PartnerPayments | Report RPT-14 | SCR-28, SCR-51 | I | ☐ |
-| FR-089 | Cash/bank documents dated, own gap-free sequence, closed-period block | M | M11 | NumberSequences, Periods | NumberingService, PeriodGuard | SCR-26, SCR-27, SCR-28 | I | ☐ |
-| FR-090 | Reprint marked Copy and logged | M | M11/M13 | AuditLogs | PrintService | SCR-09 | I | ☐ |
-| FR-091 | Cash and bank balances on dashboard and statement | M | M12 | EntryLines, CashBoxes, BankAccounts | DashboardQueries, Report RPT-16 | SCR-07, SCR-51 | I | ☐ |
+| FR-067 | Record receipt; numbered; posts Dr cash/bank Cr receivables | M | M11/M07 | TRN_Receipts, NumberSequences, JournalEntries | ReceiptService | SCR-26 | I E | ☑ |
+| FR-068 | Against invoice / on account | M | M11 | TRN_Receipts.InvoiceId, TRN_Invoices.Paid/Remaining | ReceiptService | SCR-26 | U I | ☑ |
+| FR-069 | Void receipt; balance restored | M | M11 | TRN_Receipts (Void*) | ReceiptService.Void | SCR-26 | I | ☑ |
+| FR-070 | Receipt voucher | M | M11 | TRN_Receipts | PrintService, AmountInWords | SCR-09 | U I | ☑ |
+| FR-071 | Receipts list | M | M11 | TRN_Receipts | ReceiptQueries | SCR-26 | I | ☑ |
+| FR-072 | Record advance; numbered; posts | M | M11/M07 | TRN_Advances, NumberSequences, JournalEntries | AdvanceService | SCR-27 | I E | ☑ |
+| FR-073 | Edit advance while unsettled; reverse + re-post | M | M11 | TRN_Advances | AdvanceService.Edit | SCR-27 | I | ☑ |
+| FR-074 | Void advance | M | M11 | TRN_Advances | AdvanceService.Void | SCR-27 | I | ☑ |
+| FR-075 | Payment voucher | M | M11 | TRN_Advances | PrintService | SCR-09 | I | ☑ |
+| FR-076 | Driver account view | M | M11 | TRN_Trips, TRN_Advances, TRN_Settlements | DriverAccountQueries | SCR-27 | I | ☑ |
+| FR-077 | Create settlement; pre-select open items up to date | M | M11 | TRN_Settlements, TRN_Trips (IX_TRN_Trips_Unsettled), TRN_Advances | SettlementService | SCR-27 | I E | ☑ |
+| FR-078 | Deduction lines; shortage suggestion (G-16) | M | M11 | TRN_SettlementDeductions | SettlementService | SCR-27 | U I | ☑ |
+| FR-079 | Net ≥ 0; method, cash box/bank | M | M11 | TRN_Settlements (CHECK net) | SettlementCalculator | SCR-27 | U (EX-4) | ☑ |
+| FR-080 | Confirm: number, link/lock items, post | M | M11/M07 | TRN_Settlements, NumberSequences, JournalEntries | SettlementService.Confirm | SCR-27 | I | ☑ |
+| FR-081 | Void settlement; release items | M | M11 | TRN_Settlements, TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService.Void | SCR-27 | I | ☑ |
+| FR-082 | Settlement statement + payment voucher | M | M11 | TRN_Settlements | PrintService | SCR-09 | I | ☑ |
+| FR-083 | Driver statement | M | M12 | TRN_Trips, TRN_Advances, TRN_Settlements, TRN_SettlementDeductions | Report RPT-13 | SCR-27, SCR-51 | I | ☑ |
+| FR-084 | Partner account view | M | M11 | TRN_Trips, TRN_PartnerPayments | PartnerAccountQueries | SCR-28 | I | ☑ |
+| FR-085 | Partner payment; ≤ balance due | M | M11/M07 | TRN_PartnerPayments, JournalEntries | PartnerPaymentService | SCR-28 | U I E | ☑ |
+| FR-086 | Void partner payment | M | M11 | TRN_PartnerPayments | PartnerPaymentService.Void | SCR-28 | I | ☑ |
+| FR-087 | Partner payment voucher | M | M11 | TRN_PartnerPayments | PrintService | SCR-09 | I | ☑ |
+| FR-088 | Partner statement | M | M12 | TRN_Trips, TRN_PartnerPayments | Report RPT-14 | SCR-28, SCR-51 | I | ☑ |
+| FR-089 | Cash/bank documents dated, own gap-free sequence, closed-period block | M | M11 | NumberSequences, Periods | NumberingService, PeriodGuard | SCR-26, SCR-27, SCR-28 | I | ☑ |
+| FR-090 | Reprint marked Copy and logged | M | M11/M13 | AuditLogs | PrintService | SCR-09 | I | ☑ |
+| FR-091 | Cash and bank balances on dashboard and statement | M | M12 | EntryLines, CashBoxes, BankAccounts | DashboardQueries, Report RPT-16 | SCR-07, SCR-51 | I | ◐ |
 
 ### C.5 Ledger integration (7.5)
 
@@ -443,9 +443,9 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-028 | Tariff most-specific wins | M05 | TRN_Tariffs.Specificity, UX on keys + ValidFrom | TariffResolver | U | ☑ |
 | BR-029 | Driver rate by company + site + month + fleet class | M05 | UX_TRN_MonthlySiteRates_… | DriverRateResolver | U | ☑ |
 | BR-030 | Rate frozen at save | M06 | TRN_Trips stores rates | TripService | I | ☑ |
-| BR-031 | Item in only one active settlement | M11 | TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService | I | ☐ |
-| BR-031a | Accrual off → settlement debits wage expense | M07 | CompanySettings TRN.AccrueDriverWage | PostingEngine | U I | ☐ |
-| BR-032 | Settled advance locked | M11 | TRN_Advances.SettlementId | AdvanceService | I | ☐ |
+| BR-031 | Item in only one active settlement | M11 | TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService | I | ☑ |
+| BR-031a | Accrual off → settlement debits wage expense | M07 | CompanySettings TRN.AccrueDriverWage | PostingEngine | U I | ☑ |
+| BR-032 | Settled advance locked | M11 | TRN_Advances.SettlementId | AdvanceService | I | ☑ |
 | BR-033 | Entries balance | M07 | JournalEntries CHECK TotalDebit = TotalCredit | PostingEngine | U I | ◐ |
 | BR-034 | Entry dated with source date; closed period refused | M07 | Periods | PostingEngine, PeriodGuard | I | ◐ |
 | BR-035 | Edit trip/advance = reverse + new entry | M07 | JournalEntries reversal links | PostingEngine | I | ☐ |

@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_Advances â€” Company-scoped.
 /// </summary>
-public class Advance : AuditableEntity, ITenantScoped, ICompanyScoped
+public class Advance : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocument
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

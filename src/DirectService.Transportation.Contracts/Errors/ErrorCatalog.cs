@@ -148,6 +148,18 @@ public static class ErrorCatalog
         [ErrorCodes.CreditEInvoiced] = ("قبل نظام الفوترة الإلكترونية الإشعار الدائن {0}؛ لا يمكن إلغاؤه.", "Credit note {0} was accepted by the e-invoicing system; it cannot be voided."),
         [ErrorCodes.EInvoiceOutcomeUnknown] = ("قد يكون نظام الفوترة الإلكترونية استلم هذا المستند (انقطاع أو مهلة أثناء الإرسال). أعد الإرسال أولاً لمعرفة النتيجة ثم ألغِ إن لزم.", "The e-invoicing system may have received this document (a failure or timeout during sending). Submit it again first to learn the outcome, then void if needed."),
         [ErrorCodes.EInvoicePendingDocuments] = ("لا يمكن تغيير الموصل أو البيئة ومستندات بانتظار الإرسال أو مرفوضة؛ أرسلها أو ألغها أولاً.", "The connector or environment cannot change while documents are queued or rejected; submit or cancel them first."),
+        [ErrorCodes.ReceiptIsVoid] = ("سند القبض {0} ملغى.", "Receipt {0} is void."),
+        [ErrorCodes.ReceiptInvoiceNotOpen] = ("الفاتورة {0} ليست فاتورة معتمدة مفتوحة لهذا العميل.", "Invoice {0} is not an open approved invoice of this customer."),
+        [ErrorCodes.ReceiptExceedsRemaining] = ("المبلغ {0} أكبر من الرصيد المتبقي للفاتورة {1}.", "The amount {0} is above the invoice remaining balance {1}."),
+        [ErrorCodes.AdvanceIsVoid] = ("السلفة {0} ملغاة.", "Advance {0} is void."),
+        [ErrorCodes.AdvanceSettled] = ("السلفة {0} مسوّاة في التسوية {1}؛ ألغِ التسوية أولاً.", "Advance {0} is settled in settlement {1}; void the settlement first."),
+        [ErrorCodes.SettlementIsVoid] = ("التسوية {0} ملغاة.", "Settlement {0} is void."),
+        [ErrorCodes.SettlementNetNegative] = ("صافي التسوية سالب ({0}): قلّل السلف أو الخصومات المختارة.", "The settlement net is negative ({0}): reduce the selected advances or deductions."),
+        [ErrorCodes.SettlementEmpty] = ("لا توجد رحلات أو سلف مفتوحة مختارة للتسوية.", "No open trips or advances are selected for the settlement."),
+        [ErrorCodes.SettlementItemUnavailable] = ("البند {0} ليس بنداً مفتوحاً لهذا السائق حتى تاريخ التسوية.", "Item {0} is not an open item of this driver up to the settlement date."),
+        [ErrorCodes.PartnerPaymentIsVoid] = ("دفعة الشريك {0} ملغاة.", "Partner payment {0} is void."),
+        [ErrorCodes.PartnerPaymentExceedsBalance] = ("المبلغ {0} أكبر من الرصيد المستحق للشريك {1}.", "The amount {0} is above the partner balance due {1}."),
+        [ErrorCodes.TripPartnerOverpaid] = ("لا يمكن: الشريك مدفوع له {0} وتكلفة رحلاته ستصبح {1}. ألغِ دفعة أولاً.", "Not possible: the partner was paid {0} and its trips would cost {1}. Void a payment first."),
         [ErrorCodes.PrintUnavailable] = ("محرك الطباعة غير متاح الآن. أعد المحاولة؛ لم يُسجَّل أي طباعة.", "The print engine is not available now. Try again; no print was recorded."),
     };
 
@@ -307,5 +319,17 @@ public static class ErrorCodes
     public const string CreditEInvoiced = "credit.eInvoiced";
     public const string EInvoiceOutcomeUnknown = "einvoice.outcomeUnknown";
     public const string EInvoicePendingDocuments = "einvoice.pendingDocuments";
+    public const string ReceiptIsVoid = "receipt.void";
+    public const string ReceiptInvoiceNotOpen = "receipt.invoiceNotOpen";
+    public const string ReceiptExceedsRemaining = "receipt.exceedsRemaining";
+    public const string AdvanceIsVoid = "advance.void";
+    public const string AdvanceSettled = "advance.settled";
+    public const string SettlementIsVoid = "settlement.void";
+    public const string SettlementNetNegative = "settlement.netNegative";
+    public const string SettlementEmpty = "settlement.empty";
+    public const string SettlementItemUnavailable = "settlement.itemUnavailable";
+    public const string PartnerPaymentIsVoid = "partnerPayment.void";
+    public const string PartnerPaymentExceedsBalance = "partnerPayment.exceedsBalance";
+    public const string TripPartnerOverpaid = "trip.partnerOverpaid";
     public const string PrintUnavailable = "print.unavailable";
 }

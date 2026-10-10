@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.Invoicing;
 /// becomes the PDF through <see cref="IPdfRenderer"/>, so preview, PDF and printout are identical. Every print is logged.
 /// </summary>
 public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, InvoiceService invoices, InvoiceLayoutService layouts,
-    IPdfRenderer pdf, IQrCodeRenderer qr, AuditTrail audit)
+    DocumentPrinter printer, IQrCodeRenderer qr, AuditTrail audit)
 {
     private bool En => ctx.Language == "en";
 
@@ -77,42 +77,18 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         return new GeneratedFile("preview.html", "text/html; charset=utf-8", Encoding.UTF8.GetBytes(html));
     }
 
-    private async Task<GeneratedFile> OutputAsync(string html, string? format, string name, CancellationToken ct)
-    {
-        var safe = new string(name.Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch : '_').ToArray());
-        switch (format?.Trim().ToLowerInvariant())
-        {
-            case "html":
-                await db.SaveChangesAsync(ct).ConfigureAwait(false);
-                return new GeneratedFile(safe + ".html", "text/html; charset=utf-8", Encoding.UTF8.GetBytes(html));
-            case null or "" or "pdf":
-                byte[] bytes;
-                try
-                {
-                    bytes = await pdf.RenderAsync(html, new PdfFooter(ctx.UserName ?? string.Empty, En ? "Page" : "صفحة", En ? "of" : "من", !En), ct).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException and not AppException)
-                {
-                    throw new AppException(ErrorCodes.PrintUnavailable, 503);
-                }
-                // The print is logged only once the document exists (FR-058).
-                await db.SaveChangesAsync(ct).ConfigureAwait(false);
-                return new GeneratedFile(safe + ".pdf", "application/pdf", bytes);
-            default:
-                throw Fail.Field("format", ErrorCodes.ValidationFormat, "format");
-        }
-    }
+    private Task<GeneratedFile> OutputAsync(string html, string? format, string name, CancellationToken ct) => printer.OutputAsync(html, format, name, ct);
 
     // ============================================================ HTML
 
-    private static string E(string? s) => WebUtility.HtmlEncode(s ?? string.Empty);
+    private static string E(string? s) => DocumentPrinter.E(s);
 
-    private static string M(decimal v) => v.ToString("#,##0.000", CultureInfo.InvariantCulture);
+    private static string M(decimal v) => DocumentPrinter.M(v);
 
-    private static string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+    private static string D(DateOnly? d) => DocumentPrinter.D(d);
 
     /// <summary>A left-to-right run inside RTL text (numbers, codes, dates).</summary>
-    private static string N(string? s) => $"<bdi dir=\"ltr\">{E(s)}</bdi>";
+    private static string N(string? s) => DocumentPrinter.N(s);
 
     private string L(string ar, string en) => En ? en : ar;
 
@@ -153,54 +129,9 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         _ => string.Empty,
     };
 
-    private const string Css = """
+    private string Shell(string title, string body, string? stamp) => printer.Shell(title, body, stamp);
 
-        @page { size: A4; margin: 14mm 12mm 18mm; }
-
-        bdi { font-family: Inter, 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
-        .hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0A3540; padding-bottom: 6px; }
-        .hd img { height: 46px; }
-        .band { background: #E4EDEE; padding: 4px 8px; margin-top: 6px; font-size: 9.5pt; }
-        h1 { font-size: 15pt; text-align: center; margin: 10px 0 2px; }
-        .meta { text-align: center; margin-bottom: 8px; }
-        .parties { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        th, td { border: 1px solid #9AA3A1; padding: 3px 5px; text-align: start; vertical-align: top; }
-        th { background: #E4EDEE; font-weight: 600; }
-        td.n { text-align: end; }
-        .totals { width: 260px; margin-inline-start: auto; margin-top: 8px; }
-        .totals div { display: flex; justify-content: space-between; padding: 2px 0; }
-        .totals .grand { font-weight: 700; border-top: 1px solid #171A1C; }
-        .words { margin-top: 6px; }
-        .sig { display: flex; justify-content: space-between; margin-top: 34px; gap: 16px; }
-        .sig div { flex: 1; border-top: 1px solid #5B6570; padding-top: 4px; text-align: center; }
-        .foot { margin-top: 12px; color: #5B6570; font-size: 9pt; }
-        .qr svg { width: 88px; height: 88px; }
-        .annex { page-break-before: always; }
-        .stamp { position: fixed; top: 38%; left: 18%; transform: rotate(-24deg); font: 700 88pt Inter, sans-serif; color: rgba(180,35,24,.16); border: 8px solid rgba(180,35,24,.16); padding: 0 24px; }
-        """;
-
-    private string Shell(string title, string body, string? stamp) =>
-        "<!doctype html><html lang=\"" + (En ? "en" : "ar") + "\" dir=\"" + (En ? "ltr" : "rtl") + "\"><head><meta charset=\"utf-8\"><title>" + E(title) + "</title>"
-        + "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Inter:wght@400;600&display=swap\">"
-        + "<style>" + Css + "body { font-family: " + (En ? "Inter" : "'IBM Plex Sans Arabic'") + ", 'Segoe UI', Tahoma, sans-serif; font-size: 10.5pt; color: #171A1C; margin: 0; }</style></head><body>"
-        + (stamp is null ? string.Empty : "<div class=\"stamp\">" + E(stamp) + "</div>") + body + "</body></html>";
-
-    private string Header(Company company, InvoiceLayoutResponse layout)
-    {
-        var logo = layout.ShowLogo && company.LogoFile is { Length: > 0 } bytes ? $"<img src=\"data:{ImageType(bytes)};base64,{Convert.ToBase64String(bytes)}\" alt=\"\">" : string.Empty;
-        return $"<div class=\"hd\"><div><b style=\"font-size:13pt\">{E(En ? company.NameEn ?? company.Name : company.Name)}</b><div>{L("الرقم الضريبي", "Tax no.")} {N(company.TaxNumber)}"
-            + $"{(company.CommercialRegNo is null ? string.Empty : $" · {L("السجل التجاري", "CR")} {N(company.CommercialRegNo)}")}</div><div>{E(company.Address)} {N(company.Phone)}</div></div>{logo}</div>"
-            + (layout.BandText is null ? string.Empty : $"<div class=\"band\">{E(layout.BandText)}</div>");
-    }
-
-    /// <summary>Media type of the stored logo from its first bytes (PNG, JPEG, GIF, WebP; SVG text), review L5.</summary>
-    private static string ImageType(byte[] b) =>
-        b.Length > 3 && b[0] == 0x89 && b[1] == 0x50 ? "image/png"
-        : b.Length > 2 && b[0] == 0xFF && b[1] == 0xD8 ? "image/jpeg"
-        : b.Length > 3 && b[0] == 0x47 && b[1] == 0x49 ? "image/gif"
-        : b.Length > 11 && b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50 ? "image/webp"
-        : b.Length > 0 && b[0] == (byte)'<' ? "image/svg+xml" : "image/png";
+    private string Header(Company company, InvoiceLayoutResponse layout) => printer.Header(company, layout.ShowLogo, layout.BandText);
 
     private string Parties(Customer c, string? qrText, InvoiceLayoutResponse layout) =>
         $"<div class=\"parties\"><div><b>{L("العميل", "Customer")}:</b> {E(c.Name)}<br>{L("الرقم الضريبي", "Tax no.")} {N(c.TaxNumber)}<br>{E(c.Address)} {E(c.City)}</div>"

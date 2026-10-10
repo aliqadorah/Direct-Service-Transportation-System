@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
+using DirectService.Transportation.Application.Cash;
 using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Application.Invoicing;
 using DirectService.Transportation.Application.MasterData;
@@ -91,6 +92,7 @@ public static class DependencyInjection
 
         // Invoicing and credit notes (B6)
         services.AddScoped<AuditTrail>();
+        services.AddScoped<DocumentPrinter>();
         services.AddScoped<InvoiceService>();
         services.AddScoped<CreditNoteService>();
         services.AddScoped<InvoiceLayoutService>();
@@ -104,6 +106,23 @@ public static class DependencyInjection
         services.AddScoped<EInvoiceSettingsService>();
         services.AddScoped<EInvoiceDocumentBuilder>();
         services.AddScoped<EInvoiceService>();
+
+        // Cash, drivers and partners (B8)
+        services.AddScoped<CashSupport>();
+        services.AddScoped<ReceiptService>();
+        services.AddScoped<AdvanceService>();
+        services.AddScoped<SettlementService>();
+        services.AddScoped<PartnerPaymentService>();
+        services.AddScoped<AccountStatementService>();
+        services.AddScoped<VoucherPrintService>();
+        services.AddScoped<ReceiptPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ReceiptPostingHandler>());
+        services.AddScoped<AdvancePostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<AdvancePostingHandler>());
+        services.AddScoped<SettlementPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SettlementPostingHandler>());
+        services.AddScoped<PartnerPaymentPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<PartnerPaymentPostingHandler>());
         return services;
     }
 }

@@ -55,7 +55,7 @@ public sealed record TripDraft(
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
     IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, StandardFieldService fields, CustomFieldService customFields,
-    CompanySettingsService settings, IMonthlyRateLock rateLock)
+    CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering)
 {
     public const string EntityType = "TRN.Trip";
     public const string SourceType = "Trip";
@@ -130,8 +130,12 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             // The old date's period must be open too: the old entry is reversed on its own date (DT-22, FR-010).
             await periods.EnsureOpenAsync(t.TripDate, c).ConfigureAwait(false);
             var before = EntryKey(t);
+            var oldPartner = t.PartnerId;
+            var oldCost = t.PartnerCost;
             warnings = await ApplyAsync(t, draft, isNew: false, s, new DbPriceSource(rateLock, pricing), c).ConfigureAwait(false);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
+            if (oldPartner is not null && (oldPartner != t.PartnerId || t.PartnerCost < oldCost))
+                await EnsurePartnerNotOverpaidAsync(oldPartner.Value, c).ConfigureAwait(false);
             // The entry is reversed and re-posted only when what it posts changes (amount, party, date, receipt) (BR-035).
             if (t.JournalEntryId is null || EntryKey(t) != before)
             {
@@ -160,10 +164,23 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             t.VoidedAt = DateTime.UtcNow;
             changes.SetAction(t, "Void", why);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
+            if (t.PartnerId is long partnerId) await EnsurePartnerNotOverpaidAsync(partnerId, c).ConfigureAwait(false);
             await ReverseEntryAsync(t, En ? $"Void of trip {t.ReceiptNo}" : $"إلغاء الرحلة {t.ReceiptNo}", c).ConfigureAwait(false);
             await ResolvePendingAsync(t.Id, c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         return await ResponseAsync(t.Id, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A partner trip voided or made cheaper must not leave the partner paid more than its trips cost (FR-085, B8 review M2): checked
+    /// under the partner-payment number lock, which payments also take.
+    /// </summary>
+    private async Task EnsurePartnerNotOverpaidAsync(long partnerId, CancellationToken ct)
+    {
+        await numbering.LockAsync(Configuration.DocumentTypes.PartnerPayment, ct).ConfigureAwait(false);
+        var cost = await db.Set<Trip>().Where(x => x.PartnerId == partnerId && x.Status == Active).SumAsync(x => (decimal?)x.PartnerCost, ct).ConfigureAwait(false) ?? 0;
+        var paid = await db.Set<PartnerPayment>().Where(p => p.PartnerId == partnerId && p.Status == "Active").SumAsync(p => (decimal?)p.Amount, ct).ConfigureAwait(false) ?? 0;
+        if (paid > cost) throw Fail.Rule(ErrorCodes.TripPartnerOverpaid, Money.Format(paid), Money.Format(cost));
     }
 
     /// <summary>A user with trips.edit clears Needs review after checking; recorded in history (FR-014).</summary>

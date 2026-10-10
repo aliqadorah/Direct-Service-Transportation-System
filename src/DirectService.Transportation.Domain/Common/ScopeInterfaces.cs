@@ -42,3 +42,13 @@ public interface ISite : IArchivable
     string Name { get; set; }
     string? Area { get; set; }
 }
+
+/// <summary>A numbered cash or bank document with a status and its journal entry (receipts, advances, settlements, partner payments).</summary>
+public interface ICashDocument
+{
+    long Id { get; }
+    Guid PublicId { get; }
+    string Number { get; set; }
+    string Status { get; set; }
+    long? JournalEntryId { get; set; }
+}

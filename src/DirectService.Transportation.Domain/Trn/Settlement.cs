@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_Settlements â€” Company-scoped.
 /// </summary>
-public class Settlement : AuditableEntity, ITenantScoped, ICompanyScoped
+public class Settlement : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocument
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }
