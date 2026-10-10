@@ -5,6 +5,7 @@ using DirectService.Transportation.Infrastructure.Files;
 using DirectService.Transportation.Infrastructure.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Transportation.Infrastructure.Printing;
 using DirectService.Transportation.Infrastructure.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +57,8 @@ public static class DependencyInjection
         services.AddSingleton<IUrlTokenService, UrlTokenService>();
         services.AddScoped<INumberingService, NumberingService>();
         services.AddScoped<IMonthlyRateLock, MonthlyRateLock>();
+        services.AddSingleton<IPdfRenderer, ChromiumPdfRenderer>();
+        services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
         services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.Section));

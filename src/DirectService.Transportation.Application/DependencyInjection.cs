@@ -2,7 +2,9 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
+using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
+using DirectService.Transportation.Application.Invoicing;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Pricing;
@@ -85,6 +87,17 @@ public static class DependencyInjection
         services.AddScoped<TripExportService>();
         services.AddScoped<TripPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
+
+        // Invoicing and credit notes (B6)
+        services.AddScoped<AuditTrail>();
+        services.AddScoped<InvoiceService>();
+        services.AddScoped<CreditNoteService>();
+        services.AddScoped<InvoiceLayoutService>();
+        services.AddScoped<InvoicePrintService>();
+        services.AddScoped<InvoicePostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<InvoicePostingHandler>());
+        services.AddScoped<CreditNotePostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<CreditNotePostingHandler>());
         return services;
     }
 }

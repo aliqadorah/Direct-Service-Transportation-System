@@ -22,11 +22,9 @@ public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scop
 
     public static readonly IReadOnlyList<string> DefaultSignatures = ["المحاسب", "المدير المالي"];
 
+    /// <summary>Default annex columns (keys of <c>InvoiceLayoutService.BuiltInColumns</c>, FR-056).</summary>
     public static readonly IReadOnlyList<string> DefaultAnnexColumns =
-    [
-        "ReceiptNo", "TruckPlate", "LoadingDate", "UnloadingDate", "LoadedWeight", "UnloadedWeight",
-        "BilledWeight", "Price", "Amount", "Driver", "LoadingSite", "UnloadingSite", "Material",
-    ];
+        ["receiptNo", "truckPlate", "loadingDate", "unloadedWeight", "billingQty", "unitPrice", "amount"];
 
     /// <summary>Adds and saves the reference rows for an already saved <paramref name="company"/> (inside the caller's transaction).</summary>
     public async Task ProvisionAsync(Company company, long? actingUserId, CancellationToken ct)
@@ -57,7 +55,7 @@ public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scop
         var signatures = JsonSerializer.Serialize(DefaultSignatures);
         db.Set<InvoiceLayout>().Add(new InvoiceLayout
         {
-            TenantId = t, CompanyId = c, LayoutType = "Claim", Title = "مطالبة مالية", Grouping = "LoadingSite",
+            TenantId = t, CompanyId = c, LayoutType = "Claim", Title = "كشف مطالبة", Grouping = "LoadingSite",
             AnnexColumns = columns, Signatures = signatures,
         });
         db.Set<InvoiceLayout>().Add(new InvoiceLayout

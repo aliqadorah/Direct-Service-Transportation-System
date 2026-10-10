@@ -116,6 +116,21 @@ public static class ErrorCatalog
         [ErrorCodes.TripWarnCapacity] = ("الوزن المحمّل {0} طن أكبر من حمولة الشاحنة {1} طن.", "Loaded weight {0} t is above the truck capacity of {1} t."),
         [ErrorCodes.TripWarnUnloaded] = ("الوزن المنزّل أكبر من المحمّل × 1.02.", "Unloaded weight is above loaded weight × 1.02."),
         [ErrorCodes.TripWarnDocument] = ("انتهت صلاحية {0} للسائق في {1}.", "The driver's {0} expired on {1}."),
+        // Invoicing and credit notes (B6)
+        [ErrorCodes.InvoiceNotDraft] = ("الفاتورة {0} معتمدة؛ يمكن تعديل المسودات أو اعتمادها أو حذفها فقط.", "Invoice {0} is approved; only drafts can be edited, approved or deleted."),
+        [ErrorCodes.InvoiceIsDraft] = ("المسودة لا تُلغى؛ احذفها بدلاً من ذلك.", "A draft is not voided; delete it instead."),
+        [ErrorCodes.InvoiceIsVoid] = ("الفاتورة {0} ملغاة.", "Invoice {0} is void."),
+        [ErrorCodes.InvoiceTripUnavailable] = ("الرحلة {0} لم تعد رحلة نشطة غير مفوترة لهذا العميل.", "Trip {0} is no longer an active, unbilled trip of this customer."),
+        [ErrorCodes.InvoiceTotalZero] = ("يجب أن يكون الإجمالي أكبر من صفر.", "The total must be greater than zero."),
+        [ErrorCodes.InvoiceHasPayments] = ("لا يمكن إلغاء الفاتورة {0}: عليها {1} سند قبض و{2} إشعار دائن نشط. ألغها أولاً.", "Invoice {0} cannot be voided: it has {1} active receipt(s) and {2} active credit note(s). Void them first."),
+        [ErrorCodes.InvoiceEInvoiced] = ("قبل نظام الفوترة الإلكترونية الفاتورة {0}؛ تُلغى بإشعار دائن كامل فقط.", "Invoice {0} was accepted by the e-invoicing system; it can only be cancelled by a full credit note."),
+        [ErrorCodes.CreditInvoiceNotApproved] = ("الإشعار الدائن يُنشأ من فاتورة معتمدة فقط ({0}).", "A credit note can only be created from an approved invoice ({0})."),
+        [ErrorCodes.CreditLineReturned] = ("هذا البند مرتجع بالكامل مسبقاً.", "This line is already fully returned."),
+        [ErrorCodes.CreditExceedsRemaining] = ("الإشعار الدائن ({0}) أكبر من المتبقي على الفاتورة ({1}).", "The credit note ({0}) exceeds the invoice's remaining balance ({1})."),
+        [ErrorCodes.CreditIsVoid] = ("الإشعار الدائن {0} ملغى.", "Credit note {0} is void."),
+        [ErrorCodes.CreditTripReinvoiced] = ("لا يمكن إلغاء الإشعار: الرحلة {0} فُوترت مرة أخرى أو أُلغيت.", "The credit note cannot be voided: trip {0} was invoiced again or voided."),
+        [ErrorCodes.CreditTripChanged] = ("لا يمكن إلغاء الإشعار: الرحلة {0} عُدّلت بعد إرجاعها.", "The credit note cannot be voided: trip {0} was changed after it was returned."),
+        [ErrorCodes.PrintUnavailable] = ("محرك الطباعة غير متاح الآن. أعد المحاولة؛ لم يُسجَّل أي طباعة.", "The print engine is not available now. Try again; no print was recorded."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -242,4 +257,19 @@ public static class ErrorCodes
     public const string TripWarnCapacity = "trip.warnCapacity";
     public const string TripWarnUnloaded = "trip.warnUnloaded";
     public const string TripWarnDocument = "trip.warnDocument";
+
+    public const string InvoiceNotDraft = "invoice.notDraft";
+    public const string InvoiceIsDraft = "invoice.isDraft";
+    public const string InvoiceIsVoid = "invoice.void";
+    public const string InvoiceTripUnavailable = "invoice.tripUnavailable";
+    public const string InvoiceTotalZero = "invoice.totalZero";
+    public const string InvoiceHasPayments = "invoice.hasPayments";
+    public const string InvoiceEInvoiced = "invoice.eInvoiced";
+    public const string CreditInvoiceNotApproved = "credit.invoiceNotApproved";
+    public const string CreditLineReturned = "credit.lineReturned";
+    public const string CreditExceedsRemaining = "credit.exceedsRemaining";
+    public const string CreditIsVoid = "credit.void";
+    public const string CreditTripReinvoiced = "credit.tripReinvoiced";
+    public const string CreditTripChanged = "credit.tripChanged";
+    public const string PrintUnavailable = "print.unavailable";
 }

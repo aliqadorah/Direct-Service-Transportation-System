@@ -172,27 +172,27 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-038 | Trip picker: customer's active unbilled trips, filters, select-all, live totals | M | M09 | TRN_Trips (IX_TRN_Trips_Unbilled) | InvoiceQueries.Unbilled | SCR-21 | I E | ☐ |
-| FR-039 | Manual invoice lines | M | M09 | TRN_InvoiceLines | InvoiceService | SCR-22 | U I | ☐ |
-| FR-040 | Totals live and stored at approval (8.3) | M | M09 | TRN_Invoices | InvoiceCalculator | SCR-21, SCR-22 | U (EX-2) | ☐ |
-| FR-041 | Approval setting: Draft vs direct approve; Save & approve | M | M09 | CompanySettings TRN.InvoiceApproval | InvoiceService | SCR-21, SCR-22 | I E | ☐ |
-| FR-042 | Draft reserves trips; edit, DRAFT print, approve, delete (soft) | M | M09 | TRN_Invoices, TRN_Trips.InvoiceId | InvoiceService | SCR-23, SCR-09 | I E | ☐ |
-| FR-043 | Approval: gap-free number, post entry, trips invoiced, queue e-invoice | M | M09/M07/M10 | NumberSequences, JournalEntries, TRN_EInvoiceSubmissions | InvoiceService.Approve, NumberingService | SCR-23 | I (TST-10) | ☐ |
-| FR-044 | Approval blocks (mapping, closed period, trip state, total ≤ 0) | M | M09 | PostingKeyMappings, Periods | InvoiceService.Approve | SCR-23 | U I | ☐ |
-| FR-045 | Void invoice with reason; reversal; trips released; VOID stamp | M | M09/M07 | TRN_Invoices (Void*), JournalEntries | InvoiceService.Void | SCR-23 | I E | ☐ |
-| FR-046 | Accepted e-invoice cannot be voided — full credit note | M | M09/M10 | TRN_EInvoiceSubmissions | InvoiceService.Void | SCR-23 | I | ☐ |
-| FR-047 | Invoice list filters, totals, export | M | M09 | TRN_Invoices | InvoiceQueries.List | SCR-20 | I E | ☐ |
-| FR-048 | Invoice view incl. receipts, credit notes, e-invoice status, history | M | M09 | TRN_Invoices, TRN_Receipts, TRN_CreditNotes, TRN_EInvoiceSubmissions, AuditLogs | InvoiceQueries.Detail | SCR-23 | I E | ☐ |
-| FR-049 | Credit note from approved invoice; reason | M | M09 | TRN_CreditNotes, TRN_CreditNoteLines | CreditNoteService | SCR-24 | I E | ☐ |
-| FR-050 | Proportional shares; ≤ remaining | M | M09 | TRN_CreditNotes | CreditNoteCalculator | SCR-24 | U (EX-3) | ☐ |
-| FR-051 | Own sequence; mirror entry; trips unbilled | M | M09/M07 | NumberSequences, JournalEntries, TRN_Trips.InvoiceId | CreditNoteService | SCR-24 | I | ☐ |
-| FR-052 | Void credit note; blocked if trip re-invoiced or closed | M | M09 | TRN_CreditNotes | CreditNoteService.Void | SCR-24 | I | ☐ |
-| FR-053 | Credit note printout | M | M09 | TRN_CreditNotes | PrintService | SCR-09 | I | ☐ |
-| FR-054 | Two layouts: claim statement (with annex) and tax invoice | M | M09 | TRN_InvoiceLayouts | InvoicePrintService | SCR-09 | I E | ☐ |
-| FR-055 | Layout designer with live preview | M | M09 | TRN_InvoiceLayouts | InvoiceLayoutService | SCR-74 | I E | ☐ |
-| FR-056 | Annex columns incl. custom trip fields | M | M09 | TRN_InvoiceLayouts.AnnexColumns, CustomFieldDefinitions | InvoicePrintService | SCR-74, SCR-09 | I | ☐ |
-| FR-057 | Printed invoice content (parties, tax numbers, words, page X/Y, QR, signatures) | M | M09 | TRN_Invoices, Companies, TRN_Customers, TRN_EInvoiceSubmissions.QrCode | InvoicePrintService | SCR-09 | I E | ☐ |
-| FR-058 | Print/PDF for draft/approved/void; every print logged | M | M09/M13 | AuditLogs (A-04) | PrintService | SCR-09 | I | ☐ |
+| FR-038 | Trip picker: customer's active unbilled trips, filters, select-all, live totals | M | M09 | TRN_Trips (IX_TRN_Trips_Unbilled) | InvoiceQueries.Unbilled | SCR-21 | I E | ☑ |
+| FR-039 | Manual invoice lines | M | M09 | TRN_InvoiceLines | InvoiceService | SCR-22 | U I | ☑ |
+| FR-040 | Totals live and stored at approval (8.3) | M | M09 | TRN_Invoices | InvoiceCalculator | SCR-21, SCR-22 | U (EX-2) | ☑ |
+| FR-041 | Approval setting: Draft vs direct approve; Save & approve | M | M09 | CompanySettings TRN.InvoiceApproval | InvoiceService | SCR-21, SCR-22 | I E | ☑ |
+| FR-042 | Draft reserves trips; edit, DRAFT print, approve, delete (soft) | M | M09 | TRN_Invoices, TRN_Trips.InvoiceId | InvoiceService | SCR-23, SCR-09 | I E | ☑ |
+| FR-043 | Approval: gap-free number, post entry, trips invoiced, queue e-invoice | M | M09/M07/M10 | NumberSequences, JournalEntries, TRN_EInvoiceSubmissions | InvoiceService.Approve, NumberingService | SCR-23 | I (TST-10) | ◐ |
+| FR-044 | Approval blocks (mapping, closed period, trip state, total ≤ 0) | M | M09 | PostingKeyMappings, Periods | InvoiceService.Approve | SCR-23 | U I | ☑ |
+| FR-045 | Void invoice with reason; reversal; trips released; VOID stamp | M | M09/M07 | TRN_Invoices (Void*), JournalEntries | InvoiceService.Void | SCR-23 | I E | ☑ |
+| FR-046 | Accepted e-invoice cannot be voided — full credit note | M | M09/M10 | TRN_EInvoiceSubmissions | InvoiceService.Void | SCR-23 | I | ◐ |
+| FR-047 | Invoice list filters, totals, export | M | M09 | TRN_Invoices | InvoiceQueries.List | SCR-20 | I E | ☑ |
+| FR-048 | Invoice view incl. receipts, credit notes, e-invoice status, history | M | M09 | TRN_Invoices, TRN_Receipts, TRN_CreditNotes, TRN_EInvoiceSubmissions, AuditLogs | InvoiceQueries.Detail | SCR-23 | I E | ◐ |
+| FR-049 | Credit note from approved invoice; reason | M | M09 | TRN_CreditNotes, TRN_CreditNoteLines | CreditNoteService | SCR-24 | I E | ☑ |
+| FR-050 | Proportional shares; ≤ remaining | M | M09 | TRN_CreditNotes | CreditNoteCalculator | SCR-24 | U (EX-3) | ☑ |
+| FR-051 | Own sequence; mirror entry; trips unbilled | M | M09/M07 | NumberSequences, JournalEntries, TRN_Trips.InvoiceId | CreditNoteService | SCR-24 | I | ☑ |
+| FR-052 | Void credit note; blocked if trip re-invoiced or closed | M | M09 | TRN_CreditNotes | CreditNoteService.Void | SCR-24 | I | ☑ |
+| FR-053 | Credit note printout | M | M09 | TRN_CreditNotes | PrintService | SCR-09 | I | ☑ |
+| FR-054 | Two layouts: claim statement (with annex) and tax invoice | M | M09 | TRN_InvoiceLayouts | InvoicePrintService | SCR-09 | I E | ☑ |
+| FR-055 | Layout designer with live preview | M | M09 | TRN_InvoiceLayouts | InvoiceLayoutService | SCR-74 | I E | ☑ |
+| FR-056 | Annex columns incl. custom trip fields | M | M09 | TRN_InvoiceLayouts.AnnexColumns, CustomFieldDefinitions | InvoicePrintService | SCR-74, SCR-09 | I | ☑ |
+| FR-057 | Printed invoice content (parties, tax numbers, words, page X/Y, QR, signatures) | M | M09 | TRN_Invoices, Companies, TRN_Customers, TRN_EInvoiceSubmissions.QrCode | InvoicePrintService | SCR-09 | I E | ◐ |
+| FR-058 | Print/PDF for draft/approved/void; every print logged | M | M09/M13 | AuditLogs (A-04) | PrintService | SCR-09 | I | ☑ |
 | FR-059 | E-invoicing company settings; credentials encrypted | M | M10 | EInvoiceSettings | EInvoiceSettingsService | SCR-73 | I S | ☐ |
 | FR-060 | Build national format and validate before submission | M | M10 | TRN_EInvoiceSubmissions.RequestPayload | JoFotaraConnector (UBL 2.1) | SCR-25 | U | ☐ |
 | FR-061 | Automatic and manual submission; retries; Rejected/Failed list | M | M10 | TRN_EInvoiceSubmissions | EInvoiceSubmissionJob | SCR-25 | I | ☐ |
@@ -434,12 +434,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-014 | Provider access only via approved window, logged | M01 | SupportAccessGrants (CHECK EndsAt > StartsAt) | SupportAccessGuard | S | ☐ |
 | BR-020 | Smallest currency unit; currency decimals | X | DECIMAL(18,3); Companies.CurrencyDecimals | Money type | U | ◐ |
 | BR-021 | Half-up rounding at each amount | X | — | Money.Round | U | ◐ |
-| BR-022 | Tax exclusive default 16 %; company setting | M03 | Companies.TaxRate/TaxInclusive defaults | InvoiceCalculator | U | ☐ |
-| BR-023 | Tax = round(base × rate) once | M09 | TRN_Invoices CHECKs | InvoiceCalculator | U (EX-2) | ☐ |
+| BR-022 | Tax exclusive default 16 %; company setting | M03 | Companies.TaxRate/TaxInclusive defaults | InvoiceCalculator | U | ☑ |
+| BR-023 | Tax = round(base × rate) once | M09 | TRN_Invoices CHECKs | InvoiceCalculator | U (EX-2) | ☑ |
 | BR-024 | Amount in Arabic words | X | — | AmountInWords | U | ◐ |
-| BR-025 | Credit-note proportional shares | M09 | — | CreditNoteCalculator | U (EX-3) | ☐ |
-| BR-026 | Credit note ≤ remaining | M09 | TRN_Invoices.RemainingAmount CHECK ≥ 0 | CreditNoteService | U I | ☐ |
-| BR-027 | Full return absorbs rounding → 0.000 | M09 | — | CreditNoteCalculator | U | ☐ |
+| BR-025 | Credit-note proportional shares | M09 | — | CreditNoteCalculator | U (EX-3) | ☑ |
+| BR-026 | Credit note ≤ remaining | M09 | TRN_Invoices.RemainingAmount CHECK ≥ 0 | CreditNoteService | U I | ☑ |
+| BR-027 | Full return absorbs rounding → 0.000 | M09 | — | CreditNoteCalculator | U | ☑ |
 | BR-028 | Tariff most-specific wins | M05 | TRN_Tariffs.Specificity, UX on keys + ValidFrom | TariffResolver | U | ☑ |
 | BR-029 | Driver rate by company + site + month + fleet class | M05 | UX_TRN_MonthlySiteRates_… | DriverRateResolver | U | ☑ |
 | BR-030 | Rate frozen at save | M06 | TRN_Trips stores rates | TripService | I | ☑ |
@@ -558,8 +558,8 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | UX-19 | Toasts, loading > 300 ms, job progress, blocked-state banners | all | 7 | E | ☐ |
 | UX-20 | Lock bar, read-only mode, live row highlight | edit forms, lists | 7–8 | E | ☐ |
 | UX-21 | History side panel on every record | all record views | 7–8 | E | ☐ |
-| UX-22 | A4 RTL print with header, logo, page X of Y, words, QR, signatures | SCR-09 | 8 | E | ☐ |
-| UX-23 | Print preview; PDF identical | SCR-09 | 8 | E | ☐ |
+| UX-22 | A4 RTL print with header, logo, page X of Y, words, QR, signatures | SCR-09 | 8 | E | ◐ |
+| UX-23 | Print preview; PDF identical | SCR-09 | 8 | E | ◐ |
 | UX-24 | WCAG 2.1 AA | all | 5–9 | E (a11y) | ☐ |
 | UX-25 | Click targets ≥ 32 / 44 px | all | 7 | E (a11y) | ☐ |
 
