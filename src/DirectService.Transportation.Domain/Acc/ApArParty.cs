@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.ApArParties â€” Company-scoped.
 /// </summary>
-public class ApArParty : AuditableEntity, ITenantScoped, ICompanyScoped
+public class ApArParty : AuditableEntity, ITenantScoped, ICompanyScoped, IArchivable
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

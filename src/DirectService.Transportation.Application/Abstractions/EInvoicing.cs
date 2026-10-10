@@ -83,4 +83,13 @@ public interface IEInvoiceStore
 
     /// <summary>Waits for and locks the submissions of a document, so a void and a submission in progress serialise.</summary>
     Task LockDocumentAsync(long? invoiceId, long? creditNoteId, CancellationToken ct);
+
+    /// <summary>As <see cref="TryClaimAsync"/> for acc.ApArEInvoiceSubmissions (receivable documents and returns, D-15).</summary>
+    Task<bool> TryClaimApArAsync(long submissionId, CancellationToken ct);
+
+    /// <summary>As <see cref="LockAsync"/> for acc.ApArEInvoiceSubmissions.</summary>
+    Task LockApArAsync(long submissionId, CancellationToken ct);
+
+    /// <summary>As <see cref="LockDocumentAsync"/> for a receivable document or return.</summary>
+    Task LockApArDocumentAsync(long? documentId, long? returnId, CancellationToken ct);
 }

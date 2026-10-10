@@ -1,3 +1,4 @@
+using DirectService.Transportation.Application.ApAr;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
@@ -7,6 +8,8 @@ using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Cash;
 using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Application.Invoicing;
+using DirectService.Transportation.Application.Ledger;
+using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Pricing;
@@ -123,6 +126,26 @@ public static class DependencyInjection
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SettlementPostingHandler>());
         services.AddScoped<PartnerPaymentPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<PartnerPaymentPostingHandler>());
+
+        // AP/AR, financial reports and maintenance (B9)
+        services.AddScoped<ApArPartyService>();
+        services.AddScoped<ApArDocumentService>();
+        services.AddScoped<ApArPaymentService>();
+        services.AddScoped<ApArReturnService>();
+        services.AddScoped<ApArPrintService>();
+        services.AddScoped<AgeingService>();
+        services.AddScoped<ReportExporter>();
+        services.AddScoped<LedgerReportService>();
+        services.AddScoped<LedgerReportExports>();
+        services.AddScoped<MaintenanceService>();
+        services.AddScoped<SupplierBillPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());
+        services.AddScoped<ReceivablePostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ReceivablePostingHandler>());
+        services.AddScoped<ApArPaymentPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ApArPaymentPostingHandler>());
+        services.AddScoped<ApArReturnPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ApArReturnPostingHandler>());
         return services;
     }
 }

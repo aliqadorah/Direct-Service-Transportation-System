@@ -170,6 +170,12 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
         (false, "PartnerPayments") => "دفعات شركاء",
         (true, "MonthlySiteRates") => "monthly site rates",
         (false, "MonthlySiteRates") => "أسعار شهرية للمواقع",
+        (true, "ApArDocuments") => "payable/receivable documents",
+        (false, "ApArDocuments") => "مستندات ذمم",
+        (true, "Customers") => "transport customers",
+        (false, "Customers") => "عملاء نقل",
+        (true, "EntryLines") => "journal lines",
+        (false, "EntryLines") => "سطور قيود",
         _ => type,
     };
 

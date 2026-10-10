@@ -1,0 +1,97 @@
+using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Transportation.Contracts.Cash;
+using DirectService.Transportation.Contracts.Common;
+
+namespace DirectService.Transportation.Contracts.Ledger;
+
+// ------------------------------------------------------------------ general ledger and account statement (FR-116, FR-120, FR-121)
+
+/// <summary>
+/// General ledger / account statement filters: an account (a parent account covers its descendants), the period (default: this month up to
+/// today), an optional cost centre and an optional party (type Customer / Driver / Partner / ApArParty + its id).
+/// </summary>
+public sealed record LedgerQuery(string? Account, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party, int Page = 1, int PageSize = 200);
+
+/// <summary>One movement with its running balance (debit − credit); drill-down to the entry and to its source document.</summary>
+public sealed record LedgerLine(
+    DateOnly Date, EntryLinkRef Entry, string Description, SourceDocumentRef? Source, AccountRef Account, PartyResponse? Party, Ref? CostCentre, string? Note,
+    decimal Debit, decimal Credit, decimal Balance);
+
+/// <summary>Opening, movements (paged; running balance continues across pages), totals for the whole period and closing balance; balances are debit − credit.</summary>
+public sealed record LedgerReport(
+    AccountRef Account, string AccountType, PartyResponse? Party, Ref? CostCentre, DateOnly From, DateOnly To, decimal Opening, decimal TotalDebit, decimal TotalCredit,
+    decimal Closing, PagedResult<LedgerLine> Lines);
+
+// ------------------------------------------------------------------ trial balance (FR-117)
+
+/// <summary>Trial balance for a period at a tree level (1 = top accounts; default the deepest level); optionally hide rows with nothing in them.</summary>
+public sealed record TrialBalanceQuery(DateOnly? From, DateOnly? To, int? Level, bool? HideZero);
+
+/// <summary>An account at the chosen level (leaves above it shown as themselves): opening and closing as net debit or credit, movements gross.</summary>
+public sealed record TrialBalanceRow(
+    AccountRef Account, string AccountType, int Level, bool IsLeaf, decimal OpeningDebit, decimal OpeningCredit, decimal MovementDebit, decimal MovementCredit,
+    decimal ClosingDebit, decimal ClosingCredit);
+
+public sealed record TrialBalanceTotals(decimal OpeningDebit, decimal OpeningCredit, decimal MovementDebit, decimal MovementCredit, decimal ClosingDebit, decimal ClosingCredit);
+
+/// <summary>The rows, totals, whether every pair of columns balances (a mismatch is highlighted), and the opening-balance difference still to clear (FR-110).</summary>
+public sealed record TrialBalanceReport(
+    DateOnly From, DateOnly To, int Level, int MaxLevel, IReadOnlyList<TrialBalanceRow> Rows, TrialBalanceTotals Totals, bool Balanced, decimal? OpeningDifference);
+
+// ------------------------------------------------------------------ profit and loss, balance sheet (FR-118, FR-119)
+
+/// <summary>A line of a statement in tree order: group accounts carry the total of their descendants.</summary>
+public sealed record StatementRow(AccountRef Account, string AccountType, int Level, bool IsLeaf, decimal Amount, decimal? CompareAmount);
+
+/// <summary>Profit and loss for a period, optionally for one cost centre and compared with a second period.</summary>
+public sealed record ProfitLossQuery(DateOnly? From, DateOnly? To, string? CostCentre, DateOnly? CompareFrom, DateOnly? CompareTo);
+
+public sealed record ProfitLossReport(
+    DateOnly From, DateOnly To, Ref? CostCentre, DateOnly? CompareFrom, DateOnly? CompareTo, IReadOnlyList<StatementRow> Revenue, IReadOnlyList<StatementRow> Expenses,
+    decimal TotalRevenue, decimal TotalExpenses, decimal NetProfit, decimal? CompareTotalRevenue, decimal? CompareTotalExpenses, decimal? CompareNetProfit);
+
+public sealed record BalanceSheetQuery(DateOnly? AsOf);
+
+/// <summary>
+/// Balance sheet as of a date: assets, liabilities and equity by the tree; within equity the result of the current year (1 January to the
+/// date) and the results of earlier years not yet transferred; the opening-balance difference still to clear (FR-110).
+/// </summary>
+public sealed record BalanceSheetReport(
+    DateOnly AsOf, IReadOnlyList<StatementRow> Assets, IReadOnlyList<StatementRow> Liabilities, IReadOnlyList<StatementRow> Equity, decimal CurrentYearResult,
+    decimal PriorYearsResult, decimal TotalAssets, decimal TotalLiabilities, decimal TotalEquity, decimal TotalLiabilitiesAndEquity, bool Balanced, decimal? OpeningDifference);
+
+// ------------------------------------------------------------------ cost centres, cash and banks (FR-130, FR-131)
+
+public sealed record PeriodQuery(DateOnly? From, DateOnly? To);
+
+/// <summary>Revenues (credit − debit) and expenses (debit − credit) per cost centre; the row without a cost centre has no reference.</summary>
+public sealed record CostCentreRow(Ref? CostCentre, decimal Revenue, decimal Expenses, decimal Net);
+
+public sealed record CostCentreReport(DateOnly From, DateOnly To, IReadOnlyList<CostCentreRow> Rows, CostCentreRow Totals);
+
+public sealed record CashBankStatementQuery(string? CashBox, string? BankAccount, DateOnly? From, DateOnly? To, int Page = 1, int PageSize = 200);
+
+/// <summary>Cash box or bank statement: opening, receipts (debits), payments (credits), running and closing balance.</summary>
+public sealed record CashBankStatement(
+    MoneyAccountRef Account, AccountRef LedgerAccount, DateOnly From, DateOnly To, decimal Opening, decimal Receipts, decimal Payments, decimal Closing,
+    PagedResult<LedgerLine> Lines);
+
+/// <summary>Balance of one cash box or bank account as of a date (cards and the banks list).</summary>
+public sealed record CashBankBalance(MoneyAccountRef Account, AccountRef LedgerAccount, string Status, decimal Balance);
+
+// ------------------------------------------------------------------ sub-ledger reconciliation (FR-105, RPT-23)
+
+public sealed record ReconciliationQuery(DateOnly? AsOf);
+
+/// <summary>A control-account line that no party balance explains: without a party, or with a party of another type.</summary>
+public sealed record UnmatchedLine(DateOnly Date, EntryLinkRef Entry, string Description, SourceDocumentRef? Source, decimal Debit, decimal Credit, string Problem);
+
+/// <summary>
+/// Per control account: ledger balance, sum of the party balances on its lines, difference (must be 0.000), number of parties, unmatched lines,
+/// and the sub-ledger rebuilt from the documents with its difference to the ledger (null where the documents cannot rebuild it).
+/// </summary>
+public sealed record ReconciliationRow(
+    AccountRef Account, string PartyType, decimal LedgerBalance, decimal PartyBalances, decimal Difference, int Parties, IReadOnlyList<UnmatchedLine> Unmatched,
+    decimal? DocumentBalance, decimal? DocumentDifference);
+
+public sealed record ReconciliationReport(DateOnly AsOf, IReadOnlyList<ReconciliationRow> Rows, bool Reconciled, int PendingPostings);

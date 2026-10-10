@@ -7,7 +7,9 @@ using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -28,7 +30,7 @@ public interface IEInvoiceSignal
 /// correction; technical failures are retried with back-off, then Rejected with the last error ("Failed", D-04). A credit note is
 /// submitted only after its invoice was accepted (FR-064). Voids cancel documents not yet accepted (NotRequired).
 /// </summary>
-public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
+public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
     EInvoiceSettingsService settings, EInvoiceDocumentBuilder builder, ISpreadsheetService sheets, IEInvoiceSignal signal, IOptions<EInvoicingOptions> options,
     TimeProvider clock)
 {
@@ -106,13 +108,18 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
     /// Queued submissions of the current company due for an automatic attempt, decided in SQL (review M1): never tried first, then
     /// technical failures after their back-off (2, 4, 8 … ≤ 60 min) and documents with problems every 10 minutes, oldest first.
     /// </summary>
-    public async Task<IReadOnlyList<long>> DueAsync(int max, CancellationToken ct)
+    public Task<IReadOnlyList<long>> DueAsync(int max, CancellationToken ct) => DueCoreAsync(db.Set<EInvoiceSubmission>().AsNoTracking(), max, ct);
+
+    /// <summary>Queued AP/AR receivable submissions due for an automatic attempt (same rules as <see cref="DueAsync"/>).</summary>
+    public Task<IReadOnlyList<long>> DueApArAsync(int max, CancellationToken ct) => DueCoreAsync(db.Set<ApArEInvoiceSubmission>().AsNoTracking(), max, ct);
+
+    private async Task<IReadOnlyList<long>> DueCoreAsync<T>(IQueryable<T> set, int max, CancellationToken ct) where T : AuditableEntity, IEInvoiceSubmission
     {
         var now = clock.GetUtcNow().UtcDateTime;
         var problems = now.AddMinutes(-ProblemRecheckMinutes);
         DateTime B(int minutes) => now.AddMinutes(-minutes);
         DateTime b2 = B(2), b4 = B(4), b8 = B(8), b16 = B(16), b32 = B(32), b60 = B(60), stale = now.AddMinutes(-InFlightMinutes);
-        return await db.Set<EInvoiceSubmission>().AsNoTracking()
+        return await set
             .Where(s => s.Status == EInvoiceCodes.Queued)
             .Select(s => new { s.Id, s.LastError, s.Attempts, At = s.UpdatedAt ?? s.CreatedAt })
             .Where(s => s.LastError == null
@@ -139,18 +146,44 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
     /// (2) call the national system; (3) store the outcome. A crash between (1) and (3) leaves the row in flight: it is retried after
     /// 5 minutes with the same UUID (the national system answers ALREADY_SUBMITTED if it has it) and cannot be voided meanwhile.
     /// </summary>
-    public async Task<bool> ProcessAsync(long id, bool manual, CancellationToken ct)
+    public Task<bool> ProcessAsync(long id, bool manual, CancellationToken ct) => ProcessCoreAsync(id, manual, new SubmissionKind<EInvoiceSubmission>(
+        store.TryClaimAsync, store.LockAsync, DocumentAsync,
+        async (s, c) =>
+        {
+            if (s.InvoiceId is not long invoiceId) return;
+            // Credit notes waiting for this invoice become due at once.
+            await db.Set<EInvoiceSubmission>().Where(x => x.CreditNoteId != null && x.CreditNote!.InvoiceId == invoiceId && x.Status == EInvoiceCodes.Queued)
+                .ExecuteUpdateAsync(u => u.SetProperty(x => x.UpdatedAt, DateTime.UnixEpoch), c).ConfigureAwait(false);
+        }), ct);
+
+    /// <summary>Processes one AP/AR receivable submission (D-15) exactly like an invoice or credit note.</summary>
+    public Task<bool> ProcessApArAsync(long id, bool manual, CancellationToken ct) => ProcessCoreAsync(id, manual, new SubmissionKind<ApArEInvoiceSubmission>(
+        store.TryClaimApArAsync, store.LockApArAsync, ApArDocumentAsync,
+        async (s, c) =>
+        {
+            if (s.ApArDocumentId is not long documentId) return;
+            // Returns waiting for this document become due at once.
+            await db.Set<ApArEInvoiceSubmission>().Where(x => x.ApArReturnId != null && x.ApArReturn!.DocumentId == documentId && x.Status == EInvoiceCodes.Queued)
+                .ExecuteUpdateAsync(u => u.SetProperty(x => x.UpdatedAt, DateTime.UnixEpoch), c).ConfigureAwait(false);
+        }), ct);
+
+    /// <summary>The table-specific parts of processing: row claim and lock, the document to send, what an acceptance releases.</summary>
+    private sealed record SubmissionKind<T>(
+        Func<long, CancellationToken, Task<bool>> TryClaim, Func<long, CancellationToken, Task> Lock,
+        Func<T, EInvoiceSettings, CancellationToken, Task<EInvoiceDocument?>> Document, Func<T, CancellationToken, Task> Accepted) where T : AuditableEntity, IEInvoiceSubmission;
+
+    private async Task<bool> ProcessCoreAsync<T>(long id, bool manual, SubmissionKind<T> kind, CancellationToken ct) where T : AuditableEntity, IEInvoiceSubmission
     {
         Prepared? prepared = null;
         await db.InTransactionAsync(async c =>
         {
-            if (!await store.TryClaimAsync(id, c).ConfigureAwait(false))
+            if (!await kind.TryClaim(id, c).ConfigureAwait(false))
             {
                 if (manual) throw Fail.Conflict(ErrorCodes.EInvoiceBusy);
                 return;
             }
-            var s = await db.Set<EInvoiceSubmission>().SingleAsync(x => x.Id == id, c).ConfigureAwait(false);
-            await db.Set<EInvoiceSubmission>().Entry(s).ReloadAsync(c).ConfigureAwait(false);
+            var s = await db.Set<T>().SingleAsync(x => x.Id == id, c).ConfigureAwait(false);
+            await db.Set<T>().Entry(s).ReloadAsync(c).ConfigureAwait(false);
             if (s.Status is EInvoiceCodes.Submitted or EInvoiceCodes.NotRequired)
             {
                 if (manual) throw Fail.Rule(ErrorCodes.EInvoiceNotSubmittable, s.Status);
@@ -179,7 +212,7 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
             else if (connector is null) problems.Add(new("connector", ErrorCodes.EInvoiceConnectorUnavailable));
             else
             {
-                doc = await DocumentAsync(s, config, c).ConfigureAwait(false);
+                doc = await kind.Document(s, config, c).ConfigureAwait(false);
                 if (doc is null) problems.Add(new("invoice", ErrorCodes.EInvoiceWaitingForInvoice));
                 else problems.AddRange([.. EInvoiceDocumentBuilder.Check(doc, config), .. connector.Validate(doc)]);
                 try
@@ -198,7 +231,7 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
                 var text = Truncate(ValidationPrefix + string.Join(';', problems.Select(p => $"{p.Field}={p.Code}").Distinct(StringComparer.Ordinal)));
                 if (s.LastError != text) s.LastError = text;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
-                if (s.LastError == text) await TouchAsync(s.Id, c).ConfigureAwait(false);
+                if (s.LastError == text) await TouchAsync<T>(s.Id, c).ConfigureAwait(false);
                 return;
             }
 
@@ -224,9 +257,9 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
         var accepted = false;
         await db.InTransactionAsync(async c =>
         {
-            await store.LockAsync(id, c).ConfigureAwait(false);
-            var s = await db.Set<EInvoiceSubmission>().SingleAsync(x => x.Id == id, c).ConfigureAwait(false);
-            await db.Set<EInvoiceSubmission>().Entry(s).ReloadAsync(c).ConfigureAwait(false);
+            await kind.Lock(id, c).ConfigureAwait(false);
+            var s = await db.Set<T>().SingleAsync(x => x.Id == id, c).ConfigureAwait(false);
+            await db.Set<T>().Entry(s).ReloadAsync(c).ConfigureAwait(false);
             s.ResponsePayload = outcome.ResponsePayload;
             switch (outcome.Kind)
             {
@@ -257,20 +290,15 @@ public sealed class EInvoiceService(IAppDbContext db, IRequestContext ctx, Maste
                     break;
             }
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            if (accepted && s.InvoiceId is long invoiceId)
-            {
-                // Credit notes waiting for this invoice become due at once.
-                await db.Set<EInvoiceSubmission>().Where(x => x.CreditNoteId != null && x.CreditNote!.InvoiceId == invoiceId && x.Status == EInvoiceCodes.Queued)
-                    .ExecuteUpdateAsync(u => u.SetProperty(x => x.UpdatedAt, DateTime.UnixEpoch), c).ConfigureAwait(false);
-            }
+            if (accepted) await kind.Accepted(s, c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         if (accepted) signal.Notify();
         return accepted;
     }
 
     /// <summary>Moves the re-check time of a document with unchanged problems (technical column only; not an audited change).</summary>
-    private Task<int> TouchAsync(long id, CancellationToken ct) =>
-        db.Set<EInvoiceSubmission>().Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.UpdatedAt, clock.GetUtcNow().UtcDateTime), ct);
+    private Task<int> TouchAsync<T>(long id, CancellationToken ct) where T : AuditableEntity =>
+        db.Set<T>().Where(x => x.Id == id).ExecuteUpdateAsync(u => u.SetProperty(x => x.UpdatedAt, clock.GetUtcNow().UtcDateTime), ct);
 
     /// <summary>The document of a submission, or null for a credit note whose invoice is not accepted yet (FR-064).</summary>
     private async Task<EInvoiceDocument?> DocumentAsync(EInvoiceSubmission s, EInvoiceSettings config, CancellationToken ct)

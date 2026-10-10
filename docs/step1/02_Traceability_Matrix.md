@@ -249,7 +249,7 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-102 | Automatic entries list | M | M07 | JournalEntries, EntryLines | JournalQueries | SCR-34 | I | ◐ |
 | FR-103 | Journal voucher | M | M07 | JournalEntries, EntryLines | PrintService | SCR-09 | I | ◐ |
 | FR-104 | Journal export batches JSON/CSV | M | M07/M14 | JournalExportBatches, JournalEntries.ExportBatchId | JournalExportService | SCR-34 | I | ◐ |
-| FR-105 | Sub-ledger reconciliation | M | M12 | EntryLines (IX_EntryLines_Party), Accounts | Report RPT-23 | SCR-51 | I (TST-11) | ☐ |
+| FR-105 | Sub-ledger reconciliation | M | M12 | EntryLines (IX_EntryLines_Party), Accounts | Report RPT-23 | SCR-51 | I (TST-11) | ☑ |
 | FR-106 | Control-account lines need a party | M | M07/M08 | Accounts.IsControlAccount/ControlPartyType, EntryLines.Party* | JournalValidator (G-17) | SCR-32 | U | ◐ |
 
 ### C.6 Accounting (7.6)
@@ -265,27 +265,27 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-113 | Void manual entries by reversal | M | M08 | JournalEntries (Void*) | ManualJournalService.Void | SCR-32 | I | ◐ |
 | FR-114 | Import entries with preview checks | M | M08/M14 | JournalEntries, ImportBatches | JournalImportService | SCR-33 | U I | ◐ |
 | FR-115 | Journal list, export, voucher | M | M08 | JournalEntries, EntryLines | JournalQueries | SCR-31, SCR-09 | I | ◐ |
-| FR-116 | General ledger | M | M08 | EntryLines, Accounts | GeneralLedgerReport | SCR-35 | I | ☐ |
-| FR-117 | Trial balance at tree level | M | M08 | EntryLines, Accounts | TrialBalanceReport | SCR-36 | I | ☐ |
-| FR-118 | Profit & loss; cost-centre filter | M | M08 | EntryLines, Accounts, CostCentres | ProfitLossReport | SCR-37 | I | ☐ |
-| FR-119 | Balance sheet with current-period result | M | M08 | EntryLines, Accounts | BalanceSheetReport | SCR-38 | I | ☐ |
-| FR-120 | Account statement, optionally by party | M | M08 | EntryLines | Report RPT-15 | SCR-39 | I | ☐ |
-| FR-121 | Drill-down; Excel/PDF | M | M08/M12 | — (navigation) | ReportDrillDown | SCR-35…39 | E | ☐ |
-| FR-122 | Accounting parties; transport customers as receivable parties | M | M08 | ApArParties, TRN_Customers.ApArPartyId | ApArPartyService | SCR-40, SCR-41 | I | ☐ |
-| FR-123 | Supplier bills; post | M | M08/M07 | ApArDocuments (SupplierBill), ApArDocumentLines | ApArDocumentService | SCR-40 | I | ☐ |
-| FR-124 | Receivable documents; post | M | M08/M07 | ApArDocuments (Receivable), ApArDocumentLines, ApArEInvoiceSubmissions (D-15) | ApArDocumentService | SCR-41 | I | ☐ |
-| FR-125 | Payments and collections | M | M08 | ApArPayments | ApArPaymentService | SCR-40, SCR-41 | I | ☐ |
-| FR-126 | Returns on AP/AR documents | M | M08 | ApArReturns | ApArReturnService | SCR-40, SCR-41 | I | ☐ |
-| FR-127 | Printed AP/AR documents; void rules | M | M08 | ApArDocuments, ApArPayments, ApArReturns | ApArDocumentService.Void, PrintService | SCR-40, SCR-41, SCR-09 | I | ☐ |
-| FR-128 | Payables and receivables ageing | M | M12 | ApArDocuments | Report RPT-17/18 | SCR-51 | U I | ☐ |
-| FR-129 | Cash boxes and bank accounts | M | M08 | CashBoxes, BankAccounts | CashBankService | SCR-42 | I | ◐ |
-| FR-130 | Cash/bank statement | M | M12 | EntryLines | Report RPT-16 | SCR-42, SCR-51 | I | ☐ |
-| FR-131 | Cost centres and report | M | M08 | CostCentres, EntryLines | CostCentreService | SCR-43 | I | ◐ |
+| FR-116 | General ledger | M | M08 | EntryLines, Accounts | GeneralLedgerReport | SCR-35 | I | ☑ |
+| FR-117 | Trial balance at tree level | M | M08 | EntryLines, Accounts | TrialBalanceReport | SCR-36 | I | ☑ |
+| FR-118 | Profit & loss; cost-centre filter | M | M08 | EntryLines, Accounts, CostCentres | ProfitLossReport | SCR-37 | I | ☑ |
+| FR-119 | Balance sheet with current-period result | M | M08 | EntryLines, Accounts | BalanceSheetReport | SCR-38 | I | ☑ |
+| FR-120 | Account statement, optionally by party | M | M08 | EntryLines | Report RPT-15 | SCR-39 | I | ☑ |
+| FR-121 | Drill-down; Excel/PDF | M | M08/M12 | — (navigation) | ReportDrillDown | SCR-35…39 | E | ☑ |
+| FR-122 | Accounting parties; transport customers as receivable parties | M | M08 | ApArParties, TRN_Customers.ApArPartyId | ApArPartyService | SCR-40, SCR-41 | I | ☑ |
+| FR-123 | Supplier bills; post | M | M08/M07 | ApArDocuments (SupplierBill), ApArDocumentLines | ApArDocumentService | SCR-40 | I | ☑ |
+| FR-124 | Receivable documents; post | M | M08/M07 | ApArDocuments (Receivable), ApArDocumentLines, ApArEInvoiceSubmissions (D-15) | ApArDocumentService | SCR-41 | I | ☑ |
+| FR-125 | Payments and collections | M | M08 | ApArPayments | ApArPaymentService | SCR-40, SCR-41 | I | ☑ |
+| FR-126 | Returns on AP/AR documents | M | M08 | ApArReturns | ApArReturnService | SCR-40, SCR-41 | I | ☑ |
+| FR-127 | Printed AP/AR documents; void rules | M | M08 | ApArDocuments, ApArPayments, ApArReturns | ApArDocumentService.Void, PrintService | SCR-40, SCR-41, SCR-09 | I | ☑ |
+| FR-128 | Payables and receivables ageing | M | M12 | ApArDocuments | Report RPT-17/18 | SCR-51 | U I | ☑ |
+| FR-129 | Cash boxes and bank accounts | M | M08 | CashBoxes, BankAccounts | CashBankService | SCR-42 | I | ☑ |
+| FR-130 | Cash/bank statement | M | M12 | EntryLines | Report RPT-16 | SCR-42, SCR-51 | I | ☑ |
+| FR-131 | Cost centres and report | M | M08 | CostCentres, EntryLines | CostCentreService | SCR-43 | I | ☑ |
 | FR-132 | Period list; close/reopen with reason | M | M08 | Periods | PeriodService | SCR-44 | I E | ◐ |
 | FR-133 | Closed period blocks everything everywhere | M | M08/X | Periods | PeriodGuard (used by every document service) | — (rule) | I | ◐ |
 | FR-134 | Pre-close check | S | M08 | PendingPostings, TRN_Invoices (Draft), EntryLines | PeriodService.PreCloseCheck | SCR-44 | I | ◐ |
-| FR-135 | Maintenance actions (soft deletions) | M | M08 | JournalEntries, EntryLines, Accounts, MaintenanceLogs | MaintenanceService | SCR-45 | I S | ☐ |
-| FR-136 | Maintenance protections and log | M | M08 | MaintenanceLogs | MaintenanceService | SCR-45 | I E | ☐ |
+| FR-135 | Maintenance actions (soft deletions) | M | M08 | JournalEntries, EntryLines, Accounts, MaintenanceLogs | MaintenanceService | SCR-45 | I S | ☑ |
+| FR-136 | Maintenance protections and log | M | M08 | MaintenanceLogs | MaintenanceService | SCR-45 | I E | ☑ |
 
 ### C.7 Reports & dashboard (7.7)
 

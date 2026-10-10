@@ -63,6 +63,37 @@ public sealed class EInvoiceStore(MasterDbContext db, IDataScope scope) : IEInvo
             WHERE CompanyId = {companyId} AND IsDeleted = 0 AND (InvoiceId = {invoiceId} OR CreditNoteId = {creditNoteId})
             """).ToListAsync(ct).ConfigureAwait(false);
     }
+
+    public async Task<bool> TryClaimApArAsync(long submissionId, CancellationToken ct)
+    {
+        RequireTransaction();
+        var companyId = CompanyId;
+        var rows = await db.Database.SqlQuery<long>($"""
+            SELECT Id AS Value FROM acc.ApArEInvoiceSubmissions WITH (UPDLOCK, ROWLOCK, READPAST)
+            WHERE Id = {submissionId} AND CompanyId = {companyId} AND IsDeleted = 0
+            """).ToListAsync(ct).ConfigureAwait(false);
+        return rows.Count == 1;
+    }
+
+    public async Task LockApArAsync(long submissionId, CancellationToken ct)
+    {
+        RequireTransaction();
+        var companyId = CompanyId;
+        await db.Database.SqlQuery<long>($"""
+            SELECT Id AS Value FROM acc.ApArEInvoiceSubmissions WITH (UPDLOCK, ROWLOCK)
+            WHERE Id = {submissionId} AND CompanyId = {companyId} AND IsDeleted = 0
+            """).ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task LockApArDocumentAsync(long? documentId, long? returnId, CancellationToken ct)
+    {
+        RequireTransaction();
+        var companyId = CompanyId;
+        await db.Database.SqlQuery<long>($"""
+            SELECT Id AS Value FROM acc.ApArEInvoiceSubmissions WITH (UPDLOCK, ROWLOCK)
+            WHERE CompanyId = {companyId} AND IsDeleted = 0 AND (ApArDocumentId = {documentId} OR ApArReturnId = {returnId})
+            """).ToListAsync(ct).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Credentials encrypted with ASP.NET Core Data Protection under their own purpose (SEC-09).</summary>

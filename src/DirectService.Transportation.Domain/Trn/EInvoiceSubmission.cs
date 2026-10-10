@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_EInvoiceSubmissions â€” Company-scoped.
 /// </summary>
-public class EInvoiceSubmission : AuditableEntity, ITenantScoped, ICompanyScoped
+public class EInvoiceSubmission : AuditableEntity, ITenantScoped, ICompanyScoped, IEInvoiceSubmission
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

@@ -161,6 +161,25 @@ public static class ErrorCatalog
         [ErrorCodes.PartnerPaymentExceedsBalance] = ("المبلغ {0} أكبر من الرصيد المستحق للشريك {1}.", "The amount {0} is above the partner balance due {1}."),
         [ErrorCodes.TripPartnerOverpaid] = ("لا يمكن: الشريك مدفوع له {0} وتكلفة رحلاته ستصبح {1}. ألغِ دفعة أولاً.", "Not possible: the partner was paid {0} and its trips would cost {1}. Void a payment first."),
         [ErrorCodes.PrintUnavailable] = ("محرك الطباعة غير متاح الآن. أعد المحاولة؛ لم يُسجَّل أي طباعة.", "The print engine is not available now. Try again; no print was recorded."),
+        [ErrorCodes.ApArControlAccount] = ("حساب الرقابة يجب أن يكون حساب رقابة فعّالاً قابلاً للترحيل من نوع «{0}».", "The control account must be an active, postable control account of type «{0}»."),
+        [ErrorCodes.ApArPartyRole] = ("الطرف «{0}» ليس {1}.", "Party «{0}» is not a {1}."),
+        [ErrorCodes.ApArLineAccount] = ("السطر {0}: لا يمكن استخدام الحساب {1} في هذا المستند (فواتير الموردين: مصروف أو أصل؛ المستندات المدينة: إيراد؛ دون حسابات الرقابة).", "Line {0}: account {1} cannot be used on this document (supplier bills: expense or asset; receivables: revenue; no control accounts)."),
+        [ErrorCodes.ApArTaxNumberRequired] = ("الفوترة الإلكترونية مفعّلة: أدخل الرقم الضريبي للطرف «{0}» قبل إصدار فاتورة ضريبية له.", "E-invoicing is on: enter the tax number of «{0}» before issuing a tax invoice to it."),
+        [ErrorCodes.ApArDocumentIsVoid] = ("المستند {0} ملغى.", "Document {0} is void."),
+        [ErrorCodes.ApArDocumentNotOpen] = ("لا يوجد رصيد متبقٍ على المستند {0}.", "Document {0} has no remaining balance."),
+        [ErrorCodes.ApArExceedsRemaining] = ("المبلغ {0} أكبر من الرصيد المتبقي للمستند {1}.", "The amount {0} is above the document remaining balance {1}."),
+        [ErrorCodes.ApArDocumentLinked] = ("على المستند {0} دفعات أو مرتجعات فعّالة؛ ألغها أولاً.", "Document {0} has active payments or returns; void them first."),
+        [ErrorCodes.ApArPaymentIsVoid] = ("الدفعة {0} ملغاة.", "Payment {0} is void."),
+        [ErrorCodes.ApArReturnIsVoid] = ("المرتجع {0} ملغى.", "Return {0} is void."),
+        [ErrorCodes.ApArEInvoiced] = ("قبل نظام الفوترة الإلكترونية المستند {0}؛ يُلغى بمرتجع كامل فقط.", "Document {0} was accepted by the e-invoicing system; it can only be cancelled by a full return."),
+        [ErrorCodes.ApArReturnEInvoiced] = ("قبل نظام الفوترة الإلكترونية المرتجع {0}؛ لا يمكن إلغاؤه.", "Return {0} was accepted by the e-invoicing system; it cannot be voided."),
+        [ErrorCodes.MaintenanceConfirmation] = ("اكتب «{0}» للتأكيد.", "Type «{0}» to confirm."),
+        [ErrorCodes.MaintenanceClosedPeriod] = ("رُفض الإجراء: {0} من القيود في فترات مغلقة ({1}). لم يُحذف شيء.", "Refused: {0} of the entries are in closed periods ({1}). Nothing was deleted."),
+        [ErrorCodes.MaintenanceLinked] = ("رُفض الإجراء: {0} من القيود المختارة مرتبطة بمستندات. لم يُحذف شيء.", "Refused: {0} of the selected entries are linked to documents. Nothing was deleted."),
+        [ErrorCodes.MaintenanceNothing] = ("لا توجد قيود يمكن حذفها.", "There are no entries to delete."),
+        [ErrorCodes.MaintenanceChartInUse] = ("لا يمكن استبدال دليل الحسابات: {0}.", "The chart of accounts cannot be replaced: {0}."),
+        [ErrorCodes.MaintenanceRefused] = ("لم يُنفَّذ الإجراء: {0}", "The action was not run: {0}"),
+        [ErrorCodes.MaintenanceResetBlocked] = ("رُفضت إعادة الضبط الكاملة: {0}.", "Full reset refused: {0}."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -332,4 +351,23 @@ public static class ErrorCodes
     public const string PartnerPaymentExceedsBalance = "partnerPayment.exceedsBalance";
     public const string TripPartnerOverpaid = "trip.partnerOverpaid";
     public const string PrintUnavailable = "print.unavailable";
+    public const string ApArControlAccount = "apar.controlAccount";
+    public const string ApArPartyRole = "apar.partyRole";
+    public const string ApArLineAccount = "apar.lineAccount";
+    public const string ApArTaxNumberRequired = "apar.taxNumberRequired";
+    public const string ApArDocumentIsVoid = "apar.documentVoid";
+    public const string ApArDocumentNotOpen = "apar.documentNotOpen";
+    public const string ApArExceedsRemaining = "apar.exceedsRemaining";
+    public const string ApArDocumentLinked = "apar.documentLinked";
+    public const string ApArPaymentIsVoid = "apar.paymentVoid";
+    public const string ApArReturnIsVoid = "apar.returnVoid";
+    public const string ApArEInvoiced = "apar.eInvoiced";
+    public const string ApArReturnEInvoiced = "apar.returnEInvoiced";
+    public const string MaintenanceConfirmation = "maintenance.confirmation";
+    public const string MaintenanceClosedPeriod = "maintenance.closedPeriod";
+    public const string MaintenanceLinked = "maintenance.linked";
+    public const string MaintenanceNothing = "maintenance.nothing";
+    public const string MaintenanceChartInUse = "maintenance.chartInUse";
+    public const string MaintenanceResetBlocked = "maintenance.resetBlocked";
+    public const string MaintenanceRefused = "maintenance.refused";
 }

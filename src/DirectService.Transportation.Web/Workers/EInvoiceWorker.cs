@@ -1,6 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Contracts.EInvoicing;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
 using DirectService.Transportation.Infrastructure.EInvoicing;
@@ -43,8 +44,11 @@ internal sealed partial class EInvoiceWorker(IServiceScopeFactory scopes, EInvoi
         await using (var scope = scopes.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
-            companies = (await db.Set<EInvoiceSubmission>().IgnoreQueryFilters(ScopeFilters).AsNoTracking()
-                .Where(s => s.Status == EInvoiceCodes.Queued)
+            var queued = db.Set<EInvoiceSubmission>().IgnoreQueryFilters(ScopeFilters).AsNoTracking().Where(s => s.Status == EInvoiceCodes.Queued)
+                .Select(s => new { s.TenantId, s.CompanyId })
+                .Concat(db.Set<ApArEInvoiceSubmission>().IgnoreQueryFilters(ScopeFilters).AsNoTracking().Where(s => s.Status == EInvoiceCodes.Queued)
+                    .Select(s => new { s.TenantId, s.CompanyId }));
+            companies = (await queued
                 .Join(db.Set<Company>().IgnoreQueryFilters(ScopeFilters), s => s.CompanyId, c => c.Id, (s, c) => new { s, c })
                 .Join(db.Set<Tenant>().IgnoreQueryFilters(ScopeFilters), x => x.c.TenantId, t => t.Id, (x, t) => new { x.s, x.c, t })
                 .Where(x => x.c.Status == "Active" && (x.t.Status == "Active" || x.t.Status == "Trial"))
@@ -68,6 +72,18 @@ internal sealed partial class EInvoiceWorker(IServiceScopeFactory scopes, EInvoi
                 try
                 {
                     if (await service.ProcessAsync(id, manual: false, ct).ConfigureAwait(false)) accepted++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    LogSubmissionFailed(log, id, ex);
+                }
+            }
+            // Accounting receivable documents and their returns (D-15).
+            foreach (var id in await service.DueApArAsync(200, ct).ConfigureAwait(false))
+            {
+                try
+                {
+                    if (await service.ProcessApArAsync(id, manual: false, ct).ConfigureAwait(false)) accepted++;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

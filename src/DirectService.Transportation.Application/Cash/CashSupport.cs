@@ -145,7 +145,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
 /// <summary>Pending-posting retries and journal links shared by the cash documents (FR-101).</summary>
 public abstract class CashPostingHandler<T>(IAppDbContext db, IUrlTokenService tokens) : IPostingSourceHandler where T : class, ICashDocument
 {
-    public string SourceModule => AccountingCodes.ModuleTrn;
+    public virtual string SourceModule => AccountingCodes.ModuleTrn;
 
     public abstract string SourceType { get; }
 

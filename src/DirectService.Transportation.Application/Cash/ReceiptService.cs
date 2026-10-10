@@ -255,14 +255,15 @@ public sealed class ReceiptPostingHandler(IAppDbContext db, IUrlTokenService tok
 /// <summary>Reversal of cash documents on void or edit (BR-035): the posted entry is reversed; a waiting pending posting is closed.</summary>
 internal static class CashPosting
 {
-    public static async Task ReverseAsync(IAppDbContext db, PostingEngine posting, Domain.Common.ICashDocument d, string sourceType, string description, CancellationToken ct)
+    public static async Task ReverseAsync(IAppDbContext db, PostingEngine posting, Domain.Common.ICashDocument d, string sourceType, string description, CancellationToken ct,
+        string module = AccountingCodes.ModuleTrn)
     {
         if (d.JournalEntryId is long entryId)
         {
             var entry = await db.Set<JournalEntry>().SingleAsync(e => e.Id == entryId, ct).ConfigureAwait(false);
             if (entry.Status == AccountingCodes.Posted) await posting.ReverseAsync(entry, description, null, ct).ConfigureAwait(false);
         }
-        foreach (var p in await db.Set<PendingPosting>().Where(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == sourceType && p.SourceId == d.Id && p.ResolvedAt == null)
+        foreach (var p in await db.Set<PendingPosting>().Where(p => p.SourceModule == module && p.SourceType == sourceType && p.SourceId == d.Id && p.ResolvedAt == null)
                      .ToListAsync(ct).ConfigureAwait(false))
             p.ResolvedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);

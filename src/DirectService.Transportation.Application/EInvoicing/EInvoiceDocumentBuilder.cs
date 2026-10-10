@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
@@ -51,6 +52,41 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
             new EInvoiceReference(inv.Number!, originalUuid, inv.Total), cn.Reason);
     }
 
+    /// <summary>A receivable document of Accounting (D-15): its lines with their own rates; buyer = the accounting party.</summary>
+    public async Task<EInvoiceDocument> ApArDocumentAsync(ApArDocument doc, long icv, EInvoiceSettings settings, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        ArgumentNullException.ThrowIfNull(settings);
+        var (company, buyer) = await ApArPartiesAsync(doc.PartyId, ct).ConfigureAwait(false);
+        var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == doc.Id).OrderBy(l => l.Id).Select(l => new { l.Description, l.Amount, l.TaxRate })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var built = AllocateByRate(lines.Select(l => (l.Description, l.Amount, l.TaxRate)).ToList(), doc.Tax, company.CurrencyDecimals);
+        return Document(EInvoiceCodes.Invoice, doc.Number, doc.PublicId, doc.DocumentDate, icv, doc.DueDate > doc.DocumentDate, settings, company, buyer, built, doc.Total, null, null);
+    }
+
+    /// <summary>A receivable return as a credit note: the returned amount split over the document's lines, their rates, the stored return tax.</summary>
+    public async Task<EInvoiceDocument> ApArReturnAsync(ApArReturn ret, ApArDocument doc, Guid originalUuid, long icv, EInvoiceSettings settings, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(ret);
+        ArgumentNullException.ThrowIfNull(doc);
+        ArgumentNullException.ThrowIfNull(settings);
+        var (company, buyer) = await ApArPartiesAsync(doc.PartyId, ct).ConfigureAwait(false);
+        var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == doc.Id).OrderBy(l => l.Id).Select(l => new { l.Description, l.Amount, l.TaxRate })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var shares = Split(ret.Amount, lines.Select(l => l.Amount).ToList(), company.CurrencyDecimals);
+        var built = AllocateByRate(lines.Select((l, i) => (l.Description, shares[i], l.TaxRate)).ToList(), ret.Tax, company.CurrencyDecimals);
+        return Document(EInvoiceCodes.CreditNote, ret.Number, ret.PublicId, ret.ReturnDate, icv, doc.DueDate > doc.DocumentDate, settings, company, buyer, built, ret.Total,
+            new EInvoiceReference(doc.Number, originalUuid, doc.Total), ret.Reason);
+    }
+
+    private async Task<(Company Company, EInvoiceParty Buyer)> ApArPartiesAsync(long partyId, CancellationToken ct)
+    {
+        // By id: an archived or deleted party still appears on its documents.
+        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().SingleAsync(p => p.Id == partyId, ct).ConfigureAwait(false);
+        var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == party.CompanyId, ct).ConfigureAwait(false);
+        return (company, new EInvoiceParty(party.Name, TaxId(party.TaxNumber), NullIfEmpty(TextNormalizer.DigitsOnly(party.Phone)), null));
+    }
+
     private sealed record SourceLine(string? Description, decimal Quantity, decimal UnitPrice, decimal Amount, string? Receipt, string? Loading, string? Unloading, string? Material);
 
     /// <summary>Trip lines: receipt, route, material, quantity × price (the national document carries one amount per line).</summary>
@@ -71,7 +107,12 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
     }
 
     private static EInvoiceDocument Document(string kind, string number, Guid uuid, DateOnly date, long icv, bool receivable, EInvoiceSettings settings, Company company,
-        Customer buyer, IReadOnlyList<EInvoiceLine> lines, decimal total, EInvoiceReference? original, string? note)
+        Customer buyer, IReadOnlyList<EInvoiceLine> lines, decimal total, EInvoiceReference? original, string? note) =>
+        Document(kind, number, uuid, date, icv, receivable, settings, company,
+            new EInvoiceParty(buyer.Name, TaxId(buyer.TaxNumber), NullIfEmpty(TextNormalizer.DigitsOnly(buyer.Phone)), buyer.City), lines, total, original, note);
+
+    private static EInvoiceDocument Document(string kind, string number, Guid uuid, DateOnly date, long icv, bool receivable, EInvoiceSettings settings, Company company,
+        EInvoiceParty buyer, IReadOnlyList<EInvoiceLine> lines, decimal total, EInvoiceReference? original, string? note)
     {
         var taxExclusive = lines.Sum(l => l.Quantity * l.UnitPrice);
         var discount = lines.Sum(l => l.Discount);
@@ -79,7 +120,7 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
         return new EInvoiceDocument(kind, number, uuid, date, icv, company.CurrencyCode, company.CurrencyDecimals, receivable,
             settings.RegistrationType ?? EInvoiceCodes.Sales, settings.IncomeSourceSequence,
             new EInvoiceParty(company.Name, settings.SellerTaxNumber, company.Phone, null),
-            new EInvoiceParty(buyer.Name, TaxId(buyer.TaxNumber), NullIfEmpty(TextNormalizer.DigitsOnly(buyer.Phone)), buyer.City),
+            buyer,
             lines, taxExclusive, discount, tax, total, original, note);
     }
 
@@ -102,10 +143,29 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
         var rows = source.Select((s, i) => (s.Description, Net: nets[i], Discount: discounts[i])).Where(r => r.Net != 0 || r.Discount != 0).ToList();
         if (fees != 0) rows.Add((string.IsNullOrWhiteSpace(feesDescription) ? "رسوم إضافية" : feesDescription!, fees, 0m));
         var taxes = rows.Select(r => Money.Round((r.Net - r.Discount) * rate / 100m, decimals)).ToArray();
+        Spread(taxes, rows.Select(r => r.Net - r.Discount).ToList(), tax, decimals);
+        return rows.Select((r, i) => new EInvoiceLine(i + 1, r.Description, 1m, r.Net, r.Discount, r.Net - r.Discount, rate, taxes[i])).ToList();
+    }
+
+    /// <summary>
+    /// Lines with their own tax rates (AP/AR receivables, D-15): each line's tax rounded on its amount, the difference to the stored tax
+    /// spread one smallest unit per taxable line, so the lines total exactly the stored amounts.
+    /// </summary>
+    public static IReadOnlyList<EInvoiceLine> AllocateByRate(IReadOnlyList<(string Description, decimal Net, decimal Rate)> source, decimal tax, int decimals)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var rows = source.Where(r => r.Net != 0).ToList();
+        var taxes = rows.Select(r => Money.Round(r.Net * r.Rate / 100m, decimals)).ToArray();
+        Spread(taxes, rows.Select(r => r.Rate > 0 ? r.Net : 0m).ToList(), tax, decimals);
+        return rows.Select((r, i) => new EInvoiceLine(i + 1, r.Description, 1m, r.Net, 0m, r.Net, r.Rate, taxes[i])).ToList();
+    }
+
+    /// <summary>Spreads the difference to the stored tax one smallest unit per line per round, largest taxable lines first, never below zero.</summary>
+    private static void Spread(decimal[] taxes, List<decimal> taxable, decimal tax, int decimals)
+    {
         var unit = Unit(decimals);
         var diff = tax - taxes.Sum();
-        // Spread the difference one smallest unit per line per round, largest taxable lines first, never below zero.
-        var order = Enumerable.Range(0, rows.Count).Where(i => rows[i].Net - rows[i].Discount > 0).OrderByDescending(i => rows[i].Net - rows[i].Discount).ToList();
+        var order = Enumerable.Range(0, taxes.Length).Where(i => taxable[i] > 0).OrderByDescending(i => taxable[i]).ToList();
         var moved = true;
         while (diff != 0 && moved)
         {
@@ -120,7 +180,6 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
                 moved = true;
             }
         }
-        return rows.Select((r, i) => new EInvoiceLine(i + 1, r.Description, 1m, r.Net, r.Discount, r.Net - r.Discount, rate, taxes[i])).ToList();
     }
 
     private static decimal Unit(int decimals) => 1m / (decimal)Math.Pow(10, decimals);
