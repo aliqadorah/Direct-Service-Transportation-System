@@ -1,0 +1,448 @@
+<title>Direct Service Design Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout: a review board — brief and direction switcher on top, then one direction at a time: rationale + tokens, then five screen frames shown at desktop width inside scrollable frames. Single light theme by design (PRD UX-10: light only). */
+:root{
+  color-scheme: light;
+  /* Brand (PRD UX-06) — fixed across all directions */
+  --primary:#0F4C5C; --primary-dark:#0A3540; --tint:#E4EDEE; --text:#171A1C; --muted:#5B6570;
+  --border:#E3E7E6; --page:#F6F8F7; --surface:#FFFFFF;
+  /* Semantic (text colours ≥ 4.5:1 on their backgrounds) */
+  --ok:#1D6B45; --ok-bg:#E3F2EA; --warn:#8A5300; --warn-bg:#FFF2D6; --err:#B42318; --err-bg:#FDECEA; --info:#1D5C9E; --info-bg:#E7F0FA;
+  /* Type (PRD UX-07) */
+  --ar:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
+  --en:"Inter","Segoe UI",Tahoma,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--page)}
+body{background:var(--page);color:var(--text);font-family:var(--en);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:20px;padding-block:24px 64px}
+h1,h2,h3{text-wrap:balance;margin:0}
+.intro{display:grid;grid-template-columns:auto 1fr;gap:16px 20px;align-items:center}
+.intro img{width:44px;height:auto}
+.intro h1{font-size:26px;font-weight:650;letter-spacing:-.01em}
+.intro p{grid-column:1/-1;margin:0;max-width:78ch;color:var(--muted)}
+.fixed{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;grid-column:1/-1}
+.sw{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 8px 3px 4px}
+.sw i{width:16px;height:16px;border-radius:3px;border:1px solid rgba(0,0,0,.08);display:block}
+.picker{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.pick{font:inherit;text-align:start;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;min-width:230px;flex:1 1 230px;color:var(--text)}
+.pick b{display:block;font-size:16px;font-weight:600}
+.pick span{display:block;color:var(--muted);font-size:13px}
+.pick[aria-selected="true"]{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary);background:#FBFDFD}
+.pick:focus-visible,.tab:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.direction{margin-top:22px}
+.rationale{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px}
+.rationale h2{font-size:20px;font-weight:650}
+.rationale p{margin:.4em 0 0;max-width:70ch}
+.rationale ul{margin:.6em 0 0;padding-inline-start:18px}
+.rationale li{margin:.2em 0}
+.tokens{width:100%;border-collapse:collapse;font-size:13px}
+.tokens th,.tokens td{text-align:start;padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.tokens th{color:var(--muted);font-weight:500;width:38%}
+.tokens code{font-family:var(--en);font-variant-numeric:tabular-nums;background:var(--page);padding:0 4px;border-radius:3px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-top:18px;border-bottom:1px solid var(--border)}
+.tab{font:inherit;font-size:14px;cursor:pointer;background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--muted)}
+.tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.frame{margin-top:14px;border:1px solid #CBD3D1;border-radius:8px;overflow-x:auto;background:var(--surface)}
+.frame-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#EEF1F0;border-bottom:1px solid #CBD3D1;min-width:1180px;font-size:12px;color:var(--muted)}
+.frame-bar i{width:9px;height:9px;border-radius:50%;background:#C9D0CE;display:block}
+.frame-bar span{margin-inline-start:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 10px;direction:ltr}
+.screen{min-width:1180px;height:720px;overflow:hidden;position:relative}
+.note{margin-top:10px;color:var(--muted);font-size:13.5px;max-width:90ch}
+.compare{margin-top:34px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px 20px}
+.compare h2{font-size:18px;font-weight:650}
+.cmp-wrap{overflow-x:auto;margin-top:10px}
+.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+.cmp th,.cmp td{border-bottom:1px solid var(--border);padding:7px 10px;text-align:start;vertical-align:top}
+.cmp thead th{color:var(--muted);font-weight:500}
+@media (max-width:820px){.rationale{grid-template-columns:1fr}}
+
+/* =================================================================== mockup base (inside .screen, Arabic RTL) */
+.ui{font-family:var(--ar);direction:rtl;color:var(--text);background:var(--page);height:100%;font-size:var(--fs);line-height:1.5}
+.ui .num{font-family:var(--en);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.ui svg.ic{width:var(--ic,18px);height:var(--ic,18px);flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ui .btn{display:inline-flex;align-items:center;gap:6px;height:var(--ctl);padding:0 12px;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:.93em;font-weight:500;white-space:nowrap}
+.ui .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff}
+.ui .btn.ghost{border-color:transparent;background:transparent;color:var(--primary)}
+.ui .kbd{font-family:var(--en);font-size:11px;border:1px solid var(--border);border-bottom-width:2px;border-radius:3px;padding:0 4px;color:var(--muted);background:var(--surface)}
+.ui .badge{display:inline-flex;align-items:center;gap:4px;font-size:.84em;font-weight:500;padding:1px 7px;border-radius:var(--badge-r);white-space:nowrap}
+.ui .badge svg{--ic:13px}
+.b-ok{background:var(--ok-bg);color:var(--ok)} .b-warn{background:var(--warn-bg);color:var(--warn)} .b-err{background:var(--err-bg);color:var(--err)} .b-info{background:var(--info-bg);color:var(--info)} .b-mute{background:#EEF1F0;color:var(--muted)}
+.ui table.grid{border-collapse:collapse;width:100%;background:var(--surface)}
+.ui table.grid th{position:sticky;top:0;background:var(--th-bg);color:var(--muted);font-weight:500;font-size:.86em;text-align:start;padding:0 10px;height:var(--row);border-bottom:1px solid var(--border);white-space:nowrap}
+.ui table.grid td{padding:0 10px;height:var(--row);border-bottom:1px solid var(--border);white-space:nowrap;font-size:.93em}
+.ui table.grid td.n,.ui table.grid th.n{text-align:end}
+.ui table.grid tr.sel td{background:var(--tint)}
+.ui table.grid tfoot td{font-weight:600;background:#FAFBFB;border-top:1px solid #CBD3D1}
+.ui .field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ui .field label{font-size:.86em;color:var(--muted);font-weight:500}
+.ui .field label b{color:var(--err);font-weight:600}
+.ui .input{height:var(--ctl);border:1px solid #CDD5D3;border-radius:var(--r);background:var(--surface);display:flex;align-items:center;padding:0 10px;gap:6px;font-size:.95em;min-width:0;overflow:hidden;white-space:nowrap}
+.ui .input.num{justify-content:flex-end}
+.ui .input.focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(15,76,92,.22)}
+.ui .input.bad{border-color:var(--err)}
+.ui .help{font-size:.8em;color:var(--muted)}
+.ui .help.err{color:var(--err)}
+.ui .src{font-size:.78em;color:var(--primary);display:inline-flex;gap:4px;align-items:center}
+.ui .muted{color:var(--muted)}
+.ui .banner{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:.9em}
+.ui .logo{width:26px;height:auto}
+.ui .crumbs{font-size:.84em;color:var(--muted);display:flex;gap:6px}
+.ui .hist{display:flex;flex-direction:column}
+.ui .hist .h{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.88em}
+.ui .hist .h i{grid-row:span 2;width:8px;height:8px;border-radius:50%;background:var(--primary);margin-top:6px}
+.ui .hist .h span{color:var(--muted);font-size:.92em}
+.ui .chg{font-family:var(--en);font-size:.9em}
+.ui .ln{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:.92em}
+.ui .ln.tot{border-top:1px solid var(--border);margin-top:4px;padding-top:8px;font-weight:600}
+
+/* =================================================================== Direction A — Ledger */
+.dA{--fs:14px;--row:32px;--ctl:32px;--r:3px;--badge-r:3px;--th-bg:#F1F5F5;--side:228px}
+.dA .shell{display:grid;grid-template-columns:var(--side) 1fr;height:100%}
+.dA .side{background:var(--primary-dark);color:#DCE7E9;padding:12px 10px;overflow:hidden}
+.dA .side .brand{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600;padding:2px 6px 12px;border-bottom:1px solid rgba(255,255,255,.12)}
+.dA .side .brand img{filter:brightness(0) invert(1);width:22px}
+.dA .side h6{margin:12px 6px 4px;font-size:11.5px;font-weight:500;color:#9FB8BD}
+.dA .side a{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:3px;font-size:13.5px;color:#DCE7E9;text-decoration:none}
+.dA .side a.on{background:rgba(255,255,255,.12);color:#fff;box-shadow:inset -3px 0 0 #fff}
+.dA .main{display:flex;flex-direction:column;min-width:0}
+.dA .top{height:46px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 14px}
+.dA .top .search{flex:0 1 340px;margin-inline-start:auto}
+.dA .content{padding:12px 16px;overflow:hidden;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+.dA .ph{display:flex;align-items:center;gap:10px}
+.dA .ph h3{font-size:18px;font-weight:600}
+.dA .ph .act{margin-inline-start:auto;display:flex;gap:6px}
+.dA .box{background:var(--surface);border:1px solid var(--border);border-radius:3px}
+.dA .figs{display:grid;grid-template-columns:repeat(8,1fr)}
+.dA .figs div{padding:8px 12px;border-inline-start:1px solid var(--border)}
+.dA .figs div:first-child{border-inline-start:0}
+.dA .figs span{display:block;font-size:12px;color:var(--muted)}
+.dA .figs b{font-size:17px;font-weight:600}
+.dA .qe{display:grid;grid-template-columns:110px 96px 1.3fr 1.3fr 1fr 1fr 1fr 86px 86px 84px 84px auto;gap:6px;align-items:end;padding:8px 10px;background:#F8FBFB;border-bottom:1px solid var(--border)}
+
+/* =================================================================== Direction B — Dispatch board */
+.dB{--fs:14.5px;--row:40px;--ctl:36px;--r:8px;--badge-r:999px;--th-bg:var(--surface)}
+.dB .shell{display:grid;grid-template-columns:68px 200px 1fr;height:100%}
+.dB .rail{background:var(--surface);border-inline-start:0;border-inline-end:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0}
+.dB .rail a{width:56px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0;border-radius:8px;font-size:10.5px;color:var(--muted);text-decoration:none;text-align:center;line-height:1.25}
+.dB .rail a.on{background:var(--tint);color:var(--primary-dark);font-weight:600}
+.dB .sub{background:#F0F4F4;border-inline-end:1px solid var(--border);padding:14px 10px}
+.dB .sub h6{font-size:12px;color:var(--muted);font-weight:500;margin:0 8px 8px}
+.dB .sub a{display:flex;justify-content:space-between;padding:7px 10px;border-radius:8px;color:var(--text);text-decoration:none;font-size:13.5px}
+.dB .sub a.on{background:var(--surface);box-shadow:0 0 0 1px var(--border);font-weight:600;color:var(--primary-dark)}
+.dB .sub a span{font-family:var(--en);font-size:12px;color:var(--muted)}
+.dB .main{display:flex;flex-direction:column;min-width:0}
+.dB .top{height:52px;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--page)}
+.dB .top .co{display:flex;align-items:center;gap:8px;font-weight:600}
+.dB .content{flex:1;min-height:0;padding:0 18px 16px;display:flex;flex-direction:column;gap:12px}
+.dB .panel{background:var(--surface);border:1px solid var(--border);border-radius:10px}
+.dB .chips{display:flex;gap:6px;flex-wrap:wrap}
+.dB .chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:13px}
+.dB .chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.dB .chip .num{font-size:12px;opacity:.8}
+.dB .split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;flex:1;min-height:0}
+
+/* =================================================================== Direction C — Command */
+.dC{--fs:14px;--row:36px;--ctl:34px;--r:6px;--badge-r:4px;--th-bg:#F4F7F6}
+.dC .shell{display:flex;flex-direction:column;height:100%}
+.dC .bar{height:50px;background:var(--primary-dark);color:#E6EFF0;display:flex;align-items:center;gap:6px;padding:0 14px}
+.dC .bar .brand{white-space:nowrap;display:flex;align-items:center;gap:8px;font-weight:600;color:#fff;margin-inline-end:10px}
+.dC .bar .brand img{filter:brightness(0) invert(1);width:22px}
+.dC .bar a{white-space:nowrap;color:#D3E1E3;text-decoration:none;font-size:13.5px;padding:6px 10px;border-radius:5px;display:inline-flex;gap:4px;align-items:center}
+.dC .bar a.on{background:rgba(255,255,255,.14);color:#fff}
+.dC .cmdk{margin-inline-start:auto;display:flex;align-items:center;gap:8px;height:32px;width:230px;white-space:nowrap;border-radius:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#C6D7DA;padding:0 10px;font-size:13px}
+.dC .cmdk .kbd{background:transparent;color:#C6D7DA;border-color:rgba(255,255,255,.3)}
+.dC .wtabs{height:38px;display:flex;align-items:flex-end;gap:2px;padding:0 12px;background:#E9EEED;border-bottom:1px solid #D3DAD8}
+.dC .wtab{height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;color:var(--muted)}
+.dC .wtab.on{background:var(--surface);border-color:#D3DAD8;color:var(--text);font-weight:600;margin-bottom:-1px;height:33px}
+.dC .content{flex:1;min-height:0;background:var(--surface);display:flex;flex-direction:column}
+.dC .toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)}
+.dC .toolbar h3{font-size:18px;font-weight:600;margin-inline-end:8px}
+.dC .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.dC .seg span{padding:0 10px;height:30px;display:flex;align-items:center;font-size:13px;border-inline-start:1px solid var(--border)}
+.dC .seg span:first-child{border-inline-start:0}
+.dC .seg span.on{background:var(--tint);color:var(--primary-dark);font-weight:600}
+.dC .views{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--border)}
+.dC .views span{padding:8px 12px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent}
+.dC .views span.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.dC .filters td{background:#FBFCFC;height:34px;padding:0 6px}
+.dC .filters .input{height:26px;font-size:12.5px}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHMAAABuCAYAAAAUCyyjAAAObklEQVR4nO2deVyUVRfHfw8Isg+IiBAlqWmpr1rh1ou58OaWGGICmpobiwIioCKggBuyKaDsEVmJikQuKG6pr7mUlkJoIigKqYAo+4Qoyn3/6INv5QwMM/cyM0/z+3O4c46e7zwz9zz3nPNwj5ueQiV+SE3e/wCV6EkFk0dSweSRVDB5JBVMHkkFk0dSweSRVDB5JBVMHkkFk0dSweSRmMMsr6kl524UkoraWsLa199V39BAfrh8mZTeu9/pvuWhLiyMPqyvJxu+2Ycz1wtQVFbx4nVDPV0y9Z2hCJ3tCBMDA46FbwAIi4snJ8+eRX7BjRev6Wprk/eGWSHIxwf9er/OzLc8xdE+NckvvUumR2xBWU2t2DUCXR2Ez3HCp2PepxrUh1VVZI7nMuRd+7XNdcudneHv6c47oFRhni8sJLabo/D4abNE690m2CB6/lwqQa2orCQTnGbjwaNHEq0fPXw4dsRGQ09XlzdQqf1mNj9/DufEVIlBAkDS8ZOwi9hKmpolf484BUVFSQwSAM5euoQP58xDZdUj3vyeUoOZcPQ4uVP5sMPvO5aXD5t1m8ijhnqpg3opL48cOHq8w++7UVyMiY6zceNWMS+AUoOZfva81O+9crsE/w5ch9sPKqUK6q6sfVL7LqusxNS5c/HDzz8rPVBqMIvKK9pf1IZ+e1QF67XrcOX2nQ4H9VZJiUy+G35vxEwXN2QdylFqoFRg3q+uIU+an8lsp0b4O2zWhyL759wOBbW4tFRm383PnmFpQACik1OUFigVmAIdbaip0dkUNj1thmN0LFK+OyVxUA0NDKj4BoCw+AR4B4WQ58+fU7PZWaICU09Li3v7dUsapgAAhABeaV9h1c7dhJD2mY4eMYKabwDYtX8/Zi1ZSh4/bqJql7Wo/WaOHTiAlqkX2p5zDI7R28iTdlKX0SOGU/d95seLmDrvU6JMqQs1mJ6TP4BAV4eWuRfK/jkXEzeGkxqhUGxQJ44byw3q35+672uFhZjoOBu3SkqUAig1mKYCQ26Huystc3/RxZu3YL12HX57VCUyqJoaGtgRGw19Bh+msspKTJ49RylSF6qnJpOGDuFCHOxpmnyh2w8e4r3AELGpy6vm5lz85jAmvuuFQtgtXIwDR48pNFDqN9oBIP3seeKSnIqWFvr/dy1NDezx9sTEIYNFbp8v5uaSOe6eqBcKqfvmAKxZvgweCxcq5P1cJjAB4ET+VeIUvR2NT+jbV1PjED1/Llz+M15kUItLS8mMRYtRLsXtRUk0284OW0KCODU1xTrbZwYTAK7+dpdM3RyJyrp6JvZ9bKdg0ywHkUAfVlURR1c3/Fp0k4lvG2trpEVv4bS6dmViXxoxhQkAZTU1ZNLGMNwsf8DEvv3IYUhb4sJ11dB46W+PHzdhgbcPOX3hAhPfQwYOwO6EOBgbdVOIr13mMAGgrrGR2EdG40Ihm6tkxBt9ccDPBwIdnZeC2tLSglUbNpKvs75l4vtVs574JjUVlq9ayB1op8AE/jjvXJSYQjIvXGRiv595T+QE+OGVbkYigxqf9gXZEBMLFttRQ4EA6XHbYDVkiFyBdhrMVm3I2kdCsw4wsW0qEOCgny8GW74mMqg5350krn6r8ZTCYfjf1VVTA8mRkZg8bqzcgHY6TADIvHCRLEhIwnMGqYtOV01k+nph/KCBIoN65epV4rTEHXX19DdlHICQFb5wm0enFKbD/uXVBn/megH5OCoGwqYn1G2rq3GId14gtmCs9N59Yr9wEe5VyHYGK07zHWYiLDCA47jOZSo3mABQcL+MTA2NaLOSTxb5TbdFyMwZIiNaXVtDHN2WIv96ARPfk8eNRVJEeKemLnKFCQCVdXVk0qZwFNwrY2LfyXoUUlwXcxrq6i/9renJEzj7riTHv/+eie8hAwdgb1IiDAWCTrlE5Q4TAIRNTeTjqFicYXSVjH6rP7JWeENfW+uloBJCEBQZRVJ2pjPxbWlhgYzkpE5JXRQCJgA8b2mBa/LnRJbCsLY0wMIcB1evFJu67MzKIivWbWCWuuxNSsCQgaI3ZbSkMDBbFbE/m4RkZkGCAoMOy1QgQE7gKgyweEVkUI+fOUOcfVei6Sn9mGhpaiIpMoJp6qJwMAHgwKXLZG5cApqf0a/D0dfWwh5vT7GpS/7168TRbSmqa2up++YAhAUGYL6j6PvJMttXRJgAcKGwiNhHRqOu8TF12+pqHFLdXOBkPUpkUO+XV5Dpixah9N596r4BYMmn8xDs4009dVFYmABws7yCfBgagbtV1Uzsr5lhh8AZdiIjWldfT5zc3HHl2lUmviePG4vkyAiuq6YmNZsKDRMAqhoaiG34FuTeLmFi38l6FFLdnDl1EWeTT5ub4bbKjxw+eYqJb6vBg7E7MR4G+vpULlGFhwkATc3NcNiyjZzIZ3OVjB80EHu8PUWmLgCwMSaWbE/7gonvvpa9kJGcBAszM5mBKgVMAGghBJ6f7yBpp84wsT/Awhw5gatgKjAUGdS92dnEa00QWhhss40NjZCZkoSBb/aXCajSwGxV7OEjxH9XBpPU5ZVuRsgJ9EM/s54ig3r6/AWy0NsHjU30i6N1tLSQujUKNtbWUgNVOpgAkHMlj8yK2Y6nDFIXgY42Mn29MPqtN0UG9XpREXFwWYKH1VXUfatxHLaGBGPWdNGbsvaklDAB4KfiYjItfCtqhb9Tt63RRR07lrrBfuQwkUGtqKwk9osWo7j0N+q+AWDZooUI9FrWYaBKCxMA7lQ+JB+GRkCaJt/2xHHAOocZWPmRrcig1jc0kDkey3AxN5e6bwCYNuEDJIRt5jS6SD5DRKlhAkC1UEimR0Tj0q1iJvZXT5+G4Jn2Yq8Sj4BAknnoMBPfNtbW2JUQJ/EVqliFn1Kom54edyLIn5vyzlAm9sP2HcSR3Dyx26240E2crxubtoyT584hLC5e4q2e0l+ZrSKEYHV6BtmWc5S6bT2trri4eQN6m/YQe5XsP3KULPUPwPOWFur+d8Ztwwfvtz9mR+mvzFZxHIfwOU5cvPN8ao2/rRI2PUHs4bY/JHaTJ3GZnyVDT4d+89KW5BSJ1vEGZqsWjhvL7V/lAy3Nl4uiZVHunZJ21/x72DAuJ30nzHqYUPV9reAGWiS44nkHEwA+GPwv7lRQIEwotsfffCBZRX7/Pr25Exl7MKh/P2q+m589w92y8nZ/O3kJs1Xd9Oh95Zno63VovZHAkJpvADAx7tbuGiaDEOUtFh1orxp3l2hdYfFt4ujqSrUDTWBgAB1t7XY3AryDmXb6v8Tz8y+p94b2MjFud835n34i8zy9IGxspOr7NXNzidbxBiYhBP67Mkh7u05pxHHAovHj2lzDMjX5ZMZ0idbxAubTZ88wKyaO5FzJY2LfY/JEvNtH/IzayMQkEpWYxMT38KFDscDRUaJcS+lhVguFxD4yBhdv3mJif8yAt7DOQXRVPAAsW7OWZBzMZuK7T6/XkBAWKvF6pYbJ8kY7AIQ42MPPbppIkL83NpJZS9yZ3miPC93UoRohpYXJ+ggsxWWx2Oq9ispK4uDihsLbt6n7BgCPBfOx1nt5h29jKSVMlofT+tpayFqxXG6H05sD/KWuq1U6mKzLRg6uXiG24p1l2YiWpibSYrbKVDaiNDD5XtC1OzFO5l4UpYDJ51JLSwsLZH3+GZVSS4WHyfci6PT47dT6NxUaJuv2hMAZdljDo/YEhYXJ58Yht3lzEeLrQ71xSCFhqlr6pJPCwVQ120ovhYGpaoOXXQoBU+4DKiIiSUr6Lia+O3NAhdxhqkbH0JNcYaqGOtGV3GCqxq3Rl1xgpp89T1yTU1WDECmr02Gu/2Yf2fwtmxGl3fX1cdh/5T92RGmnweyM4cHZq1fite7GIoMZl5ZGNsZs4/Xw4E6BKe+x3l5rg8je7ENMfCvSWG/mMFUD9ztPTGGqHoXRuWIGU54PqWHRIvBnzXeYic0B/gr3kBomMFm1CACSPT5q9hJ36i0CgOI/Poo6zLB9B8m6TDbPEDHW18dBPx+801t0dfmRU6fJ/OXeTHwDQHJEOD6aNFEhQQKU2+APXLpMnGK2U7P3Z/U2NcGRwNViU4+bd0rIBEcnJpVzBnp6+GpbDEZZWSksSIDilVlYVk4WJibTMvcXjXijL/atXA4jPT3xY1zcPZiANO/RA5mpKehraanQIAGKMKMOHmKy2bG1ehtfey4VmXq0am/2IZTcu0fd96D+/bE7KR49jLsrPEiAIswfi+g37iybMglhnzi2e8P6p1/yqPseM3IEvoyN5bS1tajbZiUqMKuFQnKrgt5NAY4DYhbME5t6/F2X836h5hv44/mYUcFrOXURZ6CKLCowaR5jaWlq4CuPpbC1elvirzYhxQo+fw93LHdxVoqv1b+LCkxzI0OO40BkLcIy0tPFodUrxKYe4mRhZoaaujqZfGt06YLY9esxY+oUpQQJUJo20kVdHa90M5LJRm9TE5zbENxhkABgYW4mk299XR1kpiQpNUiA4uiYT963lvq97/S2xLkNwW2OM2tLjra2Uvs279EDh77+WuFzSElEDaa/3TTudSkmU9lavY2TwYGcuBxSEk22Gc/ZWHf8w/Rmnz44lrELb/bto/QgAYowu2po4LMli6HdgTFnbhNssNfHi9NqI4eUVJFr18C0u2SzegBgzMiROLzzK6XJISUR9amW+aV3yUfhW1DRRnm/gY42IubOEltwJa0eVVeTuR5e7Tb7eDkvRoCnB28gtorJiNKH9fVkfea3+L7gBorK/l8BZ6iniylDhyBsjhNMDAyYBTMsLp6cPHsW+QU3Xrymq62NUVbvItjXF/2k2GQpg5jPmy2vqSXFDx6gb09T9DQU3ZXMSvUNDeTXoiKYm/ZELzH9JXwSb4YHq8TzqZb/NKlg8kgqmDySCiaPpILJI6lg8kgqmDzS/wDZjrAifb/FvAAAAABJRU5ErkJggg==" alt="Direct Service logo">
+    <h1>Design directions — step 5</h1>
+    <p>Three directions for Direct Service Transportation within the fixed brand: the colours, typefaces, light theme and right-to-left Arabic layout are the same in all three. What changes is the layout, the navigation, the density and the component style. Each direction shows the same five screens with real transport content: sign-in, dashboard, the trips grid with quick entry, the trip form and a driver profile. Pick one (or say which parts to combine); full mockups of every screen follow in step 6.</p>
+    <div class="fixed" aria-label="Fixed brand colours">
+      <span class="sw"><i style="background:#0F4C5C"></i>Primary #0F4C5C</span>
+      <span class="sw"><i style="background:#0A3540"></i>Primary dark #0A3540</span>
+      <span class="sw"><i style="background:#E4EDEE"></i>Tint #E4EDEE</span>
+      <span class="sw"><i style="background:#171A1C"></i>Text #171A1C</span>
+      <span class="sw"><i style="background:#5B6570"></i>Secondary #5B6570</span>
+      <span class="sw"><i style="background:#E3E7E6"></i>Borders #E3E7E6</span>
+      <span class="sw"><i style="background:#F6F8F7"></i>Page #F6F8F7</span>
+      <span class="sw"><i style="background:#FFFFFF"></i>Surface #FFFFFF</span>
+      <span class="sw">IBM Plex Sans Arabic · Inter</span>
+    </div>
+  </header>
+
+  <div class="picker" role="tablist" aria-label="Direction">
+    <button class="pick" role="tab" id="pick-A" aria-selected="true" data-dir="A"><b>A · Ledger</b><span>Dark side menu, densest tables, quick-entry strip on the page</span></button>
+    <button class="pick" role="tab" id="pick-B" aria-selected="false" data-dir="B"><b>B · Dispatch board</b><span>Icon rail + section list, list beside a live detail pane</span></button>
+    <button class="pick" role="tab" id="pick-C" aria-selected="false" data-dir="C"><b>C · Command</b><span>Top menu, record tabs, Ctrl+K command bar, widest grids</span></button>
+  </div>
+
+  <section class="direction" id="direction" aria-live="polite"></section>
+
+  <section class="compare">
+    <h2>At a glance</h2>
+    <div class="cmp-wrap">
+      <table class="cmp">
+        <thead><tr><th></th><th>A · Ledger</th><th>B · Dispatch board</th><th>C · Command</th></tr></thead>
+        <tbody>
+          <tr><th>Navigation</th><td>Fixed dark side menu (right), six PRD groups always visible</td><td>Icon rail for the groups + light list of the group's pages with counts</td><td>Top menu of groups, open records as tabs, Ctrl+K to jump anywhere</td></tr>
+          <tr><th>Table row / control height</th><td>32 / 32 px</td><td>40 / 36 px</td><td>36 / 34 px, with a compact/comfortable switch</td></tr>
+          <tr><th>Width for grids at 1280 px</th><td>about 1,050 px</td><td>about 610 px beside the detail pane (1,010 px with the pane closed)</td><td>full 1,280 px</td></tr>
+          <tr><th>Records open in</th><td>Their own page, history in a side panel</td><td>The detail pane next to the list; forms in a drawer</td><td>A record tab; several records open at once</td></tr>
+          <tr><th>Component style</th><td>Square (3 px), hairline borders, no shadows</td><td>Rounded panels (10 px), pill filters and badges</td><td>Medium (6 px), segmented controls, toolbars, visible keyboard hints</td></tr>
+          <tr><th>Best for</th><td>Clerks entering dozens of trips per hour, accountants in long lists</td><td>Dispatchers and managers checking and correcting records one by one</td><td>Mixed teams who move between trips, invoices and ledger all day</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+  <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3 3 7 3s7-1.3 7-3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 13v7h14v-7"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 8v4l3 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16M6 20h12M5 8h14M5 8l-3 6a3 3 0 0 0 6 0zM19 8l-3 6a3 3 0 0 0 6 0z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+</svg>
+
+<script>
+(function(){
+const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHMAAABuCAYAAAAUCyyjAAAObklEQVR4nO2deVyUVRfHfw8Isg+IiBAlqWmpr1rh1ou58OaWGGICmpobiwIioCKggBuyKaDsEVmJikQuKG6pr7mUlkJoIigKqYAo+4Qoyn3/6INv5QwMM/cyM0/z+3O4c46e7zwz9zz3nPNwj5ueQiV+SE3e/wCV6EkFk0dSweSRVDB5JBVMHkkFk0dSweSRVDB5JBVMHkkFk0dSweSRmMMsr6kl524UkoraWsLa199V39BAfrh8mZTeu9/pvuWhLiyMPqyvJxu+2Ycz1wtQVFbx4nVDPV0y9Z2hCJ3tCBMDA46FbwAIi4snJ8+eRX7BjRev6Wprk/eGWSHIxwf9er/OzLc8xdE+NckvvUumR2xBWU2t2DUCXR2Ez3HCp2PepxrUh1VVZI7nMuRd+7XNdcudneHv6c47oFRhni8sJLabo/D4abNE690m2CB6/lwqQa2orCQTnGbjwaNHEq0fPXw4dsRGQ09XlzdQqf1mNj9/DufEVIlBAkDS8ZOwi9hKmpolf484BUVFSQwSAM5euoQP58xDZdUj3vyeUoOZcPQ4uVP5sMPvO5aXD5t1m8ijhnqpg3opL48cOHq8w++7UVyMiY6zceNWMS+AUoOZfva81O+9crsE/w5ch9sPKqUK6q6sfVL7LqusxNS5c/HDzz8rPVBqMIvKK9pf1IZ+e1QF67XrcOX2nQ4H9VZJiUy+G35vxEwXN2QdylFqoFRg3q+uIU+an8lsp0b4O2zWhyL759wOBbW4tFRm383PnmFpQACik1OUFigVmAIdbaip0dkUNj1thmN0LFK+OyVxUA0NDKj4BoCw+AR4B4WQ58+fU7PZWaICU09Li3v7dUsapgAAhABeaV9h1c7dhJD2mY4eMYKabwDYtX8/Zi1ZSh4/bqJql7Wo/WaOHTiAlqkX2p5zDI7R28iTdlKX0SOGU/d95seLmDrvU6JMqQs1mJ6TP4BAV4eWuRfK/jkXEzeGkxqhUGxQJ44byw3q35+672uFhZjoOBu3SkqUAig1mKYCQ26Huystc3/RxZu3YL12HX57VCUyqJoaGtgRGw19Bh+msspKTJ49RylSF6qnJpOGDuFCHOxpmnyh2w8e4r3AELGpy6vm5lz85jAmvuuFQtgtXIwDR48pNFDqN9oBIP3seeKSnIqWFvr/dy1NDezx9sTEIYNFbp8v5uaSOe6eqBcKqfvmAKxZvgweCxcq5P1cJjAB4ET+VeIUvR2NT+jbV1PjED1/Llz+M15kUItLS8mMRYtRLsXtRUk0284OW0KCODU1xTrbZwYTAK7+dpdM3RyJyrp6JvZ9bKdg0ywHkUAfVlURR1c3/Fp0k4lvG2trpEVv4bS6dmViXxoxhQkAZTU1ZNLGMNwsf8DEvv3IYUhb4sJ11dB46W+PHzdhgbcPOX3hAhPfQwYOwO6EOBgbdVOIr13mMAGgrrGR2EdG40Ihm6tkxBt9ccDPBwIdnZeC2tLSglUbNpKvs75l4vtVs574JjUVlq9ayB1op8AE/jjvXJSYQjIvXGRiv595T+QE+OGVbkYigxqf9gXZEBMLFttRQ4EA6XHbYDVkiFyBdhrMVm3I2kdCsw4wsW0qEOCgny8GW74mMqg5350krn6r8ZTCYfjf1VVTA8mRkZg8bqzcgHY6TADIvHCRLEhIwnMGqYtOV01k+nph/KCBIoN65epV4rTEHXX19DdlHICQFb5wm0enFKbD/uXVBn/megH5OCoGwqYn1G2rq3GId14gtmCs9N59Yr9wEe5VyHYGK07zHWYiLDCA47jOZSo3mABQcL+MTA2NaLOSTxb5TbdFyMwZIiNaXVtDHN2WIv96ARPfk8eNRVJEeKemLnKFCQCVdXVk0qZwFNwrY2LfyXoUUlwXcxrq6i/9renJEzj7riTHv/+eie8hAwdgb1IiDAWCTrlE5Q4TAIRNTeTjqFicYXSVjH6rP7JWeENfW+uloBJCEBQZRVJ2pjPxbWlhgYzkpE5JXRQCJgA8b2mBa/LnRJbCsLY0wMIcB1evFJu67MzKIivWbWCWuuxNSsCQgaI3ZbSkMDBbFbE/m4RkZkGCAoMOy1QgQE7gKgyweEVkUI+fOUOcfVei6Sn9mGhpaiIpMoJp6qJwMAHgwKXLZG5cApqf0a/D0dfWwh5vT7GpS/7168TRbSmqa2up++YAhAUGYL6j6PvJMttXRJgAcKGwiNhHRqOu8TF12+pqHFLdXOBkPUpkUO+XV5Dpixah9N596r4BYMmn8xDs4009dVFYmABws7yCfBgagbtV1Uzsr5lhh8AZdiIjWldfT5zc3HHl2lUmviePG4vkyAiuq6YmNZsKDRMAqhoaiG34FuTeLmFi38l6FFLdnDl1EWeTT5ub4bbKjxw+eYqJb6vBg7E7MR4G+vpULlGFhwkATc3NcNiyjZzIZ3OVjB80EHu8PUWmLgCwMSaWbE/7gonvvpa9kJGcBAszM5mBKgVMAGghBJ6f7yBpp84wsT/Awhw5gatgKjAUGdS92dnEa00QWhhss40NjZCZkoSBb/aXCajSwGxV7OEjxH9XBpPU5ZVuRsgJ9EM/s54ig3r6/AWy0NsHjU30i6N1tLSQujUKNtbWUgNVOpgAkHMlj8yK2Y6nDFIXgY42Mn29MPqtN0UG9XpREXFwWYKH1VXUfatxHLaGBGPWdNGbsvaklDAB4KfiYjItfCtqhb9Tt63RRR07lrrBfuQwkUGtqKwk9osWo7j0N+q+AWDZooUI9FrWYaBKCxMA7lQ+JB+GRkCaJt/2xHHAOocZWPmRrcig1jc0kDkey3AxN5e6bwCYNuEDJIRt5jS6SD5DRKlhAkC1UEimR0Tj0q1iJvZXT5+G4Jn2Yq8Sj4BAknnoMBPfNtbW2JUQJ/EVqliFn1Kom54edyLIn5vyzlAm9sP2HcSR3Dyx26240E2crxubtoyT584hLC5e4q2e0l+ZrSKEYHV6BtmWc5S6bT2trri4eQN6m/YQe5XsP3KULPUPwPOWFur+d8Ztwwfvtz9mR+mvzFZxHIfwOU5cvPN8ao2/rRI2PUHs4bY/JHaTJ3GZnyVDT4d+89KW5BSJ1vEGZqsWjhvL7V/lAy3Nl4uiZVHunZJ21/x72DAuJ30nzHqYUPV9reAGWiS44nkHEwA+GPwv7lRQIEwotsfffCBZRX7/Pr25Exl7MKh/P2q+m589w92y8nZ/O3kJs1Xd9Oh95Zno63VovZHAkJpvADAx7tbuGiaDEOUtFh1orxp3l2hdYfFt4ujqSrUDTWBgAB1t7XY3AryDmXb6v8Tz8y+p94b2MjFud835n34i8zy9IGxspOr7NXNzidbxBiYhBP67Mkh7u05pxHHAovHj2lzDMjX5ZMZ0idbxAubTZ88wKyaO5FzJY2LfY/JEvNtH/IzayMQkEpWYxMT38KFDscDRUaJcS+lhVguFxD4yBhdv3mJif8yAt7DOQXRVPAAsW7OWZBzMZuK7T6/XkBAWKvF6pYbJ8kY7AIQ42MPPbppIkL83NpJZS9yZ3miPC93UoRohpYXJ+ggsxWWx2Oq9ispK4uDihsLbt6n7BgCPBfOx1nt5h29jKSVMlofT+tpayFqxXG6H05sD/KWuq1U6mKzLRg6uXiG24p1l2YiWpibSYrbKVDaiNDD5XtC1OzFO5l4UpYDJ51JLSwsLZH3+GZVSS4WHyfci6PT47dT6NxUaJuv2hMAZdljDo/YEhYXJ58Yht3lzEeLrQ71xSCFhqlr6pJPCwVQ120ovhYGpaoOXXQoBU+4DKiIiSUr6Lia+O3NAhdxhqkbH0JNcYaqGOtGV3GCqxq3Rl1xgpp89T1yTU1WDECmr02Gu/2Yf2fwtmxGl3fX1cdh/5T92RGmnweyM4cHZq1fite7GIoMZl5ZGNsZs4/Xw4E6BKe+x3l5rg8je7ENMfCvSWG/mMFUD9ztPTGGqHoXRuWIGU54PqWHRIvBnzXeYic0B/gr3kBomMFm1CACSPT5q9hJ36i0CgOI/Poo6zLB9B8m6TDbPEDHW18dBPx+801t0dfmRU6fJ/OXeTHwDQHJEOD6aNFEhQQKU2+APXLpMnGK2U7P3Z/U2NcGRwNViU4+bd0rIBEcnJpVzBnp6+GpbDEZZWSksSIDilVlYVk4WJibTMvcXjXijL/atXA4jPT3xY1zcPZiANO/RA5mpKehraanQIAGKMKMOHmKy2bG1ehtfey4VmXq0am/2IZTcu0fd96D+/bE7KR49jLsrPEiAIswfi+g37iybMglhnzi2e8P6p1/yqPseM3IEvoyN5bS1tajbZiUqMKuFQnKrgt5NAY4DYhbME5t6/F2X836h5hv44/mYUcFrOXURZ6CKLCowaR5jaWlq4CuPpbC1elvirzYhxQo+fw93LHdxVoqv1b+LCkxzI0OO40BkLcIy0tPFodUrxKYe4mRhZoaaujqZfGt06YLY9esxY+oUpQQJUJo20kVdHa90M5LJRm9TE5zbENxhkABgYW4mk299XR1kpiQpNUiA4uiYT963lvq97/S2xLkNwW2OM2tLjra2Uvs279EDh77+WuFzSElEDaa/3TTudSkmU9lavY2TwYGcuBxSEk22Gc/ZWHf8w/Rmnz44lrELb/bto/QgAYowu2po4LMli6HdgTFnbhNssNfHi9NqI4eUVJFr18C0u2SzegBgzMiROLzzK6XJISUR9amW+aV3yUfhW1DRRnm/gY42IubOEltwJa0eVVeTuR5e7Tb7eDkvRoCnB28gtorJiNKH9fVkfea3+L7gBorK/l8BZ6iniylDhyBsjhNMDAyYBTMsLp6cPHsW+QU3Xrymq62NUVbvItjXF/2k2GQpg5jPmy2vqSXFDx6gb09T9DQU3ZXMSvUNDeTXoiKYm/ZELzH9JXwSb4YHq8TzqZb/NKlg8kgqmDySCiaPpILJI6lg8kgqmDzS/wDZjrAifb/FvAAAAABJRU5ErkJggg==";
+const ic=(n,cls="")=>`<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const N=(v)=>`<span class="num">${v}</span>`;
+const B={unb:`<span class="badge b-info">${ic("clock")}غير مفوترة</span>`,inv:`<span class="badge b-ok">${ic("check")}مفوترة</span>`,stl:`<span class="badge b-mute">${ic("check")}مسوّاة</span>`,
+ void:`<span class="badge b-err">${ic("x")}ملغاة</span>`,short:`<span class="badge b-warn">${ic("scale")}نقص</span>`,breach:`<span class="badge b-err">${ic("alert")}مخالفة تعرفة</span>`,man:`<span class="badge b-warn">${ic("edit")}سعر يدوي</span>`};
+const trips=[
+ ["TRP-10482","2026-10-10","أحمد صالح","10-11111","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","32.000","31.850","6.000","3.500","191.100","111.475",["unb"]],
+ ["TRP-10481","2026-10-10","سامي العبادي","10-22222","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","31.500","31.020","6.000","0.000","186.120","—",["unb","short"]],
+ ["TRP-10480","2026-10-09","محمود الحويطات","11-40312","مناجم الفوسفات الأردنية","الشيدية","ميناء العقبة","فوسفات","33.200","33.150","5.250","3.250","174.038","107.738",["inv"]],
+ ["TRP-10479","2026-10-09","خالد الزعبي","12-77801","مناجم الفوسفات الأردنية","الشيدية","ميناء العقبة","فوسفات","32.800","32.790","5.000","3.250","163.950","106.568",["unb","breach"]],
+ ["TRP-10478","2026-10-09","يوسف النعيمات","10-55290","الإسمنت الأردنية","الحسا","مستودعات الزرقاء","كلنكر","30.000","29.980","4.750","3.900","142.405","116.922",["inv","man"]],
+ ["TRP-10477","2026-10-08","أحمد صالح","10-11111","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","32.400","32.300","6.000","3.500","193.800","113.050",["stl","inv"]],
+ ["TRP-10476","2026-10-08","سامي العبادي","10-22222","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","31.900","31.880","6.000","0.000","191.280","—",["inv"]],
+ ["TRP-10475","2026-10-08","محمود الحويطات","11-40312","مناجم الفوسفات الأردنية","الشيدية","ميناء العقبة","فوسفات","33.000","—","5.250","3.250","173.250","107.250",["void"]],
+ ["TRP-10474","2026-10-07","خالد الزعبي","12-77801","الإسمنت الأردنية","الحسا","مستودعات الزرقاء","كلنكر","29.600","29.590","4.750","3.900","140.553","115.401",["inv"]],
+ ["TRP-10473","2026-10-07","يوسف النعيمات","10-55290","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","32.100","31.950","6.000","3.500","191.700","111.825",["unb"]],
+ ["TRP-10472","2026-10-07","أحمد صالح","10-11111","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","32.000","31.990","6.000","3.500","191.940","111.965",["stl","inv"]],
+ ["TRP-10471","2026-10-06","سامي العبادي","10-22222","مناجم الفوسفات الأردنية","الشيدية","ميناء العقبة","فوسفات","31.700","31.650","5.250","0.000","166.163","—",["inv"]],
+ ["TRP-10470","2026-10-06","محمود الحويطات","11-40312","مناجم الفوسفات الأردنية","الشيدية","ميناء العقبة","فوسفات","33.100","33.060","5.250","3.250","173.565","107.445",["inv"]],
+ ["TRP-10469","2026-10-06","خالد الزعبي","12-77801","الإسمنت الأردنية","الحسا","مستودعات الزرقاء","كلنكر","30.200","30.180","4.750","3.900","143.355","117.702",["unb"]],
+ ["TRP-10468","2026-10-05","يوسف النعيمات","10-55290","شركة البوتاس العربية","غور الصافي","ميناء العقبة","بوتاس","32.300","32.250","6.000","3.500","193.500","112.875",["inv"]],
+];
+const badges=t=>t[14].map(k=>B[k]).join(" ");
+function tripTable(rows,cols,opts={}){
+  const all={rc:["رقم السند",t=>N(t[0])],dt:["التاريخ",t=>N(t[1])],drv:["السائق",t=>t[2]],pl:["اللوحة",t=>N(t[3])],cu:["العميل",t=>t[4]],ls:["موقع التحميل",t=>t[5]],us:["موقع التنزيل",t=>t[6]],
+   mat:["المادة",t=>t[7]],lw:["محمّل (طن)",t=>N(t[8]),1],uw:["منزّل (طن)",t=>N(t[9]),1],pr:["السعر",t=>N(t[10]),1],rt:["أجرة السائق",t=>N(t[11]),1],rev:["الإيراد",t=>N(t[12]),1],wg:["الأجر",t=>N(t[13]),1],st:["الحالة",badges]};
+  const c=cols.map(k=>all[k]);
+  return `<table class="grid"><thead><tr>${opts.check?'<th style="width:28px"><input type="checkbox" aria-label="تحديد الكل"></th>':''}${c.map(x=>`<th class="${x[2]?"n":""}">${x[0]}</th>`).join("")}</tr></thead>
+  ${opts.filters?`<tbody class="filters"><tr>${opts.check?'<td></td>':''}${c.map(x=>`<td><div class="input">${x[2]?'<span class="muted num">≥</span>':''}</div></td>`).join("")}</tr></tbody>`:""}
+  <tbody>${rows.map((t,i)=>`<tr class="${i===(opts.sel??-1)?"sel":""}">${opts.check?`<td><input type="checkbox" aria-label="تحديد ${t[0]}" ${i===opts.sel?"checked":""}></td>`:''}${c.map(x=>`<td class="${x[2]?"n":""}">${x[1](t)}</td>`).join("")}</tr>`).join("")}</tbody>
+  ${opts.foot?`<tfoot><tr>${opts.check?'<td></td>':''}${c.map((x,i)=>`<td class="${x[2]?"n":""}">${i===0?"المجموع (1,284 رحلة)":({lw:N("40,912.300"),uw:N("40,701.850"),rev:N("231,490.725"),wg:N("128,316.410")}[cols[i]]||"")}</td>`).join("")}</tr></tfoot>`:""}</table>`;
+}
+const field=(label,val,o={})=>`<div class="field" style="${o.span?`grid-column:span ${o.span}`:""}"><label>${label}${o.req?" <b aria-hidden=\"true\">*</b>":""}</label><div class="input ${o.num?"num":""} ${o.focus?"focus":""} ${o.bad?"bad":""}">${o.icon?ic(o.icon):""}${o.num?N(val):val}${o.dd?`<span style="margin-inline-start:auto" class="muted">${ic("down")}</span>`:""}</div>${o.help?`<span class="help ${o.bad?"err":""}">${o.help}</span>`:""}${o.src?`<span class="src">${ic("check")}${o.src}</span>`:""}</div>`;
+const tripFields=(cols)=>`<div style="display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:12px 14px">
+ ${field("رقم السند","TRP-10483",{req:1,focus:1})}${field("تاريخ الرحلة","2026-10-10",{req:1,num:1})}${field("تاريخ التحميل","2026-10-10",{req:1,num:1,help:"شهر التحميل يحدد أجرة السائق"})}${field("تاريخ التنزيل","2026-10-10",{num:1})}
+ ${field("السائق","أحمد صالح — 10-11111 · فولفو · 32 طن",{req:1,dd:1,span:2,help:"أسطول خاص · رخصة سارية حتى 2027-05"})}${field("العميل","شركة البوتاس العربية",{req:1,dd:1,span:2})}
+ ${field("موقع التحميل","غور الصافي",{req:1,dd:1})}${field("موقع التنزيل","ميناء العقبة",{req:1,dd:1})}${field("المادة","بوتاس",{req:1,dd:1})}${field("الشريك","—",{dd:1,help:"يعبأ تلقائياً لسائقي الشركاء"})}
+ ${field("الوزن المحمّل (طن)","32.000",{req:1,num:1})}${field("الوزن المنزّل (طن)","34.100",{num:1,bad:1,help:"أكبر من المحمّل × 1.02 — تحذير، يمكن الحفظ"})}${field("سعر العميل للطن","6.000",{req:1,num:1,src:"من التعرفة: البوتاس العربية · بوتاس"})}${field("أجرة السائق للطن","3.500",{req:1,num:1,src:"السعر الشهري: غور الصافي · 2026-10"})}
+ ${field("ملاحظات","",{span:cols})}</div>`;
+const calc=`<div class="ln"><span>كمية الفوترة (المنزّل)</span>${N("34.100 t")}</div><div class="ln"><span>الإيراد</span>${N("204.600")}</div><div class="ln"><span>أجر السائق (المنزّل × الأجرة)</span>${N("119.350")}</div><div class="ln"><span>تكلفة الشريك</span>${N("0.000")}</div><div class="ln tot"><span>الهامش</span>${N("85.250 JOD")}</div><div class="ln"><span>النقص</span><span>${N("−2.100 t")} <span class="badge b-warn">${ic("scale")}فائض وزن</span></span></div>`;
+const history=`<div class="hist">
+ <div class="h"><i></i><b>تعديل — رنا الخطيب</b><span>اليوم 10:42 · الوزن المنزّل <span class="chg">31.700 → 31.850</span></span></div>
+ <div class="h"><i></i><b>إضافة إلى الفاتورة INV-02211 — سارة حداد</b><span>2026-10-09 16:05</span></div>
+ <div class="h"><i></i><b>تسوية STL-00318 — سارة حداد</b><span>2026-10-08 12:30</span></div>
+ <div class="h"><i></i><b>تعديل الشاحنة — رنا الخطيب</b><span>2026-09-21 · اللوحة <span class="chg">10-11011 → 10-11111</span></span></div>
+ <div class="h"><i></i><b>إنشاء — رنا الخطيب</b><span>2025-01-04 09:12</span></div></div>`;
+const driverFacts=[["الرقم الوطني","9871234560"],["الهاتف","0791234567"],["الرخصة","L-1001 · فئة C · حتى 2027-05-14"],["طريقة الدفع","تحويل بنكي · البنك العربي"],["الآيبان","JO94 CBJO 0010 0000 0000 0131 0003 02"],["الشاحنة","10-11111 · فولفو FH · 32 طن"],["نوع الملكية","الشركة (أسطول خاص)"],["تأمين الشاحنة","ينتهي 2026-10-28"]];
+const facts=(cols)=>`<div style="display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:10px 18px">${driverFacts.map(([k,v])=>`<div><div class="muted" style="font-size:.84em">${k}</div><div>${/^[0-9A-Z]/.test(v)?N(v):v}</div></div>`).join("")}</div>`;
+const acct=[["الأجور غير المسوّاة","1,250.000"],["السلف المفتوحة","400.000"],["الصافي المستحق","850.000"],["رحلات الشهر","27"]];
+const loginForm=(o={})=>`<div style="display:flex;flex-direction:column;gap:14px;width:${o.w||340}px">
+ ${field("البريد الإلكتروني","rana.khatib@arabtrans.jo",{icon:"user"})}${field("كلمة المرور","••••••••••",{icon:"lock",focus:1})}
+ <div style="display:flex;justify-content:space-between;font-size:.88em"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" checked> تذكر هذا الجهاز للبريد فقط</label><a style="color:var(--primary)">نسيت كلمة المرور؟</a></div>
+ <button class="btn pri" style="justify-content:center;height:40px">تسجيل الدخول</button>
+ <div class="muted" style="font-size:.84em">الخطوة التالية: رمز التحقق من تطبيق المصادقة (إلزامي لكل مستخدم).</div></div>`;
+const groups=[["home","لوحة المعلومات"],["truck","العمليات",["الرحلات","استيراد الرحلات","النقص"]],["file","الفوترة والنقد",["الفواتير","الإشعارات الدائنة","سندات القبض","حسابات السائقين","حسابات الشركاء"]],["book","المحاسبة",["دليل الحسابات","القيود","الأستاذ العام"]],["chart","التقارير"],["db","البيانات الأساسية",["السائقون","العملاء","الشركاء","التعرفة","الأسعار الشهرية"]],["gear","الإعدادات"]];
+
+/* ------------------------------------------------------------------ A · Ledger */
+function shellA(active,inner){
+  const nav=groups.map(([i,g,items])=>items?`<h6>${g}</h6>${items.map(x=>`<a class="${x===active?"on":""}">${x}</a>`).join("")}`:`<a class="${g===active?"on":""}" style="margin-top:6px">${ic(i)}${g}</a>`).join("");
+  return `<div class="ui dA"><div class="shell"><aside class="side"><div class="brand"><img src="${LOGO}" alt="">دايركت سيرفس</div>${nav}</aside>
+  <div class="main"><div class="top"><button class="btn">${ic("down")}الشركة العربية للنقل — الأردن</button><div class="input search">${ic("search")}<span class="muted">بحث في الرحلات والفواتير والسائقين…</span></div><button class="btn ghost" aria-label="الإشعارات">${ic("bell")}${N("4")}</button><button class="btn ghost">${ic("user")}رنا الخطيب</button></div>
+  <div class="content">${inner}</div></div></div></div>`;
+}
+const A={
+ login:()=>`<div class="ui dA" style="display:grid;grid-template-columns:1fr 1fr;height:100%">
+  <div style="background:var(--primary-dark);color:#E2ECEE;padding:56px;display:flex;flex-direction:column;justify-content:space-between">
+   <div style="display:flex;gap:12px;align-items:center;color:#fff;font-size:20px;font-weight:600"><img src="${LOGO}" alt="" style="width:40px;filter:brightness(0) invert(1)">دايركت سيرفس للنقل</div>
+   <div><div style="font-size:30px;font-weight:600;color:#fff;line-height:1.35;max-width:16ch">كل رحلة، كل فاتورة، كل قيد — في دفتر واحد.</div><div style="margin-top:12px;max-width:42ch;color:#B9CDD1">للشركات التي تنقل البوتاس والفوسفات والإسمنت: السندات والأجور والفواتير والمحاسبة مترابطة.</div></div>
+   <div class="num" style="color:#8FAAB0;font-size:12px;text-align:end">Direct Service Company</div></div>
+  <div style="display:flex;align-items:center;justify-content:center;background:var(--surface)"><div><h3 style="font-size:22px;font-weight:600;margin-bottom:4px">تسجيل الدخول</h3><div class="muted" style="margin-bottom:20px">أدخل بيانات حسابك.</div>${loginForm()}</div></div></div>`,
+ dashboard:()=>shellA("لوحة المعلومات",`<div class="ph"><h3>لوحة المعلومات</h3><span class="muted">اليوم ${N("2026-10-10")}</span><div class="act"><button class="btn">اليوم</button><button class="btn pri">الشهر حتى اليوم</button></div></div>
+  <div class="box figs">${[["الرحلات","412"],["الحمولة (طن)","13,118.4"],["الإيراد","74,210.6"],["أجور السائقين","38,904.2"],["تكلفة الشركاء","9,812.0"],["الهامش","25,494.4"],["المفوتر","61,480.0"],["التحصيلات","48,215.5"]].map(([k,v])=>`<div><span>${k}</span><b class="num">${v}</b></div>`).join("")}</div>
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:10px;min-height:0;flex:1">
+   <div class="box" style="overflow:hidden"><div style="padding:8px 12px;font-weight:600;border-bottom:1px solid var(--border)">تنبيهات تحتاج إجراء</div>
+    <table class="grid"><thead><tr><th>التنبيه</th><th class="n">العدد</th><th class="n">القيمة</th><th>الأقدم</th><th></th></tr></thead><tbody>
+    ${[["b-warn","alert","رحلات غير مفوترة","86","15,904.300","2026-09-14"],["b-err","x","ذمم متأخرة","9","22,410.000","2026-07-31"],["b-info","clock","مسودات بانتظار الاعتماد","4","3,120.800","2026-10-08"],["b-err","alert","فواتير إلكترونية مرفوضة","1","1,210.400","2026-10-09"],["b-warn","scale","رحلات بنقص يتجاوز 0.5٪","7","—","2026-10-02"],["b-warn","file","وثائق سائقين تنتهي خلال 30 يوماً","3","—","2026-10-28"],["b-warn","truck","مواقع تحميل بلا أسعار لشهر 2026-10","1","—","الحسا"]].map(r=>`<tr><td><span class="badge ${r[0]}">${ic(r[1])}</span> ${r[2].replace(/([0-9][0-9.٪-]*)/g,'<span class="num">$1</span>')}</td><td class="n">${N(r[3])}</td><td class="n">${N(r[4])}</td><td>${/^\d/.test(r[5])?N(r[5]):r[5]}</td><td class="n"><a style="color:var(--primary)">فتح القائمة</a></td></tr>`).join("")}</tbody></table></div>
+   <div style="display:flex;flex-direction:column;gap:10px"><div class="box"><div style="padding:8px 12px;font-weight:600;border-bottom:1px solid var(--border)">النقد والبنوك</div>
+    <table class="grid"><tbody>${[["الصندوق الرئيسي","3,412.750"],["البنك العربي · جاري","58,920.100"],["بنك الإسكان · رواتب","12,004.000"]].map(r=>`<tr><td>${r[0]}</td><td class="n">${N(r[1])}</td></tr>`).join("")}</tbody></table></div>
+    <div class="box"><div style="padding:8px 12px;font-weight:600;border-bottom:1px solid var(--border)">مؤشرات مثبتة</div>
+    ${[["نسبة النقص للشهر","0.31%",31,"ok","ضمن الحد 0.5٪"],["أيام التحصيل","47",78,"warn","تحذير فوق 45"]].map(r=>`<div style="padding:8px 12px;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between"><span>${r[0]}</span><b class="num">${r[1]}</b></div><div style="height:6px;background:#EEF1F0;margin:6px 0 4px"><div style="height:6px;width:${r[2]}%;background:var(--${r[3]==="ok"?"primary":"warn"})"></div></div><span class="badge b-${r[3]}">${ic(r[3]==="ok"?"check":"alert")}${r[4]}</span></div>`).join("")}</div></div></div>`),
+ grid:()=>shellA("الرحلات",`<div class="ph"><div><div class="crumbs">العمليات › الرحلات</div><h3>الرحلات</h3></div><div class="act"><button class="btn">${ic("export")}استيراد</button><button class="btn">الرحلات المنشأة</button></div></div>
+  <div class="box" style="overflow:hidden"><div class="qe">${field("رقم السند","",{focus:1})}${field("التاريخ","2026-10-10",{num:1})}${field("السائق","أحمد صالح · 10-11111",{dd:1})}${field("العميل","البوتاس العربية",{dd:1})}${field("التحميل","غور الصافي",{dd:1})}${field("التنزيل","ميناء العقبة",{dd:1})}${field("المادة","بوتاس",{dd:1})}${field("محمّل","32.000",{num:1})}${field("منزّل","",{num:1})}${field("السعر","6.000",{num:1})}${field("الأجرة","3.500",{num:1})}<button class="btn pri">حفظ <span class="kbd" style="color:#fff;border-color:rgba(255,255,255,.5);background:transparent">Enter</span></button></div>
+   <div style="padding:4px 10px;font-size:12px" class="muted">السعر من التعرفة · الأجرة من السعر الشهري لغور الصافي 2026-10 · Tab للتنقل، Enter للحفظ، يمسح السند والمنزّل فقط</div></div>
+  <div class="box" style="flex:1;overflow:auto">${tripTable(trips,["rc","dt","drv","pl","cu","ls","us","mat","lw","uw","pr","rt","rev","wg","st"],{foot:1})}</div>`),
+ form:()=>shellA("الرحلات",`<div class="ph"><div><div class="crumbs">العمليات › الرحلات › رحلة جديدة</div><h3>رحلة جديدة</h3></div><div class="act"><button class="btn">إلغاء</button><button class="btn pri">حفظ الرحلة</button></div></div>
+  <div class="banner" style="background:var(--warn-bg);color:var(--warn);border:1px solid #F1D9A6;border-radius:3px">${ic("alert")}الوزن المنزّل أكبر من المحمّل × 1.02. تحذير فقط — يمكنك الحفظ.</div>
+  <div style="display:grid;grid-template-columns:1fr 290px;gap:10px;flex:1;min-height:0"><div class="box" style="padding:14px">${tripFields(4)}</div>
+  <div class="box" style="padding:12px 14px;align-self:start"><div style="font-weight:600;margin-bottom:6px">الحساب المباشر</div>${calc}<div class="help" style="margin-top:8px">فوترة على الوزن المنزّل (إعداد الشركة). التعرفة الأكثر تحديداً: عميل + مادة (12).</div></div></div>`),
+ detail:()=>shellA("السائقون",`<div class="ph"><div><div class="crumbs">البيانات الأساسية › السائقون</div><h3>أحمد صالح</h3></div><span class="badge b-ok">${ic("check")}نشط</span><span class="badge b-warn">${ic("alert")}التأمين ينتهي خلال 18 يوماً</span><div class="act"><button class="btn">${ic("history")}السجل</button><button class="btn">كشف حساب</button><button class="btn pri">${ic("edit")}تعديل</button></div></div>
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:10px;flex:1;min-height:0"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+   <div class="box figs" style="grid-template-columns:repeat(4,1fr)">${acct.map(([k,v])=>`<div><span>${k}</span><b class="num">${v}</b></div>`).join("")}</div>
+   <div class="box" style="padding:12px 14px">${facts(4)}</div>
+   <div class="box" style="flex:1;overflow:hidden"><div style="display:flex;gap:2px;border-bottom:1px solid var(--border);padding:0 8px">${["الرحلات","السلف","التسويات","الوثائق"].map((x,i)=>`<span style="padding:7px 10px;${i===0?"border-bottom:2px solid var(--primary);color:var(--primary);font-weight:600":"color:var(--muted)"}">${x}</span>`).join("")}</div>${tripTable(trips.filter(t=>t[2]==="أحمد صالح"),["rc","dt","cu","ls","mat","lw","uw","rt","wg","st"])}</div></div>
+  <aside class="box" style="padding:10px 14px;overflow:hidden"><div style="font-weight:600;margin-bottom:4px">السجل</div>${history}</aside></div>`),
+};
+
+/* ------------------------------------------------------------------ B · Dispatch board */
+function shellB(group,sub,inner){
+  const g=groups.find(x=>x[1]===group)||groups[1];
+  const counts={"الرحلات":"1,284","استيراد الرحلات":"","النقص":"7","السائقون":"58","العملاء":"14","الشركاء":"6","التعرفة":"41","الأسعار الشهرية":""};
+  return `<div class="ui dB"><div class="shell"><nav class="rail"><img src="${LOGO}" alt="دايركت سيرفس" class="logo" style="margin-bottom:10px">${groups.map(([i,n])=>`<a class="${n===group?"on":""}">${ic(i)}${n}</a>`).join("")}</nav>
+  <div class="sub"><h6>${group}</h6>${(g[2]||[group]).map(x=>`<a class="${x===sub?"on":""}">${x}<span>${counts[x]??""}</span></a>`).join("")}</div>
+  <div class="main"><div class="top"><span class="co">الشركة العربية للنقل ${ic("down")}</span><div class="input" style="width:320px;margin-inline-start:auto;border-radius:999px">${ic("search")}<span class="muted">ابحث…</span></div><button class="btn" aria-label="الإشعارات">${ic("bell")}</button><button class="btn">${ic("user")}رنا</button></div>
+  <div class="content">${inner}</div></div></div></div>`;
+}
+const B2={
+ login:()=>`<div class="ui dB" style="height:100%;display:grid;place-items:center;background:linear-gradient(180deg,var(--tint) 0,var(--page) 55%)">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:18px"><img src="${LOGO}" alt="" style="width:56px"><div style="text-align:center"><div style="font-size:22px;font-weight:600">دايركت سيرفس للنقل</div><div class="muted">سجّل الدخول لمتابعة رحلات اليوم.</div></div>
+  <div class="panel" style="padding:26px 28px">${loginForm({w:360})}</div><div class="muted" style="font-size:12.5px">English · العربية</div></div></div>`,
+ dashboard:()=>shellB("لوحة المعلومات","لوحة المعلومات",`<div style="display:flex;align-items:center;gap:10px"><h3 style="font-size:20px;font-weight:600">صباح الخير، رنا</h3><div class="chips" style="margin-inline-start:auto"><span class="chip on">اليوم</span><span class="chip">الشهر حتى اليوم</span></div></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;flex:1;min-height:0">
+   <div class="panel" style="padding:4px 0;overflow:hidden"><div style="padding:10px 16px;font-weight:600">قائمة المتابعة <span class="muted num">7</span></div>
+   ${[["b-err","alert","فاتورة إلكترونية مرفوضة INV-02207","رفض نظام الفوترة: الرقم الضريبي للعميل غير صحيح","إصلاح وإعادة الإرسال"],["b-warn","alert","86 رحلة غير مفوترة بقيمة 15,904.300","أقدمها 2026-09-14 · البوتاس العربية 61 رحلة","اختيار وفوترة"],["b-info","clock","4 مسودات بانتظار الاعتماد","مجموعها 3,120.800","مراجعة"],["b-warn","truck","موقع الحسا بلا أسعار لشهر 2026-10","رحلات هذا الموقع لن تحفظ حتى إدخال السعر","إدخال الأسعار"],["b-warn","file","3 وثائق سائقين تنتهي خلال 30 يوماً","تأمين 10-11111 ينتهي 2026-10-28","عرض"],["b-warn","scale","7 رحلات بنقص يتجاوز 0.5٪","أعلاها 1.52٪ · سامي العبادي","تقرير النقص"]].map(r=>`<div style="display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:center;padding:11px 16px;border-top:1px solid var(--border)"><span class="badge ${r[0]}" style="grid-row:span 2">${ic(r[1])}</span><b style="font-weight:600">${r[2].replace(/([0-9][0-9,.\-]*)/g,'<span class="num">$1</span>')}</b><button class="btn" style="grid-row:span 2">${r[4]}</button><span class="muted" style="font-size:.88em">${r[3].replace(/([0-9][0-9,.\-%٪]*)/g,'<span class="num">$1</span>')}</span></div>`).join("")}</div>
+   <div style="display:flex;flex-direction:column;gap:12px"><div class="panel" style="padding:14px 16px"><div class="muted" style="font-size:.88em">اليوم</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:6px">${[["الرحلات","38"],["الحمولة","1,214.6 t"],["الإيراد","7,012.4"],["الهامش","2,390.1"]].map(([k,v])=>`<div><div class="muted" style="font-size:.84em">${k}</div><div class="num" style="font-size:20px;font-weight:600">${v}</div></div>`).join("")}</div>
+    <svg viewBox="0 0 320 70" style="width:100%;height:70px;margin-top:8px" role="img" aria-label="الرحلات اليومية لآخر 14 يوماً"><polyline fill="none" stroke="var(--primary)" stroke-width="2" points="0,48 25,40 50,44 75,30 100,34 125,22 150,36 175,28 200,18 225,26 250,20 275,14 300,24 320,16"/><circle cx="320" cy="16" r="3.5" fill="var(--primary)"/><line x1="0" y1="69" x2="320" y2="69" stroke="var(--border)"/></svg></div>
+    <div class="panel" style="padding:12px 16px"><div style="font-weight:600;margin-bottom:6px">النقد والبنوك</div>${[["الصندوق الرئيسي","3,412.750"],["البنك العربي · جاري","58,920.100"],["بنك الإسكان","12,004.000"]].map(r=>`<div class="ln"><span>${r[0]}</span>${N(r[1])}</div>`).join("")}</div></div></div>`),
+ grid:()=>shellB("العمليات","الرحلات",`<div style="display:flex;align-items:center;gap:10px"><h3 style="font-size:20px;font-weight:600">الرحلات</h3><span class="muted num">1,284</span><div style="margin-inline-start:auto;display:flex;gap:8px"><button class="btn">${ic("export")}تصدير</button><button class="btn pri">${ic("plus")}رحلة جديدة <span class="kbd" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">N</span></button></div></div>
+  <div class="chips">${[["الكل","1,284",1],["غير مفوترة","86"],["مفوترة","1,151"],["مسوّاة","932"],["نقص","7"],["مخالفة تعرفة","3"],["سعر يدوي","5"],["ملغاة","12"]].map(c=>`<span class="chip ${c[2]?"on":""}">${c[0]} <span class="num">${c[1]}</span></span>`).join("")}<span class="chip">${ic("filter")}أكتوبر 2026</span></div>
+  <div class="split"><div class="panel" style="overflow:auto">${tripTable(trips.slice(0,12),["rc","dt","drv","uw","rev","st"],{sel:1})}</div>
+   <aside class="panel" style="padding:14px 16px;overflow:hidden;display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><b class="num" style="font-size:17px">TRP-10481</b>${B.unb}${B.short}<button class="btn" style="margin-inline-start:auto">${ic("edit")}تعديل</button></div>
+    <div class="muted" style="font-size:.88em">سامي العبادي · شريك: النور للنقل · ${N("10-22222")}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">${[["العميل","شركة البوتاس العربية"],["المسار","غور الصافي ← ميناء العقبة"],["المحمّل","31.500 t"],["المنزّل","31.020 t"],["النقص","0.480 t · 1.52٪"],["سعر الشريك","2.750"]].map(([k,v])=>`<div><div class="muted" style="font-size:.82em">${k}</div><div>${/^[0-9]/.test(v)?N(v):v}</div></div>`).join("")}</div>
+    <div style="border-top:1px solid var(--border);padding-top:8px">${`<div class="ln"><span>الإيراد</span>${N("186.120")}</div><div class="ln"><span>تكلفة الشريك</span>${N("85.305")}</div><div class="ln tot"><span>الهامش</span>${N("100.815")}</div>`}</div>
+    <div style="font-weight:600">السجل</div>${history}</aside></div>`),
+ form:()=>shellB("العمليات","الرحلات",`<div style="display:flex;align-items:center;gap:10px"><h3 style="font-size:20px;font-weight:600">الرحلات</h3></div>
+  <div style="position:relative;flex:1;min-height:0"><div class="panel" style="height:100%;overflow:hidden;opacity:.45">${tripTable(trips.slice(0,12),["rc","dt","drv","cu","ls","uw","rev","st"])}</div>
+   <div style="position:absolute;inset-block:0;inset-inline-end:0;width:min(720px,100%);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(10,53,64,.16);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)"><b style="font-size:17px">رحلة جديدة</b><span class="muted" style="font-size:.86em">Esc للإغلاق</span><button class="btn" style="margin-inline-start:auto">إلغاء</button><button class="btn pri">حفظ <span class="kbd" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">Ctrl+S</span></button></div>
+    <div style="padding:16px 18px;overflow:hidden;flex:1">${tripFields(2)}</div>
+    <div style="display:flex;gap:18px;padding:12px 18px;border-top:1px solid var(--border);background:#F7FAFA;border-radius:0 0 12px 12px;font-size:.92em">${[["الإيراد","204.600"],["أجر السائق","119.350"],["الهامش","85.250"]].map(([k,v])=>`<div><span class="muted">${k} </span><b class="num">${v}</b></div>`).join("")}<span class="badge b-warn" style="margin-inline-start:auto">${ic("scale")}فائض وزن 2.100 t</span></div></div></div>`),
+ detail:()=>shellB("البيانات الأساسية","السائقون",`<div class="panel" style="padding:16px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:center"><div style="grid-row:span 2;width:52px;height:52px;border-radius:50%;background:var(--tint);display:grid;place-items:center;color:var(--primary-dark);font-weight:600;font-size:18px">أص</div><div style="display:flex;gap:8px;align-items:center"><b style="font-size:20px">أحمد صالح</b>${`<span class="badge b-ok">${ic("check")}نشط</span><span class="badge b-warn">${ic("alert")}التأمين ينتهي 2026-10-28</span>`}</div><div style="grid-row:span 2;display:flex;gap:8px"><button class="btn">كشف حساب</button><button class="btn pri">${ic("edit")}تعديل</button></div><div class="muted">${N("10-11111")} · فولفو FH · ${N("32")} طن · أسطول خاص</div></div>
+  <div style="display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;flex:1;min-height:0"><nav style="display:flex;flex-direction:column;gap:2px;font-size:.92em">${["الحساب","البيانات والشاحنة","الرحلات","السلف والتسويات","الوثائق","السجل"].map((x,i)=>`<a style="padding:7px 10px;border-radius:8px;${i===0?"background:var(--tint);color:var(--primary-dark);font-weight:600":""}">${x}</a>`).join("")}</nav>
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0;overflow:hidden"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">${acct.map(([k,v],i)=>`<div class="panel" style="padding:12px 14px"><div class="muted" style="font-size:.86em">${k}</div><div class="num" style="font-size:20px;font-weight:600;${i===2?"color:var(--primary)":""}">${v}</div></div>`).join("")}</div>
+   <div class="panel" style="padding:14px 16px"><div style="font-weight:600;margin-bottom:10px">البيانات والشاحنة</div>${facts(4)}</div>
+   <div class="panel" style="overflow:hidden"><div style="font-weight:600;padding:12px 16px 6px">آخر الرحلات</div>${tripTable(trips.filter(t=>t[2]==="أحمد صالح"),["rc","dt","cu","ls","uw","wg","st"])}</div></div></div>`),
+};
+
+/* ------------------------------------------------------------------ C · Command */
+function shellC(active,tabs,inner){
+  return `<div class="ui dC"><div class="shell"><div class="bar"><span class="brand"><img src="${LOGO}" alt="">دايركت سيرفس</span>${groups.map(([i,n])=>`<a class="${n===active?"on":""}">${n}${groups.find(g=>g[1]===n)[2]?ic("down"):""}</a>`).join("")}
+  <div class="cmdk">${ic("search")}<span>انتقل أو نفّذ أمراً…</span><span class="kbd" style="margin-inline-start:auto">Ctrl K</span></div><a aria-label="الإشعارات">${ic("bell")}</a><a>${ic("user")}رنا</a></div>
+  <div class="wtabs">${tabs.map((t,i)=>`<span class="wtab ${i===tabs.length-1?"on":""}">${t}${i?`<span class="muted" aria-label="إغلاق">×</span>`:""}</span>`).join("")}</div><div class="content">${inner}</div></div></div>`;
+}
+const C={
+ login:()=>`<div class="ui dC" style="height:100%;display:grid;grid-template-columns:480px 1fr;background:var(--surface)">
+  <div style="padding:56px 64px;display:flex;flex-direction:column;justify-content:center;gap:22px;border-inline-end:1px solid var(--border)"><div style="display:flex;gap:10px;align-items:center;font-weight:600;font-size:18px"><img src="${LOGO}" alt="" style="width:34px">دايركت سيرفس للنقل</div><div><div style="font-size:24px;font-weight:600">تسجيل الدخول</div><div class="muted">لوحة المفاتيح تكفي: Tab للتنقل وEnter للدخول.</div></div>${loginForm({w:350})}</div>
+  <div style="position:relative;overflow:hidden;background:var(--page)"><svg viewBox="0 0 400 380" style="position:absolute;inset-inline-start:-40px;top:60px;width:760px;opacity:1" aria-hidden="true"><path d="M30 20 L190 190 L30 360 L110 360 L270 190 L110 20Z" fill="var(--tint)"/><path d="M160 20 L320 190 L160 360 L240 360 L400 190 L240 20Z" fill="#D7E4E6"/></svg>
+   <div style="position:absolute;bottom:40px;inset-inline-end:48px;max-width:360px" ><div style="font-weight:600;font-size:18px;color:var(--primary-dark)">من سند الوزن إلى القيد في دقائق</div><div class="muted">${N("Ctrl K")} يفتح أي رحلة أو فاتورة أو حساب برقمها.</div></div></div></div>`,
+ dashboard:()=>shellC("لوحة المعلومات",["لوحة المعلومات"],`<div class="toolbar"><h3>لوحة المعلومات</h3><span class="seg"><span>اليوم</span><span class="on">الشهر حتى اليوم</span></span><span class="muted" style="margin-inline-start:auto;font-size:13px">تتحدث مباشرة · آخر تحديث ${N("10:44")}</span><button class="btn">${ic("edit")}ترتيب البطاقات</button></div>
+  <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;overflow:hidden">
+   ${[["الإيراد","74,210.600","+8.2٪ عن سبتمبر"],["الهامش","25,494.400","34.4٪ من الإيراد"],["التحصيلات","48,215.500","78٪ من المفوتر"],["الرحلات / الحمولة","412 · 13,118 t","متوسط 31.84 t"]].map(([k,v,s])=>`<div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px"><div class="muted" style="font-size:.86em">${k}</div><div class="num" style="font-size:22px;font-weight:600">${v}</div><div class="muted" style="font-size:.82em">${s.replace(/([+0-9][0-9.,٪t ]*)/g,'<span class="num">$1</span>')}</div></div>`).join("")}
+   <div style="grid-column:span 2;border:1px solid var(--border);border-radius:6px;overflow:hidden"><div style="padding:9px 14px;font-weight:600;border-bottom:1px solid var(--border)">التنبيهات</div><table class="grid"><tbody>${[["b-err","alert","فواتير إلكترونية مرفوضة","1"],["b-warn","alert","رحلات غير مفوترة","86"],["b-err","clock","ذمم متأخرة","9"],["b-info","file","مسودات للاعتماد","4"],["b-warn","truck","مواقع بلا أسعار 2026-10","1"],["b-warn","scale","نقص / مخالفة تعرفة / مراجعة","7 · 3 · 2"]].map(r=>`<tr><td><span class="badge ${r[0]}">${ic(r[1])}${r[2].replace(/([0-9][0-9-]*)/g,'<span class="num">$1</span>')}</span></td><td class="n">${N(r[3])}</td><td class="n"><span class="kbd">↵</span></td></tr>`).join("")}</tbody></table></div>
+   <div style="grid-column:span 2;border:1px solid var(--border);border-radius:6px;padding:10px 14px"><div style="font-weight:600;margin-bottom:6px">التقارير المثبتة</div>${[["النقص الشهري","0.31%",31,"ok","ضمن الحد"],["أيام التحصيل","47",78,"warn","تحذير > 45"],["تكلفة الشركاء من الإيراد","13.2%",44,"ok","ضمن الحد"],["قيود معلقة","3",90,"err","تجاوز > 0"]].map(r=>`<div style="display:grid;grid-template-columns:150px 1fr 70px auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span>${r[0]}</span><div style="height:8px;background:#EEF1F0;border-radius:4px"><div style="height:8px;border-radius:4px;width:${r[2]}%;background:var(--${r[3]==="ok"?"primary":r[3]})"></div></div><b class="num" style="text-align:end">${r[1]}</b><span class="badge b-${r[3]}">${ic(r[3]==="ok"?"check":"alert")}${r[4]}</span></div>`).join("")}</div>
+   <div style="grid-column:span 4;display:flex;gap:12px">${[["الصندوق الرئيسي","3,412.750"],["البنك العربي · جاري","58,920.100"],["بنك الإسكان","12,004.000"]].map(r=>`<div style="flex:1;border:1px solid var(--border);border-radius:6px;padding:9px 14px;display:flex;justify-content:space-between">${ic("cash")}<span style="margin-inline-end:auto;margin-inline-start:8px">${r[0]}</span>${N(r[1])}</div>`).join("")}</div></div>`),
+ grid:()=>shellC("العمليات",["لوحة المعلومات","INV-02211","الرحلات"],`<div class="toolbar"><h3>الرحلات</h3><span class="seg"><span class="on">مضغوط</span><span>مريح</span></span><button class="btn">${ic("filter")}أعمدة</button><button class="btn">${ic("export")}Excel</button><button class="btn">${ic("export")}PDF</button><span style="margin-inline-start:auto" class="muted">${N("3")} محددة</span><button class="btn">إضافة إلى فاتورة</button><button class="btn pri">${ic("plus")}رحلة <span class="kbd" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">N</span></button></div>
+  <div class="views">${["كل الرحلات","غير المفوترة","هذا الأسبوع · البوتاس","تحتاج مراجعة","+ حفظ العرض"].map((x,i)=>`<span class="${i===1?"on":""}">${x}</span>`).join("")}</div>
+  <div style="flex:1;overflow:auto">${tripTable(trips.filter(t=>t[14].includes("unb")).concat(trips.slice(5,13)),["rc","dt","drv","pl","cu","ls","us","mat","lw","uw","pr","rt","rev","wg","st"],{check:1,filters:1,sel:0,foot:1})}</div>`),
+ form:()=>shellC("العمليات",["لوحة المعلومات","الرحلات","رحلة جديدة"],`<div class="toolbar"><h3>رحلة جديدة</h3><span class="muted" style="font-size:13px">مسودة محفوظة محلياً</span><span style="margin-inline-start:auto"></span><button class="btn">إلغاء <span class="kbd">Esc</span></button><button class="btn">حفظ وجديد <span class="kbd">Ctrl ↵</span></button><button class="btn pri">حفظ</button></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr);flex:1;min-height:0"><div style="padding:16px 20px;overflow:hidden;max-width:1060px">
+   <div class="banner" style="background:var(--info-bg);color:var(--info);border-radius:6px;margin-bottom:12px">${ic("lock")}هذه الرحلة جديدة. عند فتح رحلة محفوظة يظهر هنا من يعدّلها الآن.</div>${tripFields(4)}</div></div>
+  <div style="display:flex;align-items:center;gap:22px;padding:10px 20px;border-top:1px solid var(--border);background:#F4F7F6">${[["كمية الفوترة","34.100 t"],["الإيراد","204.600"],["أجر السائق","119.350"],["تكلفة الشريك","0.000"],["الهامش","85.250"]].map(([k,v],i)=>`<div><span class="muted" style="font-size:.86em">${k} </span><b class="num" style="${i===4?"color:var(--primary)":""}">${v}</b></div>`).join("")}<span class="badge b-warn" style="margin-inline-start:auto">${ic("scale")}المنزّل أكبر من المحمّل × 1.02</span></div>`),
+ detail:()=>shellC("البيانات الأساسية",["لوحة المعلومات","الرحلات","أحمد صالح"],`<div class="toolbar"><h3>أحمد صالح</h3><span class="badge b-ok">${ic("check")}نشط</span><span class="badge b-warn">${ic("alert")}التأمين ينتهي 2026-10-28</span><span style="margin-inline-start:auto"></span><button class="btn">كشف حساب</button><button class="btn">سلفة</button><button class="btn">تسوية</button><button class="btn pri">${ic("edit")}تعديل <span class="kbd" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">E</span></button></div>
+  <div class="views">${["نظرة عامة","الرحلات","السلف","التسويات","الوثائق"].map((x,i)=>`<span class="${i===0?"on":""}">${x}</span>`).join("")}</div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;flex:1;min-height:0"><div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px;overflow:hidden">
+   <div style="display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:6px">${acct.map(([k,v],i)=>`<div style="padding:10px 14px;${i?"border-inline-start:1px solid var(--border)":""}"><div class="muted" style="font-size:.86em">${k}</div><div class="num" style="font-size:19px;font-weight:600">${v}</div></div>`).join("")}</div>
+   ${facts(4)}
+   <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">${tripTable(trips.filter(t=>t[2]==="أحمد صالح"),["rc","dt","cu","ls","us","uw","rt","wg","st"])}</div></div>
+   <aside style="border-inline-start:1px solid var(--border);padding:12px 16px;overflow:hidden;background:#FBFCFC"><div style="display:flex;justify-content:space-between;align-items:center"><b>السجل</b><span class="kbd">H</span></div>${history}</aside></div>`),
+};
+
+const DIRS={
+ A:{name:"A · Ledger",fn:A,title:"Ledger — the accountant's book",lead:"A fixed dark side menu holds all six PRD groups, always visible. Pages are dense and quiet, like a ledger: hairline borders, square corners, no shadows. Data entry happens on the page itself, so the quick-entry strip sits directly above the trips grid.",
+  points:["Most rows on screen (32 px): about 15 trips visible at 1280 × 720.","Arabic menu on the right in the brand's dark teal, which gives the app a strong frame. Content stays white and calm.","Each record has its own page; history and links open in a side panel (UX-21).","Risk: newcomers see the whole menu at once, and the density can tire people who mostly read."],
+  tokens:[["Base text","14 px · line 1.5"],["Table row / control","32 px / 32 px"],["Spacing scale","4 · 8 · 12 · 16 · 24"],["Corner radius","3 px everywhere"],["Elevation","none, 1 px borders only"],["Side menu","228 px, #0A3540"],["Status badges","square tag, icon + text"]]},
+ B:{name:"B · Dispatch board",fn:B2,title:"Dispatch board — list and detail side by side",lead:"A narrow icon rail switches between the groups, and a light second column lists that group's pages with live counts. Lists open the selected record in a detail pane beside them, and new records open in a drawer, so the list never disappears. Panels are rounded and filters are pills.",
+  points:["Fastest for checking records one after another: arrow keys move through the list and the pane follows.","The dashboard is a follow-up queue: each alert has its next action written on its button.","Roomier rows (40 px) are easier to read, especially in Arabic with diacritics in names.","Risk: the detail pane takes width from the grid, so the 15-column trips list needs the pane closed or fewer columns."],
+  tokens:[["Base text","14.5 px · line 1.5"],["Table row / control","40 px / 36 px"],["Spacing scale","8 · 12 · 16 · 24 · 32"],["Corner radius","10 px panels · 8 px controls · pills for filters and badges"],["Elevation","drawers only (one soft shadow)"],["Navigation","68 px icon rail + 200 px page list"],["Status badges","pill, icon + text"]]},
+ C:{name:"C · Command",fn:C,title:"Command — keyboard and tabs",lead:"Navigation moves to a top bar of groups, which gives every page the full screen width. Open records become tabs, like documents, so a clerk can keep an invoice open while checking trips. A Ctrl+K command bar opens any record by its number or runs an action. Toolbars, saved views and visible keyboard hints are part of every page.",
+  points:["Widest grids: all 15 trip columns fit at 1280 px, plus a filter row under the headers.","Saved views (\"Unbilled\", \"This week · Potash\") turn the PRD filter lists into one click.","The trip form keeps its live totals in a fixed bar at the bottom, always in view while tabbing through fields.","Risk: top menus hold fewer items than a side menu, so deep groups (Accounting) need drop-down menus, and tabs need limits."],
+  tokens:[["Base text","14 px · line 1.5"],["Table row / control","36 px / 34 px (switch to 30 / 30 for compact)"],["Spacing scale","4 · 8 · 12 · 16 · 20 · 24"],["Corner radius","6 px controls and frames"],["Elevation","none; record tabs and toolbars give structure"],["Top bar","50 px, #0A3540 · record tabs 38 px"],["Status badges","rounded tag, icon + text"]]},
+};
+const SCREENS=[["login","Sign-in"],["dashboard","Dashboard"],["grid","Data grid · trips"],["form","Form · new trip"],["detail","Detail · driver"]];
+const NOTES={login:"Sign-in leads to the mandatory authenticator code step (FR-177). No social sign-in.",dashboard:"Cards follow FR-137…FR-141: month-to-date figures, alert cards that open filtered lists, cash and bank balances, pinned reports with thresholds.",grid:"Trips with the quick-entry row (US-01): price from the tariff and wage from the monthly site rate, with their source shown. Status is always icon + text (UX-05).",form:"The full trip form with live calculation (UX-17) and a non-blocking weight warning (FR-002). Values are the PRD's own example: 32.000 t loaded, price 6.000, rate 3.500.",detail:"Driver profile with truck details, account figures, document expiry alert and the record history (FR-153, FR-156, UX-21)."};
+let dir="A",scr="grid";
+try{const s=JSON.parse(localStorage.getItem("ds-step5")||"{}");if(DIRS[s.dir])dir=s.dir;if(SCREENS.some(x=>x[0]===s.scr))scr=s.scr;}catch(e){}
+const host=document.getElementById("direction");
+function render(){
+  const d=DIRS[dir];
+  document.querySelectorAll(".pick").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.dir===dir)));
+  host.innerHTML=`<div class="rationale"><div><h2>${d.title}</h2><p>${d.lead}</p><ul>${d.points.map(p=>`<li>${p}</li>`).join("")}</ul></div>
+   <table class="tokens" aria-label="Tokens of direction ${d.name}"><tbody>${d.tokens.map(([k,v])=>`<tr><th>${k}</th><td>${v.replace(/(#[0-9A-F]{6}|\d+(?:\.\d+)? ?px)/g,"<code>$1</code>")}</td></tr>`).join("")}<tr><th>Fixed</th><td>Brand colours, IBM Plex Sans Arabic / Inter, light theme, RTL</td></tr></tbody></table></div>
+   <div class="tabs" role="tablist" aria-label="Screen">${SCREENS.map(([k,l])=>`<button class="tab" role="tab" aria-selected="${k===scr}" data-scr="${k}">${l}</button>`).join("")}</div>
+   <div class="frame"><div class="frame-bar"><i></i><i></i><i></i><span>app.directservice.jo/${scr==="login"?"sign-in":"c/7kQ2m9/"+({dashboard:"dashboard",grid:"trips",form:"trips/new",detail:"drivers/Xb81fQ0a"}[scr])}</span></div><div class="screen" lang="ar">${d.fn[scr]()}</div></div>
+   <p class="note">${NOTES[scr]} Shown at 1180 × 720 px; on a phone, scroll the frame sideways.</p>`;
+  host.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{scr=t.dataset.scr;save();render();host.querySelector(`[data-scr="${scr}"]`).focus();}));
+}
+function save(){try{localStorage.setItem("ds-step5",JSON.stringify({dir,scr}))}catch(e){}}
+document.querySelectorAll(".pick").forEach(b=>b.addEventListener("click",()=>{dir=b.dataset.dir;save();render();}));
+render();
+})();
+</script>

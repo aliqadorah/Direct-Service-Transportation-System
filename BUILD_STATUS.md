@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 10 Oct 2026 (step 4 · B4 done; step 5 design directions in progress; next backend block: B5 Trips)_
+_Last updated: 10 Oct 2026 (step 4 · B4 done; step 5 design directions presented — waiting for the owner's choice; next backend block: B5 Trips)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -25,7 +25,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (**approved 8 Oct 2026**, seeded in B2) |
 | Design | `docs/design/Database_Design_Revision5.md` |
 | 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md`, `docs/step4/B4_Pricing.md` (delivery, tests, code + security review) |
-| 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions within the brand — in progress) |
+| 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions within the brand — **waiting for the owner's choice**; published privately at https://claude.ai/artifact/JkisN139zLE9tGYCGKmDit) |
 | API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
 
 ## Completed steps
@@ -43,7 +43,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - **Step 4 · B4 — Pricing: done (10 Oct 2026).** Tariffs (customer/partner; keys or All; price > 0 with the currency's decimals; validity; add/edit/archive/restore; unique per keys + start incl. archived; import/export), resolution (specificity 8/4/2/1, tie → latest Valid from) in `PricingRules` + `PricingResolver`, rate history on every change (`RateHistoryLog`, trn.TRN_RateHistory), monthly site rates (month strip None/Partial/Complete, month entry for all active sites, no inheritance, warning when the month has trips, clearing refused while trips use the site, required row versions), missing-rates data for the dashboard, trip-form price quote, FR-030 driver-rate rules ready for B5. 17 endpoints. 208 tests passing. Independent code + security review: no High; M1–M4, L5–L7, L9 fixed (`docs/step4/B4_Pricing.md`). OpenAPI re-exported (196 paths), Redocly clean.
 
 ## Current step
-- **Step 5 — design directions: in progress** (`docs/step5/`); the build stops there for the owner's choice. Step 6 mockups follow the choice; no UI code before mockup approval.
+- **Step 5 — design directions: presented 10 Oct 2026, waiting for the owner's choice** (A Ledger, B Dispatch board, C Command — `docs/step5/Design_Directions.md`). Step 6 mockups follow the choice; no UI code before mockup approval.
 - Backend may continue meanwhile with **Step 4 · B5 — Trips** (step 2 §10): trip form/quick entry, calculations, validation, pricing via `PricingResolver`/`PricingRules`, wage/partner-cost posting, edit/void, import, history (FR-001…018, FR-022…025, FR-031…033; PRD 7.1, 8.2).
 
 ## Resume here (for a new session)
