@@ -5,6 +5,7 @@ using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
+using DirectService.Transportation.Application.Pricing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.Application;
@@ -69,6 +70,13 @@ public static class DependencyInjection
         services.AddScoped<SiteService<Domain.Trn.UnloadingSite>>(sp => sp.GetRequiredService<UnloadingSiteService>());
         services.AddScoped<OwnershipTypeService>();
         services.AddScoped<MasterExchangeService>();
+
+        // Pricing (B4)
+        services.AddScoped<RateHistoryLog>();
+        services.AddScoped<TariffService>();
+        services.AddScoped<MonthlyRateService>();
+        services.AddScoped<PricingResolver>();
+        services.AddScoped<PricingExchangeService>();
         return services;
     }
 }

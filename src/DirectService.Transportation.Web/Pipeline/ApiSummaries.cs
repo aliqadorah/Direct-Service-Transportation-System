@@ -238,6 +238,25 @@ internal static class ApiSummaries
         ["PUT /api/v1/companies/{company}/column-views/{viewKey}"] = "Save the current user's column view of a list",
         ["POST /api/v1/companies/{company}/column-views/{viewKey}/reset"] = "Remove the personal column view (back to the company default)",
         ["PUT /api/v1/companies/{company}/column-views/{viewKey}/default"] = "Save the company default column view of a list",
+
+        // Pricing (B4)
+        ["GET /api/v1/companies/{company}/tariffs/"] = "List customer and partner tariff lines with key filters (or \"all\"), validity date, search, status, sort and paging (FR-019)",
+        ["GET /api/v1/companies/{company}/tariffs/export"] = "Export tariff lines to Excel or CSV (FR-019)",
+        ["POST /api/v1/companies/{company}/tariffs/import/preview"] = "Preview a tariff import: column matching, duplicates and problems per row",
+        ["POST /api/v1/companies/{company}/tariffs/import"] = "Import tariff lines (strict: all rows or none; history written per line)",
+        ["GET /api/v1/companies/{company}/tariffs/{tariff}"] = "Get a tariff line with its rate history (FR-026)",
+        ["GET /api/v1/companies/{company}/tariffs/{tariff}/history"] = "Rate history of a tariff line: added, edited old → new, archived, restored (FR-026)",
+        ["POST /api/v1/companies/{company}/tariffs/"] = "Add a tariff line (a repeated clientId returns the line already created)",
+        ["PUT /api/v1/companies/{company}/tariffs/{tariff}"] = "Edit a tariff line; saved trips keep their prices (FR-026)",
+        ["POST /api/v1/companies/{company}/tariffs/{tariff}/archive"] = "Archive a tariff line (no longer used for new trips)",
+        ["POST /api/v1/companies/{company}/tariffs/{tariff}/restore"] = "Restore an archived tariff line",
+        ["GET /api/v1/companies/{company}/monthly-rates/months"] = "Month strip: no rates / partial / complete per month over the active loading sites (FR-028)",
+        ["GET /api/v1/companies/{company}/monthly-rates/missing"] = "Active loading sites without rates in the current (or given) month — dashboard warning (FR-037)",
+        ["GET /api/v1/companies/{company}/monthly-rates/{month}"] = "Rates of a month (YYYY-MM) for every active loading site, with trip counts (FR-027, FR-029)",
+        ["PUT /api/v1/companies/{company}/monthly-rates/{month}"] = "Save the rates of a month; warns when the month has trips, refuses clearing a site with trips (FR-034, FR-035)",
+        ["GET /api/v1/companies/{company}/monthly-rates/{month}/history"] = "Rate history of a month or of one loading site in it: old value, new value, user, time (FR-036)",
+        ["GET /api/v1/companies/{company}/monthly-rates/{month}/export"] = "Export the rates of a month to Excel or CSV (FR-028)",
+        ["GET /api/v1/companies/{company}/pricing/quote"] = "Prices for the trip form: customer price and partner rate from the tariffs, driver rate from the monthly site rates (FR-006, FR-022, FR-030)",
     };
 
     public static string Key(string method, string? route) => $"{method} /{route?.TrimStart('/')}";

@@ -351,20 +351,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
         return (prepared, preview);
     }
 
-    private static Dictionary<string, string> ParseMapping(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, string>(StringComparer.Ordinal);
-        try
-        {
-            var map = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? [];
-            if (map.Count > 200 || map.Any(m => m.Key.Length > 60 || m.Value is null || m.Value.Length > 200)) throw new JsonException();
-            return new Dictionary<string, string>(map, StringComparer.Ordinal);
-        }
-        catch (JsonException)
-        {
-            throw Fail.Field("mapping", ErrorCodes.ValidationFormat, "mapping");
-        }
-    }
+    private static Dictionary<string, string> ParseMapping(string? json) => ImportMapping.Parse(json);
 
     private sealed record Item(Prepared Prepared, IReadOnlyList<(string Key, string? Value)> Unique);
 

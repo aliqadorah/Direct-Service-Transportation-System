@@ -71,6 +71,9 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
 
     public string Token<T>(Guid publicId) => tokens.Encode<T>(publicId);
 
+    /// <summary>The PublicId of a token of type <typeparamref name="T"/>, or null when malformed or of another type.</summary>
+    public Guid? Decode<T>(string? token) => tokens.Decode<T>(token);
+
     /// <summary>
     /// Saves a new record. When the create carried a client id and the save fails (two identical requests racing, review M4), the
     /// record created by the other request is returned if it is in this company; a client id used elsewhere is refused (400).

@@ -99,6 +99,13 @@ public static class ErrorCatalog
         [ErrorCodes.FieldCannotRequire] = ("الحقل «{0}» لا يمكن جعله مطلوباً دائماً لأن قواعد العمل تمنعه في بعض الحالات.", "Field «{0}» cannot be made always required because the business rules forbid it in some cases."),
         [ErrorCodes.OwnershipFleetInUse] = ("لا يمكن تحويل نوع الملكية إلى أسطول خاص لأن {0} سائقاً عليه مرتبطون بشركاء.", "The ownership type cannot become own fleet because {0} of its drivers are linked to partners."),
         [ErrorCodes.PendingNoHandler] = ("لا يمكن إعادة ترحيل هذا النوع من المستندات في هذا الإصدار.", "This document type cannot be re-posted in this version."),
+        // Pricing (B4)
+        [ErrorCodes.TariffDuplicate] = ("يوجد بند تعرفة بنفس المفاتيح وتاريخ البدء (بما في ذلك البنود المؤرشفة). عدّل البند الموجود أو استعده.", "A tariff line with the same keys and start date already exists (archived lines included). Edit or restore that line."),
+        [ErrorCodes.TariffDuplicateInFile] = ("بند تعرفة مكرر في الملف (نفس المفاتيح وتاريخ البدء).", "Duplicate tariff line in the file (same keys and start date)."),
+        [ErrorCodes.RatesInUse] = ("لا يمكن مسح أسعار الموقع «{0}» للشهر {1} لأن عليه {2} رحلة.", "The rates of site «{0}» for {1} cannot be cleared because {2} trip(s) use them."),
+        [ErrorCodes.RatesMonthHasTrips] = ("الشهر {0} فيه رحلات محفوظة؛ الأسعار الجديدة تطبق على الرحلات الجديدة فقط.", "Month {0} already has trips; only new trips use the new rates."),
+        [ErrorCodes.RateMissing] = ("لا يوجد سعر سائق لموقع التحميل «{0}» للشهر {1} ({2}).", "There is no driver rate for loading site «{0}» in {1} ({2})."),
+        [ErrorCodes.RateManualNotAllowed] = ("إدخال سعر سائق يدوي يتطلب صلاحية إدارة البيانات الأساسية.", "Entering a manual driver rate requires the master-data permission."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -208,4 +215,11 @@ public static class ErrorCodes
     public const string FieldConditional = "field.conditional";
     public const string FieldCannotRequire = "field.cannotRequire";
     public const string OwnershipFleetInUse = "ownership.fleetInUse";
+
+    public const string TariffDuplicate = "tariff.duplicate";
+    public const string TariffDuplicateInFile = "tariff.duplicateInFile";
+    public const string RatesInUse = "rates.inUse";
+    public const string RatesMonthHasTrips = "rates.monthHasTrips";
+    public const string RateMissing = "rate.missing";
+    public const string RateManualNotAllowed = "rate.manualNotAllowed";
 }

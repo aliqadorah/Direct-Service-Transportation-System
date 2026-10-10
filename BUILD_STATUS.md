@@ -1,6 +1,6 @@
 # Direct Service Transportation — Build Status
 
-_Last updated: 8 Oct 2026 (step 4 · B3 done; next: B4 Pricing)_
+_Last updated: 10 Oct 2026 (step 4 · B4 done; step 5 design directions in progress; next backend block: B5 Trips)_
 
 ## Input files (exact copies of the approved Project docs)
 | File | Location in this folder | Project path |
@@ -24,7 +24,8 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 | 2 | `docs/step2/01_Architecture_and_Build_Plan.md` (ADR-01…18, API design, security model, build order), `02_Owner_Decisions_Step2.md` |
 | 3 | `docs/step3/01_Database_Implementation.md`, `02_Design_vs_Database_Verification.md` (no differences), `03_Chart_Of_Accounts_Template_DRAFT.md` (**approved 8 Oct 2026**, seeded in B2) |
 | Design | `docs/design/Database_Design_Revision5.md` |
-| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md` (delivery, tests, code + security review) |
+| 4 | `docs/step4/B1_Foundation_and_Identity.md`, `docs/step4/B2_Accounting_Core_and_Posting_Engine.md`, `docs/step4/B3_Master_Data.md`, `docs/step4/B4_Pricing.md` (delivery, tests, code + security review) |
+| 5 | `docs/step5/Design_Directions.md` + `docs/step5/design-directions.html` (three directions within the brand — in progress) |
 | API | `docs/api/openapi-v1.json` (exported OpenAPI 3.1, Redocly-linted with `redocly.yaml`) |
 
 ## Completed steps
@@ -39,13 +40,15 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 
 - **Step 4 · B3 — Master data: done (8 Oct 2026).** Drivers with truck (national ID/plate unique with Arabic digits folded, payment details by method, document-expiry alerts), customers and partners (name unique among active), materials, loading/unloading sites, ownership types (built-in Company protected); reference counts with protected deletion, archive/restore, rename by id, history old → new; import/export of every list (column matching, duplicates, strict); custom fields (trips/drivers/customers), standard-field configuration, form configuration, column views; idempotent creates by `clientId`. 100 endpoints. 181 tests passing. Independent code + security review: no High; M1–M4 and L2/L3/L5/L6 fixed (`docs/step4/B3_Master_Data.md`). Also fixed a B1 audit bug: updates through the row-version check were logged as "Restore". OpenAPI re-exported (182 paths), Redocly clean.
 
+- **Step 4 · B4 — Pricing: done (10 Oct 2026).** Tariffs (customer/partner; keys or All; price > 0 with the currency's decimals; validity; add/edit/archive/restore; unique per keys + start incl. archived; import/export), resolution (specificity 8/4/2/1, tie → latest Valid from) in `PricingRules` + `PricingResolver`, rate history on every change (`RateHistoryLog`, trn.TRN_RateHistory), monthly site rates (month strip None/Partial/Complete, month entry for all active sites, no inheritance, warning when the month has trips, clearing refused while trips use the site, required row versions), missing-rates data for the dashboard, trip-form price quote, FR-030 driver-rate rules ready for B5. 17 endpoints. 208 tests passing. Independent code + security review: no High; M1–M4, L5–L7, L9 fixed (`docs/step4/B4_Pricing.md`). OpenAPI re-exported (196 paths), Redocly clean.
+
 ## Current step
-- **Step 4 · B4 — Pricing** (step 2 §10): tariffs (customer and partner), specificity resolution, rate history; monthly loading-site driver rates with month strip (FR-019…037; PRD 7.2, 8.4).
-- Waiting (the build will stop there): **step 5 design directions** — not started yet; backend blocks continue first.
+- **Step 5 — design directions: in progress** (`docs/step5/`); the build stops there for the owner's choice. Step 6 mockups follow the choice; no UI code before mockup approval.
+- Backend may continue meanwhile with **Step 4 · B5 — Trips** (step 2 §10): trip form/quick entry, calculations, validation, pricing via `PricingResolver`/`PricingRules`, wage/partner-cost posting, edit/void, import, history (FR-001…018, FR-022…025, FR-031…033; PRD 7.1, 8.2).
 
 ## Resume here (for a new session)
 1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
-2. Next block: **B4** (see "Current step"). Requirements: PRD 7.2, 8.4, 6.2 and the FR-019…037 rows of `docs/step1/02_Traceability_Matrix.md`; tables trn.TRN_Tariffs (Specificity computed column, A-07/DT-07), trn.TRN_MonthlySiteRates, trn.TRN_RateHistory (append-only). Read `docs/step4/B2_*.md` (accounting services) and `docs/step4/B3_Master_Data.md` (master-data patterns: `MasterDataSupport`, `FieldRules`, `CustomFieldService`, idempotent creates, `RequireAnyPermission`/`RequireMember`). Tariff/rate writes need masters.manage (BR-004); manual rate overrides too.
+2. First check whether the owner has chosen a design direction (step 5, `docs/step5/Design_Directions.md`); if so, record the choice and do step 6 (full mockups of every PRD 13.5 screen in Arabic RTL with loading/empty/error/success states) and stop for approval. Backend next block: **B5 Trips** (see "Current step"). Requirements: PRD 7.1, 8.2, 6.1, 9.3–9.5 and the FR-001…018 rows of `docs/step1/02_Traceability_Matrix.md` plus the B5 parts of FR-022…025 and FR-031…033. Read `docs/step4/B4_Pricing.md`: use `PricingResolver.TariffAsync`/`MonthlyRateAsync` and `PricingRules.ResolveDriverRate`/`MustResolveAgain`; **read the monthly rate row WITH (UPDLOCK) inside the trip transaction** (B4 review M2); store tariff price, breach flag, rate/source/month at save (BR-030); partner trips: driver rate 0, RateSource 'Monthly' (DT-54); tariff lock (FR-025) via `PricingResolver.TariffLockAsync`, deviations audited; manual rate needs masters.manage (`rate.manualNotAllowed`).
 3. Module pattern (follow B1):
    - Services in `src/…Application/<Module>/` using `IAppDbContext`, `IRequestContext`, `IChangeContext.SetAction(entity, action, reason)` for audited business actions, `db.InTransactionAsync` for multi-save operations, `db.ExpectRowVersion` for updates, `Fail.*` / `Validator` for problems (codes + AR/EN messages in `Contracts/Errors/ErrorCatalog.cs` — a unit test requires every code to have both messages).
    - DTOs in `src/…Contracts/<Module>/` — identifiers are always URL tokens (`IUrlTokenService.Encode<T>`), never internal ids.
@@ -76,6 +79,7 @@ Run steps 3, 4, 7, 8, 9 without stopping. **Stop only for:** step 5 design direc
 - All items listed as settled in `Build_Brief.md`; `core.Users.Email` unique platform-wide.
 - Step 1 decisions D-01…D-18 (`docs/step1/03_Owner_Decisions.md`): D-01 namespaced permission keys; D-02 LayoutType default 'Claim'; D-03 tariff price / deduction > 0; D-04 rejected e-invoices resubmittable, Failed = Rejected + LastError; D-05 manual-entry edit = reverse + re-post; D-06 tariff lock lets masters.manage deviate; D-07 C-08…C-11 recommendations; D-08 tenant settings columns; D-09 Companies.Status; D-10 chart template drafted for approval; D-11 credits reduce only their invoice; D-12 TRIAL plan, trial end → Suspended → Cancelled; D-13 provider console for all staff, support window read-only; D-14 G-recommendations; D-15 AR documents e-invoiced; D-16 prefixes TRP-, CRN-, RCV-, ADV-, STL-, PPY-, JV-, BIL-, ARD-, PAY-, RTN-, JEX- (5 digits); D-17 assumptions accepted; D-18 help pages at the end.
 - DT-21 … DT-35 (B2 decisions taken without asking): **accepted by the owner on 8 Oct 2026.**
+- DT-36 … DT-49 (B3 decisions taken without asking): **accepted by the owner on 10 Oct 2026.** DT-50 … DT-64 (B4): open for owner review.
 - Step 2 decisions Q-01…Q-10 (`docs/step2/02_Owner_Decisions_Step2.md`): architecture approved; revision 5 option R5-A; idle timeout 30 min (5–1,440); absolute session lifetime 12 h (platform setting); password length 8–64; only Active companies count toward the plan; collation `Arabic_100_CI_AI_SC_UTF8`; PDF via HTML + headless Chromium; build order as proposed; git + Node.js yes, commit locally after each module, never push.
 
 ## Database design revision 5 (implemented)
@@ -132,6 +136,21 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 | DT-47 | Expiry alert window | Expired = before today; expiring = today … today + 30 days inclusive; "today" in the company time zone | as stated |
 | DT-48 | Partner on an own-fleet driver | Refused (a partner's truck is external fleet, BR-029); an ownership type with partner-linked drivers cannot become own fleet | as stated |
 | DT-49 | Idempotent create (API-05) | Implemented from B3 on: `clientId` GUID → PublicId; repeat → 200 with the record, new → 201; a client id that exists outside the company → 400 | as stated |
+| DT-50 | Read access to pricing (PRD 3.4 has no pricing view key) | (a) tariffs, monthly rates, their history and exports readable with masters.manage, trips.view, trips.edit or reports.view; quote with trips.edit or masters.manage; missing-rates warning any member; writes/imports masters.manage; (b) masters.manage only | (a) — trip viewers see prices and wages on trips anyway; the breach report (reports.view) needs tariffs |
+| DT-51 | Tariff delete | (a) archive/restore only (FR-019 lists archive; nothing references tariffs); (b) soft delete too | (a) — archived lines stay in the design's unique index, so an identical line is edited or restored instead |
+| DT-52 | Tariff edit semantics | (a) edit in place, old → new in TRN_RateHistory and core.AuditLogs; party type, keys and dates editable; (b) new version row per change | (a) — trips store their prices, so edits never alter saved trips (FR-026) |
+| DT-53 | Month-strip status | A site counts as rated with at least one of the two rates (design allows one); Complete = every active loading site rated; Partial = some; None = none (or no active site) | as stated |
+| DT-54 | Driver rate of partner trips | 0 regardless of the monthly table (7.1.1, FR-005); stored RateSource 'Monthly' (CHECK allows Monthly/Manual; nothing was typed) | as stated (applies in B5) |
+| DT-55 | Typed driver rate without masters.manage | No monthly rate → blocked with the missing-rate message (FR-030 "otherwise"); differs from the monthly rate → refused `rate.manualNotAllowed` (BR-004) | as stated (applies in B5) |
+| DT-56 | Dates used by pricing | Tariff validity checked on the trip date (FR-020); rate month = loading date's month (BR-029); the quote uses one for the other when only one is given | as stated |
+| DT-57 | Editing rates of past or closed months | Allowed (rates are configuration and never alter saved trips; trips cannot be posted into closed periods anyway) | as stated |
+| DT-58 | FR-034 "warns" | Non-blocking: GET shows `hasTrips` and trip counts per site so the UI warns before saving; the save response repeats the warning. "Trips" = non-void trips with that rate month | as stated |
+| DT-59 | FR-035 "clearing both rates" | Both empty → soft delete with reason "Rates cleared", refused while non-void trips of that site use the month; removing one of two rates is allowed | as stated |
+| DT-60 | Rate history format | Readable snapshots (names at the time, amounts invariant, All = empty) + action (Create/Update/Archive/Restore/Clear) and subject; RateHistory rows are not copied into core.AuditLogs (the tariff/rate rows are audited there) | as stated |
+| DT-61 | Decimals of prices and rates | Company currency decimals (3 for JOD; PRD 7.2.1 "Money, 3 decimals"), although the columns hold 4 | as stated |
+| DT-62 | Archived loading sites in the month grid | Keep and show their rates in months where they have them; get no new rates; the grid lists active sites | as stated |
+| DT-63 | "Save and print" of monthly rates (FR-028) | Excel/CSV now; PDF with the print engine in B6 (like DT-45) | as stated |
+| DT-64 | Concurrency on the monthly grid (B4 review M1) | Changing or clearing stored rates requires the row version (400 missing, 409 stale) | as stated — stricter than other PUTs (B3 L4 still open for those) |
 | DT-14 | Audit JSON for secret columns | `PasswordHash`, `SecurityStamp`, `TwoFactorSecret`, `CodeHash`, `TokenHash`, `ClientIdEncrypted`, `SecretKeyEncrypted` written as `"***"`; binary columns (logo) omitted | as stated |
 
 ## Extra indexes / constraints added beyond the design
@@ -150,6 +169,7 @@ See `docs/design/Database_Design_Revision5.md`: `TRN_Invoices.LayoutType` defaul
 `tools/design/parse_design.py` (design → model), `checks.py` (check constraints), `gen_efcore.py` (one-off source generation — do not re-run over hand-edited files), `verify_database.py` + `catalog.sql` (verification report), `selftest_verify.py`.
 
 ## Open issues
+- B4: trip save (B5) must read the monthly rate row with an update lock so clearing rates and saving a trip serialise (review M2); breach report RPT-04 (B10); monthly-rate PDF (B6); dashboard missing-rates card (B10); the UI must warn before saving a month with trips (L10).
 - B3 review suggestions not built: import preview should fold Arabic diacritics like the CI_AI collation (L1); make `rowVersion` required on PUT once the UI exists (L4); per-row queries in large driver imports (L7).
 - Development database: audit rows of B1/B2 updates written before the interceptor fix carry Action "Restore" instead of "Update" (test data only).
 - Posting source handlers to register in B5/B6/B8/B9 (`IPostingSourceHandler`); until then pending postings of those types report "cannot be re-posted in this version".

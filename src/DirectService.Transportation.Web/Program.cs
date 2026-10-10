@@ -118,6 +118,7 @@ company.MapSettingsEndpoints();
 company.MapLockEndpoints();
 company.MapAccountingEndpoints();
 company.MapMasterDataEndpoints();
+company.MapPricingEndpoints();
 app.MapHub<LiveHub>(LiveHub.Path);
 
 await app.RunAsync().ConfigureAwait(false);
