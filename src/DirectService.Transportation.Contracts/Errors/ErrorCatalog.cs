@@ -106,6 +106,16 @@ public static class ErrorCatalog
         [ErrorCodes.RatesMonthHasTrips] = ("الشهر {0} فيه رحلات محفوظة؛ الأسعار الجديدة تطبق على الرحلات الجديدة فقط.", "Month {0} already has trips; only new trips use the new rates."),
         [ErrorCodes.RateMissing] = ("لا يوجد سعر سائق لموقع التحميل «{0}» للشهر {1} ({2}).", "There is no driver rate for loading site «{0}» in {1} ({2})."),
         [ErrorCodes.RateManualNotAllowed] = ("إدخال سعر سائق يدوي يتطلب صلاحية إدارة البيانات الأساسية.", "Entering a manual driver rate requires the master-data permission."),
+        // Trips (B5)
+        [ErrorCodes.DateFuture] = ("الحقل «{0}» لا يمكن أن يكون في المستقبل.", "Field «{0}» cannot be in the future."),
+        [ErrorCodes.TripReceiptDuplicate] = ("رقم السند «{0}» مستخدم في رحلة أخرى.", "Receipt number «{0}» is already used by another trip."),
+        [ErrorCodes.TripInvoiced] = ("الرحلة {0} مفوترة في {1}. أعد الفاتورة أو ألغها أولاً.", "Trip {0} is invoiced on {1}. Return or void the invoice first."),
+        [ErrorCodes.TripSettled] = ("أجر الرحلة {0} مسوّى في {1}. ألغِ التسوية أولاً.", "The wage of trip {0} is settled in {1}. Void the settlement first."),
+        [ErrorCodes.TripIsVoid] = ("الرحلة {0} ملغاة.", "Trip {0} is void."),
+        [ErrorCodes.TariffLocked] = ("قفل التعرفة مفعّل: الانحراف عن سعر التعرفة {0} يحتاج صلاحية إدارة البيانات الأساسية.", "Tariff lock is on: deviating from the tariff price {0} requires the master-data permission."),
+        [ErrorCodes.TripWarnCapacity] = ("الوزن المحمّل {0} طن أكبر من حمولة الشاحنة {1} طن.", "Loaded weight {0} t is above the truck capacity of {1} t."),
+        [ErrorCodes.TripWarnUnloaded] = ("الوزن المنزّل أكبر من المحمّل × 1.02.", "Unloaded weight is above loaded weight × 1.02."),
+        [ErrorCodes.TripWarnDocument] = ("انتهت صلاحية {0} للسائق في {1}.", "The driver's {0} expired on {1}."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -222,4 +232,14 @@ public static class ErrorCodes
     public const string RatesMonthHasTrips = "rates.monthHasTrips";
     public const string RateMissing = "rate.missing";
     public const string RateManualNotAllowed = "rate.manualNotAllowed";
+
+    public const string DateFuture = "validation.futureDate";
+    public const string TripReceiptDuplicate = "trip.receiptDuplicate";
+    public const string TripInvoiced = "trip.invoiced";
+    public const string TripSettled = "trip.settled";
+    public const string TripIsVoid = "trip.void";
+    public const string TariffLocked = "tariff.locked";
+    public const string TripWarnCapacity = "trip.warnCapacity";
+    public const string TripWarnUnloaded = "trip.warnUnloaded";
+    public const string TripWarnDocument = "trip.warnDocument";
 }

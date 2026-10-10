@@ -58,11 +58,11 @@ internal static class ImportParse
         _ => null,
     };
 
-    public static ImportBatch Batch(string entityType, string fileName, int total, int imported, long userId) => new()
+    public static ImportBatch Batch(string entityType, string fileName, int total, int imported, long userId, string mode = "Strict") => new()
     {
         EntityType = entityType,
         FileName = fileName.Length <= 200 ? fileName : fileName[^200..],
-        Mode = "Strict",
+        Mode = mode,
         TotalRows = total,
         ImportedRows = imported,
         RejectedRows = total - imported,

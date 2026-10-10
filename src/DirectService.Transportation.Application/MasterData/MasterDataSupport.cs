@@ -178,7 +178,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     private static readonly HashSet<string> TechnicalColumns =
     [
         "Id", "TenantId", "CompanyId", "PublicId", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "IsDeleted", "DeletedAt",
-        "DeletedBy", "DeleteReason", "_reason",
+        "DeletedBy", "DeleteReason", "_reason", "JournalEntryId", "ReceiptNoKey",
     ];
 
     /// <summary>
@@ -217,7 +217,9 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
             var reason = p.New.TryGetValue("_reason", out var why) ? CustomFieldService.Text(why) : null;
             return new HistoryEntry(DateTime.SpecifyKind(p.Row.OccurredAt, DateTimeKind.Utc),
                 p.Row.UserId is long uid ? users.GetValueOrDefault(uid) : null, p.Row.Action, reason, changes);
-        }).ToList();
+        })
+        // Technical-only updates (e.g. the journal link set by a posting) are not business events of the record.
+        .Where(h => h.Action != "Update" || h.Changes.Count > 0 || h.Reason is not null).ToList();
     }
 
     private static readonly Dictionary<string, string> LinkColumns = new(StringComparer.Ordinal)
@@ -225,6 +227,13 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
         ["OwnershipTypeId"] = "OwnershipType",
         ["PartnerId"] = "Partner",
         ["ApArPartyId"] = "ApArParty",
+        ["DriverId"] = "Driver",
+        ["CustomerId"] = "Customer",
+        ["LoadingSiteId"] = "LoadingSite",
+        ["UnloadingSiteId"] = "UnloadingSite",
+        ["MaterialId"] = "Material",
+        ["InvoiceId"] = "Invoice",
+        ["SettlementId"] = "Settlement",
     };
 
     private async Task<Dictionary<(string, long), string>> LinkNamesAsync(IEnumerable<KeyValuePair<string, JsonElement>> values, CancellationToken ct)
@@ -255,7 +264,26 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
                          .Where(x => x.CompanyId == companyId && parties.Contains(x.Id)).Select(x => new { x.Id, x.Name }).ToListAsync(ct).ConfigureAwait(false))
                 result[("ApArPartyId", o.Id)] = o.Name;
         }
+        await AddNamesAsync<Driver>("DriverId", x => x.FullName).ConfigureAwait(false);
+        await AddNamesAsync<Customer>("CustomerId", x => x.Name).ConfigureAwait(false);
+        await AddNamesAsync<LoadingSite>("LoadingSiteId", x => x.Name).ConfigureAwait(false);
+        await AddNamesAsync<UnloadingSite>("UnloadingSiteId", x => x.Name).ConfigureAwait(false);
+        await AddNamesAsync<Material>("MaterialId", x => x.Name).ConfigureAwait(false);
+        await AddNamesAsync<Invoice>("InvoiceId", x => x.Number ?? "—").ConfigureAwait(false);
+        await AddNamesAsync<Settlement>("SettlementId", x => x.Number).ConfigureAwait(false);
         return result;
+
+        // Names of linked records of this company, soft-deleted ones included (history keeps names).
+        async Task AddNamesAsync<T>(string column, Expression<Func<T, string>> name) where T : AuditableEntity, ICompanyScoped
+        {
+            var ids = wanted.Where(w => w.Column == column).Select(w => w.Id).ToList();
+            if (ids.Count == 0) return;
+            var param = name.Parameters[0];
+            var select = Expression.Lambda<Func<T, KeyValuePair<long, string>>>(
+                Expression.New(typeof(KeyValuePair<long, string>).GetConstructor([typeof(long), typeof(string)])!, Expression.Property(param, nameof(AuditableEntity.Id)), name.Body), param);
+            foreach (var kv in await db.Set<T>().IgnoreQueryFilters().AsNoTracking().Where(x => x.CompanyId == companyId && ids.Contains(x.Id)).Select(select).ToListAsync(ct).ConfigureAwait(false))
+                result[(column, kv.Key)] = kv.Value;
+        }
     }
 
     private static string? Display(string column, JsonElement value, Dictionary<(string, long), string> names) =>

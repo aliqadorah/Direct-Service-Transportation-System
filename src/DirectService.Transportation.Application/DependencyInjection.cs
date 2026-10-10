@@ -6,6 +6,7 @@ using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Pricing;
+using DirectService.Transportation.Application.Trips;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.Application;
@@ -77,6 +78,13 @@ public static class DependencyInjection
         services.AddScoped<MonthlyRateService>();
         services.AddScoped<PricingResolver>();
         services.AddScoped<PricingExchangeService>();
+
+        // Trips (B5)
+        services.AddScoped<TripService>();
+        services.AddScoped<TripImportService>();
+        services.AddScoped<TripExportService>();
+        services.AddScoped<TripPostingHandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
         return services;
     }
 }

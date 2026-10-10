@@ -45,7 +45,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
         var activeSites = await db.Set<LoadingSite>().AsNoTracking().Where(s => s.Status == MasterCodes.Active).Select(s => s.Id).ToListAsync(ct).ConfigureAwait(false);
         var rated = await db.Set<MonthlySiteRate>().AsNoTracking().Where(r => months.Contains(r.RateMonth) && activeSites.Contains(r.LoadingSiteId))
             .GroupBy(r => r.RateMonth).Select(g => new { Month = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Month, x => x.Count, ct).ConfigureAwait(false);
-        var tripMonths = await db.Set<Trip>().AsNoTracking().Where(t => months.Contains(t.RateMonth) && t.Status != TripVoid)
+        var tripMonths = await db.Set<Trip>().AsNoTracking().Where(t => months.Contains(t.RateMonth) && t.Status != TripVoid && t.PartnerId == null)
             .Select(t => t.RateMonth).Distinct().ToListAsync(ct).ConfigureAwait(false);
         return months.Select(m =>
         {
@@ -80,7 +80,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
 
     /// <summary>Non-void trips per loading site whose rate month is <paramref name="month"/> (FR-034, FR-035).</summary>
     private async Task<Dictionary<long, int>> TripCountsAsync(string month, CancellationToken ct) =>
-        await db.Set<Trip>().AsNoTracking().Where(t => t.RateMonth == month && t.Status != TripVoid)
+        await db.Set<Trip>().AsNoTracking().Where(t => t.RateMonth == month && t.Status != TripVoid && t.PartnerId == null)
             .GroupBy(t => t.LoadingSiteId).Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct).ConfigureAwait(false);
 
@@ -164,7 +164,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
                 var cleared = work.Where(w => w.Action == "Clear").Select(w => w.Site.Id).ToList();
                 if (cleared.Count > 0)
                 {
-                    var used = await db.Set<Trip>().Where(t => t.RateMonth == m && t.Status != TripVoid && cleared.Contains(t.LoadingSiteId))
+                    var used = await db.Set<Trip>().Where(t => t.RateMonth == m && t.Status != TripVoid && t.PartnerId == null && cleared.Contains(t.LoadingSiteId))
                         .GroupBy(t => t.LoadingSiteId).Select(g => new { g.Key, Count = g.Count() }).FirstOrDefaultAsync(c).ConfigureAwait(false);
                     if (used is not null) throw Fail.Rule(ErrorCodes.RatesInUse, work.First(w => w.Site.Id == used.Key).Site.Name, m, used.Count);
                 }

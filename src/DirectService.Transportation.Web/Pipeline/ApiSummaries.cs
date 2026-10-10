@@ -256,6 +256,18 @@ internal static class ApiSummaries
         ["PUT /api/v1/companies/{company}/monthly-rates/{month}"] = "Save the rates of a month; warns when the month has trips, refuses clearing a site with trips (FR-034, FR-035)",
         ["GET /api/v1/companies/{company}/monthly-rates/{month}/history"] = "Rate history of a month or of one loading site in it: old value, new value, user, time (FR-036)",
         ["GET /api/v1/companies/{company}/monthly-rates/{month}/export"] = "Export the rates of a month to Excel or CSV (FR-028)",
+        ["GET /api/v1/companies/{company}/trips/"] = "Created Trips list: status, billing, settled, fleet, partner, flag and date filters, search, sort, paging and totals (FR-009)",
+        ["GET /api/v1/companies/{company}/trips/export"] = "Export the filtered trips to Excel or CSV with the company's labels and custom fields (FR-009, FR-017)",
+        ["GET /api/v1/companies/{company}/trips/recent"] = "The last ten trips saved by the current user (FR-008)",
+        ["GET /api/v1/companies/{company}/trips/quick-entry"] = "Quick-entry defaults: today and the driver, customer, material and route of the user's last trip (FR-007)",
+        ["GET /api/v1/companies/{company}/trips/{trip}"] = "Get a trip with its warnings and history (FR-015)",
+        ["GET /api/v1/companies/{company}/trips/{trip}/history"] = "History of a trip: created, edits old → new, voided, invoiced, settled (FR-015)",
+        ["POST /api/v1/companies/{company}/trips/"] = "Create a trip: validated, priced from tariffs and monthly rates, calculated, frozen and posted (FR-001…006, FR-016)",
+        ["PUT /api/v1/companies/{company}/trips/{trip}"] = "Edit an unbilled, unsettled trip in an open period; the entry is reversed and re-posted (FR-010, FR-032)",
+        ["POST /api/v1/companies/{company}/trips/{trip}/void"] = "Void a trip with a reason; reversal posted, record kept (FR-011)",
+        ["POST /api/v1/companies/{company}/trips/{trip}/clear-review"] = "Clear the Needs review flag after checking (FR-014)",
+        ["POST /api/v1/companies/{company}/trips/import/preview"] = "Preview a trip import: matched columns, valid, rejected, duplicate and needs-review rows (FR-013)",
+        ["POST /api/v1/companies/{company}/trips/import"] = "Import trips (strict: all or none; tolerant: valid rows, defaults flagged for review), logged as a batch (FR-013, FR-033)",
         ["GET /api/v1/companies/{company}/pricing/quote"] = "Prices for the trip form: customer price and partner rate from the tariffs, driver rate from the monthly site rates (FR-006, FR-022, FR-030)",
     };
 

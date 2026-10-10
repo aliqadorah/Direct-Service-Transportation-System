@@ -125,24 +125,24 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Requirement (short) | Pri | Mod | DB | Code | Screens | Tests | St |
 |---|---|---|---|---|---|---|---|---|
-| FR-001 | Create trip from full form or quick-entry row | M | M06 | TRN_Trips | TripService.Create | SCR-10, SCR-11 | U I E | ☐ |
-| FR-002 | Validate on save, block naming the field; warnings don't block | M | M06 | TRN_Trips, StandardFieldConfigs, CustomFieldDefinitions | TripValidator | SCR-10, SCR-11 | U I E | ☐ |
-| FR-003 | Selecting driver shows truck; capacity warning | M | M06/M04 | TRN_Drivers | TripService, DriverLookup | SCR-10, SCR-11 | U E | ☐ |
-| FR-004 | Fleet type from ownership type; partner from driver link | M | M06 | TRN_Trips.FleetClass/PartnerId, TRN_OwnershipTypes, TRN_Drivers.PartnerId | TripCalculator | SCR-10, SCR-11 | U | ☐ |
-| FR-005 | Live calculations (billing/wage qty, revenue, wage, partner cost, margin) | M | M06 | TRN_Trips (BillingQty, WageQty, Revenue, DriverWage, PartnerCost), CompanySettings TRN.BillOnUnloadedWeight / TRN.PayDriverOnLoadedWeight | TripCalculator | SCR-10, SCR-11 | U (EX-1) | ☐ |
-| FR-006 | Automatic pricing with source shown | M | M05/M06 | TRN_Tariffs, TRN_MonthlySiteRates | TariffResolver, DriverRateResolver | SCR-10, SCR-11 | U I | ◐ |
-| FR-007 | Quick-entry keyboard behaviour; remember last values per user | M | M06 | TRN_Trips.CreatedBy (G-12) | QuickEntryDefaults | SCR-10 | E | ☐ |
-| FR-008 | Last ten trips of the user with History/Edit | M | M06 | TRN_Trips, AuditLogs | TripQueries.Recent | SCR-10 | I E | ☐ |
-| FR-009 | Created Trips list: filters, search, paging, sort, columns, export | M | M06/M14 | TRN_Trips, TableColumnViews | TripQueries.List, ExportService | SCR-10 | I E P | ☐ |
-| FR-010 | Edit rules; reverse/re-post wage; rate kept unless site/month/driver change | M | M06/M07 | TRN_Trips, JournalEntries, EntryLines, Periods | TripService.Edit | SCR-11 | U I | ☐ |
-| FR-011 | Void with reason; reversal; blocked if invoiced/settled/closed | M | M06/M07 | TRN_Trips (Void*), JournalEntries | TripService.Void | SCR-11 | I E | ☐ |
-| FR-012 | Shortage and shortage %; flag above tolerance | M | M06 | TRN_Trips (ShortageWeight, ShortagePct, IsShortageFlagged), CompanySettings TRN.ShortageTolerancePct | TripCalculator | SCR-10, SCR-13 | U | ☐ |
-| FR-013 | Import xlsx/CSV/TSV/paste, mapping, preview, tolerant mode, import log | M | M06/M14 | TRN_Trips, ImportBatches | TripImportService | SCR-12 | U I E | ☐ |
-| FR-014 | Clear Needs review; recorded in history | M | M06 | TRN_Trips.NeedsReview, AuditLogs | TripService.ClearReview | SCR-10, SCR-11 | I | ☐ |
-| FR-015 | Trip history incl. invoice/credit note/settlement events | M | M06/M13 | AuditLogs | HistoryQueries | SCR-11 (history panel) | I | ☐ |
-| FR-016 | Wage accrual / partner cost entry on save | M | M07 | JournalEntries, EntryLines, PostingKeyMappings, TRN_Trips.JournalEntryId | PostingEngine (Trip) | — (no own screen; seen in SCR-34) | U I | ☐ |
-| FR-017 | Custom trip fields everywhere | M | M03/M06 | CustomFieldDefinitions, TRN_Trips.CustomValues | CustomFieldService | SCR-10, SCR-11, SCR-12, SCR-52 | I E | ☐ |
-| FR-018 | Trip statement for driver/customer/partner (print/export) | S | M12 | TRN_Trips | TripStatementReport | SCR-50, SCR-09 | I | ☐ |
+| FR-001 | Create trip from full form or quick-entry row | M | M06 | TRN_Trips | TripService.Create | SCR-10, SCR-11 | U I E | ☑ |
+| FR-002 | Validate on save, block naming the field; warnings don't block | M | M06 | TRN_Trips, StandardFieldConfigs, CustomFieldDefinitions | TripValidator | SCR-10, SCR-11 | U I E | ☑ |
+| FR-003 | Selecting driver shows truck; capacity warning | M | M06/M04 | TRN_Drivers | TripService, DriverLookup | SCR-10, SCR-11 | U E | ☑ |
+| FR-004 | Fleet type from ownership type; partner from driver link | M | M06 | TRN_Trips.FleetClass/PartnerId, TRN_OwnershipTypes, TRN_Drivers.PartnerId | TripCalculator | SCR-10, SCR-11 | U | ☑ |
+| FR-005 | Live calculations (billing/wage qty, revenue, wage, partner cost, margin) | M | M06 | TRN_Trips (BillingQty, WageQty, Revenue, DriverWage, PartnerCost), CompanySettings TRN.BillOnUnloadedWeight / TRN.PayDriverOnLoadedWeight | TripCalculator | SCR-10, SCR-11 | U (EX-1) | ☑ |
+| FR-006 | Automatic pricing with source shown | M | M05/M06 | TRN_Tariffs, TRN_MonthlySiteRates | TariffResolver, DriverRateResolver | SCR-10, SCR-11 | U I | ☑ |
+| FR-007 | Quick-entry keyboard behaviour; remember last values per user | M | M06 | TRN_Trips.CreatedBy (G-12) | QuickEntryDefaults | SCR-10 | E | ☑ |
+| FR-008 | Last ten trips of the user with History/Edit | M | M06 | TRN_Trips, AuditLogs | TripQueries.Recent | SCR-10 | I E | ☑ |
+| FR-009 | Created Trips list: filters, search, paging, sort, columns, export | M | M06/M14 | TRN_Trips, TableColumnViews | TripQueries.List, ExportService | SCR-10 | I E P | ☑ |
+| FR-010 | Edit rules; reverse/re-post wage; rate kept unless site/month/driver change | M | M06/M07 | TRN_Trips, JournalEntries, EntryLines, Periods | TripService.Edit | SCR-11 | U I | ☑ |
+| FR-011 | Void with reason; reversal; blocked if invoiced/settled/closed | M | M06/M07 | TRN_Trips (Void*), JournalEntries | TripService.Void | SCR-11 | I E | ☑ |
+| FR-012 | Shortage and shortage %; flag above tolerance | M | M06 | TRN_Trips (ShortageWeight, ShortagePct, IsShortageFlagged), CompanySettings TRN.ShortageTolerancePct | TripCalculator | SCR-10, SCR-13 | U | ☑ |
+| FR-013 | Import xlsx/CSV/TSV/paste, mapping, preview, tolerant mode, import log | M | M06/M14 | TRN_Trips, ImportBatches | TripImportService | SCR-12 | U I E | ☑ |
+| FR-014 | Clear Needs review; recorded in history | M | M06 | TRN_Trips.NeedsReview, AuditLogs | TripService.ClearReview | SCR-10, SCR-11 | I | ☑ |
+| FR-015 | Trip history incl. invoice/credit note/settlement events | M | M06/M13 | AuditLogs | HistoryQueries | SCR-11 (history panel) | I | ☑ |
+| FR-016 | Wage accrual / partner cost entry on save | M | M07 | JournalEntries, EntryLines, PostingKeyMappings, TRN_Trips.JournalEntryId | PostingEngine (Trip) | — (no own screen; seen in SCR-34) | U I | ☑ |
+| FR-017 | Custom trip fields everywhere | M | M03/M06 | CustomFieldDefinitions, TRN_Trips.CustomValues | CustomFieldService | SCR-10, SCR-11, SCR-12, SCR-52 | I E | ☑ |
+| FR-018 | Trip statement for driver/customer/partner (print/export) | S | M12 | TRN_Trips | TripStatementReport | SCR-50, SCR-09 | I | ◐ |
 
 ### C.2 Pricing (7.2)
 
@@ -151,18 +151,18 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | FR-019 | Tariff lines: add, edit, archive, import, export | M | M05 | TRN_Tariffs | TariffService | SCR-67 | I E | ☑ |
 | FR-020 | Line matching incl. validity dates | M | M05 | TRN_Tariffs | TariffResolver | — (logic) | U | ☑ |
 | FR-021 | Specificity scoring; tie → latest Valid from | M | M05 | TRN_Tariffs.Specificity, IX_TRN_Tariffs_Lookup | TariffResolver | — (logic) | U | ☑ |
-| FR-022 | Winning line fills price/partner rate; trip stores tariff price | M | M05/M06 | TRN_Trips.TariffPrice/CustomerPrice/PartnerRate | TariffResolver | SCR-10, SCR-11, SCR-12 | U I | ◐ |
-| FR-023 | Breach flag and amount | M | M06 | TRN_Trips.IsTariffBreach | TripCalculator | SCR-10, SCR-11 | U | ◐ |
+| FR-022 | Winning line fills price/partner rate; trip stores tariff price | M | M05/M06 | TRN_Trips.TariffPrice/CustomerPrice/PartnerRate | TariffResolver | SCR-10, SCR-11, SCR-12 | U I | ☑ |
+| FR-023 | Breach flag and amount | M | M06 | TRN_Trips.IsTariffBreach | TripCalculator | SCR-10, SCR-11 | U | ☑ |
 | FR-024 | Breach report | M | M12 | TRN_Trips | Report RPT-04 | SCR-50 | I | ◐ |
-| FR-025 | Tariff lock; deviations audited | M | M06 | CompanySettings TRN.LockTariffs, AuditLogs | TripValidator | SCR-10, SCR-11 | U I S | ◐ |
+| FR-025 | Tariff lock; deviations audited | M | M06 | CompanySettings TRN.LockTariffs, AuditLogs | TripValidator | SCR-10, SCR-11 | U I S | ☑ |
 | FR-026 | Tariff history; changes never alter trips | M | M05 | TRN_RateHistory | TariffService | SCR-67 | I | ☑ |
 | FR-027 | Monthly rates per month + site, own/external | M | M05 | TRN_MonthlySiteRates | MonthlyRateService | SCR-68 | I | ☑ |
 | FR-028 | Month strip with status; enter for all active sites; save, print | M | M05 | TRN_MonthlySiteRates, TRN_LoadingSites | MonthlyRateService | SCR-68, SCR-09 | I E | ◐ |
 | FR-029 | No inheritance from previous month | M | M05 | TRN_MonthlySiteRates | MonthlyRateService | SCR-68 | U | ☑ |
-| FR-030 | New-trip rate resolution table | M | M05 | TRN_MonthlySiteRates, TRN_Trips.RateSource/IsManualRate | DriverRateResolver | SCR-10, SCR-11 | U | ◐ |
-| FR-031 | Trip stores rate, source and month; frozen | M | M06 | TRN_Trips.DriverRate/RateSource/RateMonth | TripService | — (logic) | I | ◐ |
-| FR-032 | Rate on edit kept unless site/month/driver change | M | M06 | TRN_Trips | TripService.Edit | SCR-11 | U | ◐ |
-| FR-033 | Import rate rules | M | M06 | TRN_Trips, TRN_MonthlySiteRates | TripImportService | SCR-12 | U | ◐ |
+| FR-030 | New-trip rate resolution table | M | M05 | TRN_MonthlySiteRates, TRN_Trips.RateSource/IsManualRate | DriverRateResolver | SCR-10, SCR-11 | U | ☑ |
+| FR-031 | Trip stores rate, source and month; frozen | M | M06 | TRN_Trips.DriverRate/RateSource/RateMonth | TripService | — (logic) | I | ☑ |
+| FR-032 | Rate on edit kept unless site/month/driver change | M | M06 | TRN_Trips | TripService.Edit | SCR-11 | U | ☑ |
+| FR-033 | Import rate rules | M | M06 | TRN_Trips, TRN_MonthlySiteRates | TripImportService | SCR-12 | U | ☑ |
 | FR-034 | Warn when editing a month with trips | M | M05 | TRN_MonthlySiteRates, TRN_Trips | MonthlyRateService | SCR-68 | I | ☑ |
 | FR-035 | Clearing both rates of a used site refused; rename keeps link | M | M05 | TRN_MonthlySiteRates (CHECK one rate), TRN_LoadingSites | MonthlyRateService | SCR-68 | I | ☑ |
 | FR-036 | Rate history | M | M05 | TRN_RateHistory | MonthlyRateService | SCR-68 | I | ☑ |
@@ -362,12 +362,12 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 
 | ID | Story | Covered by | Screens | Tests | St |
 |---|---|---|---|---|---|
-| US-01 | Quick trip entry | FR-001, 005–008, 022, 030 | SCR-10 | E | ☐ |
-| US-02 | Bulk trip import | FR-013, 033 | SCR-12 | E | ☐ |
-| US-03 | Void a trip | FR-011 | SCR-11 | E | ☐ |
-| US-04 | Weight shortage tracking | FR-012, RPT-03 | SCR-13, SCR-50 | E | ☐ |
-| US-05 | Driver wage from monthly site rates | FR-027–036 | SCR-68, SCR-10 | E | ◐ |
-| US-06 | Customer and partner tariffs | FR-019–026 | SCR-67 | E | ◐ |
+| US-01 | Quick trip entry | FR-001, 005–008, 022, 030 | SCR-10 | E | ☑ |
+| US-02 | Bulk trip import | FR-013, 033 | SCR-12 | E | ☑ |
+| US-03 | Void a trip | FR-011 | SCR-11 | E | ☑ |
+| US-04 | Weight shortage tracking | FR-012, RPT-03 | SCR-13, SCR-50 | E | ◐ |
+| US-05 | Driver wage from monthly site rates | FR-027–036 | SCR-68, SCR-10 | E | ☑ |
+| US-06 | Customer and partner tariffs | FR-019–026 | SCR-67 | E | ☑ |
 | US-07 | Invoice unbilled trips | FR-038, 040, 044 | SCR-21 | E | ☐ |
 | US-08 | Manual invoice | FR-039 | SCR-22 | E | ☐ |
 | US-09 | Draft and approval | FR-041–043 | SCR-23 | E | ☐ |
@@ -441,8 +441,8 @@ _Prepared 8 Oct 2026. Skeleton: database objects and screens are mapped now. Cod
 | BR-026 | Credit note ≤ remaining | M09 | TRN_Invoices.RemainingAmount CHECK ≥ 0 | CreditNoteService | U I | ☐ |
 | BR-027 | Full return absorbs rounding → 0.000 | M09 | — | CreditNoteCalculator | U | ☐ |
 | BR-028 | Tariff most-specific wins | M05 | TRN_Tariffs.Specificity, UX on keys + ValidFrom | TariffResolver | U | ☑ |
-| BR-029 | Driver rate by company + site + month + fleet class | M05 | UX_TRN_MonthlySiteRates_… | DriverRateResolver | U | ◐ |
-| BR-030 | Rate frozen at save | M06 | TRN_Trips stores rates | TripService | I | ◐ |
+| BR-029 | Driver rate by company + site + month + fleet class | M05 | UX_TRN_MonthlySiteRates_… | DriverRateResolver | U | ☑ |
+| BR-030 | Rate frozen at save | M06 | TRN_Trips stores rates | TripService | I | ☑ |
 | BR-031 | Item in only one active settlement | M11 | TRN_Trips.SettlementId, TRN_Advances.SettlementId | SettlementService | I | ☐ |
 | BR-031a | Accrual off → settlement debits wage expense | M07 | CompanySettings TRN.AccrueDriverWage | PostingEngine | U I | ☐ |
 | BR-032 | Settled advance locked | M11 | TRN_Advances.SettlementId | AdvanceService | I | ☐ |

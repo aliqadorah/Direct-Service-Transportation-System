@@ -19,7 +19,7 @@ public sealed class SpreadsheetService : ISpreadsheetService
         var data = extension switch
         {
             ".xlsx" => ReadXlsx(content),
-            ".csv" or ".txt" => ReadCsv(content),
+            ".csv" or ".txt" or ".tsv" => ReadCsv(content),
             _ => throw new AppException(ErrorCodes.ImportFileType, 400, "file"),
         };
         if (data.Rows.Count == 0) throw new AppException(ErrorCodes.ImportEmpty, 422, "file");

@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section));
         services.AddSingleton<IUrlTokenService, UrlTokenService>();
         services.AddScoped<INumberingService, NumberingService>();
+        services.AddScoped<IMonthlyRateLock, MonthlyRateLock>();
         services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.Section));
