@@ -94,6 +94,7 @@
 
 @code {
     private string _mode = "tolerant";
+    private int _previewVersion;
     private string? _fileName, _error;
     private byte[]? _bytes;
     private TripImportPreview? _preview;
@@ -142,15 +143,19 @@
     private async Task Preview()
     {
         if (_bytes is null || _fileName is null) return;
+        var version = ++_previewVersion;
         _busy = true;
         _error = null;
         try
         {
-            _preview = await Api.UploadAsync<TripImportPreview>(Api.C("trips/import/preview"), new MemoryStream(_bytes), _fileName, Fields);
+            var preview = await Api.UploadAsync<TripImportPreview>(Api.C("trips/import/preview"), new MemoryStream(_bytes), _fileName, Fields);
+            // Only the latest preview counts: an earlier answer (e.g. of the other mode) must never enable the import (found by E2E).
+            if (version != _previewVersion) return;
+            _preview = preview;
             foreach (var (k, v) in _preview.Columns.Matched) _mapping.TryAdd(k, v);
         }
-        catch (ApiException e) { _error = e.Problem.Detail; _preview = null; }
-        finally { _busy = false; }
+        catch (ApiException e) when (version == _previewVersion) { _error = e.Problem.Detail; _preview = null; }
+        finally { if (version == _previewVersion) _busy = false; }
     }
 
     private async Task Import()

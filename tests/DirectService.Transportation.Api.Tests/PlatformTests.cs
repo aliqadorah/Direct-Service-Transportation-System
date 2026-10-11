@@ -45,6 +45,31 @@ public sealed class PlatformTests(ApiFactory f)
         return u with { Client = await f.SignInAsync(u.Email, u.Password, u.AuthenticatorKey) };
     }
 
+    [Fact]
+    public async Task Staff_accounts_are_created_by_operations_with_a_set_password_link_DT131()
+    {
+        var email = $"staff-{Guid.NewGuid():N}@example.test";
+        using (var scope = f.Services.CreateScope())
+            Assert.Contains("created", await scope.ServiceProvider.GetRequiredService<StaffAccountService>().CreateAsync(email, "Support Agent", CancellationToken.None),
+                StringComparison.Ordinal);
+        var user = await f.DbAsync(db => db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Email == email));
+        Assert.True(user.IsPlatformStaff);
+        Assert.Null(user.TenantId);
+
+        var link = f.Emails.LinkParameters(email, "PasswordReset");
+        var client = f.NewClient();
+        await client.UseAntiforgeryAsync();
+        await (await client.PostAsJsonAsync("/api/v1/auth/password-reset/confirm", new PasswordResetConfirmRequest(link["u"], link["t"], ApiHelpers.Password))).EnsureOkAsync();
+        var staff = await f.SignInFirstTimeAsync(client, email, ApiHelpers.Password);   // two-step verification is set up at the first sign-in
+        Assert.True(staff.Me.IsPlatformStaff);
+        await (await staff.Client.GetAsync("/api/v1/platform/plans")).EnsureOkAsync();
+
+        // A sign-up user's e-mail can never be turned into a staff account by the command.
+        var owner = await f.SignUpOwnerAsync();
+        using var again = f.Services.CreateScope();
+        await Assert.ThrowsAsync<DirectService.Transportation.Application.Abstractions.AppException>(() => again.ServiceProvider.GetRequiredService<StaffAccountService>().CreateAsync(owner.Email, "X", CancellationToken.None));
+    }
+
     private static PlanRequest Plan(string code, decimal price, int users = 10, bool active = true) => new(code, "باقة " + code, "Plan " + code, price, "Monthly", 3, users, 5000, 1024, active, null);
 
     private static string Code(string prefix) => prefix + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();

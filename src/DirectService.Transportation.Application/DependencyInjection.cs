@@ -153,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<ConsoleService>();
         services.AddScoped<SupportAccessService>();
         services.AddScoped<TenantLifecycleService>();
+        services.AddScoped<StaffAccountService>();
         services.AddScoped<SetupChecklistService>();
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<CompanyExportService>();

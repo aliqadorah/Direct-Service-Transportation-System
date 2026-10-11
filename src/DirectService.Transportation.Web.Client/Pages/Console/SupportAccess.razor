@@ -56,7 +56,7 @@
             <Btn Icon="search" Text="@L["ui.search"]" OnClick="Find" />
         </div>
         <SelectField TValue="string?" @bind-Value="_tenant" Options="_tenants" Empty="@L["ui.choose"]" Label="@L["con.tenant"]" Required="true" />
-        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" />
+        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" BindOnInput="true" />
         <p class="help" style="margin:0">@L["con.supportText"]</p>
         @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
     </ChildContent>

@@ -97,6 +97,13 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
         return principal;
     }
 
+    /// <summary>Drops a session's cached user data (language, name), so the next request reads them again — e.g. after a language change (FR-178).</summary>
+    public async Task ForgetAsync(long sessionId, CancellationToken ct)
+    {
+        var hash = await db.Set<UserSession>().IgnoreQueryFilters(TenantFilter).Where(s => s.Id == sessionId).Select(s => s.TokenHash).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+        if (hash is not null) cache.Remove(CacheKey(hash));
+    }
+
     /// <summary>Revokes one session (sign-out). Revocation = RevokedAt + soft delete (design §7).</summary>
     public async Task RevokeAsync(long sessionId, string reason, CancellationToken ct)
     {

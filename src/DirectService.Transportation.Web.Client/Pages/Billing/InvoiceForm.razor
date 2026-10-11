@@ -258,8 +258,14 @@
         _tripsLoading = true;
         try
         {
-            string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
-            var qs = $"customer={U(_m.CustomerId)}&from={D(_from)}&to={D(_to)}&loadingSite={U(_loading)}&unloadingSite={U(_unloading)}&material={U(_material)}";
+            // Only the filters in use are sent: an empty "from=" cannot bind to an optional date and the API answers 400 (found by E2E).
+            var p = new List<string> { "customer=" + U(_m.CustomerId) };
+            if (_from is { } from) p.Add("from=" + from.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            if (_to is { } to) p.Add("to=" + to.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            if (_loading is not null) p.Add("loadingSite=" + U(_loading));
+            if (_unloading is not null) p.Add("unloadingSite=" + U(_unloading));
+            if (_material is not null) p.Add("material=" + U(_material));
+            var qs = string.Join('&', p);
             var r = await Api.GetAsync<UnbilledTripsResponse>(Api.C("invoices/unbilled-trips?" + qs));
             if (version != _tripsVersion) return;   // the customer or a filter changed meanwhile
             var rows = new List<PickRow>();

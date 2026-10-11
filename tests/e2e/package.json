@@ -1,0 +1,15 @@
+{
+  "name": "direct-service-transportation-e2e",
+  "private": true,
+  "description": "End-to-end UI tests of the PRD Section 9 flows per role, Arabic RTL and English (TST-03), and the WCAG 2.1 AA check of every screen.",
+  "scripts": {
+    "test": "playwright test",
+    "test:flows": "playwright test flows",
+    "test:a11y": "playwright test accessibility",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.64.0"
+  }
+}

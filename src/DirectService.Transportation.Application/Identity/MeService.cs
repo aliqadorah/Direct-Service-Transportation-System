@@ -60,6 +60,8 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
         u.DateFormat = r.DateFormat;
         u.DefaultCompanyId = defaultCompanyId;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        // The session caches the language: without this, server messages stayed in the old language after a change (found by E2E).
+        if (ctx.SessionId is long session) await sessions.ForgetAsync(session, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<SessionResponse>> SessionsAsync(CancellationToken ct)

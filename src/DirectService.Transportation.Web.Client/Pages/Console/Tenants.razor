@@ -93,7 +93,7 @@
         }
         @if (_action is "suspend") {<Banner Tone="Tone.Warn" Text="@L["con.suspendText"]" />}
         @if (_action is "support") {<p class="muted" style="margin:0">@L["con.supportText"]</p>}
-        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" />
+        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" BindOnInput="true" />
         @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
     </ChildContent>
     <Footer>

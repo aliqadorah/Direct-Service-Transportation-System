@@ -148,6 +148,16 @@ app.MapRazorComponents<DirectService.Transportation.Web.Components.App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(DirectService.Transportation.Web.Client.Routes).Assembly);
 
+// Operations command (DT-131): `create-staff <email> <full name>` creates a platform staff account and e-mails a set-password link, then exits.
+if (args is ["create-staff", var staffEmail, .. var staffName])
+{
+    using var opsScope = app.Services.CreateScope();
+    var outcome = await opsScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Application.Platform.StaffAccountService>()
+        .CreateAsync(staffEmail, string.Join(' ', staffName), CancellationToken.None).ConfigureAwait(false);
+    Console.WriteLine(outcome);
+    return;
+}
+
 await app.RunAsync().ConfigureAwait(false);
 
 /// <summary>Entry point (public for WebApplicationFactory in the API tests).</summary>

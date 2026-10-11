@@ -60,6 +60,7 @@ public sealed class TextAreaField : FieldBase<string?>
 {
     [Parameter] public int? MaxLength { get; set; }
     [Parameter] public int Rows { get; set; } = 3;
+    [Parameter] public bool BindOnInput { get; set; }
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -70,7 +71,7 @@ public sealed class TextAreaField : FieldBase<string?>
         builder.AddAttribute(63, "maxlength", MaxLength);
         builder.AddAttribute(64, "placeholder", Placeholder);
         builder.AddAttribute(65, "value", CurrentValueAsString);
-        builder.AddAttribute(66, "onchange", EventCallback.Factory.CreateBinder<string?>(this, v => CurrentValueAsString = v, CurrentValueAsString));
+        builder.AddAttribute(66, BindOnInput ? "oninput" : "onchange", EventCallback.Factory.CreateBinder<string?>(this, v => CurrentValueAsString = v, CurrentValueAsString));
         builder.SetUpdatesAttributeName("value");
         ControlAttributes(builder, 70);
         builder.CloseElement();

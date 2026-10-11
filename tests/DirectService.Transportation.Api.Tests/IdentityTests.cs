@@ -199,5 +199,10 @@ public sealed class IdentityTests(ApiFactory f)
         Assert.Equal(owner.CompanyId, me.DefaultCompany);
         var bad = await owner.Client.PutAsJsonAsync("/api/v1/me/preferences", new PreferencesRequest("fr", null, "yyyy-MM-dd"));
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        Assert.Matches("[؀-ۿ]", await bad.Content.ReadAsStringAsync());   // messages in Arabic at once (session cache refreshed)
+        // FR-178: switching back to English changes the server's messages immediately, in the same session (found by the E2E tests).
+        await (await owner.Client.PutAsJsonAsync("/api/v1/me/preferences", new PreferencesRequest("en", owner.CompanyId, "yyyy-MM-dd"))).EnsureOkAsync();
+        var badEn = await owner.Client.PutAsJsonAsync("/api/v1/me/preferences", new PreferencesRequest("fr", null, "yyyy-MM-dd"));
+        Assert.DoesNotMatch("[؀-ۿ]", await badEn.Content.ReadAsStringAsync());
     }
 }
