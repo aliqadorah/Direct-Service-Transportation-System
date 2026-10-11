@@ -1,0 +1,131 @@
+@page "/c/{Company}/accounting/periods"
+@*
+  SCR-44 periods (FR-132…134, BR-036, DT-30): one row per month of a year with status, who closed it and the reason; close / reopen with a
+  reason (core.settings.manage), audited. Before closing, the pre-close check lists pending postings, unapproved drafts dated in the month
+  and control accounts with lines without a party; closing with open items needs an explicit confirmation.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.periods"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.periods"])])">
+    <Actions>
+        <Btn Small="true" Icon="right" FlipIcon="true" AriaLabel="@L["per.prevYear"]" OnClick="() => Year(-1)" />
+        <bdi class="num" style="font-weight:600;padding:0 6px">@_year</bdi>
+        <Btn Small="true" Icon="left" FlipIcon="true" AriaLabel="@L["per.nextYear"]" OnClick="() => Year(1)" />
+    </Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        <ListFrame Label="@L["nav.periods"]">
+            <DataGrid TItem="PeriodResponse" Items="_items" Key="p => p.PeriodMonth" Caption="@L["nav.periods"]">
+                <Columns>
+                    <GridColumn TItem="PeriodResponse" Title="@L["per.month"]" Value="p => p.PeriodMonth" Ltr="true" />
+                    <GridColumn TItem="PeriodResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Closed" ? "closedPeriod" : "open")" /></Template></GridColumn>
+                    <GridColumn TItem="PeriodResponse" Title="@L["per.by"]" Value="@(p => p.ClosedBy is null ? null : $"{p.ClosedBy} · {Fmt.DateTime(p.ClosedAt?.ToLocalTime(), Shell.DateFormat)}")" />
+                    <GridColumn TItem="PeriodResponse" Title="@L["ui.reason"]" Value="p => p.Reason" Wrap="true" />
+                    <GridColumn TItem="PeriodResponse" Title="@L["profile.action"]" HideTitle="true">
+                        <Template>
+                            @if (Shell.Can(PermissionKeys.SettingsManage))
+                            {
+                                @if (context.Status == "Closed") {<Btn Small="true" Icon="refresh" Text="@L["per.reopen"]" OnClick="() => Ask(context, false)" />}
+                                else {<Btn Small="true" Icon="lock" Text="@L["per.close"]" OnClick="() => Ask(context, true)" />}
+                            }
+                        </Template>
+                    </GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_open" Title="@L.F(_closing ? "per.closeTitle" : "per.reopenTitle", _target?.PeriodMonth ?? "")" Busy="_busy" Icon="@(_closing ? "lock" : "refresh")">
+    <ChildContent>
+        @if (_closing)
+        {
+            @if (_check is null) {<p class="muted" role="status">@L["ui.loading"]</p>}
+            else if (_check.Clean) {<Banner Tone="Tone.Ok" Text="@L["per.clean"]" />}
+            else
+            {
+                <Banner Tone="Tone.Warn" Text="@L["per.notClean"]" />
+                <ul style="margin:0;padding-inline-start:18px">
+                    @if (_check.PendingPostings > 0) {<li><a href="@NavModel.Href(Company, "accounting/automatic?tab=pending")"><Tx Value="@L.F("per.pending", _check.PendingPostings)" /></a></li>}
+                    @if (_check.UnapprovedDrafts > 0) {<li><a href="@NavModel.Href(Company, "invoices?status=draft")"><Tx Value="@L.F("per.drafts", _check.UnapprovedDrafts)" /></a></li>}
+                    @foreach (var u in _check.UnreconciledControlAccounts) {<li><Tx Value="@L.F("per.unreconciled", $"{u.Account.Code} {L.Pick(u.Account.NameAr, u.Account.NameEn)}", Fmt.Money(u.LinesWithoutParty))" /></li>}
+                </ul>
+                <CheckField @bind-Value="_confirm" Label="@L["per.confirm"]" />
+            }
+            <p class="muted" style="margin:0">@L["per.closeText"]</p>
+        }
+        else {<p style="margin:0">@L["per.reopenText"]</p>}
+        <div class="field">
+            <label for="per-reason">@L["ui.reason"] <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="per-reason" class="input" rows="2" maxlength="500" aria-required="true" @bind="_reason" @bind:event="oninput"></textarea>
+        </div>
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _open = false" />
+        <Btn Primary="true" Text="@L[_closing ? "per.close" : "per.reopen"]" Busy="_busy"
+             Disabled="@(string.IsNullOrWhiteSpace(_reason) || (_closing && (_check is null || (!_check.Clean && !_confirm))))" OnClick="Run" />
+    </Footer>
+</Modal>
+
+@code {
+    private IReadOnlyList<PeriodResponse> _items = [];
+    private PreCloseCheckResponse? _check;
+    private PeriodResponse? _target;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _reason, _error;
+    private int _year = DateTime.Today.Year;
+    private bool _open, _closing, _busy, _confirm;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _items = await Api.GetAsync<IReadOnlyList<PeriodResponse>>(Api.C($"accounting/periods?year={_year}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Year(int delta) { _year += delta; return Load(); }
+
+    private async Task Ask(PeriodResponse p, bool close)
+    {
+        _target = p;
+        _closing = close;
+        _reason = null;
+        _error = null;
+        _confirm = false;
+        _check = null;
+        _open = true;
+        if (close)
+        {
+            try { _check = await Api.GetAsync<PreCloseCheckResponse>(Api.C($"accounting/periods/{p.PeriodMonth}/pre-close-check")); }
+            catch (ApiException e) { _error = e.Problem.Detail; }
+        }
+    }
+
+    private async Task Run()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<PeriodResponse>(Api.C($"accounting/periods/{_target.PeriodMonth}/{(_closing ? "close" : "reopen")}"), new PeriodActionRequest(_reason?.Trim(), _confirm));
+            _open = false;
+            Toasts.Success(L.F(_closing ? "per.closed" : "per.reopened", _target.PeriodMonth));
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

@@ -10,6 +10,7 @@
 @inject UiJs Js
 @inject Downloads Files
 @inject ToastService Toasts
+@inject ShellState Shell
 
 <PageHeader Title="@L.F("print.title", L["print.kind." + Kind])" Crumbs="@([new Crumb(L[Doc.Crumb], NavModel.Href(Company, Doc.Back))])">
     <Actions>
@@ -18,7 +19,7 @@
             <SelectField TValue="string?" Value="_layout" ValueChanged="LayoutChanged" ValueExpression="() => _layout" Options="Layouts" Empty="@L["print.savedLayout"]"
                          aria-label="@L["inv.layout"]" FieldClass="w200" />
         }
-        <Btn Icon="export" Text="PDF" Busy="_busy" Disabled="_html is null" OnClick="Pdf" />
+        @if (Kind != "journal") {<Btn Icon="export" Text="PDF" Busy="_busy" Disabled="_html is null" OnClick="Pdf" />}
         <Btn Primary="true" Icon="print" Text="@L["ui.print"]" Shortcut="Ctrl P" Busy="_busy" Disabled="_html is null" OnClick="Print" />
     </Actions>
 </PageHeader>
@@ -55,6 +56,8 @@
         "receivable" => ($"apar/receivables/{E(Id)}/print", $"accounting/receivables/{Id}", "nav.receivables"),
         "apar-payment" => ($"apar/payments/{E(Id)}/print", $"accounting/apar-payments/{Id}", "nav.accounting"),
         "apar-return" => ($"apar/returns/{E(Id)}/print", $"accounting/apar-returns/{Id}", "nav.accounting"),
+        // The journal voucher is built here from the API's voucher data (FR-103); it is not a logged document print.
+        "journal" => (Shell.Can(PermissionKeys.AcctView) ? $"accounting/journal-entries/{E(Id)}/voucher" : $"ledger/entries/{E(Id)}/voucher", $"accounting/journal/{Id}", "nav.journal"),
         _ => ("", "", "nav.dashboard"),
     };
 
@@ -73,6 +76,12 @@
         if (Doc.Api.Length == 0) { _state = LoadState.Empty; return; }
         try
         {
+            if (Kind == "journal")
+            {
+                _html = Pages.Accounting.VoucherHtml.Build(await Api.GetAsync<Contracts.Accounting.JournalVoucherResponse>(Api.C(Doc.Api)), L, Shell.DateFormat);
+                _state = LoadState.Ready;
+                return;
+            }
             var file = await Api.FileAsync(Path("html", preview: true));
             _html = Encoding.UTF8.GetString(file.Bytes);
             _state = LoadState.Ready;
@@ -93,9 +102,12 @@
         _busy = true;
         try
         {
-            var file = await Api.FileAsync(Path("html", preview: false));
-            _html = Encoding.UTF8.GetString(file.Bytes);
-            await Js.PrintHtml(_frame, _html);
+            if (Kind != "journal")
+            {
+                var file = await Api.FileAsync(Path("html", preview: false));
+                _html = Encoding.UTF8.GetString(file.Bytes);
+            }
+            await Js.PrintHtml(_frame, _html!);
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
         finally { _busy = false; }

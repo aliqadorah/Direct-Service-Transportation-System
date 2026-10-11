@@ -1,0 +1,283 @@
+@page "/c/{Company}/accounting/payables/{Id}"
+@page "/c/{Company}/accounting/receivables/{Id}"
+@*
+  AP/AR document view (FR-123…127): party, dates, reference, lines with accounts and tax, totals, payments / collections and returns, remaining
+  balance, amount in words, e-invoice status of receivables (D-15) and history. acct.apar: record a payment or collection (≤ remaining), a
+  return (proportional tax, DT-107), void with a reason (refused with active payments or returns), resubmit a rejected e-invoice. Print.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject MoneyAccounts Money
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var d = _d!.Document; var isVoid = d.Status == ApArCodes.Void; }
+        <PageHeader Title="@d.Number" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L[Payables ? "nav.payables" : "nav.receivables"], NavModel.Href(Company, Route))])">
+            <Badges>
+                <StatusTag Status="@ApArStatus.Tag(d)" />
+                @if (!Payables && !isVoid) {<StatusTag Status="@BillingStatus.EInvoice(d.EInvoiceStatus)" />}
+                @if (d.DaysOverdue > 0 && d.RemainingAmount > 0) {<Badge Tone="Tone.Err" Icon="clock" Text="@L.F("ap.daysOverdue", d.DaysOverdue)" />}
+            </Badges>
+            <Actions>
+                <Btn Icon="print" Text="@L["ui.print"]" Href="@NavModel.Href(Company, $"print/{(Payables ? "bill" : "receivable")}/{Id}")" />
+                @if (!isVoid && CanWrite)
+                {
+                    @if (_submission is { Status: "Rejected" }) {<Btn Icon="send" Text="@L["inv.resubmit"]" Busy="_busy" OnClick="Resubmit" />}
+                    @if (d.RemainingAmount > 0)
+                    {
+                        <Btn Icon="refresh" Text="@L["ap.return"]" Disabled="!_postingReady" OnClick="OpenReturn" />
+                        <Btn Primary="true" Icon="cash" Text="@L[Payables ? "ap.pay" : "ap.collect"]" Disabled="!_postingReady" OnClick="OpenPayment" />
+                    }
+                    <Btn Danger="true" Icon="x" Text="@L["inv.void"]" Disabled="!_postingReady" OnClick="() => _voiding = true" />
+                }
+            </Actions>
+        </PageHeader>
+        <PostingBanner OnStatus="r => _postingReady = r" />
+        @if (isVoid) {<Banner Tone="Tone.Err" Text="@L.F("cash.voidBanner", d.VoidReason ?? "")" />}
+        @if (_submission is { Status: "Rejected" } s) {<Banner Tone="Tone.Err" Text="@L.F("inv.rejectedBanner", s.LastError ?? string.Join(" · ", s.Problems.Select(p => p.Message)))" />}
+        @if (d.PostingPending) {<Banner Tone="Tone.Warn" Text="@L["doc.postingPending"]" />}
+        <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
+            <div class="stack" style="min-width:0">
+                <Box><KeyValues Columns="3" Items="Details(d)" /></Box>
+                <Box Title="@L["inv.items"]" NoPad="true">
+                    <DataGrid TItem="ApArLineResponse" Items="_d.Lines" Key="l => l.Id" Caption="@L["inv.items"]" FooterLabel="@L["ui.total"]">
+                        <Columns>
+                            <GridColumn TItem="ApArLineResponse" Title="@L["inv.description"]" Value="l => l.Description" Wrap="true" />
+                            <GridColumn TItem="ApArLineResponse" Title="@L["je.account"]" Value="@(l => $"{l.Account.Code} · {L.Pick(l.Account.NameAr, l.Account.NameEn)}")" />
+                            <GridColumn TItem="ApArLineResponse" Title="@L["je.costCentre"]" Value="l => l.CostCentre?.Name" />
+                            <GridColumn TItem="ApArLineResponse" Title="@L["ap.taxRate"]" Value="l => Fmt.Percent(l.TaxRate)" Numeric="true" />
+                            <GridColumn TItem="ApArLineResponse" Title="@L["inv.amount"]" Value="l => Fmt.Money(l.Amount)" Numeric="true" Footer="@Fmt.Money(d.Subtotal)" />
+                        </Columns>
+                    </DataGrid>
+                </Box>
+                @if (_d.Payments.Count > 0)
+                {
+                    <Box Title="@L[Payables ? "ap.payments" : "ap.collections"]" NoPad="true">
+                        <DataGrid TItem="ApArPaymentResponse" Items="_d.Payments" Key="p => p.Id" Caption="@L[Payables ? "ap.payments" : "ap.collections"]" RowClass="@(p => p.Status == "Void" ? "void" : null)"
+                                  OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-payments/{p.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="ApArPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" />
+                                <GridColumn TItem="ApArPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="ApArPaymentResponse" Title="@L["cash.method"]" Value="@(p => L["pay." + p.PaymentMethod])" />
+                                <GridColumn TItem="ApArPaymentResponse" Title="@L["inv.amount"]" Value="p => Fmt.Money(p.Amount)" Numeric="true" />
+                                <GridColumn TItem="ApArPaymentResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                            </Columns>
+                        </DataGrid>
+                    </Box>
+                }
+                @if (_d.Returns.Count > 0)
+                {
+                    <Box Title="@L["ap.returns"]" NoPad="true">
+                        <DataGrid TItem="ApArReturnResponse" Items="_d.Returns" Key="r => r.Id" Caption="@L["ap.returns"]" RowClass="@(r => r.Status == "Void" ? "void" : null)"
+                                  OnRowClick="@(r => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-returns/{r.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="ApArReturnResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" />
+                                <GridColumn TItem="ApArReturnResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReturnDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="ApArReturnResponse" Title="@L["ui.reason"]" Value="r => r.Reason" Clip="true" />
+                                <GridColumn TItem="ApArReturnResponse" Title="@L["inv.total"]" Value="r => Fmt.Money(r.Total)" Numeric="true" />
+                                <GridColumn TItem="ApArReturnResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                            </Columns>
+                        </DataGrid>
+                    </Box>
+                }
+                <Box Title="@L["ui.history"]"><RecordHistory Items="_d.History" /></Box>
+            </div>
+            <Box Title="@L["inv.totals"]">
+                <div class="ln"><span>@L["inv.subtotal"]</span><Money Value="d.Subtotal" /></div>
+                <div class="ln"><span>@L["inv.tax"]</span><Money Value="d.Tax" /></div>
+                <div class="ln tot big"><span>@L["inv.total"]</span><Money Value="d.Total" /></div>
+                @if (d.PaidAmount != 0) {<div class="ln"><span>@L[Payables ? "ap.payments" : "ap.collections"]</span><Money Value="-d.PaidAmount" /></div>}
+                @if (d.ReturnedAmount != 0) {<div class="ln"><span>@L["ap.returns"]</span><Money Value="-d.ReturnedAmount" /></div>}
+                <div class="ln tot"><span>@L["inv.remaining"]</span><Money Value="d.RemainingAmount" /></div>
+                <p class="muted" style="margin:8px 0 0"><Tx Value="@L.F("doc.inWords", _d.AmountInWords)" /></p>
+                @if (d.JournalEntry is { } je) {<p style="margin:8px 0 0">@L["doc.entry"]: <a href="@NavModel.Href(Company, $"accounting/journal/{je.Id}")"><bdi>@je.Number</bdi></a></p>}
+            </Box>
+        </div>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_paying" Title="@L[Payables ? "ap.pay" : "ap.collect"]" Busy="_busy" Wide="true">
+    <ChildContent>
+        <EditForm EditContext="_payCtx" OnValidSubmit="Pay" id="pay-form" class="stack">
+            <ProblemValidator @ref="_payProblems" />
+            <ErrorSummary Extra="_payExtra" />
+            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <DateField @bind-Value="_pay.PaymentDate" Label="@L["trip.date"]" Required="true" />
+                <NumberField @bind-Value="_pay.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" Help="@L.F("cn.remainingHelp", Fmt.Money(_d?.Document.RemainingAmount))" />
+                <IntField @bind-Value="_pay.AttachmentsCount" Label="@L["rcpt.attachments"]" Min="0" Max="99" />
+                <PaymentFields Model="_pay" />
+            </div>
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _paying = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="pay-form" />
+    </Footer>
+</Modal>
+<Modal @bind-Open="_returning" Title="@L["ap.return"]" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_retCtx" OnValidSubmit="Return" id="ret-form" class="stack">
+            <ProblemValidator @ref="_retProblems" />
+            <ErrorSummary Extra="_retExtra" />
+            <DateField @bind-Value="_ret.ReturnDate" Label="@L["trip.date"]" Required="true" />
+            <NumberField @bind-Value="_ret.Amount" Label="@L["ap.returnAmount"]" Required="true" Min="0.001m" Help="@L["ap.returnHelp"]" />
+            <TextField @bind-Value="_ret.Reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" />
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _returning = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="ret-form" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("inv.voidTitle", _d?.Document.Number ?? "")" Danger="true" AskReason="true" ConfirmText="@L["inv.void"]"
+               Message="@L["ap.voidText"]" Busy="_busy" Error="@_error" OnConfirm="Void" />
+
+@code {
+    private ApArDocumentDetails? _d;
+    private EInvoiceSubmissionResponse? _submission;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private bool _busy, _voiding, _paying, _returning, _postingReady = true;
+    private PayModel _pay = new();
+    private ReturnModel _ret = new();
+    private EditContext _payCtx = new(new PayModel()), _retCtx = new(new ReturnModel());
+    private ProblemValidator? _payProblems, _retProblems;
+    private IReadOnlyList<string>? _payExtra, _retExtra;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private bool Payables => Nav.Uri.Contains("/accounting/payables/", StringComparison.Ordinal);
+    private string Route => Payables ? "accounting/payables" : "accounting/receivables";
+    private string DocPath => Payables ? "apar/bills" : "apar/receivables";
+    private bool CanWrite => Shell.Can(PermissionKeys.AcctApar);
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<ApArDocumentDetails>(Api.C($"{DocPath}/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; return; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; return; }
+        _submission = null;
+        if (!Payables)
+        {
+            try { _submission = (await Api.GetAsync<EInvoiceSubmissionDetails>(Api.C($"apar/receivables/{Uri.EscapeDataString(Id)}/e-invoice"))).Submission; } catch (ApiException) { }
+        }
+    }
+
+    private IReadOnlyList<KeyValue> Details(ApArDocumentResponse d) =>
+    [
+        new(L["ap.party"], d.Party.Name),
+        new(L["trip.date"], Fmt.Date(d.DocumentDate, Shell.DateFormat)),
+        new(L["inv.due"], Fmt.Date(d.DueDate, Shell.DateFormat)),
+        new(L["ap.reference"], d.Reference),
+        new(L["ap.kind"], L[Payables ? "ap.bill" : "ap.receivable"]),
+    ];
+
+    private async Task OpenPayment()
+    {
+        try { await Money.EnsureAsync(); } catch (ApiException) { }
+        _pay = new PayModel { PaymentDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today), Amount = _d!.Document.RemainingAmount };
+        _payCtx = new EditContext(_pay);
+        _payExtra = null;
+        _paying = true;
+    }
+
+    private async Task OpenReturn()
+    {
+        try { await Money.EnsureAsync(); } catch (ApiException) { }
+        _ret = new ReturnModel { ReturnDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today) };
+        _retCtx = new EditContext(_ret);
+        _retExtra = null;
+        _returning = true;
+    }
+
+    private async Task Pay()
+    {
+        _busy = true;
+        _payExtra = null;
+        try
+        {
+            var r = await Api.PostAsync<ApArPaymentDetails>(Api.C("apar/payments"), new ApArPaymentRequest(Id, _pay.PaymentDate, _pay.Amount, _pay.PaymentMethod, _pay.CashBox(),
+                _pay.Bank(), _pay.Ref(), _pay.AttachmentsCount ?? 0, _pay.ClientId));
+            _paying = false;
+            Toasts.Success(L.F("ap.paid", r.Payment.Number, Fmt.Money(r.Payment.Amount)), L["ui.print"], NavModel.Href(Company, $"print/apar-payment/{r.Payment.Id}"));
+            await Load();
+        }
+        catch (ApiException e) { if (_payProblems?.Show(e.Problem) is { } other) _payExtra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Return()
+    {
+        _busy = true;
+        _retExtra = null;
+        try
+        {
+            var r = await Api.PostAsync<ApArReturnDetails>(Api.C("apar/returns"), new ApArReturnRequest(Id, _ret.ReturnDate, _ret.Amount, _ret.Reason?.Trim(), _ret.ClientId));
+            _returning = false;
+            Toasts.Success(L.F("ap.returned", r.Return.Number, Fmt.Money(r.Return.Total)));
+            await Load();
+        }
+        catch (ApiException e) { if (_retProblems?.Show(e.Problem) is { } other) _retExtra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Void(string reason)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<ApArDocumentDetails>(Api.C($"{DocPath}/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Document.RowVersion));
+            _voiding = false;
+            Toasts.Success(L.F("cash.voided", _d.Document.Number));
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Resubmit()
+    {
+        if (_submission is null) return;
+        _busy = true;
+        try
+        {
+            var s = (await Api.PostAsync<EInvoiceSubmissionDetails>(Api.C($"apar/e-invoice-submissions/{Uri.EscapeDataString(_submission.Id)}/submit"), null)).Submission;
+            if (s.Status == "Submitted") Toasts.Success(L.F("ei.accepted", _d!.Document.Number)); else Toasts.Error(s.LastError ?? string.Join(" · ", s.Problems.Select(p => p.Message)));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private sealed class PayModel : IPaymentModel
+    {
+        public DateOnly? PaymentDate { get; set; }
+        public decimal? Amount { get; set; }
+        public int? AttachmentsCount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? CashBoxId { get; set; }
+        public string? BankAccountId { get; set; }
+        public string? Reference { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+
+    private sealed class ReturnModel
+    {
+        public DateOnly? ReturnDate { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Reason { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

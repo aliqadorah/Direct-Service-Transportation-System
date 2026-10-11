@@ -1,0 +1,178 @@
+@page "/c/{Company}/accounting/maintenance"
+@*
+  SCR-45 maintenance zone (FR-135, FR-136, DT-105; acct.maint): back up first (JSON, logged), then one of four actions — delete selected
+  unlinked entries, delete all entries (linked and opening entries kept), replace the chart (template or empty, only when nothing is
+  posted), full accounting reset. Each shows what it would delete and what blocks it, then needs the typed confirmation word and a
+  reason. The maintenance log lists every action with its counts.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+
+<PageHeader Title="@L["nav.maintenance"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.maintenance"])])">
+    <Actions><Btn Icon="export" Text="@L["mnt.backup"]" Busy="_busy" OnClick="Backup" /></Actions>
+</PageHeader>
+<Banner Tone="Tone.Warn" Text="@L["mnt.warning"]" />
+<div class="cols fill" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;min-height:0">
+    <div class="stack">
+        <Box Title="@L["mnt.action"]">
+            <div class="stack" role="radiogroup" aria-label="@L["mnt.action"]">
+                @foreach (var a in Actions)
+                {
+                    var key = a;
+                    <label style="display:flex;gap:8px;align-items:flex-start">
+                        <input type="radio" name="mnt-action" checked="@(_action == key)" @onchange="() => Pick(key)" />
+                        <span><b>@L["mnt." + key]</b><br /><span class="muted">@L["mnt." + key + ".text"]</span></span>
+                    </label>
+                }
+            </div>
+            @if (_action == MaintenanceActions.ReplaceChart)
+            {
+                <SelectField TValue="string?" @bind-Value="_chartSource" Options="Sources" Label="@L["mnt.chartSource"]" @bind-Value:after="Preview" />
+            }
+        </Box>
+        @if (_action == MaintenanceActions.DeleteEntries)
+        {
+            <Box Title="@L["mnt.pickEntries"]" NoPad="true">
+                @if (_entries.Count == 0) {<p class="muted pad" style="margin:0">@L["mnt.noManual"]</p>}
+                else
+                {
+                    <DataGrid TItem="JournalEntrySummary" Items="_entries" Key="e => e.Id" Caption="@L["mnt.pickEntries"]" Selectable="true" Selected="_picked" SelectedChanged="Picked">
+                        <Columns>
+                            <GridColumn TItem="JournalEntrySummary" Title="@L["doc.number"]" Value="e => e.Number" Ltr="true" />
+                            <GridColumn TItem="JournalEntrySummary" Title="@L["trip.date"]" Value="e => Fmt.Date(e.EntryDate, Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="JournalEntrySummary" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
+                            <GridColumn TItem="JournalEntrySummary" Title="@L["inv.amount"]" Value="e => Fmt.Money(e.TotalDebit)" Numeric="true" />
+                        </Columns>
+                    </DataGrid>
+                }
+            </Box>
+        }
+        <Box Title="@L["mnt.log"]" NoPad="true">
+            @if (_log.Count == 0) {<p class="muted pad" style="margin:0">@L["mnt.noLog"]</p>}
+            else
+            {
+                <DataGrid TItem="MaintenanceLogEntry" Items="_log" Key="x => (object)x" Caption="@L["mnt.log"]">
+                    <Columns>
+                        <GridColumn TItem="MaintenanceLogEntry" Title="@L["trip.date"]" Value="x => Fmt.DateTime(x.OccurredAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="MaintenanceLogEntry" Title="@L["mnt.action"]" Value="@(x => L["mnt." + x.Action])" />
+                        <GridColumn TItem="MaintenanceLogEntry" Title="@L["mnt.user"]" Value="x => x.User" />
+                        <GridColumn TItem="MaintenanceLogEntry" Title="@L["mnt.counts"]" Value="Counts" Wrap="true" />
+                    </Columns>
+                </DataGrid>
+            }
+        </Box>
+    </div>
+    <Box Title="@L["mnt.preview"]">
+        @if (_action is null) {<p class="muted" style="margin:0">@L["mnt.pickAction"]</p>}
+        else if (_preview is null) {<p class="muted" style="margin:0">@(_previewError ?? L["ui.loading"])</p>}
+        else
+        {
+            @if (_preview.Blockers.Count > 0)
+            {
+                <Banner Tone="Tone.Err" Text="@L["mnt.blocked"]" />
+                <ul style="margin:0;padding-inline-start:18px">@foreach (var b in _preview.Blockers) {<li><Tx Value="@b" /></li>}</ul>
+            }
+            <KeyValues Columns="1" Items="@(_preview.Counts.Select(c => new KeyValue(L["mnt.count." + c.Key] is var t && t.StartsWith("mnt.", StringComparison.Ordinal) ? c.Key : t, Fmt.Count(c.Value))).ToList())" />
+            @if (_preview.LinkedEntriesKept > 0) {<p class="help" style="margin:6px 0">@L.F("mnt.linkedKept", _preview.LinkedEntriesKept)</p>}
+            @if (_preview.Blockers.Count == 0)
+            {
+                <div class="field">
+                    <label for="mnt-reason">@L["ui.reason"] <span class="req" aria-hidden="true">*</span></label>
+                    <textarea id="mnt-reason" class="input" rows="2" maxlength="500" @bind="_reason" @bind:event="oninput"></textarea>
+                </div>
+                <div class="field">
+                    <label for="mnt-word">@L.F("ui.typeToConfirm", _preview.ConfirmationWord)</label>
+                    <input id="mnt-word" class="input" autocomplete="off" @bind="_word" @bind:event="oninput" />
+                </div>
+                @if (_runError is not null) {<Banner Tone="Tone.Err" Text="@_runError" />}
+                <Btn DangerPrimary="true" Icon="trash" Text="@L["mnt.run"]" Busy="_busy"
+                     Disabled="@(string.IsNullOrWhiteSpace(_reason) || _word?.Trim() != _preview.ConfirmationWord || (_action == MaintenanceActions.DeleteEntries && _picked.Count == 0))" OnClick="Run" />
+            }
+        }
+    </Box>
+</div>
+
+@code {
+    private static readonly string[] Actions = [MaintenanceActions.DeleteEntries, MaintenanceActions.DeleteAllEntries, MaintenanceActions.ReplaceChart, MaintenanceActions.Reset];
+    private string? _action, _chartSource = "template", _reason, _word, _previewError, _runError;
+    private MaintenancePreview? _preview;
+    private IReadOnlyList<MaintenanceLogEntry> _log = [];
+    private IReadOnlyList<JournalEntrySummary> _entries = [];
+    private IReadOnlySet<object> _picked = new HashSet<object>();
+    private bool _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<Option<string?>> Sources => [new("template", L["mnt.fromTemplate"]), new("empty", L["mnt.empty"])];
+
+    protected override Task OnInitializedAsync() => LoadLog();
+
+    private async Task LoadLog()
+    {
+        try { _log = await Api.GetAsync<IReadOnlyList<MaintenanceLogEntry>>(Api.C("accounting/maintenance/log")); } catch (ApiException) { _log = []; }
+    }
+
+    private string Counts(MaintenanceLogEntry x) => string.Join(" · ", x.Counts.Select(c => $"{(L["mnt.count." + c.Key] is var t && t.StartsWith("mnt.", StringComparison.Ordinal) ? c.Key : t)}: {Fmt.Count(c.Value)}"));
+
+    private async Task Pick(string action)
+    {
+        _action = action;
+        _word = _reason = _runError = null;
+        if (action == MaintenanceActions.DeleteEntries && _entries.Count == 0)
+        {
+            try { _entries = (await Api.GetAsync<PagedResult<JournalEntrySummary>>(Api.C("accounting/journal-entries?manual=true&status=Posted&pageSize=200"))).Items; }
+            catch (ApiException) { _entries = []; }
+        }
+        await Preview();
+    }
+
+    private Task Picked(IReadOnlySet<object> s) { _picked = s; return Preview(); }
+
+    private MaintenanceRequest Request() => new(_word?.Trim(), _reason?.Trim(),
+        _action == MaintenanceActions.DeleteEntries ? _picked.Select(k => k.ToString()!).ToList() : null,
+        _action == MaintenanceActions.ReplaceChart ? _chartSource : null);
+
+    private async Task Preview()
+    {
+        if (_action is null) return;
+        _preview = null;
+        _previewError = null;
+        try { _preview = await Api.PostAsync<MaintenancePreview>(Api.C($"accounting/maintenance/{_action}/preview"), Request()); }
+        catch (ApiException e) { _previewError = e.Problem.Detail; }
+    }
+
+    private async Task Backup()
+    {
+        _busy = true;
+        try
+        {
+            var file = await Api.FileAsync(Api.C("accounting/maintenance/backup"), new { });
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+            Toasts.Success(L["mnt.backedUp"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Run()
+    {
+        if (_action is null) return;
+        _busy = true;
+        _runError = null;
+        try
+        {
+            var r = await Api.PostAsync<MaintenanceResult>(Api.C($"accounting/maintenance/{_action}"), Request());
+            Toasts.Success(L.F("mnt.done", L["mnt." + r.Action]));
+            _action = null;
+            _preview = null;
+            _entries = [];
+            _picked = new HashSet<object>();
+            await LoadLog();
+        }
+        catch (ApiException e) { _runError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

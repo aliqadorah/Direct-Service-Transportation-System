@@ -1,0 +1,93 @@
+@page "/c/{Company}/accounting/trial-balance"
+@*
+  SCR-36 trial balance (FR-117, FR-110): period, tree level, hide empty rows; opening, movements and closing as debit / credit with totals;
+  a mismatch is highlighted; the opening-balance difference still to clear is shown during setup. A row opens its ledger. Excel / PDF.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.trialBalance"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.trialBalance"])])" />
+<div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+    <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+    <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+    <SelectField TValue="int?" @bind-Value="_level" Options="Levels" Empty="@L["rep.allLevels"]" Label="@L["rep.level"]" FieldClass="w160" />
+    <CheckField @bind-Value="_hideZero" Label="@L["rep.hideZero"]" />
+    <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+    </span>
+</div>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="book" Title="@L["rep.noMovement"]" /></Empty>
+    <ChildContent>
+        @{ var r = _r!; }
+        @if (!r.Balanced) {<Banner Tone="Tone.Err" Text="@L["rep.tbMismatch"]" />}
+        @if (r.OpeningDifference is decimal d && d != 0) {<Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(d))" />}
+        <ListFrame Label="@L["nav.trialBalance"]">
+            <DataGrid TItem="TrialBalanceRow" Items="r.Rows" Key="x => x.Account.Id" Caption="@L["nav.trialBalance"]" OnRowClick="Open" FooterLabel="@L["ui.total"]"
+                      RowClass="@(x => x.IsLeaf ? null : "grp")">
+                <Columns>
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["acc.code"]" Value="x => x.Account.Code" Ltr="true" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["md.name"]" Value="x => L.Pick(x.Account.NameAr, x.Account.NameEn)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.openDebit"]" Value="x => M(x.OpeningDebit)" Numeric="true" Footer="@Fmt.Money(r.Totals.OpeningDebit)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.openCredit"]" Value="x => M(x.OpeningCredit)" Numeric="true" Footer="@Fmt.Money(r.Totals.OpeningCredit)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.moveDebit"]" Value="x => M(x.MovementDebit)" Numeric="true" Footer="@Fmt.Money(r.Totals.MovementDebit)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.moveCredit"]" Value="x => M(x.MovementCredit)" Numeric="true" Footer="@Fmt.Money(r.Totals.MovementCredit)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.closeDebit"]" Value="x => M(x.ClosingDebit)" Numeric="true" Footer="@Fmt.Money(r.Totals.ClosingDebit)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["rep.closeCredit"]" Value="x => M(x.ClosingCredit)" Numeric="true" Footer="@Fmt.Money(r.Totals.ClosingCredit)" />
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private TrialBalanceReport? _r;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private DateOnly? _from, _to;
+    private int? _level;
+    private bool _hideZero = true;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<Option<int?>> Levels => Enumerable.Range(1, _r?.MaxLevel ?? 4).Select(i => new Option<int?>(i, L.F("rep.levelN", i))).ToList();
+
+    private static string? M(decimal v) => v == 0 ? null : Fmt.Money(v);
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private string Query()
+    {
+        var p = new List<string> { "hideZero=" + (_hideZero ? "true" : "false") };
+        if (_from is { } f) p.Add("from=" + f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        if (_to is { } t) p.Add("to=" + t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        if (_level is { } l) p.Add("level=" + l.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return "?" + string.Join('&', p);
+    }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            _r = await Api.GetAsync<TrialBalanceReport>(Api.C("accounting/reports/trial-balance" + Query()));
+            _from ??= _r.From;
+            _to ??= _r.To;
+            _state = _r.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/reports/trial-balance/export" + Query()), format);
+
+    private void Open(TrialBalanceRow x)
+    {
+        string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        Nav.NavigateTo(NavModel.Href(Company, $"accounting/ledger?account={Uri.EscapeDataString(x.Account.Id)}&from={D(_from)}&to={D(_to)}"));
+    }
+}

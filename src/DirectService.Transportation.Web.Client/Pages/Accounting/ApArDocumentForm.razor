@@ -1,0 +1,152 @@
+@page "/c/{Company}/accounting/payables/new"
+@page "/c/{Company}/accounting/receivables/new"
+@*
+  SCR-40 supplier bill / SCR-41 receivable document (FR-123, FR-124, DT-106, DT-107): party (suppliers; customers incl. transport customers,
+  DT-101), date, due date from the party's terms, reference, lines with description, account (expense or asset for bills, revenue for
+  receivables — never control accounts), amount, tax rate (company rate by default) and cost centre. Posted on save (no drafts, DT-106);
+  tax is computed once on the document by the API.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+@inject MoneyAccounts Money
+@inject NavigationManager Nav
+
+<PageHeader Title="@L[Payables ? "ap.newBill" : "ap.newReceivable"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L[Payables ? "nav.payables" : "nav.receivables"], NavModel.Href(Company, Route))])">
+    <Actions><Btn Primary="true" Text="@L["ap.savePost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
+</PageHeader>
+<PostingBanner OnStatus="r => _postingReady = r" />
+<EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+    <ProblemValidator @ref="_problems" />
+    <ErrorSummary @ref="_summary" Extra="_extra" />
+    <section class="box pad" style="flex:none">
+        <div class="fg" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+            <ComboField TValue="string?" @bind-Value="_m.Party" Options="_parties" Label="@L["ap.party"]" Required="true" Span="2" OnSelected="_ => PartyChanged()" />
+            <DateField @bind-Value="_m.DocumentDate" Label="@L["trip.date"]" Required="true" @bind-Value:after="PartyChanged" />
+            <DateField @bind-Value="_m.DueDate" Label="@L["inv.due"]" Help="@(_terms is int t ? L.F("inv.termsDays", t) : null)" />
+            <TextField @bind-Value="_m.Reference" Label="@L["ap.reference"]" MaxLength="50" Ltr="true" />
+        </div>
+    </section>
+    <div class="cols fill" style="grid-template-columns:1fr 280px;align-items:start;min-height:0">
+        <Box Title="@L["inv.items"]" NoPad="true">
+            <Actions><Btn Small="true" Icon="plus" Text="@L["inv.addLine"]" OnClick="() => _m.Lines.Add(new LineModel())" /></Actions>
+            <ChildContent>
+                <div class="tbl-wrap">
+                    <table class="tbl">
+                        <caption class="sr-only">@L["inv.items"]</caption>
+                        <thead><tr><th scope="col">@L["inv.description"]</th><th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["inv.amount"]</th><th scope="col" class="n">@L["ap.taxRate"]</th><th scope="col">@L["je.costCentre"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th></tr></thead>
+                        <tbody>
+                            @for (var i = 0; i < _m.Lines.Count; i++)
+                            {
+                                var line = _m.Lines[i];
+                                var n = i + 1;
+                                <tr @key="line">
+                                    <td style="min-width:200px"><TextField @bind-Value="line.Description" MaxLength="300" aria-label="@L.F("inv.lineDescription", n)" /></td>
+                                    <td style="min-width:240px"><ComboField TValue="string?" @bind-Value="line.AccountId" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" /></td>
+                                    <td class="n" style="width:140px"><NumberField @bind-Value="line.Amount" Min="0.001m" aria-label="@L.F("ap.lineAmount", n)" /></td>
+                                    <td class="n" style="width:110px"><NumberField @bind-Value="line.TaxRate" Min="0m" Max="100m" Decimals="2" Unit="%" aria-label="@L.F("ap.lineTax", n)" Placeholder="@L["ap.companyRate"]" /></td>
+                                    <td style="width:170px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
+                                    <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 1" OnClick="() => _m.Lines.Remove(line)" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </ChildContent>
+        </Box>
+        <Box Title="@L["inv.totals"]">
+            <div class="ln"><span>@L["inv.subtotal"]</span><Money Value="_m.Lines.Sum(l => l.Amount ?? 0)" /></div>
+            <p class="help" style="margin:6px 0 0">@L["ap.taxOnce"]</p>
+        </Box>
+    </div>
+</EditForm>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private IReadOnlyList<Option<string?>> _parties = [], _accounts = [];
+    private IReadOnlyList<ApArPartyOption> _partyOptions = [];
+    private int? _terms;
+    private DateOnly? _lastAutoDue;
+    private bool _saving, _postingReady = true;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool Payables => Nav.Uri.Contains("/accounting/payables", StringComparison.Ordinal);
+    private string Route => Payables ? "accounting/payables" : "accounting/receivables";
+    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.AcctApar);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new EditContext(_m);
+        _m.Lines.Add(new LineModel());
+        try
+        {
+            await Lookups.EnsureAsync();
+            // Bills: expense or asset accounts; receivables: revenue (DT-107). Control accounts are refused by the API.
+            _accounts = Lookups.Accounts.Where(a => !a.IsControlAccount && (Payables ? a.AccountType is "Expense" or "Asset" : a.AccountType == "Revenue"))
+                .Select(a => new Option<string?>(a.Account.Id, Lookups.Name(a.Account))).ToList();
+            _partyOptions = await Lookups.PartiesAsync(Payables ? "Supplier" : "Customer");
+            _parties = _partyOptions.Select(p => new Option<string?>($"{p.Type}|{p.Id}", p.Name, p.Type == "Customer" ? L["ap.transportCustomer"] : p.TaxNumber)).ToList();
+        }
+        catch (ApiException) { }
+        try { await Money.EnsureAsync(); } catch (ApiException) { }
+        _m.DocumentDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    /// <summary>Due date = document date + the party's payment terms, until the user changes it.</summary>
+    private void PartyChanged()
+    {
+        _terms = _partyOptions.FirstOrDefault(p => $"{p.Type}|{p.Id}" == _m.Party)?.PaymentTermsDays;
+        if (_terms is int t && _m.DocumentDate is DateOnly d && (_m.DueDate is null || _m.DueDate == _lastAutoDue))
+            _m.DueDate = _lastAutoDue = d.AddDays(t);
+    }
+
+    private async Task Save()
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            string? partyId = null, customerId = null;
+            if (_m.Party?.Split('|') is [var type, var id]) { if (type == "Customer") customerId = id; else partyId = id; }
+            var req = new ApArDocumentRequest(partyId, customerId, _m.DocumentDate, _m.DueDate, string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim(),
+                _m.Lines.Select(l => new ApArLineRequest(l.Description?.Trim(), l.AccountId, l.Amount, l.TaxRate, l.CostCentreId)).ToList(), _m.ClientId);
+            var r = await Api.PostAsync<ApArDocumentDetails>(Api.C(Payables ? "apar/bills" : "apar/receivables"), req);
+            Toasts.Success(L.F("ap.saved", r.Document.Number, Fmt.Money(r.Document.Total)));
+            Lookups.Invalidate();
+            Nav.NavigateTo(NavModel.Href(Company, $"{Route}/{r.Document.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model
+    {
+        public string? Party { get; set; }
+        public DateOnly? DocumentDate { get; set; }
+        public DateOnly? DueDate { get; set; }
+        public string? Reference { get; set; }
+        public List<LineModel> Lines { get; } = [];
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+
+    private sealed class LineModel
+    {
+        public string? Description { get; set; }
+        public string? AccountId { get; set; }
+        public decimal? Amount { get; set; }
+        public decimal? TaxRate { get; set; }
+        public string? CostCentreId { get; set; }
+    }
+}

@@ -1,0 +1,55 @@
+@* A financial-statement section (FR-118, FR-119): accounts in tree order, indented by level, groups in bold, the amount and an optional comparison; a leaf opens its ledger. *@
+@inject Loc L
+@inject NavigationManager Nav
+@inject ShellState Shell
+<table class="grid">
+    <caption class="sr-only">@Title</caption>
+    <thead>
+        <tr>
+            <th scope="col">@Title</th>
+            <th scope="col" class="n">@(AmountTitle ?? L["inv.amount"])</th>
+            @if (Compare) {<th scope="col" class="n">@L["rep.compare"]</th>}
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var row in Rows)
+        {
+            var r = row;
+            <tr @key="r.Account.Id" style="@(r.IsLeaf ? null : "font-weight:600")" class="@(r.IsLeaf ? "clk" : null)" tabindex="@(r.IsLeaf ? 0 : null)"
+                @onclick="() => Open(r)" @onkeydown="@(e => { if (e.Key == "Enter") Open(r); })">
+                <td><span style="padding-inline-start:@((r.Level - 1) * 16)px"><bdi class="num">@r.Account.Code</bdi> @L.Pick(r.Account.NameAr, r.Account.NameEn)</span></td>
+                <td class="n"><bdi class="num">@Fmt.Money(r.Amount)</bdi></td>
+                @if (Compare) {<td class="n"><bdi class="num">@Fmt.Money(r.CompareAmount)</bdi></td>}
+            </tr>
+        }
+        @foreach (var extra in Extra)
+        {
+            <tr><td><Tx Value="@extra.Label" /></td><td class="n"><bdi class="num">@Fmt.Money(extra.Amount)</bdi></td>@if (Compare) {<td class="n"><bdi class="num">@Fmt.Money(extra.Compare)</bdi></td>}</tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr><td>@TotalLabel</td><td class="n"><bdi class="num">@Fmt.Money(Total)</bdi></td>@if (Compare) {<td class="n"><bdi class="num">@Fmt.Money(CompareTotal)</bdi></td>}</tr>
+    </tfoot>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? AmountTitle { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<StatementRow> Rows { get; set; } = [];
+    /// <summary>Lines after the accounts (e.g. current-year result inside equity).</summary>
+    [Parameter] public IReadOnlyList<(string Label, decimal Amount, decimal? Compare)> Extra { get; set; } = [];
+    [Parameter] public string TotalLabel { get; set; } = "";
+    [Parameter] public decimal Total { get; set; }
+    [Parameter] public decimal? CompareTotal { get; set; }
+    [Parameter] public bool Compare { get; set; }
+    /// <summary>Period passed to the ledger of a leaf account.</summary>
+    [Parameter] public DateOnly? From { get; set; }
+    [Parameter] public DateOnly? To { get; set; }
+
+    private void Open(StatementRow r)
+    {
+        if (!r.IsLeaf || Shell.Company is not { } c || !Shell.Can(PermissionKeys.AcctView)) return;
+        string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        Nav.NavigateTo(NavModel.Href(c.Id, $"accounting/ledger?account={Uri.EscapeDataString(r.Account.Id)}&from={D(From)}&to={D(To)}"));
+    }
+}

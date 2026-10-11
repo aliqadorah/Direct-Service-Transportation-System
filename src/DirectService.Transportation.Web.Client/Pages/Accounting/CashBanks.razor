@@ -1,0 +1,286 @@
+@page "/c/{Company}/accounting/cash-banks"
+@*
+  SCR-42 banks and cash boxes (FR-129, FR-130, DT-25): cash boxes and bank accounts with their own ledger account, status and balance as of a
+  date; add / edit / archive / restore / delete (acct.setup); the statement of one cash box or bank for a period with opening, receipts,
+  payments, running and closing balance (Excel / PDF).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+@inject MoneyAccounts Money
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.cashBanks"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.cashBanks"])])">
+    <Actions>
+        @if (CanSetup)
+        {
+            <Btn Icon="plus" Text="@L["cb.newBox"]" OnClick="() => EditBox(null)" />
+            <Btn Primary="true" Icon="plus" Text="@L["cb.newBank"]" OnClick="() => EditBank(null)" />
+        }
+    </Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.List" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="cash" Title="@L["cb.none"]" Text="@L["cb.noneText"]">
+            <Actions>@if (CanSetup) {<Btn Primary="true" Text="@L["cb.newBox"]" OnClick="() => EditBox(null)" />}</Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <div class="cols fill" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start;min-height:0">
+            <div class="stack" style="min-width:0">
+                <Box Title="@L["cb.boxes"]" NoPad="true">
+                    <DataGrid TItem="CashBoxResponse" Items="_boxes" Key="b => b.Id" Caption="@L["cb.boxes"]" OnRowClick="b => Show(CashCodes.CashBox, b.Id, b.Name)"
+                              RowClass="@(b => b.Id == _selected ? "sel" : b.Status == "Active" ? null : "void")">
+                        <Columns>
+                            <GridColumn TItem="CashBoxResponse" Title="@L["md.name"]" Value="b => b.Name" />
+                            <GridColumn TItem="CashBoxResponse" Title="@L["cb.ledger"]" Value="b => Lookups.Name(b.Account)" Clip="true" />
+                            <GridColumn TItem="CashBoxResponse" Title="@L["dash.balance"]" Value="b => Fmt.Money(Balance(b.Id))" Numeric="true" />
+                            <GridColumn TItem="CashBoxResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
+                            @if (CanSetup) {<GridColumn TItem="CashBoxResponse" Title="@L["ml.edit"]" HideTitle="true"><Template><span @onclick:stopPropagation="true" @onkeydown:stopPropagation="true"><Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L.F("ml.editTitle", context.Name)" OnClick="() => EditBox(context)" /></span></Template></GridColumn>}
+                        </Columns>
+                    </DataGrid>
+                </Box>
+                <Box Title="@L["cb.banks"]" NoPad="true">
+                    <DataGrid TItem="BankAccountResponse" Items="_banks" Key="b => b.Id" Caption="@L["cb.banks"]" OnRowClick="b => Show(CashCodes.BankAccount, b.Id, b.Name)"
+                              RowClass="@(b => b.Id == _selected ? "sel" : b.Status == "Active" ? null : "void")">
+                        <Columns>
+                            <GridColumn TItem="BankAccountResponse" Title="@L["md.name"]" Value="b => b.Name" />
+                            <GridColumn TItem="BankAccountResponse" Title="@L["md.bank"]" Value="b => b.BankName" />
+                            <GridColumn TItem="BankAccountResponse" Title="IBAN" Value="b => b.Iban" Ltr="true" />
+                            <GridColumn TItem="BankAccountResponse" Title="@L["cb.currency"]" Value="b => b.CurrencyCode" Ltr="true" />
+                            <GridColumn TItem="BankAccountResponse" Title="@L["dash.balance"]" Value="b => Fmt.Money(Balance(b.Id))" Numeric="true" />
+                            <GridColumn TItem="BankAccountResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
+                            @if (CanSetup) {<GridColumn TItem="BankAccountResponse" Title="@L["ml.edit"]" HideTitle="true"><Template><span @onclick:stopPropagation="true" @onkeydown:stopPropagation="true"><Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L.F("ml.editTitle", context.Name)" OnClick="() => EditBank(context)" /></span></Template></GridColumn>}
+                        </Columns>
+                    </DataGrid>
+                </Box>
+            </div>
+            <Box Title="@(_selectedName is null ? L["cb.statement"] : L.F("cb.statementOf", _selectedName))" NoPad="true">
+                @if (_selected is null)
+                {
+                    <EmptyState Icon="book" Title="@L["cb.pick"]" />
+                }
+                else
+                {
+                    <div class="row pad" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+                        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+                        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+                        <Btn Icon="filter" Text="@L["rep.run"]" OnClick="Statement" />
+                        <span style="margin-inline-start:auto;display:flex;gap:6px">
+                            <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+                            <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+                        </span>
+                    </div>
+                    @if (_statement is { } s)
+                    {
+                        <Figures Items="@([new Figure(L["rep.opening"], Fmt.Money(s.Opening)), new Figure(L["cb.receipts"], Fmt.Money(s.Receipts)), new Figure(L["cb.payments"], Fmt.Money(s.Payments)), new Figure(L["rep.closing"], Fmt.Money(s.Closing))])" />
+                        <DataGrid TItem="LedgerLine" Items="s.Lines.Items" Key="l => (object)l" Caption="@L["cb.statement"]" OnRowClick="@(l => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{l.Entry.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="LedgerLine" Title="@L["trip.date"]" Value="l => Fmt.Date(l.Date, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="LedgerLine" Title="@L["rep.entry"]" Value="l => l.Entry.Number" Ltr="true" />
+                                <GridColumn TItem="LedgerLine" Title="@L["je.description"]" Value="l => l.Description" Clip="true" />
+                                <GridColumn TItem="LedgerLine" Title="@L["cb.receipts"]" Value="@(l => l.Debit == 0 ? null : Fmt.Money(l.Debit))" Numeric="true" />
+                                <GridColumn TItem="LedgerLine" Title="@L["cb.payments"]" Value="@(l => l.Credit == 0 ? null : Fmt.Money(l.Credit))" Numeric="true" />
+                                <GridColumn TItem="LedgerLine" Title="@L["dash.balance"]" Value="l => Fmt.Money(l.Balance)" Numeric="true" />
+                            </Columns>
+                        </DataGrid>
+                    }
+                }
+            </Box>
+        </div>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@EditorTitle" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" id="cb-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <TextField @bind-Value="_m.Name" Label="@L["md.name"]" Required="true" MaxLength="100" />
+            @if (_m.IsBank)
+            {
+                <TextField @bind-Value="_m.BankName" Label="@L["md.bank"]" Required="true" MaxLength="100" />
+                <TextField @bind-Value="_m.AccountNumber" Label="@L["cb.accountNumber"]" MaxLength="50" Ltr="true" />
+                <TextField @bind-Value="_m.Iban" Label="IBAN" MaxLength="34" Ltr="true" Help="@L["md.ibanHelp"]" />
+                <TextField @bind-Value="_m.CurrencyCode" Label="@L["cb.currency"]" MaxLength="3" Ltr="true" />
+            }
+            <ComboField TValue="string?" @bind-Value="_m.AccountId" Options="@Lookups.AccountOptions("Asset")" Label="@L["cb.ledger"]" Required="true" Help="@L["cb.ledgerHelp"]" />
+        </EditForm>
+        @if (_m.Id is not null)
+        {
+            <div class="row" style="gap:6px;margin-top:10px">
+                <Btn Icon="@(_m.Status == "Active" ? "archive" : "refresh")" Text="@L[_m.Status == "Active" ? "ml.archive" : "ml.restore"]" Busy="_busy" OnClick="ToggleStatus" />
+                <Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _editing = false; _deleting = true; }" />
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cb-form" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _m.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["cb.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="Delete" />
+
+@code {
+    private IReadOnlyList<CashBoxResponse> _boxes = [];
+    private IReadOnlyList<BankAccountResponse> _banks = [];
+    private Dictionary<string, decimal> _balances = new(StringComparer.Ordinal);
+    private CashBankStatement? _statement;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _selected, _selectedKind, _selectedName, _deleteError;
+    private DateOnly? _from, _to;
+    private bool _editing, _busy, _deleting;
+    private EditorModel _m = new();
+    private EditContext _ctx = new(new EditorModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanSetup => Shell.Can(PermissionKeys.AcctSetup);
+    private string EditorTitle => _m.Id is null ? L[_m.IsBank ? "cb.newBank" : "cb.newBox"] : L.F("ml.editTitle", _m.Name ?? "");
+    private decimal Balance(string id) => _balances.GetValueOrDefault(id);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _boxes = await Api.GetAsync<IReadOnlyList<CashBoxResponse>>(Api.C("accounting/cash-boxes"));
+            _banks = await Api.GetAsync<IReadOnlyList<BankAccountResponse>>(Api.C("accounting/bank-accounts"));
+            var balances = await Api.GetAsync<IReadOnlyList<CashBankBalance>>(Api.C("accounting/reports/cash-bank-balances"));
+            _balances = balances.ToDictionary(b => b.Account.Id, b => b.Balance, StringComparer.Ordinal);
+            _state = _boxes.Count == 0 && _banks.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Show(string kind, string id, string name)
+    {
+        _selected = id;
+        _selectedKind = kind;
+        _selectedName = name;
+        return Statement();
+    }
+
+    private string Query()
+    {
+        var p = new List<string> { (_selectedKind == CashCodes.CashBox ? "cashBox=" : "bankAccount=") + Uri.EscapeDataString(_selected!) };
+        if (_from is { } f) p.Add("from=" + f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        if (_to is { } t) p.Add("to=" + t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return "?" + string.Join('&', p);
+    }
+
+    private async Task Statement()
+    {
+        if (_selected is null) return;
+        try
+        {
+            _statement = await Api.GetAsync<CashBankStatement>(Api.C("accounting/reports/cash-bank-statement" + Query() + "&pageSize=200"));
+            _from ??= _statement.From;
+            _to ??= _statement.To;
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/reports/cash-bank-statement/export" + Query()), format);
+
+    private void EditBox(CashBoxResponse? b)
+    {
+        _m = b is null ? new EditorModel() : new EditorModel { Id = b.Id, Name = b.Name, AccountId = b.Account.Id, Status = b.Status, RowVersion = b.RowVersion };
+        Open();
+    }
+
+    private void EditBank(BankAccountResponse? b)
+    {
+        _m = b is null ? new EditorModel { IsBank = true, CurrencyCode = "JOD" }
+            : new EditorModel { IsBank = true, Id = b.Id, Name = b.Name, BankName = b.BankName, AccountNumber = b.AccountNumber, Iban = b.Iban, CurrencyCode = b.CurrencyCode,
+                AccountId = b.Account.Id, Status = b.Status, RowVersion = b.RowVersion };
+        Open();
+    }
+
+    private void Open()
+    {
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _editing = true;
+    }
+
+    private string Path => _m.IsBank ? "accounting/bank-accounts" : "accounting/cash-boxes";
+
+    private async Task Save()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            object req = _m.IsBank
+                ? new BankAccountRequest(_m.Name?.Trim(), _m.BankName?.Trim(), _m.AccountNumber?.Trim(), _m.Iban?.Trim(), _m.CurrencyCode?.Trim(), _m.AccountId, _m.RowVersion)
+                : new CashBoxRequest(_m.Name?.Trim(), _m.AccountId, _m.RowVersion);
+            if (_m.Id is null) await Api.PostAsync(Api.C(Path), req);
+            else await Api.PutAsync(Api.C($"{Path}/{Uri.EscapeDataString(_m.Id)}"), req);
+            _editing = false;
+            Toasts.Success(L.F("ml.saved", _m.Name ?? ""));
+            Money.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task ToggleStatus()
+    {
+        _busy = true;
+        try
+        {
+            var active = _m.Status == "Active";
+            await Api.PostAsync(Api.C($"{Path}/{Uri.EscapeDataString(_m.Id!)}/{(active ? "archive" : "restore")}"), new StatusChangeRequest(_m.RowVersion));
+            _editing = false;
+            Toasts.Success(L.F(active ? "ml.archivedToast" : "ml.restored", _m.Name ?? ""));
+            Money.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete(string reason)
+    {
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"{Path}/{Uri.EscapeDataString(_m.Id!)}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            Toasts.Success(L.F("ml.deleted", _m.Name ?? ""));
+            Money.Invalidate();
+            if (_selected == _m.Id) { _selected = null; _statement = null; }
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class EditorModel
+    {
+        public bool IsBank { get; set; }
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? BankName { get; set; }
+        public string? AccountNumber { get; set; }
+        public string? Iban { get; set; }
+        public string? CurrencyCode { get; set; }
+        public string? AccountId { get; set; }
+        public string Status { get; set; } = "Active";
+        public string? RowVersion { get; set; }
+    }
+}

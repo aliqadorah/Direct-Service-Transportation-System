@@ -1,0 +1,355 @@
+@page "/c/{Company}/accounting/payables"
+@page "/c/{Company}/accounting/receivables"
+@*
+  SCR-40 accounts payable and SCR-41 accounts receivable (FR-122…128, DT-101…112): documents (supplier bills / receivable documents with
+  their payment state, filters, totals, export), parties (suppliers / customers incl. transport customers, add / edit / archive / delete),
+  payments or collections, returns, and ageing as of a date (RPT-17 / RPT-18) with unapplied receipts. acct.apar writes; acct.acct.view reads.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L[Payables ? "nav.payables" : "nav.receivables"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L[Payables ? "nav.payables" : "nav.receivables"])])">
+    <Actions>
+        @if (CanWrite)
+        {
+            <Btn Icon="users" Text="@L[Payables ? "ap.newSupplier" : "ap.newCustomer"]" OnClick="() => EditParty(null)" />
+            <Btn Primary="true" Icon="plus" Text="@L[Payables ? "ap.newBill" : "ap.newReceivable"]" Href="@NavModel.Href(Company, $"{Route}/new")" />
+        }
+    </Actions>
+</PageHeader>
+<TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="SetTab" Label="@L[Payables ? "nav.payables" : "nav.receivables"]" />
+@switch (_tab)
+{
+    case "parties":
+        <ListShell Label="@L["ap.parties"]" Search="@_q" OnSearch="SearchParties" State="_state" Reference="@_reference" OnRetry="Load"
+                   EmptyIcon="users" EmptyTitle="@L["ap.noParties"]" EmptyText="@L[Payables ? "ap.noSuppliersText" : "ap.noCustomersText"]" Filtered="_q is not null" OnClear="() => SearchParties(null)"
+                   Page="_page" PageSize="50" Total="_parties?.TotalCount" OnPage="Go">
+            <EmptyActions>@if (CanWrite) {<Btn Primary="true" Text="@L[Payables ? "ap.newSupplier" : "ap.newCustomer"]" OnClick="() => EditParty(null)" />}</EmptyActions>
+            <ChildContent>
+                <DataGrid TItem="ApArPartyResponse" Items="_parties!.Items" Key="p => p.Id" Caption="@L["ap.parties"]" OnRowClick="EditParty" RowClass="@(p => p.Status == "Active" ? null : "void")">
+                    <Columns>
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["md.name"]" Value="p => p.Name" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["md.taxNumber"]" Value="p => p.TaxNumber" Ltr="true" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["md.phone"]" Value="p => p.Phone" Ltr="true" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["ap.controlAccount"]" Value="p => p.ControlAccount.Code" Ltr="true" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["md.terms"]" Value="@(p => $"{p.PaymentTermsDays} {L["md.days"]}")" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["ap.openBalance"]" Value="p => Fmt.Money(p.OpenBalance)" Numeric="true" />
+                        <GridColumn TItem="ApArPartyResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
+                    </Columns>
+                </DataGrid>
+            </ChildContent>
+        </ListShell>
+        break;
+    case "payments":
+        <ListShell Label="@L[Payables ? "ap.payments" : "ap.collections"]" State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="cash"
+                   EmptyTitle="@L[Payables ? "ap.noPayments" : "ap.noCollections"]" Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/payments/export?kind={Kind}&status=all"), f))"
+                   Page="_page" PageSize="50" Total="_payments?.Page.TotalCount" OnPage="Go">
+            <DataGrid TItem="ApArPaymentResponse" Items="_payments!.Page.Items" Key="p => p.Id" Caption="@L[Payables ? "ap.payments" : "ap.collections"]" RowClass="@(p => p.Status == "Void" ? "void" : null)"
+                      OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-payments/{p.Id}")))" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_payments.Totals.Count))">
+                <Columns>
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["ap.party"]" Value="p => p.Party.Name" Clip="true" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["ap.document"]" Value="p => p.Document.Number" Ltr="true" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["cash.method"]" Value="@(p => L["pay." + p.PaymentMethod])" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["inv.amount"]" Value="p => Fmt.Money(p.Amount)" Numeric="true" Footer="@Fmt.Money(_payments.Totals.Amount)" />
+                    <GridColumn TItem="ApArPaymentResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListShell>
+        break;
+    case "returns":
+        <ListShell Label="@L["ap.returns"]" State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="refresh" EmptyTitle="@L["ap.noReturns"]"
+                   Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/returns/export?kind={Kind}&status=all"), f))"
+                   Page="_page" PageSize="50" Total="_returns?.Page.TotalCount" OnPage="Go">
+            <DataGrid TItem="ApArReturnResponse" Items="_returns!.Page.Items" Key="r => r.Id" Caption="@L["ap.returns"]" RowClass="@(r => r.Status == "Void" ? "void" : null)"
+                      OnRowClick="@(r => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-returns/{r.Id}")))">
+                <Columns>
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReturnDate, Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["ap.party"]" Value="r => r.Party.Name" Clip="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["ap.document"]" Value="r => r.Document.Number" Ltr="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["ui.reason"]" Value="r => r.Reason" Clip="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["inv.total"]" Value="r => Fmt.Money(r.Total)" Numeric="true" />
+                    <GridColumn TItem="ApArReturnResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListShell>
+        break;
+    case "ageing":
+        <div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+            <DateField @bind-Value="_asOf" Label="@L["rep.asOf"]" FieldClass="w160" />
+            <Btn Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
+            <span style="margin-inline-start:auto;display:flex;gap:6px">
+                <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Files.SaveAsync(Api.C($"apar/ageing/{AgeingKind}/export{AsOf}"), "xlsx"))" />
+                <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Files.SaveAsync(Api.C($"apar/ageing/{AgeingKind}/export{AsOf}"), "pdf"))" />
+            </span>
+        </div>
+        <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+            <Empty><EmptyState Icon="check" Title="@L["ap.nothingOpen"]" /></Empty>
+            <ChildContent>
+                @{ var a = _ageing!; }
+                <ListFrame Label="@L["ap.ageing"]">
+                    <DataGrid TItem="AgeingRow" Items="a.Rows" Key="r => (object)r" Caption="@L["ap.ageing"]" FooterLabel="@L["ui.total"]">
+                        <Columns>
+                            <GridColumn TItem="AgeingRow" Title="@L["ap.party"]" Value="r => r.Party.Name" />
+                            <GridColumn TItem="AgeingRow" Title="@L["ap.notDue"]" Value="r => Fmt.Money(r.Amounts.NotDue)" Numeric="true" Footer="@Fmt.Money(a.Totals.NotDue)" />
+                            <GridColumn TItem="AgeingRow" Title="1–30" Value="r => Fmt.Money(r.Amounts.Days1To30)" Numeric="true" Footer="@Fmt.Money(a.Totals.Days1To30)" />
+                            <GridColumn TItem="AgeingRow" Title="31–60" Value="r => Fmt.Money(r.Amounts.Days31To60)" Numeric="true" Footer="@Fmt.Money(a.Totals.Days31To60)" />
+                            <GridColumn TItem="AgeingRow" Title="61–90" Value="r => Fmt.Money(r.Amounts.Days61To90)" Numeric="true" Footer="@Fmt.Money(a.Totals.Days61To90)" />
+                            <GridColumn TItem="AgeingRow" Title="@L["ap.over90"]" Value="r => Fmt.Money(r.Amounts.Over90)" Numeric="true" Footer="@Fmt.Money(a.Totals.Over90)" />
+                            <GridColumn TItem="AgeingRow" Title="@L["inv.total"]" Value="r => Fmt.Money(r.Amounts.Total)" Numeric="true" Footer="@Fmt.Money(a.Totals.Total)" />
+                            <GridColumn TItem="AgeingRow" Title="@L["ap.unapplied"]" Value="@(r => r.Amounts.Unapplied == 0 ? null : Fmt.Money(r.Amounts.Unapplied))" Numeric="true" Footer="@Fmt.Money(a.Totals.Unapplied)" />
+                        </Columns>
+                    </DataGrid>
+                </ListFrame>
+            </ChildContent>
+        </StateView>
+        break;
+    default:
+        <ListShell Label="@L[Payables ? "ap.bills" : "ap.receivables"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q" SearchPlaceholder="@L["ap.search"]" OnSearch="Search"
+                   Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C(DocPath + "/export" + DocQuery(false)), f))" State="_state" Reference="@_reference" OnRetry="Load"
+                   EmptyIcon="file" EmptyTitle="@L[Payables ? "ap.noBills" : "ap.noReceivables"]" EmptyText="@L[Payables ? "ap.noBillsText" : "ap.noReceivablesText"]"
+                   Filtered="@(_q is not null || _from is not null || _to is not null)" OnClear="ClearAll" Page="_page" PageSize="50" Total="_docs?.Page.TotalCount" OnPage="Go">
+            <Filters>
+                <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+                <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+                <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Load" />
+            </Filters>
+            <EmptyActions>@if (CanWrite) {<Btn Primary="true" Text="@L[Payables ? "ap.newBill" : "ap.newReceivable"]" Href="@NavModel.Href(Company, $"{Route}/new")" />}</EmptyActions>
+            <ChildContent>
+                <DataGrid TItem="ApArDocumentResponse" Items="_docs!.Page.Items" Key="d => d.Id" Caption="@L[Payables ? "ap.bills" : "ap.receivables"]" RowClass="@(d => d.Status == "Void" ? "void" : null)"
+                          OnRowClick="@(d => Nav.NavigateTo(NavModel.Href(Company, $"{Route}/{d.Id}")))" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_docs.Totals.Count))">
+                    <Columns>
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["doc.number"]" Value="d => d.Number" Ltr="true" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["trip.date"]" Value="d => Fmt.Date(d.DocumentDate, Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["ap.party"]" Value="d => d.Party.Name" Clip="true" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["ap.reference"]" Value="d => d.Reference" Ltr="true" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.total"]" Value="d => Fmt.Money(d.Total)" Numeric="true" Footer="@Fmt.Money(_docs.Totals.Total)" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.remaining"]" Value="d => Fmt.Money(d.RemainingAmount)" Numeric="true" Footer="@Fmt.Money(_docs.Totals.Remaining)" />
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.due"]">
+                            <Template><bdi class="num">@Fmt.Date(context.DueDate, Shell.DateFormat)</bdi>@if (context.DaysOverdue > 0 && context.RemainingAmount > 0) {<text> </text><Badge Tone="Tone.Err" Icon="clock" Text="@L.F("ap.daysOverdue", context.DaysOverdue)" />}</Template>
+                        </GridColumn>
+                        <GridColumn TItem="ApArDocumentResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@ApArStatus.Tag(context)" /></Template></GridColumn>
+                        @if (!Payables) {<GridColumn TItem="ApArDocumentResponse" Title="@L["inv.einvoice"]"><Template><StatusTag Status="@BillingStatus.EInvoice(context.EInvoiceStatus)" /></Template></GridColumn>}
+                    </Columns>
+                </DataGrid>
+            </ChildContent>
+        </ListShell>
+        break;
+}
+
+<Modal @bind-Open="_editing" Title="@(_party.Id is null ? L[Payables ? "ap.newSupplier" : "ap.newCustomer"] : L.F("ml.editTitle", _party.Name ?? ""))" Busy="_busy" Wide="true">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="SaveParty" id="party-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                <TextField @bind-Value="_party.Name" Label="@L["md.name"]" Required="true" MaxLength="200" Span="2" ReadOnly="!CanWrite" />
+                <TextField @bind-Value="_party.TaxNumber" Label="@L["md.taxNumber"]" MaxLength="20" Ltr="true" ReadOnly="!CanWrite" />
+                <TextField @bind-Value="_party.Phone" Label="@L["md.phone"]" MaxLength="20" Ltr="true" ReadOnly="!CanWrite" />
+                <TextField @bind-Value="_party.Address" Label="@L["md.address"]" MaxLength="300" Span="2" ReadOnly="!CanWrite" />
+                <ComboField TValue="string?" @bind-Value="_party.ControlAccountId" Options="ControlAccounts" Label="@L["ap.controlAccount"]" ReadOnly="!CanWrite" Help="@L["ap.controlHelp"]" />
+                <IntField @bind-Value="_party.PaymentTermsDays" Label="@L["md.terms"]" Min="0" Max="365" Unit="@L["md.days"]" ReadOnly="!CanWrite" />
+            </div>
+        </EditForm>
+        @if (_party.Id is not null && CanWrite)
+        {
+            <div class="row" style="gap:6px;margin-top:10px">
+                <Btn Icon="@(_party.Status == "Active" ? "archive" : "refresh")" Text="@L[_party.Status == "Active" ? "ml.archive" : "ml.restore"]" Busy="_busy" OnClick="TogglePartyStatus" />
+                <Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _editing = false; _deleting = true; }" />
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        @if (CanWrite) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="party-form" />}
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _party.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["ml.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="DeleteParty" />
+
+@code {
+    private string _tab = "documents", _view = "open";
+    private ApArDocumentPage? _docs;
+    private PagedResult<ApArPartyResponse>? _parties;
+    private ApArPaymentPage? _payments;
+    private ApArReturnPage? _returns;
+    private AgeingReport? _ageing;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _deleteError;
+    private DateOnly? _from, _to, _asOf;
+    private int _page = 1;
+    private bool _editing, _busy, _deleting;
+    private PartyModel _party = new();
+    private EditContext _ctx = new(new PartyModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool Payables => Nav.Uri.Contains("/accounting/payables", StringComparison.Ordinal);
+    private string Route => Payables ? "accounting/payables" : "accounting/receivables";
+    private string Kind => Payables ? "bills" : "receivables";
+    private string DocPath => "apar/" + Kind;
+    private string AgeingKind => Payables ? "payables" : "receivables";
+    private string Role => Payables ? "Supplier" : "Customer";
+    private bool CanWrite => Shell.Can(PermissionKeys.AcctApar);
+    private string AsOf => _asOf is { } d ? "?asOf=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "";
+
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("documents", L[Payables ? "ap.bills" : "ap.receivables"]), new("parties", L[Payables ? "ap.suppliers" : "ap.customers"]),
+        new("payments", L[Payables ? "ap.payments" : "ap.collections"]), new("returns", L["ap.returns"]), new("ageing", L["ap.ageing"]),
+    ];
+
+    private IReadOnlyList<TabItem> Views => [new("open", L["ap.viewOpen"]), new("overdue", L["inv.viewOverdue"]), new("closed", L["st.closed"]), new("void", L["st.void"]), new("all", L["ml.all"])];
+
+    /// <summary>Control accounts of the party's role (trade payables / receivables) for the party editor (DT-110).</summary>
+    private IReadOnlyList<Option<string?>> ControlAccounts =>
+        Lookups.Accounts.Where(a => a.IsControlAccount && a.ControlPartyType == Role).Select(a => new Option<string?>(a.Account.Id, Lookups.Name(a.Account))).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tab"] is { Length: > 0 } t) _tab = t;
+        await Load();
+    }
+
+    private string DocQuery(bool paged)
+    {
+        var p = new List<string>();
+        void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
+        Add("status", _view switch { "void" => "void", "all" => "all", _ => "posted" });
+        Add("payment", _view is "open" or "overdue" or "closed" ? _view : null);
+        Add("q", _q);
+        Add("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Add("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        if (paged) Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return "?" + string.Join('&', p);
+    }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            var page = _page.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            switch (_tab)
+            {
+                case "parties":
+                    _parties = await Api.GetAsync<PagedResult<ApArPartyResponse>>(Api.C($"apar/parties?role={Role}&status=all&page={page}" + (_q is null ? "" : "&q=" + Uri.EscapeDataString(_q))));
+                    _state = _parties.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                    break;
+                case "payments":
+                    _payments = await Api.GetAsync<ApArPaymentPage>(Api.C($"apar/payments?kind={Kind}&status=all&page={page}"));
+                    _state = _payments.Page.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                    break;
+                case "returns":
+                    _returns = await Api.GetAsync<ApArReturnPage>(Api.C($"apar/returns?kind={Kind}&status=all&page={page}"));
+                    _state = _returns.Page.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                    break;
+                case "ageing":
+                    _ageing = await Api.GetAsync<AgeingReport>(Api.C($"apar/ageing/{AgeingKind}{AsOf}"));
+                    _asOf ??= _ageing.AsOf;
+                    _state = _ageing.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                    break;
+                default:
+                    _docs = await Api.GetAsync<ApArDocumentPage>(Api.C(DocPath + DocQuery(true)));
+                    _state = _docs.Page.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
+                    break;
+            }
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetTab(string t) { _tab = t; _page = 1; _q = null; return Load(); }
+    private Task SetView(string v) { _view = v; _page = 1; return Load(); }
+    private Task Search(string? q) { _q = q; _page = 1; return Load(); }
+    private Task SearchParties(string? q) { _q = q; _page = 1; return Load(); }
+    private Task Go(int p) { _page = p; return Load(); }
+    private Task ClearAll() { _q = null; _from = _to = null; _page = 1; return Load(); }
+
+    private void EditParty(ApArPartyResponse? p)
+    {
+        _party = p is null
+            ? new PartyModel { PaymentTermsDays = 30, ControlAccountId = ControlAccounts.FirstOrDefault()?.Value }
+            : new PartyModel { Id = p.Id, Name = p.Name, TaxNumber = p.TaxNumber, Phone = p.Phone, Address = p.Address, ControlAccountId = p.ControlAccount.Id,
+                PaymentTermsDays = p.PaymentTermsDays, Status = p.Status, RowVersion = p.RowVersion };
+        _ctx = new EditContext(_party);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task SaveParty()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var req = new ApArPartyRequest(Role, _party.Name?.Trim(), Clean(_party.TaxNumber), Clean(_party.Phone), Clean(_party.Address), _party.ControlAccountId,
+                _party.PaymentTermsDays, _party.Id is null ? _party.ClientId : null, _party.RowVersion);
+            if (_party.Id is null) await Api.PostAsync(Api.C("apar/parties"), req);
+            else await Api.PutAsync(Api.C($"apar/parties/{Uri.EscapeDataString(_party.Id)}"), req);
+            _editing = false;
+            Toasts.Success(L.F("ml.saved", _party.Name ?? ""));
+            Lookups.Invalidate();
+            if (_tab == "parties") await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private async Task TogglePartyStatus()
+    {
+        _busy = true;
+        try
+        {
+            var active = _party.Status == "Active";
+            await Api.PostAsync(Api.C($"apar/parties/{Uri.EscapeDataString(_party.Id!)}/{(active ? "archive" : "restore")}"), new StatusChangeRequest(_party.RowVersion));
+            _editing = false;
+            Toasts.Success(L.F(active ? "ml.archivedToast" : "ml.restored", _party.Name ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteParty(string reason)
+    {
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"apar/parties/{Uri.EscapeDataString(_party.Id!)}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            Toasts.Success(L.F("ml.deleted", _party.Name ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class PartyModel
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? TaxNumber { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? ControlAccountId { get; set; }
+        public int? PaymentTermsDays { get; set; }
+        public string Status { get; set; } = "Active";
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

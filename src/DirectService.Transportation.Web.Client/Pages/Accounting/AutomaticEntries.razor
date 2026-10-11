@@ -1,0 +1,174 @@
+@page "/c/{Company}/accounting/automatic"
+@*
+  SCR-34 automatic entries, pending postings and journal export (FR-096…104): automatic entries with their source documents (acct.je.view);
+  postings that could not be made with the reason, attempts and retry one / all (acct.je.export); numbered journal export batches for a
+  period range in JSON or CSV, re-export allowed (FR-104).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.automatic"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.automatic"])])" />
+<TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="SetTab" Label="@L["nav.automatic"]" />
+@switch (_tab)
+{
+    case "pending":
+        <div class="row" style="gap:8px;flex:none;justify-content:flex-end">
+            @if (CanExport) {<Btn Icon="refresh" Text="@L["auto.retryAll"]" Busy="_busy" Disabled="@(_pending is not { Count: > 0 })" OnClick="RetryAll" />}
+        </div>
+        <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+            <Empty><EmptyState Icon="check" Title="@L["auto.noPending"]" Text="@L["auto.noPendingText"]" /></Empty>
+            <ChildContent>
+                <ListFrame Label="@L["auto.pending"]">
+                    <DataGrid TItem="PendingPostingResponse" Items="_pending!" Key="p => p.Id" Caption="@L["auto.pending"]">
+                        <Columns>
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["je.source"]">
+                                <Template>
+                                    @if (context.Source is { } s && Links.ForSource(Company, s.Type, s.Id) is { } href) {<a href="@href"><bdi>@(s.Number ?? L["je.src." + s.Type])</bdi></a>}
+                                    else {<span>@L["je.src." + context.SourceType]</span>}
+                                </Template>
+                            </GridColumn>
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["ui.reason"]" Value="p => p.Reason" Wrap="true" />
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["ei.attempts"]" Value="p => Fmt.Count(p.Attempts)" Numeric="true" />
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["ei.lastAttempt"]" Value="p => Fmt.DateTime(p.LastAttemptAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["auto.since"]" Value="p => Fmt.DateTime(p.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="PendingPostingResponse" Title="@L["profile.action"]" HideTitle="true">
+                                <Template>@if (CanExport) {<Btn Small="true" Icon="refresh" Text="@L["auto.retry"]" OnClick="() => Retry(context)" />}</Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                </ListFrame>
+            </ChildContent>
+        </StateView>
+        break;
+    case "exports":
+        @if (CanExport)
+        {
+            <Box Title="@L["auto.newExport"]">
+                <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap">
+                    <TextField @bind-Value="_exportFrom" Label="@L["je.periodFrom"]" Placeholder="YYYY-MM" Ltr="true" MaxLength="7" FieldClass="w160" />
+                    <TextField @bind-Value="_exportTo" Label="@L["je.periodTo"]" Placeholder="YYYY-MM" Ltr="true" MaxLength="7" FieldClass="w160" />
+                    <SelectField TValue="string?" @bind-Value="_exportFormat" Options="Formats" Label="@L["auto.format"]" FieldClass="w160" />
+                    <Btn Primary="true" Icon="export" Text="@L["auto.export"]" Busy="_busy" OnClick="Export" />
+                </div>
+                @if (_exportError is not null) {<Banner Tone="Tone.Err" Text="@_exportError" />}
+                <p class="help" style="margin:6px 0 0">@L["auto.exportHelp"]</p>
+            </Box>
+        }
+        <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+            <Empty><EmptyState Icon="export" Title="@L["auto.noBatches"]" /></Empty>
+            <ChildContent>
+                <ListFrame Label="@L["auto.batches"]">
+                    <DataGrid TItem="JournalExportBatchResponse" Items="_batches!" Key="b => b.Id" Caption="@L["auto.batches"]">
+                        <Columns>
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["doc.number"]" Value="b => b.BatchNo" Ltr="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["je.periodFrom"]" Value="b => b.PeriodFrom" Ltr="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["je.periodTo"]" Value="b => b.PeriodTo" Ltr="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["auto.format"]" Value="b => b.Format" Ltr="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["auto.entries"]" Value="b => Fmt.Count(b.EntryCount)" Numeric="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["je.debit"]" Value="b => Fmt.Money(b.TotalDebit)" Numeric="true" />
+                            <GridColumn TItem="JournalExportBatchResponse" Title="@L["auto.exportedBy"]" Value="@(b => $"{b.ExportedBy} · {Fmt.DateTime(b.ExportedAt.ToLocalTime(), Shell.DateFormat)}")" />
+                        </Columns>
+                    </DataGrid>
+                </ListFrame>
+            </ChildContent>
+        </StateView>
+        break;
+    default:
+        <JournalList Company="@Company" AutomaticOnly="true" />
+        break;
+}
+
+@code {
+    private string _tab = "entries";
+    private IReadOnlyList<PendingPostingResponse>? _pending;
+    private IReadOnlyList<JournalExportBatchResponse>? _batches;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _exportFrom, _exportTo, _exportError;
+    private string? _exportFormat = "json";
+    private bool _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanExport => Shell.Can(PermissionKeys.JeExport);
+
+    private IReadOnlyList<TabItem> Tabs => CanExport
+        ? [new("entries", L["auto.entries"]), new("pending", L["auto.pending"], _pending?.Count), new("exports", L["auto.batches"])]
+        : [new("entries", L["auto.entries"]), new("pending", L["auto.pending"], _pending?.Count)];
+
+    private static IReadOnlyList<Option<string?>> Formats => [new("json", "JSON"), new("csv", "CSV")];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tab"] is { Length: > 0 } t) _tab = t;
+        await Load();
+    }
+
+    private async Task SetTab(string t)
+    {
+        _tab = t;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            if (_tab == "pending")
+            {
+                _pending = await Api.GetAsync<IReadOnlyList<PendingPostingResponse>>(Api.C("ledger/pending-postings"));
+                _state = _pending.Count == 0 ? LoadState.Empty : LoadState.Ready;
+            }
+            else if (_tab == "exports")
+            {
+                _batches = await Api.GetAsync<IReadOnlyList<JournalExportBatchResponse>>(Api.C("ledger/exports"));
+                _state = _batches.Count == 0 ? LoadState.Empty : LoadState.Ready;
+            }
+            else _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task Retry(PendingPostingResponse p)
+    {
+        try
+        {
+            var r = await Api.PostAsync<RetryResult>(Api.C($"ledger/pending-postings/{Uri.EscapeDataString(p.Id)}/retry"), null);
+            if (r.Posted > 0) Toasts.Success(L["auto.retried"]); else Toasts.Error(L["auto.stillPending"]);
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task RetryAll()
+    {
+        _busy = true;
+        try
+        {
+            var r = await Api.PostAsync<RetryResult>(Api.C("ledger/pending-postings/retry-all"), null);
+            Toasts.Success(L.F("auto.retriedAll", r.Posted, r.StillPending));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Export()
+    {
+        _busy = true;
+        _exportError = null;
+        try
+        {
+            var file = await Api.FileAsync(Api.C("ledger/exports"), new JournalExportRequest(_exportFrom?.Trim(), _exportTo?.Trim(), _exportFormat));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+            Toasts.Success(L.F("auto.exported", file.Name));
+            await Load();
+        }
+        catch (ApiException e) { _exportError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

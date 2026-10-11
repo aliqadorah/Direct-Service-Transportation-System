@@ -1,0 +1,216 @@
+@page "/c/{Company}/accounting/journal/new"
+@page "/c/{Company}/accounting/journal/{Id}/edit"
+@*
+  SCR-32 journal entry (FR-106, FR-111…113, D-05): date, description, lines with account (postable), debit or credit, cost centre, party —
+  required on control accounts and of the account's party type (customer, supplier, driver, partner) — and a note. Totals and the difference
+  are shown while typing; the API refuses unbalanced entries, closed periods and missing parties. Editing a posted manual entry reverses it
+  and posts the corrected entry.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+@inject TripLookups Transport
+@inject MoneyAccounts Money
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <PageHeader Title="@(_existing is null ? L["nav.newJournal"] : L.F("je.edit", _existing.Number))" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
+            <Actions><Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
+        </PageHeader>
+        @if (_existing is not null) {<Banner Tone="Tone.Info" Text="@L.F("je.editHelp", _existing.Number)" />}
+        @if (_existing is not null) {<RecordLockGuard EntityType="ACC.JournalEntry" Id="@_existing.Id" OnState="h => _lockedBy = h" />}
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <section class="box pad" style="flex:none">
+                <div class="fg" style="grid-template-columns:200px 1fr">
+                    <DateField @bind-Value="_m.EntryDate" Label="@L["trip.date"]" Required="true" />
+                    <TextField @bind-Value="_m.Description" Label="@L["je.description"]" Required="true" MaxLength="500" />
+                </div>
+            </section>
+            <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
+                <Actions><Btn Small="true" Icon="plus" Text="@L["je.addLine"]" OnClick="() => _m.Lines.Add(new LineModel())" /></Actions>
+                <ChildContent>
+                    <div class="tbl-wrap fill">
+                        <table class="tbl">
+                            <caption class="sr-only">@L["je.lines"]</caption>
+                            <thead><tr>
+                                <th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.costCentre"]</th><th scope="col">@L["je.party"]</th><th scope="col">@L["drv.note"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>
+                            </tr></thead>
+                            <tbody>
+                                @for (var i = 0; i < _m.Lines.Count; i++)
+                                {
+                                    var line = _m.Lines[i];
+                                    var n = i + 1;
+                                    var account = Lookups.Account(line.AccountId);
+                                    <tr @key="line">
+                                        <td style="min-width:260px"><ComboField TValue="string?" @bind-Value="line.AccountId" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" OnSelected="_ => line.Party = null" /></td>
+                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
+                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
+                                        <td style="width:180px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
+                                        <td style="min-width:200px">
+                                            @if (account is { IsControlAccount: true } a)
+                                            {
+                                                @if (a.ControlPartyType == "Driver")
+                                                {
+                                                    <ComboField TValue="string?" @bind-Value="line.Party" SearchAsync="SearchDrivers" Selected="line.PartyOption" aria-label="@L.F("je.lineParty", n)" Placeholder="@L["party.Driver"]" />
+                                                }
+                                                else
+                                                {
+                                                    <ComboField TValue="string?" @bind-Value="line.Party" Options="PartyOptions(a.ControlPartyType)" aria-label="@L.F("je.lineParty", n)" Placeholder="@L["party." + a.ControlPartyType]" />
+                                                }
+                                            }
+                                        </td>
+                                        <td style="min-width:160px"><TextField @bind-Value="line.Note" MaxLength="200" aria-label="@L.F("je.lineNote", n)" /></td>
+                                        <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 2" OnClick="() => _m.Lines.Remove(line)" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td>@L["ui.total"]</td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(Debit)</bdi></td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(Credit)</bdi></td>
+                                    <td colspan="4">
+                                        @if (Debit == Credit && Debit > 0) {<Badge Tone="Tone.Ok" Icon="check" Text="@L["je.balanced"]" />}
+                                        else {<Badge Tone="Tone.Err" Icon="alert" Text="@L.F("je.difference", Fmt.Money(Debit - Credit))" />}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </ChildContent>
+            </Box>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private JournalEntryResponse? _existing;
+    private IReadOnlyList<Option<string?>> _accounts = [];
+    private readonly Dictionary<string, IReadOnlyList<Option<string?>>> _parties = new(StringComparer.Ordinal);
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy;
+    private bool _saving;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? Id { get; set; }
+
+    private decimal Debit => _m.Lines.Sum(l => l.Debit ?? 0);
+    private decimal Credit => _m.Lines.Sum(l => l.Credit ?? 0);
+    private bool CanSave => !_saving && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
+
+    private IReadOnlyList<Option<string?>> PartyOptions(string? type) => type is null ? [] : _parties.GetValueOrDefault(type) ?? [];
+
+    protected override Task OnParametersSetAsync()
+    {
+        _ctx = new EditContext(_m);
+        return Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            _accounts = Lookups.AccountOptions();
+            await LoadParties();
+            if (Id is not null)
+            {
+                _existing = await Api.GetAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}"));
+                _m.EntryDate = _existing.EntryDate;
+                _m.Description = _existing.Description;
+                _m.RowVersion = _existing.RowVersion;
+                _m.Lines = _existing.Lines.Select(l => new LineModel
+                {
+                    AccountId = l.Account.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+                    Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
+                    PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
+                }).ToList();
+            }
+            else
+            {
+                try { await Money.EnsureAsync(); } catch (ApiException) { }
+                _m.EntryDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today);
+                _m.Lines = [new LineModel(), new LineModel()];
+            }
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    /// <summary>Parties of control accounts (FR-106): accounting parties by role (transport customers included) and partners; drivers are searched.</summary>
+    private async Task LoadParties()
+    {
+        static Option<string?> Opt(ApArPartyOption p) => new($"{p.Type}|{p.Id}", p.Name, p.TaxNumber);
+        try { _parties["Customer"] = (await Lookups.PartiesAsync("Customer")).Select(Opt).ToList(); } catch (ApiException) { }
+        try { _parties["Supplier"] = (await Lookups.PartiesAsync("Supplier")).Select(Opt).ToList(); } catch (ApiException) { }
+        try
+        {
+            await Transport.EnsureAsync();
+            _parties["Partner"] = Transport.Partners.Select(p => new Option<string?>($"Partner|{p.Value}", p.Text)).ToList();
+        }
+        catch (ApiException) { }
+    }
+
+    private async Task<IReadOnlyList<Option<string?>>> SearchDrivers(string text, CancellationToken ct) =>
+        (await Transport.SearchDriversAsync(text, ct)).Select(o => new Option<string?>($"Driver|{o.Value}", o.Text, o.Sub)).ToList();
+
+    private async Task Save()
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var lines = _m.Lines.Where(l => l.AccountId is not null || l.Debit is not null || l.Credit is not null).Select(l =>
+            {
+                PartyRequest? party = null;
+                if (l.Party?.Split('|') is [var type, var id]) party = new PartyRequest(type, id);
+                return new JournalLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, party, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim());
+            }).ToList();
+            var req = new ManualEntryRequest(_m.EntryDate, _m.Description?.Trim(), lines, _m.RowVersion);
+            var r = _existing is null
+                ? await Api.PostAsync<JournalEntryResponse>(Api.C("accounting/journal-entries"), req)
+                : await Api.PutAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(_existing.Id)}"), req);
+            Toasts.Success(L.F(_existing is null ? "je.posted" : "je.reposted", r.Number, _existing?.Number ?? ""));
+            Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{r.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model
+    {
+        public DateOnly? EntryDate { get; set; }
+        public string? Description { get; set; }
+        public List<LineModel> Lines { get; set; } = [];
+        public string? RowVersion { get; set; }
+    }
+
+    private sealed class LineModel
+    {
+        public string? AccountId { get; set; }
+        public decimal? Debit { get; set; }
+        public decimal? Credit { get; set; }
+        public string? CostCentreId { get; set; }
+        public string? Party { get; set; }
+        public Option<string?>? PartyOption { get; set; }
+        public string? Note { get; set; }
+    }
+}

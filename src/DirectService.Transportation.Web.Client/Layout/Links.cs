@@ -16,6 +16,23 @@ public static class Links
         _ => null,
     };
 
+    /// <summary>The screen of the document that posted an entry (FR-097, FR-121), by its source type; null when it has no screen.</summary>
+    public static string? ForSource(string company, string? type, string? id) => id is null ? null : type switch
+    {
+        "Trip" => NavModel.Href(company, $"trips/{id}"),
+        "Invoice" => NavModel.Href(company, $"invoices/{id}"),
+        "CreditNote" => NavModel.Href(company, $"credit-notes/{id}"),
+        "Receipt" => NavModel.Href(company, $"receipts/{id}"),
+        "Advance" => NavModel.Href(company, $"driver-accounts/advances/{id}"),
+        "Settlement" => NavModel.Href(company, $"driver-accounts/settlements/{id}"),
+        "PartnerPayment" => NavModel.Href(company, $"partner-accounts/payments/{id}"),
+        "SupplierBill" => NavModel.Href(company, $"accounting/payables/{id}"),
+        "Receivable" => NavModel.Href(company, $"accounting/receivables/{id}"),
+        "ApArPayment" => NavModel.Href(company, $"accounting/apar-payments/{id}"),
+        "ApArReturn" => NavModel.Href(company, $"accounting/apar-returns/{id}"),
+        _ => null,
+    };
+
     /// <summary>The screen of a setup-checklist step (the API names the area by its API path).</summary>
     public static string ForSetupStep(string company, string link) => NavModel.Href(company, link.TrimStart('/') switch
     {
@@ -67,7 +84,7 @@ public static class Links
         if (link.StartsWith("/ledger/pending-postings", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/automatic?tab=pending");
         if (link.StartsWith("/exports/", StringComparison.Ordinal)) return NavModel.Href(company, "exports/" + link["/exports/".Length..]);
         if (link.StartsWith("/apar/receivables/", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/receivables/" + link["/apar/receivables/".Length..]);
-        if (link.StartsWith("/apar/returns/", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/receivables/returns/" + link["/apar/returns/".Length..]);
+        if (link.StartsWith("/apar/returns/", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/apar-returns/" + link["/apar/returns/".Length..]);
         return NavModel.Href(company, link.TrimStart('/'));
     }
 }

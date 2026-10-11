@@ -1,0 +1,95 @@
+@page "/c/{Company}/accounting/apar-payments/{Id}"
+@page "/c/{Company}/accounting/apar-returns/{Id}"
+@* AP/AR payment / collection (FR-125) or return (FR-126) view: document, party, amounts, method and account, amount in words; print, void (acct.apar). *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @if (_payment is { } p)
+        {
+            <CashDocView Title="@p.Payment.Number" Crumbs="@Crumbs(p.Payment.Kind)" IsVoid="@(p.Payment.Status == "Void")" VoidReason="@p.Payment.VoidReason" PostingPending="p.Payment.PostingPending"
+                         Details="PaymentDetails(p.Payment)" Amount="p.Payment.Amount" AmountLabel="@L["inv.amount"]" AmountInWords="@p.AmountInWords" Entry="p.Payment.JournalEntry"
+                         History="p.History" PrintHref="@NavModel.Href(Company, $"print/apar-payment/{Id}")" CanVoid="@Shell.Can(PermissionKeys.AcctApar)" VoidText="@L["ap.paymentVoidText"]" OnVoid="Void" />
+        }
+        else if (_return is { } r)
+        {
+            <CashDocView Title="@r.Return.Number" Crumbs="@Crumbs(r.Return.Kind)" IsVoid="@(r.Return.Status == "Void")" VoidReason="@r.Return.VoidReason" PostingPending="r.Return.PostingPending"
+                         Details="ReturnDetails(r.Return)" Amount="r.Return.Total" AmountLabel="@L["inv.total"]" AmountInWords="@r.AmountInWords" Entry="r.Return.JournalEntry"
+                         History="r.History" PrintHref="@NavModel.Href(Company, $"print/apar-return/{Id}")" CanVoid="@Shell.Can(PermissionKeys.AcctApar)" VoidText="@L["ap.returnVoidText"]" OnVoid="Void" />
+        }
+    </ChildContent>
+</StateView>
+
+@code {
+    private ApArPaymentDetails? _payment;
+    private ApArReturnDetails? _return;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private bool IsReturn => Nav.Uri.Contains("/apar-returns/", StringComparison.Ordinal);
+
+    /// <summary>The kind is the document's (SupplierBill → payables, Receivable → receivables).</summary>
+    private IReadOnlyList<Crumb> Crumbs(string kind)
+    {
+        var payables = kind is ApArCodes.SupplierBill or "bills" or "Payment";
+        return [new Crumb(L["nav.accounting"]), new Crumb(L[payables ? "nav.payables" : "nav.receivables"], NavModel.Href(Company, payables ? "accounting/payables" : "accounting/receivables"))];
+    }
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            if (IsReturn) _return = await Api.GetAsync<ApArReturnDetails>(Api.C($"apar/returns/{Uri.EscapeDataString(Id)}"));
+            else _payment = await Api.GetAsync<ApArPaymentDetails>(Api.C($"apar/payments/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private string DocLink(DocRef doc, string kind) =>
+        NavModel.Href(Company, (kind is ApArCodes.SupplierBill or "bills" or "Payment" ? "accounting/payables/" : "accounting/receivables/") + doc.Id);
+
+    private IReadOnlyList<KeyValue> PaymentDetails(ApArPaymentResponse p) =>
+    [
+        new(L["ap.document"], null, @<a href="@DocLink(p.Document, p.Kind)"><bdi>@p.Document.Number</bdi></a>),
+        new(L["ap.party"], p.Party.Name),
+        new(L["trip.date"], Fmt.Date(p.PaymentDate, Shell.DateFormat)),
+        new(L["cash.method"], L["pay." + p.PaymentMethod]),
+        new(L["cash.account"], p.Account.Name),
+        new(L["cash.reference"], p.Reference),
+    ];
+
+    private IReadOnlyList<KeyValue> ReturnDetails(ApArReturnResponse r) =>
+    [
+        new(L["ap.document"], null, @<a href="@DocLink(r.Document, r.Kind)"><bdi>@r.Document.Number</bdi></a>),
+        new(L["ap.party"], r.Party.Name),
+        new(L["trip.date"], Fmt.Date(r.ReturnDate, Shell.DateFormat)),
+        new(L["ap.returnAmount"], Fmt.Money(r.Amount)),
+        new(L["inv.tax"], Fmt.Money(r.Tax)),
+        new(L["ui.reason"], r.Reason),
+    ];
+
+    private async Task<string?> Void(string reason)
+    {
+        try
+        {
+            if (_return is { } r) await Api.PostAsync<ApArReturnDetails>(Api.C($"apar/returns/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, r.Return.RowVersion));
+            else if (_payment is { } p) await Api.PostAsync<ApArPaymentDetails>(Api.C($"apar/payments/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, p.Payment.RowVersion));
+            Toasts.Success(L.F("cash.voided", _return?.Return.Number ?? _payment?.Payment.Number ?? ""));
+            await Load();
+            return null;
+        }
+        catch (ApiException e) { return e.Problem.Detail ?? L["ui.loadFailed"]; }
+    }
+}

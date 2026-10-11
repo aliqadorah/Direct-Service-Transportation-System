@@ -381,6 +381,11 @@ public sealed class InvoiceTests(ApiFactory f)
         // Cash boxes and banks for cash documents (DT-147), and the receipts of one invoice (FR-048).
         var money = await ReadAsync<MoneyAccountOptions>(await c.GetAsync(U(o, "/accounting/money-accounts/options")));
         Assert.NotEmpty(money.CashBoxes);
+        Assert.Equal(Today.AddDays(1), money.Today);
+        // Postable accounts with their control-party type for the accounting forms (DT-147).
+        var accounts = await ReadAsync<List<AccountOption>>(await c.GetAsync(U(o, "/accounting/accounts/options")));
+        Assert.Contains(accounts, a => a.IsControlAccount && a.ControlPartyType == "Customer");
+        await (await c.GetAsync(U(o, "/accounting/cost-centres/options"))).EnsureOkAsync();
         await (await c.PostAsJsonAsync(U(o, "/receipts"), new Contracts.Cash.ReceiptRequest(w.Customer.Id, Today, inv.Invoice.Id, 100m, "Cash", money.CashBoxes[0].Id, null, null, 0, null, null))).EnsureOkAsync();
         await (await c.PostAsJsonAsync(U(o, "/receipts"), new Contracts.Cash.ReceiptRequest(w.Customer.Id, Today, null, 50m, "Cash", money.CashBoxes[0].Id, null, null, 0, null, null))).EnsureOkAsync();
         var onInvoice = await ReadAsync<Contracts.Cash.ReceiptPage>(await c.GetAsync(U(o, $"/receipts?invoice={inv.Invoice.Id}")));

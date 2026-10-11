@@ -1,0 +1,103 @@
+@page "/c/{Company}/accounting/journal/{Id}"
+@*
+  Journal entry view (FR-097, FR-102, FR-103, FR-112, FR-113): lines with account, debit, credit, cost centre, party and note; totals; the
+  source document and the reversal links; void details; export batch. Manual posted entries can be edited (reverse + re-post, D-05) or voided
+  with a reason (acct.post); every entry prints as a journal voucher.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var e = _e!; var editable = e.IsManual && e.Status == "Posted" && e.ReversesEntry is null && Shell.Can(PermissionKeys.AcctPost); }
+        <PageHeader Title="@e.Number" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
+            <Badges><StatusTag Status="@JournalStatus.Tag(e.Status)" /><Badge Tone="Tone.Mute" Text="@(e.IsManual ? L["je.manual"] : L["je.src." + (e.SourceType ?? "Opening")])" /></Badges>
+            <Actions>
+                <Btn Icon="print" Text="@L["je.voucher"]" Href="@NavModel.Href(Company, $"print/journal/{Id}")" />
+                @if (editable)
+                {
+                    <Btn Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"accounting/journal/{Id}/edit")" />
+                    <Btn Danger="true" Icon="x" Text="@L["inv.void"]" OnClick="() => _voiding = true" />
+                }
+            </Actions>
+        </PageHeader>
+        @if (e.Status == "Void") {<Banner Tone="Tone.Err" Text="@L.F("je.voidBanner", e.VoidReason ?? "", e.VoidedBy ?? "", Fmt.DateTime(e.VoidedAt?.ToLocalTime(), Shell.DateFormat))" />}
+        @if (e.ReversedByEntry is { } rb) {<Banner Tone="Tone.Lock" Text="@L.F("je.reversedBanner", rb.Number)"><Actions><a href="@NavModel.Href(Company, $"accounting/journal/{rb.Id}")">@L["ui.open"]</a></Actions></Banner>}
+        @if (e.ReversesEntry is { } ro) {<Banner Tone="Tone.Info" Text="@L.F("je.reversesBanner", ro.Number)"><Actions><a href="@NavModel.Href(Company, $"accounting/journal/{ro.Id}")">@L["ui.open"]</a></Actions></Banner>}
+        <Box>
+            <KeyValues Columns="4" Items="Details(e)" />
+        </Box>
+        <ListFrame Label="@L["je.lines"]">
+            <DataGrid TItem="JournalLineResponse" Items="e.Lines" Key="l => l.LineNo" Caption="@L["je.lines"]" FooterLabel="@L["ui.total"]">
+                <Columns>
+                    <GridColumn TItem="JournalLineResponse" Title="#" Value="l => Fmt.Count(l.LineNo)" Numeric="true" Width="40px" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.account"]" Value="l => Lookups.Name(l.Account)" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.debit"]" Value="@(l => l.Debit == 0 ? null : Fmt.Money(l.Debit))" Numeric="true" Footer="@Fmt.Money(e.TotalDebit)" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.credit"]" Value="@(l => l.Credit == 0 ? null : Fmt.Money(l.Credit))" Numeric="true" Footer="@Fmt.Money(e.TotalCredit)" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.costCentre"]" Value="l => l.CostCentre?.Name" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.party"]" Value="@(l => l.Party is { } p ? $"{p.Name} ({L["party." + p.Type]})" : null)" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["drv.note"]" Value="l => l.Note" Wrap="true" />
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("inv.voidTitle", _e?.Number ?? "")" Danger="true" AskReason="true" ConfirmText="@L["inv.void"]"
+               Message="@L["je.voidText"]" Busy="_busy" Error="@_error" OnConfirm="Void" />
+
+@code {
+    private JournalEntryResponse? _e;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private bool _voiding, _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            // acct.je.view without acct.acct.view reads the automatic entries only (DT-32).
+            var path = Shell.Can(PermissionKeys.AcctView) ? $"accounting/journal-entries/{Uri.EscapeDataString(Id)}" : $"ledger/entries/{Uri.EscapeDataString(Id)}";
+            _e = await Api.GetAsync<JournalEntryResponse>(Api.C(path));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException x) when (x.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException x) { _reference = x.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Details(JournalEntryResponse e) =>
+    [
+        new(L["trip.date"], Fmt.Date(e.EntryDate, Shell.DateFormat)),
+        new(L["je.period"], e.PeriodMonth),
+        new(L["je.description"], e.Description),
+        e.Source is { } s && Links.ForSource(Company, s.Type, s.Id) is { } href
+            ? new(L["je.source"], null, @<a href="@href"><bdi>@(s.Number ?? L["je.src." + s.Type])</bdi></a>)
+            : new(L["je.source"], e.IsManual ? L["je.manual"] : e.Source?.Number ?? L["je.src." + (e.SourceType ?? "Opening")]),
+        new(L["je.createdBy"], $"{e.CreatedBy} · {Fmt.DateTime(e.CreatedAt.ToLocalTime(), Shell.DateFormat)}"),
+        new(L["je.exportBatch"], e.ExportBatchNo ?? "—"),
+    ];
+
+    private async Task Void(string reason)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}/void"), new VoidRequest(reason, _e!.RowVersion));
+            _voiding = false;
+            Toasts.Success(L.F("je.voided", _e.Number));
+            await Load();
+        }
+        catch (ApiException x) { _error = x.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}
