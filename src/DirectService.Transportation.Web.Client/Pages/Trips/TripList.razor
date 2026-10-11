@@ -1,0 +1,7 @@
+@page "/c/{Company}/trips/list"
+@* SCR-10 Created Trips list (FR-009, FR-017). *@
+<TripListView Company="@Company" />
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

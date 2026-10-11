@@ -1,0 +1,36 @@
+@* Frame of the account pages (SCR-01…05): brand side (dark, inline start) and the form card; static server rendering, in the language
+   of the request (profile or browser), with a language switch kept in the query string. *@
+@using DirectService.Transportation.Application.Abstractions
+@inject IRequestContext Request
+@inject Loc L
+@inject NavigationManager Nav
+<PageTitle>@Title · @L["shell.product"]</PageTitle>
+<div class="auth">
+    <aside class="brandside">
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-weight:600;font-size:16px"><img src="img/logo.png" alt="" />@L["shell.product"]</div>
+        <p style="max-width:36ch;font-size:15px;line-height:1.7">@L["acct.brandText"]</p>
+        <small style="color:var(--side-foot)">© Direct Service</small>
+    </aside>
+    <main class="formside" id="content">
+        <div class="card">
+            <div style="display:flex;justify-content:flex-end"><a href="@LanguageHref" lang="@(L.En ? "ar" : "en")" hreflang="@(L.En ? "ar" : "en")">@L["acct.language"]</a></div>
+            <header>
+                <h1 style="font-size:22px">@Title</h1>
+                @if (Lead is not null) {<p class="muted" style="margin-top:4px">@Lead</p>}
+            </header>
+            @ChildContent
+            @if (Foot is not null) {<div class="help" style="font-size:13px">@Foot</div>}
+        </div>
+    </main>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Lead { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Foot { get; set; }
+
+    private string LanguageHref => Nav.GetUriWithQueryParameter("lang", L.En ? "ar" : "en");
+
+    protected override void OnInitialized() => L.SetLanguage(Request.Language);
+}

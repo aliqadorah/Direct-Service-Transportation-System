@@ -1,0 +1,22 @@
+@page "/c/{Company}/masters/materials"
+@* SCR-63 materials (FR-159): name and unit (default tonne). *@
+@inject Loc L
+
+<SimpleMasterList TModel="MasterEditModel" ModelId="m => m.Id" ModelName="m => m.Name" TItem="MaterialResponse" Path="materials" Title="@L["nav.materials"]" AddText="@L["md.newMaterial"]" Intro="@L["md.materialsIntro"]"
+                  EmptyIcon="layers" EmptyTitle="@L["md.noMaterials"]" EmptyText="@L["md.noMaterialsText"]"
+                  IdOf="m => m.Id" NameOf="m => m.Name" StatusOf="m => m.Status" RowVersionOf="m => m.RowVersion"
+                  ToModel="@(m => new MasterEditModel { Id = m.Id, Name = m.Name, Extra = m.Unit, RowVersion = m.RowVersion })"
+                  ToRequest="@(m => new MaterialRequest(m.Name?.Trim(), string.IsNullOrWhiteSpace(m.Extra) ? null : m.Extra.Trim(), m.Id is null ? m.ClientId : null, m.RowVersion))">
+    <Columns>
+        <GridColumn TItem="MaterialResponse" Title="@L["md.name"]" Value="m => m.Name" SortKey="name" />
+        <GridColumn TItem="MaterialResponse" Title="@L["md.unit"]" Value="@(m => m.Unit == "ton" ? L["md.unitDefault"] : m.Unit)" SortKey="unit" />
+    </Columns>
+    <Editor Context="m">
+        <TextField @bind-Value="m.Name" Label="@L["md.name"]" Required="true" MaxLength="100" />
+        <TextField @bind-Value="m.Extra" Label="@L["md.unit"]" MaxLength="20" Placeholder="@L["md.unitDefault"]" Help="@L["md.unitHelp"]" />
+    </Editor>
+</SimpleMasterList>
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

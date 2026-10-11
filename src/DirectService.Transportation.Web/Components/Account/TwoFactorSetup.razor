@@ -1,0 +1,99 @@
+@page "/two-factor/setup"
+@* SCR-05 two-factor set-up (FR-177): QR code and manual key, confirm with a first code, then the ten one-time recovery codes (shown once). *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Contracts.Identity
+@using DirectService.Transportation.Web.Security
+@inject AuthFlow Flow
+@inject IQrCodeRenderer Qr
+
+@if (_codes is not null)
+{
+    <AuthCard Title="@L["acct.codesTitle"]" Lead="@L["acct.codesLead"]">
+        <ChildContent>
+            <Banner Tone="Tone.Ok" Text="@L["acct.mandatory"]" />
+            <ul class="num" dir="ltr" aria-label="@L["acct.codesTitle"]"
+                style="list-style:none;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--page);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;font-size:15px;letter-spacing:.04em">
+                @foreach (var c in _codes) {<li>@c</li>}
+            </ul>
+            <div class="row">
+                <a class="btn" href="@DownloadHref" download="direct-service-recovery-codes.txt"><Icon Name="import" />@L["acct.codesDownload"]</a>
+            </div>
+            <a class="btn pri w100" href="@LocalUrl(ReturnUrl)">@L["acct.codesContinue"]</a>
+        </ChildContent>
+    </AuthCard>
+}
+else
+{
+    <AuthCard Title="@L["acct.setupTitle"]" Lead="@L["acct.setupLead"]">
+        <ChildContent>
+            <EditForm Model="Input" FormName="two-factor-setup" OnSubmit="Submit" class="stack" method="post">
+                <ProblemValidator @ref="_problems" />
+                @if (_setup is not null)
+                {
+                    <div style="display:flex;gap:14px;align-items:center">
+                        <div role="img" aria-label="@L["acct.setupQr"]" style="width:132px;height:132px;flex:none;background:#fff;border:1px solid var(--border)">@((MarkupString)Qr.Svg(_setup.AuthenticatorUri))</div>
+                        <div style="font-size:13px">
+                            <div>@L["acct.setupStep1"]</div>
+                            <div>@L["acct.setupStep2"]</div>
+                            <div class="num" dir="ltr" style="margin-top:4px;background:var(--page);padding:3px 6px;border-radius:var(--r);word-break:break-all">@Grouped(_setup.SharedKey)</div>
+                        </div>
+                    </div>
+                }
+                <TextField @bind-Value="Input.Code" Label="@L["acct.codeField"]" Ltr="true" Autocomplete="one-time-code" Required="true" MaxLength="7"
+                           inputmode="numeric" pattern="[0-9 ]*" class="num" style="font-size:20px;letter-spacing:.3em;text-align:center" />
+                <Btn Type="submit" Primary="true" Text="@L["acct.setupSubmit"]" Class="w100" />
+            </EditForm>
+        </ChildContent>
+        <Foot>@L["acct.setupNote"]</Foot>
+    </AuthCard>
+}
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); }
+
+    private ProblemValidator? _problems;
+    private TwoFactorSetupResponse? _setup;
+    private IReadOnlyList<string>? _codes;
+
+    [SupplyParameterFromForm] private CodeInput Input { get; set; } = default!;
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    private string DownloadHref => "data:text/plain;charset=utf-8," + Uri.EscapeDataString(string.Join("\r\n", _codes ?? []));
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();   // before the first await: the page renders while waiting
+        if (await AuthFlow.StageAsync(Http) != AuthFlow.StageSetup) { Go(Href("/sign-in", LocalUrl(ReturnUrl))); return; }
+        // The key is created once and kept until confirmed, so reloading the page shows the same QR code.
+        _setup = await Flow.SetupAsync(Http);
+    }
+
+    private async Task Submit()
+    {
+        if (AccountValidation.Required(L, ("code", Input.Code, "acct.codeField")) is { } missing)
+        {
+            _problems?.Show(missing);
+            return;
+        }
+        try
+        {
+            var result = await Flow.CompleteSetupAsync(Http, Input.Code!.Replace(" ", "", StringComparison.Ordinal), Http.RequestAborted);
+            _codes = result.RecoveryCodes;
+        }
+        catch (AppException e)
+        {
+            if (e.Status == 401) { Go(Href("/sign-in", LocalUrl(ReturnUrl))); return; }
+            _problems?.Show(Problem(e) with { Field = "code" });
+            Input.Code = null;
+        }
+    }
+
+    private static string Grouped(string key) => string.Join(' ', Enumerable.Range(0, (key.Length + 3) / 4).Select(i => key.Substring(i * 4, Math.Min(4, key.Length - i * 4))));
+
+    private sealed class CodeInput
+    {
+        public string? Code { get; set; }
+    }
+}

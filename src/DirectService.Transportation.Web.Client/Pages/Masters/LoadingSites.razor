@@ -1,0 +1,7 @@
+@page "/c/{Company}/masters/loading-sites"
+@* SCR-64 loading sites (FR-160). *@
+<SiteList Loading="true" />
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

@@ -1,0 +1,70 @@
+@*
+  Record lock of an edit form (BR-039, FR-186, ADR-11): takes the lock when the form opens, sends a heartbeat every 30 s and releases it
+  when the form closes (the server also releases locks idle for 90 s). When another user holds it, the bar says who and the page turns
+  read-only (the server refuses their saves as well).
+*@
+@implements IAsyncDisposable
+@using DirectService.Transportation.Contracts.Platform
+@inject Api Api
+@inject Loc L
+@if (_message is not null) {<Banner Tone="Tone.Lock" Icon="lock" Live="true" Text="@_message" />}
+
+@code {
+    private string? _lockId;
+    private string? _holder;
+    private string? _message;
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+
+    /// <summary>Entity type as the server names it, e.g. "TRN.Trip".</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    /// <summary>Raised with the holder's name when someone else edits the record (null when this user holds the lock).</summary>
+    [Parameter] public EventCallback<string?> OnState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var l = await Api.PostAsync<LockResponse>(Api.C("locks"), new AcquireLockRequest(EntityType, Id));
+            if (l.HeldByMe) { _lockId = l.Id; Beat(); }
+            else { _holder = l.HolderName; _message = L.F("ui.lockedBy", l.HolderName); }
+        }
+        catch (ApiException e) when (e.Problem.Status is 409 or 423)
+        {
+            // The server names the holder in its message ("{name} is editing this record").
+            _holder = e.Problem.Detail ?? "?";
+            _message = e.Problem.Detail;
+        }
+        catch (ApiException) { }
+        await OnState.InvokeAsync(_holder);
+    }
+
+    private void Beat()
+    {
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        var token = _cts.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await _timer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                    await Api.PutAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId!)}/heartbeat"), null, token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { }
+            catch (ApiException) { }
+        }, token);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts?.Cancel();
+        _timer?.Dispose();
+        _cts?.Dispose();
+        if (_lockId is not null)
+        {
+            try { await Api.DeleteAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId)}")); } catch (ApiException) { }
+        }
+    }
+}

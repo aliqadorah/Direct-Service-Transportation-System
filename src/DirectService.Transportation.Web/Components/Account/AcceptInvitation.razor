@@ -1,0 +1,113 @@
+@page "/accept-invitation"
+@* Invitation link (FR-172, BR-001…003): a new user sets name and password (the link proves the email); an existing user signs in and
+   accepts; invalid, expired or used invitations say so. *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
+@using DirectService.Transportation.Contracts.Identity
+@inject InvitationService Invitations
+
+<AuthCard Title="@L["acct.inviteTitle"]" Lead="@(_info is { IsValid: true } && !_done ? L.F("acct.inviteLead", _info.CompanyName, _info.Email) : null)">
+    @if (_done)
+    {
+        <Banner Tone="Tone.Ok" Text="@L[_joined ? "acct.inviteJoined" : "acct.inviteDone"]" />
+        <a class="btn pri w100" href="@(_joined ? "/" : Href("/sign-in"))">@L[_joined ? "acct.codesContinue" : "acct.signIn"]</a>
+    }
+    else if (_info is not { IsValid: true })
+    {
+        <Banner Tone="Tone.Err" Text="@L["acct.inviteInvalid"]" />
+        <a href="@Href("/sign-in")" style="font-size:13px">@L["acct.backToSignIn"]</a>
+    }
+    else if (_info.HasAccount)
+    {
+        @if (Http.User.Identity?.IsAuthenticated == true)
+        {
+            <EditForm Model="Existing" FormName="accept-existing" OnSubmit="AcceptExisting" class="stack" method="post">
+                @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+                <Btn Type="submit" Primary="true" Text="@L["acct.inviteAccept"]" Class="w100" />
+            </EditForm>
+        }
+        else
+        {
+            <Banner Tone="Tone.Info" Text="@L["acct.inviteHasAccount"]" />
+            <a class="btn pri w100" href="@Href("/sign-in", "/accept-invitation?t=" + Uri.EscapeDataString(Token ?? ""))">@L["acct.signIn"]</a>
+        }
+    }
+    else
+    {
+        <EditForm Model="Input" FormName="accept-new" OnSubmit="AcceptNew" class="stack" method="post">
+            <ProblemValidator @ref="_problems" />
+            @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            <TextField @bind-Value="Input.FullName" Label="@L["acct.fullName"]" Required="true" Autocomplete="name" MaxLength="150" />
+            <TextField @bind-Value="Input.Password" Label="@L["acct.password"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="128" Help="@L["acct.passwordHelp"]" />
+            <Btn Type="submit" Primary="true" Text="@L["acct.inviteCreate"]" Class="w100" />
+        </EditForm>
+    }
+</AuthCard>
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); Existing ??= new(); }
+
+    private InvitationInfoResponse? _info;
+    private ProblemValidator? _problems;
+    private string? _banner;
+    private bool _done;
+    private bool _joined;
+
+    [SupplyParameterFromQuery(Name = "t")] private string? Token { get; set; }
+    [SupplyParameterFromForm(FormName = "accept-new")] private NewInput Input { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "accept-existing")] private ExistingInput Existing { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new(); Existing ??= new();   // before the first await: the page renders while waiting
+        if (string.IsNullOrEmpty(Token)) return;
+        try { _info = await Invitations.InfoAsync(Token, Http.RequestAborted); }
+        catch (AppException) { _info = null; }
+    }
+
+    private async Task AcceptNew()
+    {
+        if (AccountValidation.Required(L, ("fullName", Input.FullName, "acct.fullName"), ("password", Input.Password, "acct.password")) is { } missing)
+        {
+            _problems?.Show(missing);
+            return;
+        }
+        try
+        {
+            await Invitations.AcceptNewAsync(new InvitationAcceptRequest(Token!, Input.FullName!.Trim(), Input.Password), Http.RequestAborted);
+            _done = true;
+        }
+        catch (AppException e)
+        {
+            _banner = _problems?.Show(Problem(e));
+            Input.Password = null;
+        }
+    }
+
+    private async Task AcceptExisting()
+    {
+        try
+        {
+            await Invitations.AcceptExistingAsync(Token!, Http.RequestAborted);
+            _done = true;
+            _joined = true;
+        }
+        catch (AppException e)
+        {
+            _banner = Problem(e).Detail;
+        }
+    }
+
+    private sealed class NewInput
+    {
+        public string? FullName { get; set; }
+        public string? Password { get; set; }
+    }
+
+    private sealed class ExistingInput
+    {
+        public string? Accept { get; set; }
+    }
+}

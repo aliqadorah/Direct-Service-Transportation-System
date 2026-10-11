@@ -1,0 +1,95 @@
+@*
+  Custom fields of an entity (FR-179…181): one control per configured field — text, long text, number, date, list, checkbox — editing a
+  key → JSON value dictionary. All visible fields are always sent, so saving keeps the values (the API clears omitted ones).
+*@
+@using System.Globalization
+@using System.Text.Json
+@using DirectService.Transportation.Contracts.Configuration
+@inject Loc L
+@if (Fields.Count > 0)
+{
+    <div class="fg" style="grid-template-columns:repeat(@Columns,minmax(0,1fr))">
+        @foreach (var f in Fields)
+        {
+            var field = f;
+            var id = $"{_id}-{field.Key}";
+            switch (field.FieldType)
+            {
+                case CustomFieldTypes.Checkbox:
+                    <label class="chk" style="align-self:end"><input id="@id" type="checkbox" checked="@(Bool(field.Key))" @onchange="e => Set(field.Key, e.Value is true)" /><Tx Value="@field.Label" /></label>
+                    break;
+                case CustomFieldTypes.List:
+                    <div class="field">
+                        <label for="@id"><Tx Value="@field.Label" />@if (field.IsRequired) {<text> </text><span class="req" aria-hidden="true">*</span>}</label>
+                        <select id="@id" class="input" aria-required="@(field.IsRequired ? "true" : null)" aria-invalid="@(ErrorOf(field) is null ? null : "true")" value="@Text(field.Key)" @onchange="e => SetText(field, e.Value?.ToString())">
+                            <option value="">@L["ui.choose"]</option>
+                            @foreach (var o in field.Options ?? []) {<option value="@o">@o</option>}
+                        </select>
+                        @Messages(field)
+                    </div>
+                    break;
+                default:
+                    <div class="field" style="@(field.FieldType == CustomFieldTypes.LongText ? $"grid-column:span {Columns}" : null)">
+                        <label for="@id"><Tx Value="@field.Label" />@if (field.IsRequired) {<text> </text><span class="req" aria-hidden="true">*</span>}</label>
+                        @if (field.FieldType == CustomFieldTypes.LongText)
+                        {
+                            <textarea id="@id" class="input" rows="2" maxlength="2000" aria-invalid="@(ErrorOf(field) is null ? null : "true")" value="@Text(field.Key)" @onchange="e => SetText(field, e.Value?.ToString())"></textarea>
+                        }
+                        else
+                        {
+                            <input id="@id" class="input @(field.FieldType is CustomFieldTypes.Number or CustomFieldTypes.Date ? "num" : null)" maxlength="500"
+                                   type="@(field.FieldType == CustomFieldTypes.Date ? "date" : "text")" inputmode="@(field.FieldType == CustomFieldTypes.Number ? "decimal" : null)"
+                                   aria-required="@(field.IsRequired ? "true" : null)" aria-invalid="@(ErrorOf(field) is null ? null : "true")"
+                                   value="@Text(field.Key)" @onchange="e => SetText(field, e.Value?.ToString())" />
+                        }
+                        @Messages(field)
+                    </div>
+                    break;
+            }
+        }
+    </div>
+}
+
+@code {
+    private readonly string _id = Ids.Next("cf");
+    private readonly Dictionary<string, string> _localErrors = new(StringComparer.Ordinal);
+
+    [Parameter, EditorRequired] public IReadOnlyList<FormField> Fields { get; set; } = [];
+    [Parameter, EditorRequired] public Dictionary<string, JsonElement> Values { get; set; } = new();
+    [Parameter] public int Columns { get; set; } = 3;
+    /// <summary>API field errors keyed "customValues.{key}" → message.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Errors { get; set; }
+
+    private string? ErrorOf(FormField f) => _localErrors.TryGetValue(f.Key, out var e) ? e : Errors is not null && Errors.TryGetValue("customValues." + f.Key, out var a) ? a : null;
+
+    private RenderFragment Messages(FormField f) => __builder =>
+    {
+        if (ErrorOf(f) is { } err) {<span class="help err"><Icon Name="alert" /><Tx Value="@err" /></span>}
+        else if (f.HelpText is not null) {<span class="help"><Tx Value="@f.HelpText" /></span>}
+    };
+
+    private string Text(string key) => Values.TryGetValue(key, out var v) ? v.ValueKind switch
+    {
+        JsonValueKind.String => v.GetString() ?? "",
+        JsonValueKind.Number => v.GetDecimal().ToString(CultureInfo.InvariantCulture),
+        JsonValueKind.True => "true",
+        _ => "",
+    } : "";
+
+    private bool Bool(string key) => Values.TryGetValue(key, out var v) && v.ValueKind == JsonValueKind.True;
+
+    private void Set(string key, bool value) => Values[key] = JsonSerializer.SerializeToElement(value);
+
+    private void SetText(FormField f, string? text)
+    {
+        _localErrors.Remove(f.Key);
+        if (string.IsNullOrWhiteSpace(text)) { Values.Remove(f.Key); return; }
+        if (f.FieldType == CustomFieldTypes.Number)
+        {
+            if (Fmt.TryParseDecimal(text, out var d)) Values[f.Key] = JsonSerializer.SerializeToElement(d);
+            else _localErrors[f.Key] = L.F("ui.notANumber", f.Label);
+            return;
+        }
+        Values[f.Key] = JsonSerializer.SerializeToElement(text.Trim());
+    }
+}

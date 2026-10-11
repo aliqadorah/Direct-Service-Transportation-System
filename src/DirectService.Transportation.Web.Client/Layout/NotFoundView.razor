@@ -1,0 +1,9 @@
+@* SCR-00 error state: a record or company that does not exist or belongs to a company the user cannot open (never revealed). *@
+@inject Loc L
+@inject ShellState Shell
+<PageHeader Title="@L["page.notFoundTitle"]" />
+<section class="box fill" style="display:flex">
+    <EmptyState Icon="search" Title="@L["page.notFound"]" Text="@L["page.notFoundText"]">
+        <Actions><Btn Primary="true" Icon="home" Text="@L["nav.dashboard"]" Href="@NavModel.Href(Shell.Company?.Id ?? "", "")" /></Actions>
+    </EmptyState>
+</section>

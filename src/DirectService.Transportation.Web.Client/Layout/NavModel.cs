@@ -74,8 +74,8 @@ public static class NavModel
             new("nav.loadingSites", "masters/loading-sites"),
             new("nav.unloadingSites", "masters/unloading-sites"),
             new("nav.ownershipTypes", "masters/ownership-types"),
-            new("nav.tariffs", "masters/tariffs"),
-            new("nav.monthlyRates", "masters/monthly-rates"),
+            new("nav.tariffs", "masters/tariffs", PermissionKeys.MastersManage, PermissionKeys.TripsView, PermissionKeys.TripsEdit, PermissionKeys.ReportsView),
+            new("nav.monthlyRates", "masters/monthly-rates", PermissionKeys.MastersManage, PermissionKeys.TripsView, PermissionKeys.TripsEdit, PermissionKeys.ReportsView),
         ]),
         new("nav.settings", "gear", null,
         [

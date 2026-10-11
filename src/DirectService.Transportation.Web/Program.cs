@@ -45,6 +45,9 @@ builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddOpenApi("v1", OpenApiSetup.Configure);
 builder.Services.AddSignalR();
 builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
+builder.Services.AddScoped<AuthFlow>();
+// The design-system services also render the static account pages on the server (SCR-01…05).
+DirectService.Transportation.Web.Client.Services.ClientServices.AddClientUi(builder.Services);
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddHealthChecks().AddDbContextCheck<MasterDbContext>("database", tags: ["ready"]);
 

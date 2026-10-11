@@ -78,6 +78,37 @@ public sealed class TripTests(ApiFactory f)
     private Task<long> TripIdAsync(string receipt, SignedInUser o) =>
         f.DbAsync(db => db.Set<Trip>().IgnoreQueryFilters().Where(t => t.ReceiptNo == receipt).OrderByDescending(t => t.Id).Select(t => t.Id).FirstAsync());
 
+    [Fact]
+    public async Task Live_calculation_matches_the_saved_trip_and_saves_nothing_UX17()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        // The PRD example of a save, previewed: same calculator and company settings (bill on unloaded weight, tolerance 0.5%).
+        var calc = await ReadAsync<TripCalculationResponse>(await o.Client.PostAsJsonAsync(U(o, "/trips/calculate"),
+            new TripCalculationRequest(32.000m, 31.850m, 6.000m, 6.000m, 3.500m, null, false)));
+        Assert.Equal(31.850m, calc.BillingQty);
+        Assert.Equal(191.100m, calc.Revenue);
+        Assert.Equal(111.475m, calc.DriverWage);
+        Assert.Equal(79.625m, calc.Margin);
+        Assert.Equal(0.150m, calc.ShortageWeight);
+        Assert.False(calc.IsShortageFlagged);
+        Assert.True(calc.BillOnUnloadedWeight);
+        Assert.Equal(3, calc.Decimals);
+        // Partner trip: driver wage 0, partner cost on the wage quantity; a price below the tariff is a breach (loss).
+        var partner = await ReadAsync<TripCalculationResponse>(await o.Client.PostAsJsonAsync(U(o, "/trips/calculate"),
+            new TripCalculationRequest(31.500m, 31.020m, 5.800m, 6.000m, 3.500m, 2.750m, true)));
+        Assert.Equal(0m, partner.DriverWage);
+        Assert.Equal(85.305m, partner.PartnerCost);
+        Assert.True(partner.IsTariffBreach);
+        Assert.Equal(-6.204m, partner.BreachAmount);
+        Assert.True(partner.IsShortageFlagged);
+        // Partial input while typing: missing values count as 0; nothing was saved.
+        var partial = await ReadAsync<TripCalculationResponse>(await o.Client.PostAsJsonAsync(U(o, "/trips/calculate"),
+            new TripCalculationRequest(32.000m, null, null, null, null, null, false)));
+        Assert.Equal(0m, partial.Revenue);
+        Assert.Empty(await ReadAsync<List<TripResponse>>(await o.Client.GetAsync(U(o, "/trips/recent"))));
+    }
+
     // ------------------------------------------------------------------ create, price, calculate, post
 
     [Fact]

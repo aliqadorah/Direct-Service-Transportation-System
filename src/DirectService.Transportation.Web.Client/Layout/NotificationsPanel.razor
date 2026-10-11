@@ -1,0 +1,65 @@
+@* Notifications (FR-190): newest first, unread marked; opening one marks it read and goes to its record; "mark all read". *@
+@using DirectService.Transportation.Contracts.Collaboration
+@inject Api Api
+@inject ShellState Shell
+@inject Loc L
+@inject NavigationManager Nav
+<SidePanel Open="Open" OpenChanged="OpenChanged" Title="@L["shell.notificationsTitle"]">
+    @if (_page is null)
+    {
+        <div role="status" class="muted">@L["ui.loading"]</div>
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <EmptyState Icon="bell" Title="@L["shell.noNotifications"]" />
+    }
+    else
+    {
+        @if (_page.Unread > 0) {<div style="display:flex;justify-content:flex-end"><Btn Small="true" Ghost="true" Icon="check" Text="@L["shell.markAllRead"]" OnClick="ReadAll" /></div>}
+        <ul class="hist">
+            @foreach (var n in _page.Items)
+            {
+                var note = n;
+                <li class="@(note.Type.Contains("Rejected", StringComparison.Ordinal) || note.Type.Contains("Failed", StringComparison.Ordinal) ? "v" : null)">
+                    <button type="button" class="btn ghost" style="height:auto;padding:0;justify-content:flex-start;text-align:start;white-space:normal;color:var(--text)" @onclick="() => OpenNote(note)">
+                        @if (note.ReadAt is null) {<b><Tx Value="@note.Message" /></b>} else {<Tx Value="@note.Message" />}
+                    </button>
+                    <span class="w"><bdi class="num">@Fmt.DateTime(note.CreatedAt.ToLocalTime(), Shell.DateFormat)</bdi>@if (note.ReadAt is null) {<text> · </text><Badge Tone="Tone.Info" Text="@L["shell.unread"]" />}</span>
+                </li>
+            }
+        </ul>
+    }
+</SidePanel>
+
+@code {
+    private NotificationPage? _page;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Open) { _page = null; return; }
+        if (_page is not null || Shell.Company is null) return;
+        try { _page = await Api.GetAsync<NotificationPage>(Api.C("notifications")); }
+        catch (ApiException) { _page = new NotificationPage([], 0); }
+    }
+
+    private async Task OpenNote(NotificationResponse n)
+    {
+        if (n.ReadAt is null)
+        {
+            try { await Api.PostAsync(Api.C($"notifications/{n.Id}/read"), null); } catch (ApiException) { }
+            Shell.SetNotifications(Shell.UnreadNotifications - 1);
+        }
+        await OpenChanged.InvokeAsync(false);
+        if (Links.ForNotification(n.Company ?? Shell.Company?.Id, n.Link) is { } href) Nav.NavigateTo(href);
+    }
+
+    private async Task ReadAll()
+    {
+        try { await Api.PostAsync(Api.C("notifications/read-all"), null); } catch (ApiException) { }
+        Shell.SetNotifications(0);
+        _page = _page is null ? null : new NotificationPage(_page.Items.Select(i => i with { ReadAt = i.ReadAt ?? DateTime.UtcNow }).ToList(), 0);
+    }
+}

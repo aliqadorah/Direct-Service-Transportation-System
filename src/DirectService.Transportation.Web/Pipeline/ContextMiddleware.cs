@@ -35,7 +35,9 @@ internal sealed class RequestContextMiddleware(RequestDelegate next)
         }
         else
         {
-            var lang = http.Request.GetTypedHeaders().AcceptLanguage
+            // Anonymous: the account pages' language switch (?lang=ar|en), else the browser's preference.
+            var query = http.Request.Query["lang"].ToString();
+            var lang = query is "ar" or "en" ? query : http.Request.GetTypedHeaders().AcceptLanguage
                 .OrderByDescending(l => l.Quality ?? 1)
                 .Select(l => l.Value.Value?[..Math.Min(2, l.Value.Length)])
                 .FirstOrDefault(l => l is "ar" or "en");

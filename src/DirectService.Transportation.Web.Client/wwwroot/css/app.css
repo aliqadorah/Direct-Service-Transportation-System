@@ -350,3 +350,5 @@ table.grid tr.flt .input { border-color: var(--border-control); }
   .side, .top, .toasts { display: none; }
   .shell { display: block; height: auto; }
 }
+.w100 { width: 100%; }
+.w160 { width: 160px; } .w200 { width: 200px; } .w220 { width: 220px; }

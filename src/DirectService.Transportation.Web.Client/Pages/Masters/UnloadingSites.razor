@@ -1,0 +1,7 @@
+@page "/c/{Company}/masters/unloading-sites"
+@* SCR-65 unloading sites (FR-160). *@
+<SiteList Loading="false" />
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

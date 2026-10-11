@@ -1,0 +1,295 @@
+@*
+  Simple master list (SCR-63…66, FR-159…162, FR-164, FR-166): saved views Active / Archived / All, search, sortable columns, server paging,
+  Excel/CSV export, add/edit in a dialog (masters.manage), archive/restore, delete only when nothing refers to the record (BR-040) with a
+  reason, and the record's history and references in a side panel. Used by materials, loading/unloading sites and ownership types.
+*@
+@typeparam TItem
+@typeparam TModel where TModel : class, new()
+@using DirectService.Transportation.Contracts.Common
+@using DirectService.Transportation.Contracts.Accounting
+@using Md = DirectService.Transportation.Contracts.MasterData
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+
+<PageHeader Title="@Title" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(Title)])">
+    <Actions>
+        @if (CanManage)
+        {
+            <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Shell.Company?.Id ?? "", $"masters/import/{Path}")" />
+            <Btn Primary="true" Icon="plus" Text="@AddText" OnClick="New" />
+        }
+    </Actions>
+</PageHeader>
+@if (Intro is not null) {<p class="muted" style="margin:0">@Intro</p>}
+
+<SavedViews Items="Views" Selected="@_q.View" SelectedChanged="View" Label="@Title">
+    <Tools>
+        <div class="adorn" style="width:220px"><span class="start"><Icon Name="search" /></span>
+            <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["ui.search"]" value="@_q.Q" @onchange="Search" /></div>
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+    </Tools>
+</SavedViews>
+
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="@EmptyIcon" Title="@(_q.Q is null ? EmptyTitle : L["ui.noMatches"])" Text="@(_q.Q is null ? EmptyText : null)">
+            <Actions>
+                @if (_q.Q is not null) {<Btn Text="@L["ui.clear"]" OnClick="ClearSearch" />}
+                else if (CanManage) {<Btn Primary="true" Icon="plus" Text="@AddText" OnClick="New" />}
+            </Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@Title">
+            <ChildContent>
+                <DataGrid TItem="TItem" Items="_items" Key="i => IdOf(i)" Caption="@Title" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                          OnRowClick="Open" RowClass="@(i => HasStatus && StatusOf!(i) == "Archived" ? "void" : null)">
+                    <Columns>
+                        @Columns
+                        @if (HasStatus)
+                        {
+                            <GridColumn TItem="TItem" Title="@L["ml.status"]" SortKey="status"><Template><StatusTag Status="@(StatusOf!(context) == "Archived" ? "archived" : "active")" /></Template></GridColumn>
+                        }
+                        <GridColumn TItem="TItem" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @if (CanManage)
+                                {
+                                    <span style="display:inline-flex;gap:4px" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+                                        <Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L["ml.edit"]" Title="@L["ml.edit"]" OnClick="() => Edit(context)" />
+                                        @if (HasStatus)
+                                        {
+                                            var archived = StatusOf!(context) == "Archived";
+                                            <Btn Small="true" Ghost="true" Icon="@(archived ? "refresh" : "archive")" AriaLabel="@L[archived ? "ml.restore" : "ml.archive"]" Title="@L[archived ? "ml.restore" : "ml.archive"]" OnClick="() => SetStatus(context, archived)" />
+                                        }
+                                        <Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L["ml.delete"]" Title="@L["ml.delete"]" OnClick="() => AskDelete(context)" />
+                                    </span>
+                                }
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+            </ChildContent>
+            <Footer>@if (Paged) {<Pager Page="_q.Page" PageSize="_q.PageSize" Total="_total" OnPage="Go" OnPageSize="Size" />}</Footer>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(ModelId(_model) is null ? AddText : L.F("ml.editTitle", ModelName(_model) ?? ""))" Busy="_saving" Wide="WideEditor">
+    <ChildContent>
+        <EditForm Model="_model" OnValidSubmit="Save" id="@_formId" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary />
+            @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            @Editor?.Invoke(_model)
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" form="@_formId" />
+    </Footer>
+</Modal>
+
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target is null ? "" : NameOf(_target))" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["ml.deleteText"]" Busy="_saving" Error="@_deleteError" OnConfirm="Delete">
+    @if (_refs is { CanDelete: false } r)
+    {
+        <Banner Tone="Tone.Err" Text="@L["ml.inUse"]" />
+        <ul style="margin:0;padding-inline-start:18px">@foreach (var x in r.References.Where(x => x.Count > 0)) {<li><Tx Value="@($"{x.Label}: {Fmt.Count(x.Count)}")" /></li>}</ul>
+        @if (HasStatus) {<p class="muted">@L["ml.archiveInstead"]</p>}
+    }
+</ConfirmDialog>
+
+<SidePanel @bind-Open="_panel" Title="@(_panelItem is null ? L["ui.history"] : NameOf(_panelItem))">
+    @if (_panelRefs is null || _panelHistory is null)
+    {
+        <div role="status" class="muted">@L["ui.loading"]</div>
+    }
+    else
+    {
+        <h3 style="font-size:13px;margin-bottom:6px">@L["ml.references"]</h3>
+        @if (_panelRefs.References.All(x => x.Count == 0)) {<p class="muted">@L["ml.noReferences"]</p>}
+        else {<ul style="margin:0 0 12px;padding-inline-start:18px">@foreach (var x in _panelRefs.References.Where(x => x.Count > 0)) {<li><Tx Value="@($"{x.Label}: {Fmt.Count(x.Count)}")" /></li>}</ul>}
+        <h3 style="font-size:13px;margin:12px 0 6px">@L["ui.history"]</h3>
+        <RecordHistory Items="_panelHistory" />
+    }
+</SidePanel>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "name" };
+    private readonly string _formId = Ids.Next("mform");
+    private IReadOnlyList<TItem> _items = [];
+    private int _total;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private TModel _model = new();
+    private bool _editing, _saving, _deleting, _panel;
+    private string? _banner, _deleteError;
+    private ProblemValidator? _problems;
+    private TItem? _target;
+    private Md.ReferencesResponse? _refs;
+    private TItem? _panelItem;
+    private Md.ReferencesResponse? _panelRefs;
+    private IReadOnlyList<Md.HistoryEntry>? _panelHistory;
+
+    /// <summary>API collection under the company, e.g. "materials", "loading-sites".</summary>
+    [Parameter, EditorRequired] public string Path { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string AddText { get; set; } = "";
+    [Parameter] public string? Intro { get; set; }
+    [Parameter] public string EmptyIcon { get; set; } = "db";
+    [Parameter, EditorRequired] public string EmptyTitle { get; set; } = "";
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public RenderFragment? Columns { get; set; }
+    [Parameter] public RenderFragment<TModel>? Editor { get; set; }
+    [Parameter, EditorRequired] public Func<TModel, string?> ModelId { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TModel, string?> ModelName { get; set; } = default!;
+    [Parameter] public bool WideEditor { get; set; }
+    [Parameter, EditorRequired] public Func<TItem, string> IdOf { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TItem, string> NameOf { get; set; } = default!;
+    [Parameter] public Func<TItem, string>? StatusOf { get; set; }
+    [Parameter, EditorRequired] public Func<TItem, TModel> ToModel { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<TModel, object> ToRequest { get; set; } = default!;
+    [Parameter] public Func<TItem, string?>? RowVersionOf { get; set; }
+    /// <summary>False for lists the API returns whole (ownership types).</summary>
+    [Parameter] public bool Paged { get; set; } = true;
+
+    private bool HasStatus => StatusOf is not null;
+    private bool CanManage => Shell.Can(PermissionKeys.MastersManage);
+
+    private IReadOnlyList<TabItem> Views => HasStatus
+        ? [new("active", L["ml.active"]), new("archived", L["ml.archived"]), new("all", L["ml.all"])]
+        : [new("all", L["ml.all"])];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!HasStatus) _q.View = "all";
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            var query = _q.ToQuery(HasStatus ? "status" : null, Paged);
+            if (Paged)
+            {
+                var page = await Api.GetAsync<PagedResult<TItem>>(Api.C(Path + query));
+                (_items, _total) = (page.Items, page.TotalCount);
+            }
+            else
+            {
+                _items = await Api.GetAsync<IReadOnlyList<TItem>>(Api.C(Path));
+                _total = _items.Count;
+            }
+            _state = _items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private Task View(string v) { _q.View = v; _q.Page = 1; return Load(); }
+    private Task Search(ChangeEventArgs e) { _q.Q = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString()!.Trim(); _q.Page = 1; return Load(); }
+    private Task ClearSearch() { _q.Q = null; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private void New()
+    {
+        _model = new TModel();
+        _banner = null;
+        _editing = true;
+    }
+
+    private void Edit(TItem item)
+    {
+        _model = ToModel(item);
+        _banner = null;
+        _editing = true;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _banner = null;
+        try
+        {
+            if (ModelId(_model) is not { } id) await Api.PostAsync<TItem>(Api.C(Path), ToRequest(_model));
+            else await Api.PutAsync<TItem>(Api.C($"{Path}/{Uri.EscapeDataString(id)}"), ToRequest(_model));
+            _editing = false;
+            Toasts.Success(L.F("ml.saved", ModelName(_model) ?? ""));
+            await Load();
+        }
+        catch (ApiException e)
+        {
+            _banner = _problems?.Show(e.Problem);
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SetStatus(TItem item, bool restore)
+    {
+        try
+        {
+            await Api.PostAsync<TItem>(Api.C($"{Path}/{Uri.EscapeDataString(IdOf(item))}/{(restore ? "restore" : "archive")}"), new StatusChangeRequest(RowVersionOf?.Invoke(item)));
+            Toasts.Success(L.F(restore ? "ml.restored" : "ml.archivedToast", NameOf(item)));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task AskDelete(TItem item)
+    {
+        _target = item;
+        _deleteError = null;
+        _refs = null;
+        _deleting = true;
+        try { _refs = await Api.GetAsync<Md.ReferencesResponse>(Api.C($"{Path}/{Uri.EscapeDataString(IdOf(item))}/references")); }
+        catch (ApiException) { }
+    }
+
+    private async Task Delete(string reason)
+    {
+        if (_target is null) return;
+        _saving = true;
+        try
+        {
+            await Api.PostAsync(Api.C($"{Path}/{Uri.EscapeDataString(IdOf(_target))}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            Toasts.Success(L.F("ml.deleted", NameOf(_target)));
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
+    private async Task Open(TItem item)
+    {
+        (_panelItem, _panelRefs, _panelHistory) = (item, null, null);
+        _panel = true;
+        var id = Uri.EscapeDataString(IdOf(item));
+        try
+        {
+            _panelRefs = await Api.GetAsync<Md.ReferencesResponse>(Api.C($"{Path}/{id}/references"));
+            _panelHistory = await Api.GetAsync<IReadOnlyList<Md.HistoryEntry>>(Api.C($"{Path}/{id}/history"));
+        }
+        catch (ApiException e) { _panel = false; Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task Export(string format)
+    {
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"{Path}/export{_q.ToQuery(HasStatus ? "status" : null, false)}{(_q.ToQuery(HasStatus ? "status" : null, false).Length == 0 ? "?" : "&")}format={format}"));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+}

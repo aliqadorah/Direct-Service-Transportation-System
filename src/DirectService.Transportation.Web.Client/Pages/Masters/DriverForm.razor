@@ -1,0 +1,187 @@
+@page "/c/{Company}/masters/drivers/new"
+@page "/c/{Company}/masters/drivers/{Id}/edit"
+@* SCR-60 driver form (FR-152…155, 8.9): identity, licence and payment (bank details for transfers, alias for CliQ), the driver's one truck
+   with ownership type and partner (external fleet only), document dates, custom fields; configured labels and required flags. *@
+@using System.Text.Json
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+@inject FormConfig Forms
+
+<PageHeader Title="@(Id is null ? L["md.newDriver"] : _m.FullName ?? "")" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.drivers"], NavModel.Href(Company, "masters/drivers"))])" />
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <EditForm Model="_m" OnValidSubmit="Save" OnInvalidSubmit="Invalid" class="stack fill">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <section class="box pad">
+                <h2 class="lbl" style="font-size:14px;margin-bottom:6px">@L["md.identity"]</h2>
+                <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+                    <TextField @bind-Value="_m.FullName" Label="@F("fullName", L["md.fullName"])" Required="true" MaxLength="150" />
+                    <TextField @bind-Value="_m.NationalId" Label="@F("nationalId", L["md.nationalId"])" Required="true" Ltr="true" MaxLength="20" Help="@L["md.nationalIdHelp"]" />
+                    <TextField @bind-Value="_m.Phone1" Label="@F("phone1", L["md.phone1"])" Required="true" Type="tel" Ltr="true" MaxLength="20" Placeholder="07XXXXXXXX" />
+                    @if (!_form.Hidden("phone2")) {<TextField @bind-Value="_m.Phone2" Label="@F("phone2", L["md.phone2"])" Required="@R("phone2")" Type="tel" Ltr="true" MaxLength="20" />}
+                    @if (!_form.Hidden("address")) {<TextField @bind-Value="_m.Address" Label="@F("address", L["md.address"])" Required="@R("address")" MaxLength="300" Span="4" />}
+                </div>
+                <h2 class="lbl" style="font-size:14px;margin:14px 0 6px">@L["md.licencePayment"]</h2>
+                <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+                    <TextField @bind-Value="_m.LicenceNo" Label="@F("licenceNo", L["md.licenceNo"])" Required="true" Ltr="true" MaxLength="30" />
+                    <TextField @bind-Value="_m.LicenceType" Label="@F("licenceType", L["md.licenceType"])" Required="true" MaxLength="30" />
+                    <DateField @bind-Value="_m.LicenceExpiry" Label="@F("licenceExpiry", L["md.licenceExpiry"])" Required="true" />
+                    <SelectField TValue="string" @bind-Value="_m.PaymentMethod" Label="@F("paymentMethod", L["md.paymentMethod"])" Required="true"
+                                 Options="@([new Option<string>("Cash", L["pay.Cash"]), new Option<string>("Bank", L["pay.Bank"]), new Option<string>("CliQ", L["pay.CliQ"])])" Help="@L["md.paymentHelp"]" />
+                    @if (_m.PaymentMethod == "Bank" || !_form.Hidden("bankName"))
+                    {
+                        <TextField @bind-Value="_m.BankName" Label="@F("bankName", L["md.bank"])" Required="@(_m.PaymentMethod == "Bank" || R("bankName"))" MaxLength="100" />
+                        <TextField @bind-Value="_m.Iban" Label="IBAN" Required="@(_m.PaymentMethod == "Bank" || R("iban"))" Ltr="true" MaxLength="34" Help="@L["md.ibanHelp"]" Span="2" />
+                    }
+                    @if (_m.PaymentMethod == "CliQ" || !_form.Hidden("cliqAlias"))
+                    {
+                        <TextField @bind-Value="_m.CliqAlias" Label="@F("cliqAlias", L["md.cliq"])" Required="@(_m.PaymentMethod == "CliQ" || R("cliqAlias"))" Ltr="true" MaxLength="50" />
+                    }
+                </div>
+                <h2 class="lbl" style="font-size:14px;margin:14px 0 6px">@L["md.truck"]</h2>
+                <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+                    <TextField @bind-Value="_m.PlateNumber" Label="@F("plateNumber", L["md.plate"])" Required="true" Ltr="true" MaxLength="20" />
+                    @if (!_form.Hidden("truckType")) {<TextField @bind-Value="_m.TruckType" Label="@F("truckType", L["md.truckType"])" Required="@R("truckType")" MaxLength="50" />}
+                    @if (!_form.Hidden("trailerNo")) {<TextField @bind-Value="_m.TrailerNo" Label="@F("trailerNo", L["md.trailer"])" Required="@R("trailerNo")" Ltr="true" MaxLength="20" />}
+                    <NumberField @bind-Value="_m.CapacityTons" Label="@F("capacityTons", L["md.capacity"])" Required="true" Decimals="3" Min="0.001m" Unit="@L["md.tons"]" />
+                    <SelectField TValue="string?" @bind-Value="_m.OwnershipTypeId" Label="@F("ownershipTypeId", L["md.ownership"])" Required="true" Options="_types" Empty="@L["ui.choose"]" />
+                    @if (IsExternal)
+                    {
+                        <ComboField TValue="string?" @bind-Value="_m.PartnerId" Options="_partners" Label="@F("partnerId", L["md.partner"])" Help="@L["md.partnerHelp"]" />
+                    }
+                    <DateField @bind-Value="_m.RegistrationExpiry" Label="@F("registrationExpiry", L["md.registrationExpiry"])" Required="true" />
+                    <DateField @bind-Value="_m.InsuranceExpiry" Label="@F("insuranceExpiry", L["md.insuranceExpiry"])" Required="true" />
+                    <DateField @bind-Value="_m.InspectionExpiry" Label="@F("inspectionExpiry", L["md.inspectionExpiry"])" Required="true" />
+                </div>
+                @if (_form.Custom.Count > 0)
+                {
+                    <h2 class="lbl" style="font-size:14px;margin:14px 0 6px">@L["md.customFields"]</h2>
+                    <CustomFieldsEditor Fields="_form.Custom" Values="_m.CustomValues" Columns="4" Errors="_customErrors" />
+                }
+                @if (!_form.Hidden("notes")) {<div style="margin-top:10px"><TextAreaField @bind-Value="_m.Notes" Label="@F("notes", L["md.notes"])" MaxLength="1000" /></div>}
+            </section>
+            <div class="formbar">
+                <Btn Text="@L["ui.cancel"]" Href="@(Id is null ? NavModel.Href(Company, "masters/drivers") : NavModel.Href(Company, $"masters/drivers/{Id}"))" />
+                <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" />
+            </div>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private DriverModel _m = new();
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _saving;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private IReadOnlyList<string>? _extra;
+    private Dictionary<string, string>? _customErrors;
+    private FormView _form = FormView.Empty;
+    private IReadOnlyList<OwnershipTypeResponse> _typeList = [];
+    private IReadOnlyList<Option<string?>> _types = [];
+    private IReadOnlyList<Option<string?>> _partners = [];
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? Id { get; set; }
+
+    private bool IsExternal => _typeList.FirstOrDefault(t => t.Id == _m.OwnershipTypeId)?.FleetClass == "External";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _form = await Forms.GetAsync(FormConfig.Driver);
+            _typeList = await Api.GetAsync<IReadOnlyList<OwnershipTypeResponse>>(Api.C("ownership-types"));
+            _types = _typeList.Select(t => new Option<string?>(t.Id, t.Name)).ToList();
+            _partners = (await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("partners/options"))).Select(p => new Option<string?>(p.Id, p.Name)).ToList();
+            if (Id is not null) _m = DriverModel.From((await Api.GetAsync<DriverProfile>(Api.C($"drivers/{Uri.EscapeDataString(Id)}"))).Driver);
+            else _m.OwnershipTypeId ??= _typeList.FirstOrDefault(t => t.IsBuiltIn)?.Id;
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private string F(string key, string fallback) => _form.Label(key, fallback);
+    private bool R(string key) => _form.Required(key);
+
+    private Task Invalid() => _summary?.FocusAsync() ?? Task.CompletedTask;
+
+    private async Task Save()
+    {
+        _saving = true;
+        _extra = null;
+        _customErrors = null;
+        try
+        {
+            if (!IsExternal) _m.PartnerId = null;
+            var saved = Id is null
+                ? await Api.PostAsync<DriverResponse>(Api.C("drivers"), _m.ToRequest())
+                : await Api.PutAsync<DriverResponse>(Api.C($"drivers/{Uri.EscapeDataString(Id)}"), _m.ToRequest());
+            Toasts.Success(L.F("md.driverSaved", saved.FullName, saved.PlateNumber));
+            Nav.NavigateTo(NavModel.Href(Company, $"masters/drivers/{saved.Id}"));
+        }
+        catch (ApiException e)
+        {
+            _customErrors = e.Problem.Errors?.Where(x => x.Field?.StartsWith("customValues.", StringComparison.Ordinal) == true)
+                .ToDictionary(x => x.Field!, x => x.Message ?? "");
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class DriverModel
+    {
+        public string? FullName { get; set; }
+        public string? NationalId { get; set; }
+        public string? Phone1 { get; set; }
+        public string? Phone2 { get; set; }
+        public string? Address { get; set; }
+        public string? LicenceNo { get; set; }
+        public string? LicenceType { get; set; }
+        public DateOnly? LicenceExpiry { get; set; }
+        public string PaymentMethod { get; set; } = "Cash";
+        public string? BankName { get; set; }
+        public string? Iban { get; set; }
+        public string? CliqAlias { get; set; }
+        public string? PlateNumber { get; set; }
+        public string? TruckType { get; set; }
+        public string? TrailerNo { get; set; }
+        public decimal? CapacityTons { get; set; }
+        public string? OwnershipTypeId { get; set; }
+        public string? PartnerId { get; set; }
+        public DateOnly? RegistrationExpiry { get; set; }
+        public DateOnly? InsuranceExpiry { get; set; }
+        public DateOnly? InspectionExpiry { get; set; }
+        public string? Notes { get; set; }
+        public Dictionary<string, JsonElement> CustomValues { get; set; } = new();
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+        public bool IsNew { get; set; } = true;
+
+        public static DriverModel From(DriverResponse d) => new()
+        {
+            IsNew = false, FullName = d.FullName, NationalId = d.NationalId, Phone1 = d.Phone1, Phone2 = d.Phone2, Address = d.Address, LicenceNo = d.LicenceNo,
+            LicenceType = d.LicenceType, LicenceExpiry = d.LicenceExpiry, PaymentMethod = d.PaymentMethod, BankName = d.BankName, Iban = d.Iban,
+            CliqAlias = d.CliqAlias, PlateNumber = d.PlateNumber, TruckType = d.TruckType, TrailerNo = d.TrailerNo, CapacityTons = d.CapacityTons,
+            OwnershipTypeId = d.OwnershipType.Id, PartnerId = d.Partner?.Id, RegistrationExpiry = d.RegistrationExpiry, InsuranceExpiry = d.InsuranceExpiry,
+            InspectionExpiry = d.InspectionExpiry, Notes = d.Notes, CustomValues = new Dictionary<string, JsonElement>(d.CustomValues), RowVersion = d.RowVersion,
+        };
+
+        public DriverRequest ToRequest() => new(T(FullName), T(NationalId), T(Phone1), T(Phone2), T(Address), T(LicenceNo), T(LicenceType), LicenceExpiry,
+            PaymentMethod, T(BankName), T(Iban), T(CliqAlias), T(PlateNumber), T(TruckType), T(TrailerNo), CapacityTons, OwnershipTypeId, PartnerId,
+            RegistrationExpiry, InsuranceExpiry, InspectionExpiry, T(Notes), CustomValues, IsNew ? ClientId : null, RowVersion);
+
+        private static string? T(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+}

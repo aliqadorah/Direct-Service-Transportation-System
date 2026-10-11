@@ -1,0 +1,25 @@
+@* SCR-64 loading sites and SCR-65 unloading sites (FR-160): two separate lists with name and area; monthly driver rates per loading
+   site are entered on SCR-68. *@
+@inject Loc L
+
+@{ var loading = Loading; }
+<SimpleMasterList @key="loading" TModel="MasterEditModel" ModelId="m => m.Id" ModelName="m => m.Name" TItem="SiteResponse" Path="@(loading ? "loading-sites" : "unloading-sites")" Title="@L[loading ? "nav.loadingSites" : "nav.unloadingSites"]"
+                  AddText="@L["md.newSite"]" Intro="@L[loading ? "md.loadingIntro" : "md.unloadingIntro"]"
+                  EmptyIcon="map" EmptyTitle="@L["md.noSites"]" EmptyText="@L[loading ? "md.noLoadingText" : "md.noUnloadingText"]"
+                  IdOf="s => s.Id" NameOf="s => s.Name" StatusOf="s => s.Status" RowVersionOf="s => s.RowVersion"
+                  ToModel="@(s => new MasterEditModel { Id = s.Id, Name = s.Name, Extra = s.Area, RowVersion = s.RowVersion })"
+                  ToRequest="@(m => new SiteRequest(m.Name?.Trim(), string.IsNullOrWhiteSpace(m.Extra) ? null : m.Extra.Trim(), m.Id is null ? m.ClientId : null, m.RowVersion))">
+    <Columns>
+        <GridColumn TItem="SiteResponse" Title="@L["md.name"]" Value="s => s.Name" SortKey="name" />
+        <GridColumn TItem="SiteResponse" Title="@L["md.area"]" Value="s => s.Area" SortKey="area" />
+    </Columns>
+    <Editor Context="m">
+        <TextField @bind-Value="m.Name" Label="@L["md.name"]" Required="true" MaxLength="150" />
+        <TextField @bind-Value="m.Extra" Label="@L["md.area"]" MaxLength="100" />
+    </Editor>
+</SimpleMasterList>
+
+@code {
+    /// <summary>True for loading sites, false for unloading sites.</summary>
+    [Parameter] public bool Loading { get; set; }
+}

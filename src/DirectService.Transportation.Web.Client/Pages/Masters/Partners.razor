@@ -1,0 +1,60 @@
+@page "/c/{Company}/masters/partners"
+@* SCR-62 partners (FR-158): companies that provide external trucks; payment details for partner payments; linked drivers in the panel. *@
+@inject Loc L
+
+<SimpleMasterList TItem="PartnerResponse" TModel="PartnerModel" Path="partners" Title="@L["nav.partners"]" AddText="@L["md.newPartner"]" WideEditor="true"
+                  Intro="@L["md.partnersIntro"]" EmptyIcon="users" EmptyTitle="@L["md.noPartners"]" EmptyText="@L["md.noPartnersText"]"
+                  IdOf="p => p.Id" NameOf="p => p.Name" StatusOf="p => p.Status" RowVersionOf="p => p.RowVersion" ModelId="m => m.Id" ModelName="m => m.Name"
+                  ToModel="PartnerModel.From" ToRequest="m => m.ToRequest()">
+    <Columns>
+        <GridColumn TItem="PartnerResponse" Title="@L["md.name"]" Value="p => p.Name" SortKey="name" />
+        <GridColumn TItem="PartnerResponse" Title="@L["md.taxNumber"]" Value="p => p.TaxNumber" Ltr="true" />
+        <GridColumn TItem="PartnerResponse" Title="@L["md.contact"]" Value="p => p.ContactPerson" />
+        <GridColumn TItem="PartnerResponse" Title="@L["md.phone"]" Value="p => p.Phone" Ltr="true" />
+        <GridColumn TItem="PartnerResponse" Title="IBAN" Value="p => p.Iban" Ltr="true" Clip="true" />
+    </Columns>
+    <Editor Context="m">
+        <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <TextField @bind-Value="m.Name" Label="@L["md.name"]" Required="true" MaxLength="200" Span="2" />
+            <TextField @bind-Value="m.TaxNumber" Label="@L["md.taxNumber"]" Ltr="true" MaxLength="20" />
+            <TextField @bind-Value="m.ContactPerson" Label="@L["md.contact"]" MaxLength="150" />
+            <TextField @bind-Value="m.Phone" Label="@L["md.phone"]" Type="tel" Ltr="true" MaxLength="20" />
+            <TextField @bind-Value="m.Address" Label="@L["md.address"]" MaxLength="300" />
+            <TextField @bind-Value="m.BankName" Label="@L["md.bank"]" MaxLength="100" />
+            <TextField @bind-Value="m.Iban" Label="IBAN" Ltr="true" MaxLength="34" Help="@L["md.ibanHelp"]" />
+            <TextField @bind-Value="m.CliqAlias" Label="@L["md.cliq"]" Ltr="true" MaxLength="50" />
+            <TextAreaField @bind-Value="m.Notes" Label="@L["md.notes"]" MaxLength="1000" Span="3" />
+        </div>
+    </Editor>
+</SimpleMasterList>
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+
+    public sealed class PartnerModel
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? TaxNumber { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? ContactPerson { get; set; }
+        public string? BankName { get; set; }
+        public string? Iban { get; set; }
+        public string? CliqAlias { get; set; }
+        public string? Notes { get; set; }
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+
+        public static PartnerModel From(PartnerResponse p) => new()
+        {
+            Id = p.Id, Name = p.Name, TaxNumber = p.TaxNumber, Phone = p.Phone, Address = p.Address, ContactPerson = p.ContactPerson,
+            BankName = p.BankName, Iban = p.Iban, CliqAlias = p.CliqAlias, Notes = p.Notes, RowVersion = p.RowVersion,
+        };
+
+        public PartnerRequest ToRequest() => new(Name?.Trim(), N(TaxNumber), N(Phone), N(Address), N(ContactPerson), N(BankName), N(Iban), N(CliqAlias), N(Notes),
+            Id is null ? ClientId : null, RowVersion);
+
+        private static string? N(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+}

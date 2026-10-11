@@ -1,0 +1,86 @@
+@*
+  Layout of the signed-in application (SCR-00): loads the profile, selects the company of the URL (/c/{company}/…; tenant pages use the
+  current or home company), and renders the shell with the page. A company the user cannot open is shown as "not found" (the API also
+  answers 404), so its existence is never revealed.
+*@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppSession Session
+@inject ShellState Shell
+@inject NavigationManager Nav
+@inject Loc L
+
+@if (_state == LoadState.Loading)
+{
+    <div class="empty" style="height:100vh" role="status"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@L["ui.loading"]</span></div>
+}
+else
+{
+    <AppShell SearchAsync="Session.SearchAsync" OnCompany="SwitchCompany" OnNotifications="() => _notes = true" OnProfile="Profile"
+              OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
+        <Banners><TenantBanners /></Banners>
+        <ChildContent>
+            @if (_state == LoadState.Error)
+            {
+                <ErrorState Reference="@_reference" OnRetry="Load" />
+            }
+            else if (_state == LoadState.Empty)
+            {
+                <NotFoundView />
+            }
+            else
+            {
+                @Body
+            }
+            <NotificationsPanel @bind-Open="_notes" />
+        </ChildContent>
+    </AppShell>
+}
+
+@code {
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _notes;
+    private string? _company;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += Moved;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            _company = CompanyOfUrl() ?? Shell.Company?.Id ?? Session.HomeCompany;
+            _state = _company is not null && await Session.EnterCompanyAsync(_company) ? LoadState.Ready : LoadState.Empty;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private void Moved(object? sender, LocationChangedEventArgs e)
+    {
+        var company = CompanyOfUrl();
+        if (company is null || company == _company) return;
+        _ = InvokeAsync(async () => { await Load(); StateHasChanged(); });
+    }
+
+    /// <summary>The company token of /c/{company}/… addresses.</summary>
+    private string? CompanyOfUrl()
+    {
+        var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return path.Length >= 2 && path[0] == "c" ? Uri.UnescapeDataString(path[1]) : null;
+    }
+
+    private void SwitchCompany(string company) => Nav.NavigateTo(NavModel.Href(company, ""));
+
+    private void Profile() => Nav.NavigateTo(NavModel.Href(Shell.Company?.Id ?? "", "profile"));
+
+    public void Dispose() => Nav.LocationChanged -= Moved;
+}

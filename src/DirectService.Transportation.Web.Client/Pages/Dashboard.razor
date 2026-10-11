@@ -1,0 +1,154 @@
+@page "/c/{Company}"
+@* SCR-07 dashboard (FR-137…141): today / month-to-date figures, alert cards that open the filtered lists, cash and bank balances, pinned
+   reports with their threshold state (icon + text). Each part appears only with its permission (the API leaves the rest out). *@
+@using DirectService.Transportation.Contracts.Reports
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+
+<PageHeader Title="@L["nav.dashboard"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
+    <Actions>
+        <Btn Text="@L["dash.today"]" Primary="@(_period == "today")" Pressed="@(_period == "today" ? "true" : "false")" OnClick="@(() => Period("today"))" />
+        <Btn Text="@L["dash.mtd"]" Primary="@(_period == "mtd")" Pressed="@(_period == "mtd" ? "true" : "false")" OnClick="@(() => Period("mtd"))" />
+        @if (Shell.Can(PermissionKeys.ReportsView)) {<Btn Icon="pin" Text="@L["dash.pinReport"]" Href="@NavModel.Href(Company, "reports/saved")" />}
+    </Actions>
+</PageHeader>
+
+<StateView State="_state" Kind="SkeletonKind.Dashboard" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="truck" Title="@L["dash.emptyTitle"]" Text="@L["dash.emptyText"]">
+            <Actions>
+                @if (Shell.Can(PermissionKeys.TripsEdit)) {<Btn Primary="true" Icon="plus" Text="@L["nav.newTrip"]" Href="@NavModel.Href(Company, "trips/new")" />}
+                @if (Shell.SetupIncomplete) {<Btn Text="@L["nav.setup"]" Href="@NavModel.Href(Company, NavModel.Setup)" />}
+            </Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        @if (_data!.OpeningDifference is decimal diff && diff != 0)
+        {
+            <Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(diff))">
+                <Actions><a href="@NavModel.Href(Company, "accounting/chart?tab=openings")">@L["dash.openings"]</a></Actions>
+            </Banner>
+        }
+        <Figures Items="Figures" />
+        <div class="cols fill" style="grid-template-columns:1.55fr 1fr">
+            <Box Title="@L["dash.alerts"]" NoPad="true" Class="fill">
+                @if (_data.Alerts.Count == 0)
+                {
+                    <EmptyState Icon="check" Title="@L["dash.noAlerts"]" />
+                }
+                else
+                {
+                    <DataGrid TItem="DashboardAlert" Items="_data.Alerts" Key="a => a.Key" Caption="@L["dash.alerts"]">
+                        <Columns>
+                            <GridColumn TItem="DashboardAlert" Title="@L["dash.alert"]" Wrap="true">
+                                <Template><span class="badge @ToneCss.Badge(SeverityTone(context.Severity))"><Icon Name="@(context.Severity == "info" ? "info" : "alert")" Label="@L["sev." + context.Severity]" /></span> <Tx Value="@context.Title" /></Template>
+                            </GridColumn>
+                            <GridColumn TItem="DashboardAlert" Title="@L["dash.count"]" Value="a => Fmt.Count(a.Count)" Numeric="true" />
+                            <GridColumn TItem="DashboardAlert" Title="@L["dash.value"]" Value="AlertValue" Numeric="true" />
+                            <GridColumn TItem="DashboardAlert" Title="@L["dash.detail"]" Value="a => a.Detail" Wrap="true" />
+                            <GridColumn TItem="DashboardAlert" Title="@L["dash.open"]" HideTitle="true">
+                                <Template>@if (Links.ForDrill(Company, context.Link.Type, context.Link.Id, context.Link.Filters) is { } href) {<a href="@href">@L["dash.openList"]</a>}</Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                }
+            </Box>
+            <div class="stack" style="min-height:0">
+                @if (_data.CashAndBanks is { } cash)
+                {
+                    <Box Title="@L["dash.cash"]" NoPad="true">
+                        <DataGrid TItem="DashboardCashCard" Items="cash" Key="c => c.Id" Caption="@L["dash.cash"]" FooterLabel="@L["ui.total"]">
+                            <Columns>
+                                <GridColumn TItem="DashboardCashCard" Title="@L["dash.account"]" Value="c => c.Name" />
+                                <GridColumn TItem="DashboardCashCard" Title="@L["dash.balance"]" Value="c => Fmt.Money(c.Balance)" Numeric="true" Footer="@Fmt.Money(cash.Sum(c => c.Balance))" />
+                            </Columns>
+                        </DataGrid>
+                    </Box>
+                }
+                @if (Shell.Can(PermissionKeys.ReportsView))
+                {
+                    <Box Title="@L["dash.pins"]">
+                        <Actions><Btn Small="true" Icon="pin" Text="@L["dash.pinReport"]" Href="@NavModel.Href(Company, "reports/saved")" /></Actions>
+                        <ChildContent>
+                            @if (_data.Pins.Count == 0) {<p class="muted">@L["dash.noPins"]</p>}
+                            @foreach (var p in _data.Pins)
+                            {
+                                var tone = p.State switch { "exceeded" => Tone.Err, "warning" => Tone.Warn, _ => Tone.Ok };
+                                <div style="padding:5px 0;border-bottom:1px solid var(--border)">
+                                    <div style="display:flex;justify-content:space-between;gap:8px"><span><Tx Value="@p.Report.Name" /> · <Tx Value="@p.MeasureLabel" /></span><b><Money Value="p.Value" /></b></div>
+                                    @if (p.CriticalThreshold is decimal crit && crit > 0 && p.Value is decimal v) {<div style="margin:4px 0"><ProgressBar Value="v" Max="crit" Label="@p.MeasureLabel" /></div>}
+                                    @if (p.Problem is not null) {<Badge Tone="Tone.Mute" Icon="info" Text="@p.Problem" />}
+                                    else {<Badge Tone="tone" Icon="@(tone == Ui.Tone.Ok ? "check" : "alert")" Text="@PinText(p)" />}
+                                </div>
+                            }
+                        </ChildContent>
+                    </Box>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</StateView>
+
+@code {
+    private LoadState _state = LoadState.Loading;
+    private DashboardResponse? _data;
+    private string? _reference;
+    private string _period = "mtd";
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            _data = await Api.GetAsync<DashboardResponse>(Api.C("dashboard?period=" + _period));
+            var f = _data.Figures;
+            _state = (f.Trips ?? 0) == 0 && _data.Alerts.Count == 0 && _period == "mtd" && (_data.CashAndBanks?.Count ?? 0) == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private Task Period(string p)
+    {
+        if (_period == p) return Task.CompletedTask;
+        _period = p;
+        return Load();
+    }
+
+    private IReadOnlyList<Figure> Figures
+    {
+        get
+        {
+            var f = _data!.Figures;
+            var list = new List<Figure>();
+            if (f.Trips is int t) list.Add(new(L["dash.trips"], Fmt.Count(t)));
+            if (f.Tonnage is decimal w) list.Add(new(L["dash.tonnage"], Fmt.Qty(w, 1)));
+            if (f.Revenue is decimal r) list.Add(new(L["dash.revenue"], Fmt.Money(r)));
+            if (f.DriverWages is decimal dw) list.Add(new(L["dash.wages"], Fmt.Money(dw)));
+            if (f.PartnerCosts is decimal pc) list.Add(new(L["dash.partnerCosts"], Fmt.Money(pc)));
+            if (f.Margin is decimal m) list.Add(new(L["dash.margin"], Fmt.Money(m)));
+            if (f.Invoiced is decimal i) list.Add(new(L["dash.invoiced"], Fmt.Money(i)));
+            if (f.Collections is decimal c) list.Add(new(L["dash.collections"], Fmt.Money(c)));
+            return list;
+        }
+    }
+
+    private static string AlertValue(DashboardAlert a) => a.Value is null ? "—" : Fmt.Money(a.Value);
+
+    private static Tone SeverityTone(string severity) => severity switch { "error" => Ui.Tone.Err, "warning" => Ui.Tone.Warn, _ => Ui.Tone.Info };
+
+    private string PinText(DashboardPinResponse p) => p.State switch
+    {
+        "exceeded" => L.F("dash.pinExceeded", Fmt.Money(p.CriticalThreshold)),
+        "warning" => L.F("dash.pinWarning", Fmt.Money(p.WarningThreshold)),
+        _ => L["dash.pinNormal"],
+    };
+}

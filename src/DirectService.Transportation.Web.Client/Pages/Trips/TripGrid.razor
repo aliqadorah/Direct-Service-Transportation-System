@@ -1,0 +1,55 @@
+@* Trips table shared by the recent trips, the Created Trips list and the shortage view: receipt (opens the trip), parties and route,
+   weights, prices and amounts, status tags (billing, settled, void, shortage, tariff breach, manual rate, needs review). *@
+@using DirectService.Transportation.Contracts.Trips
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+<DataGrid TItem="TripResponse" Items="Items" Key="t => t.Id" Caption="@L["nav.trips"]" LiveKeys="LiveKeys" SortKey="@SortKey" SortDesc="SortDesc" OnSort="OnSort"
+          ShowFilters="ShowFilters" Filters="Filters" OnFilter="OnFilter" Selectable="Selectable" Selected="Selected" SelectedChanged="SelectedChanged"
+          OnRowClick="Open" RowClass="@(t => t.Status == "Void" ? "void" : null)" FooterLabel="@FooterLabel">
+    <Columns>
+        <GridColumn TItem="TripResponse" Title="@L["trip.receiptNo"]" Value="t => t.ReceiptNo" Ltr="true" SortKey="receiptNo" FilterKey="@(ShowFilters ? "q" : null)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.date"]" Value="t => Fmt.Date(t.TripDate, Shell.DateFormat)" Ltr="true" SortKey="tripDate" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.driver"]" Value="t => t.Driver.Name" SortKey="driver" Clip="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["md.plate"]" Value="t => t.TruckPlate" Ltr="true" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.customer"]" Value="t => t.Customer.Name" SortKey="customer" Clip="true" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.loading"]" Value="t => t.LoadingSite.Name" Clip="true" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.unloading"]" Value="t => t.UnloadingSite.Name" Clip="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.material"]" Value="t => t.Material.Name" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.loadedT"]" Value="t => Fmt.Qty(t.LoadedWeight)" Numeric="true" Footer="@Totals?.LoadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.unloadedT"]" Value="t => Fmt.Qty(t.UnloadedWeight)" Numeric="true" Footer="@Totals?.UnloadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
+        @if (Shortage)
+        {
+            <GridColumn TItem="TripResponse" Title="@L["trip.shortageT"]" Value="t => Fmt.Qty(t.ShortageWeight)" Numeric="true" />
+            <GridColumn TItem="TripResponse" Title="@L["trip.shortagePct"]" Value="t => Fmt.Percent(t.ShortagePct)" Numeric="true" SortKey="shortagePct" />
+        }
+        <GridColumn TItem="TripResponse" Title="@L["trip.price"]" Value="t => Fmt.Money(t.CustomerPrice)" Numeric="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.rate"]" Value="t => Fmt.Money(t.PartnerRate ?? t.DriverRate)" Numeric="true" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.revenue"]" Value="t => Fmt.Money(t.Revenue)" Numeric="true" SortKey="revenue" Footer="@Money(Totals?.Revenue)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.wageCost"]" Value="t => Fmt.Money(t.DriverWage + t.PartnerCost)" Numeric="true" Footer="@Money(Totals is null ? null : Totals.DriverWage + Totals.PartnerCost)" />
+        <GridColumn TItem="TripResponse" Title="@L["ml.status"]"><Template><TripTags Trip="context" /></Template></GridColumn>
+    </Columns>
+</DataGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TripResponse> Items { get; set; } = [];
+    [Parameter, EditorRequired] public string Company { get; set; } = "";
+    [Parameter] public IReadOnlySet<object>? LiveKeys { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool Shortage { get; set; }
+    [Parameter] public TripTotals? Totals { get; set; }
+    [Parameter] public string? FooterLabel { get; set; }
+    [Parameter] public string? SortKey { get; set; }
+    [Parameter] public bool SortDesc { get; set; }
+    [Parameter] public EventCallback<(string Key, bool Desc)> OnSort { get; set; }
+    [Parameter] public bool ShowFilters { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Filters { get; set; }
+    [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> OnFilter { get; set; }
+    [Parameter] public bool Selectable { get; set; }
+    [Parameter] public IReadOnlySet<object>? Selected { get; set; }
+    [Parameter] public EventCallback<IReadOnlySet<object>> SelectedChanged { get; set; }
+
+    private static string? Money(decimal? v) => v is null ? null : Fmt.Money(v);
+
+    private void Open(TripResponse t) => Nav.NavigateTo(NavModel.Href(Company, $"trips/{t.Id}"));
+}

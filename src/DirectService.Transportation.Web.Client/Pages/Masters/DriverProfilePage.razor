@@ -1,0 +1,128 @@
+@page "/c/{Company}/masters/drivers/{Id}"
+@* SCR-60 driver profile (FR-156): driver and truck details, document alerts, account summary (trn.drv.view), what refers to the driver,
+   history with old → new values; archive / restore, protected delete, edit (masters.manage). *@
+@using DirectService.Transportation.Contracts.Cash
+@using DirectService.Transportation.Contracts.Accounting
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var d = _profile!.Driver; }
+        <PageHeader Title="@d.FullName" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.drivers"], NavModel.Href(Company, "masters/drivers"))])">
+            <Badges>
+                <StatusTag Status="@(d.Status == "Archived" ? "archived" : "active")" />
+                @foreach (var a in d.Alerts) {<DocAlert Alert="a" />}
+            </Badges>
+            <Actions>
+                @if (Shell.Can(PermissionKeys.DrvView)) {<Btn Icon="print" Text="@L["md.statement"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}")" />}
+                @if (Shell.Can(PermissionKeys.MastersManage))
+                {
+                    <Btn Icon="@(d.Status == "Archived" ? "refresh" : "archive")" Text="@L[d.Status == "Archived" ? "ml.restore" : "ml.archive"]" OnClick="ToggleStatus" />
+                    <Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => _deleting = true" />
+                    <Btn Primary="true" Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"masters/drivers/{Id}/edit")" />
+                }
+            </Actions>
+        </PageHeader>
+        <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+            <div class="stack" style="min-width:0">
+                @if (_account is not null)
+                {
+                    <Figures Items="@([new Figure(L["md.unsettledWages"], Fmt.Money(_account.Gross)), new Figure(L["md.openAdvances"], Fmt.Money(_account.AdvancesTotal)), new Figure(L["md.netDue"], Fmt.Money(_account.NetDue)), new Figure(L["md.openTrips"], Fmt.Count(_account.OpenTrips.Count))])" />
+                }
+                <Box>
+                    <KeyValues Columns="4" Items="Details(d)" />
+                </Box>
+                <Box Title="@L["ml.references"]">
+                    @if (_profile.References.All(x => x.Count == 0)) {<p class="muted">@L["ml.noReferences"]</p>}
+                    else {<ul style="margin:0;padding-inline-start:18px">@foreach (var x in _profile.References.Where(x => x.Count > 0)) {<li><Tx Value="@($"{x.Label}: {Fmt.Count(x.Count)}")" /></li>}</ul>}
+                </Box>
+            </div>
+            <Box Title="@L["ui.history"]"><RecordHistory Items="_profile.History" /></Box>
+        </div>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _profile?.Driver.FullName ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["ml.deleteText"]" Busy="_busy" Error="@_error" OnConfirm="Delete">
+    @if (_profile is not null && _profile.References.Any(x => x.Count > 0))
+    {
+        <Banner Tone="Tone.Err" Text="@L["ml.inUse"]" />
+        <ul style="margin:0;padding-inline-start:18px">@foreach (var x in _profile.References.Where(x => x.Count > 0)) {<li><Tx Value="@($"{x.Label}: {Fmt.Count(x.Count)}")" /></li>}</ul>
+        <p class="muted">@L["ml.archiveInstead"]</p>
+    }
+</ConfirmDialog>
+
+@code {
+    private LoadState _state = LoadState.Loading;
+    private DriverProfile? _profile;
+    private DriverAccountResponse? _account;
+    private string? _reference, _error;
+    private bool _deleting, _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _profile = await Api.GetAsync<DriverProfile>(Api.C($"drivers/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; return; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; return; }
+        if (Shell.Can(PermissionKeys.DrvView))
+        {
+            try { _account = await Api.GetAsync<DriverAccountResponse>(Api.C($"drivers/{Uri.EscapeDataString(Id)}/account")); } catch (ApiException) { }
+        }
+    }
+
+    private IReadOnlyList<KeyValue> Details(DriverResponse d) =>
+    [
+        new(L["md.nationalId"], d.NationalId),
+        new(L["md.phone"], string.Join(" · ", new[] { d.Phone1, d.Phone2 }.Where(x => !string.IsNullOrEmpty(x)))),
+        new(L["md.licence"], $"{d.LicenceNo} · {d.LicenceType} · {L["md.until"]} {Fmt.Date(d.LicenceExpiry, Shell.DateFormat)}"),
+        new(L["md.paymentMethod"], L["pay." + d.PaymentMethod] + (d.BankName is null ? "" : " · " + d.BankName) + (d.CliqAlias is null ? "" : " · " + d.CliqAlias)),
+        new("IBAN", d.Iban),
+        new(L["md.truck"], string.Join(" · ", new[] { d.PlateNumber, d.TruckType, Fmt.Qty(d.CapacityTons, 0) + " " + L["md.tons"] }.Where(x => !string.IsNullOrWhiteSpace(x)))),
+        new(L["md.trailer"], d.TrailerNo),
+        new(L["md.ownership"], $"{d.OwnershipType.Name} ({L[d.FleetClass == "Own" ? "md.fleetOwn" : "md.fleetExternal"]})"),
+        new(L["md.partner"], d.Partner?.Name),
+        new(L["md.docDates"], $"{Fmt.Date(d.RegistrationExpiry, Shell.DateFormat)} / {Fmt.Date(d.InsuranceExpiry, Shell.DateFormat)} / {Fmt.Date(d.InspectionExpiry, Shell.DateFormat)}"),
+        new(L["md.address"], d.Address),
+        new(L["md.notes"], d.Notes),
+    ];
+
+    private async Task ToggleStatus()
+    {
+        var d = _profile!.Driver;
+        var restore = d.Status == "Archived";
+        try
+        {
+            await Api.PostAsync<DriverResponse>(Api.C($"drivers/{Uri.EscapeDataString(Id)}/{(restore ? "restore" : "archive")}"), new StatusChangeRequest(d.RowVersion));
+            Toasts.Success(L.F(restore ? "ml.restored" : "ml.archivedToast", d.FullName));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task Delete(string reason)
+    {
+        _busy = true;
+        try
+        {
+            await Api.PostAsync(Api.C($"drivers/{Uri.EscapeDataString(Id)}/delete"), new DeleteRequest(reason));
+            Toasts.Success(L.F("ml.deleted", _profile!.Driver.FullName));
+            Nav.NavigateTo(NavModel.Href(Company, "masters/drivers"));
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

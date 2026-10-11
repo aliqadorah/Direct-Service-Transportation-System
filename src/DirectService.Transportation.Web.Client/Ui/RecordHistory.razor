@@ -1,0 +1,28 @@
+@* History of a master record from the API (FR-166): action, user, time, reason and each field's old → new value. *@
+@using Md = DirectService.Transportation.Contracts.MasterData
+@inject Loc L
+@inject ShellState Shell
+@if (Items.Count == 0)
+{
+    <p class="muted">@L["hist.none"]</p>
+}
+else
+{
+    <HistoryList Items="Entries" />
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Md.HistoryEntry> Items { get; set; } = [];
+
+    private IReadOnlyList<HistoryEntry> Entries => Items.SelectMany(h =>
+    {
+        var what = L["hist." + h.Action] is var t && t.StartsWith("hist.", StringComparison.Ordinal) ? h.Action : t;
+        if (h.Reason is not null) what += " — " + h.Reason;
+        var when = Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat);
+        var who = h.User ?? L["hist.system"];
+        var isVoid = h.Action is "Delete" or "Void" or "Archive";
+        return h.Changes.Count == 0
+            ? [new HistoryEntry(who, what, when, IsVoid: isVoid)]
+            : h.Changes.Select(c => new HistoryEntry(who, $"{what} · {c.Field}", when, c.OldValue ?? "—", c.NewValue ?? "—", isVoid));
+    }).ToList();
+}

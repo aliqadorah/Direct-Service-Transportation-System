@@ -1,0 +1,29 @@
+@page "/c/{Company}/masters/ownership-types"
+@* SCR-66 ownership types (FR-161, DT-38): own or external fleet class decides the monthly-rate column; the built-in "Company" type is
+   protected (the API refuses changing or deleting it). *@
+@inject Loc L
+
+<SimpleMasterList TModel="MasterEditModel" ModelId="m => m.Id" ModelName="m => m.Name" TItem="OwnershipTypeResponse" Path="ownership-types" Title="@L["nav.ownershipTypes"]" AddText="@L["md.newType"]" Intro="@L["md.typesIntro"]"
+                  EmptyIcon="truck" EmptyTitle="@L["md.noTypes"]" EmptyText="@L["md.noTypesText"]" Paged="false"
+                  IdOf="t => t.Id" NameOf="t => t.Name" RowVersionOf="t => t.RowVersion"
+                  ToModel="@(t => new MasterEditModel { Id = t.Id, Name = t.Name, Extra = t.FleetClass, RowVersion = t.RowVersion })"
+                  ToRequest="@(m => new OwnershipTypeRequest(m.Name?.Trim(), m.Extra, m.Id is null ? m.ClientId : null, m.RowVersion))">
+    <Columns>
+        <GridColumn TItem="OwnershipTypeResponse" Title="@L["md.name"]" Value="t => t.Name" />
+        <GridColumn TItem="OwnershipTypeResponse" Title="@L["md.fleetClass"]">
+            <Template><Badge Tone="@(context.FleetClass == "Own" ? Tone.Primary : Tone.Mute)" Icon="truck" Text="@L[context.FleetClass == "Own" ? "md.fleetOwn" : "md.fleetExternal"]" /></Template>
+        </GridColumn>
+        <GridColumn TItem="OwnershipTypeResponse" Title="@L["md.builtIn"]" HideTitle="true">
+            <Template>@if (context.IsBuiltIn) {<Badge Tone="Tone.Info" Icon="lock" Text="@L["md.builtInText"]" />}</Template>
+        </GridColumn>
+    </Columns>
+    <Editor Context="m">
+        <TextField @bind-Value="m.Name" Label="@L["md.name"]" Required="true" MaxLength="100" />
+        <SelectField TValue="string" @bind-Value="m.Extra" Label="@L["md.fleetClass"]" Required="true" Empty="@L["ui.choose"]"
+                     Options="@([new Option<string>("Own", L["md.fleetOwn"]), new Option<string>("External", L["md.fleetExternal"])])" Help="@L["md.fleetHelp"]" />
+    </Editor>
+</SimpleMasterList>
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

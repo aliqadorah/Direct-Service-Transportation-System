@@ -256,6 +256,7 @@ internal static class ApiSummaries
         ["PUT /api/v1/companies/{company}/monthly-rates/{month}"] = "Save the rates of a month; warns when the month has trips, refuses clearing a site with trips (FR-034, FR-035)",
         ["GET /api/v1/companies/{company}/monthly-rates/{month}/history"] = "Rate history of a month or of one loading site in it: old value, new value, user, time (FR-036)",
         ["GET /api/v1/companies/{company}/monthly-rates/{month}/export"] = "Export the rates of a month to Excel or CSV (FR-028)",
+        ["POST /api/v1/companies/{company}/trips/calculate"] = "Live calculation for the trip form with the company settings; nothing is saved (UX-17, PRD 8.2)",
         ["GET /api/v1/companies/{company}/trips/"] = "Created Trips list: status, billing, settled, fleet, partner, flag and date filters, search, sort, paging and totals (FR-009)",
         ["GET /api/v1/companies/{company}/trips/export"] = "Export the filtered trips to Excel or CSV with the company's labels and custom fields (FR-009, FR-017)",
         ["GET /api/v1/companies/{company}/trips/recent"] = "The last ten trips saved by the current user (FR-008)",

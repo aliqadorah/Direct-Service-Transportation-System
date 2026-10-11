@@ -1,4 +1,5 @@
 @page "/design"
+@layout BareLayout
 @*
   Component gallery (development only): every design-system component in its states, inside the real shell, with sample data from the
   approved board, for visual comparison with docs/step6 and for the accessibility check of step 9. Not reachable in production.
@@ -67,8 +68,8 @@ else
                                 <DateField @bind-Value="_form.Date" Label="@(L.En ? "Date" : "التاريخ")" Required="true" />
                                 <ComboField TValue="string" @bind-Value="_form.Driver" Options="Drivers" Label="@(L.En ? "Driver" : "السائق")" Required="true" Help="@(L.En ? "Type part of the name or the plate." : "اكتب جزءاً من الاسم أو اللوحة.")" />
                                 <ComboField TValue="string" @bind-Value="_form.Customer" Options="Customers" Label="@(L.En ? "Customer" : "العميل")" Required="true" />
-                                <NumberField @bind-Value="_form.Loaded" Label="@(L.En ? "Loaded weight" : "الوزن المحمّل")" Unit="@(L.En ? "t" : "طن")" Required="true" Min="0" />
-                                <NumberField @bind-Value="_form.Unloaded" Label="@(L.En ? "Unloaded weight" : "الوزن المنزّل")" Unit="@(L.En ? "t" : "طن")" Min="0" Help="@(L.En ? "Shortage tolerance 0.5%" : "حد النقص المسموح 0.5٪")" />
+                                <NumberField @bind-Value="_form.Loaded" Label="@(L.En ? "Loaded weight" : "الوزن المحمّل")" Unit="@(L.En ? "t" : "طن")" Required="true" Min="0m" />
+                                <NumberField @bind-Value="_form.Unloaded" Label="@(L.En ? "Unloaded weight" : "الوزن المنزّل")" Unit="@(L.En ? "t" : "طن")" Min="0m" Help="@(L.En ? "Shortage tolerance 0.5%" : "حد النقص المسموح 0.5٪")" />
                                 <NumberField @bind-Value="_form.Price" Label="@(L.En ? "Price per tonne" : "السعر للطن")" Unit="JOD" Source="@(L.En ? "From tariff TRF-0012" : "من التعرفة TRF-0012")" />
                                 <SelectField TValue="string" @bind-Value="_form.Method" Options="Methods" Label="@(L.En ? "Payment method" : "طريقة الدفع")" Empty="@L["ui.choose"]" />
                                 <TextField @bind-Value="_form.Plate" Label="@(L.En ? "Plate" : "اللوحة")" Ltr="true" MaxLength="20" />

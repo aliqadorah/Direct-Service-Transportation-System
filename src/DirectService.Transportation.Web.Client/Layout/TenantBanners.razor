@@ -1,0 +1,29 @@
+@* Page-wide banners of the shell (UX-19): subscription past due or suspended (read-only, BR-012/D-12), trial, archived company (read-only). *@
+@inject ShellState Shell
+@inject Loc L
+@{
+    var tenant = Shell.Me?.TenantStatus;
+    var canManage = Shell.Can(PermissionKeys.TenantManage);
+}
+@if (Shell.Company?.Status == "Archived")
+{
+    <Banner Tone="Tone.Lock" Icon="archive" Text="@L["banner.archived"]" />
+}
+@if (tenant == "Suspended")
+{
+    <Banner Tone="Tone.Err" Icon="lock" Text="@L["banner.suspended"]">
+        <Actions>@if (canManage) {<a href="/tenant/subscription">@L["banner.renew"]</a>}</Actions>
+    </Banner>
+}
+else if (tenant == "PastDue")
+{
+    <Banner Tone="Tone.Warn" Text="@L["banner.pastDue"]">
+        <Actions>@if (canManage) {<a href="/tenant/subscription">@L["banner.updatePayment"]</a>}</Actions>
+    </Banner>
+}
+else if (tenant == "Trial" && canManage)
+{
+    <Banner Tone="Tone.Info" Icon="clock" Text="@L["banner.trial"]">
+        <Actions><a href="/tenant/subscription">@L["banner.choosePlan"]</a></Actions>
+    </Banner>
+}

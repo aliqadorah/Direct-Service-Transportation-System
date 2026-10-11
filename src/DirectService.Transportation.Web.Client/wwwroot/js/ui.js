@@ -107,3 +107,13 @@ export function focusFirst(el) { const b = el && el.querySelector(FOCUSABLE); if
 
 /** Opens the browser's date picker of a (visually hidden) date input. */
 export function showPicker(el) { try { el.showPicker(); } catch { el.focus(); } }
+
+/** Saves a file received from the API (exports, PDFs) through a temporary object URL. */
+export function saveFile(name, contentType, bytes) {
+  const blob = new Blob([bytes], { type: contentType || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name || "download"; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}

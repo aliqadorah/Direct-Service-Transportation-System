@@ -1,0 +1,21 @@
+@* Status tags of a trip (UX-05): void, or billing (unbilled / invoiced) + settled, and the flags shortage, tariff breach, manual rate,
+   needs review, posting pending. *@
+@using DirectService.Transportation.Contracts.Trips
+@inject Loc L
+<span class="tags">
+    @if (Trip.Status == "Void") {<StatusTag Status="void" />}
+    else
+    {
+        <StatusTag Status="@(Trip.Billing == "Invoiced" ? "invoiced" : "unbilled")" />
+        @if (Trip.IsSettled) {<StatusTag Status="settled" />}
+    }
+    @if (Trip.IsShortageFlagged) {<StatusTag Status="short" />}
+    @if (Trip.IsTariffBreach) {<StatusTag Status="breach" />}
+    @if (Trip.IsManualRate) {<StatusTag Status="manual" />}
+    @if (Trip.NeedsReview) {<StatusTag Status="review" />}
+    @if (Trip.PostingPending) {<StatusTag Status="pending" />}
+</span>
+
+@code {
+    [Parameter, EditorRequired] public TripResponse Trip { get; set; } = default!;
+}

@@ -1,0 +1,205 @@
+@page "/c/{Company}/trips"
+@*
+  SCR-10 trips — quick entry and the last ten trips (US-01, FR-001…008, FR-017, FR-022, FR-030): keyboard-only row (Tab to move, Enter to
+  save); driver, customer, material and route remembered (quick-entry defaults); customer price and driver rate pre-filled from the
+  tariffs and monthly rates with their source; after a save only the receipt number and unloaded weight are cleared. Users who may only
+  view trips go to the Created Trips list.
+*@
+@using DirectService.Transportation.Contracts.Trips
+@using DirectService.Transportation.Contracts.Pricing
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject UiJs Js
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.trips"]" Crumbs="@([new Crumb(L["nav.operations"])])">
+    <Actions>
+        <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "trips/import")" />
+        <Btn Icon="file" Text="@L["trip.fullForm"]" Href="@NavModel.Href(Company, "trips/new")" />
+        <Btn Icon="layers" Text="@L["trip.created"]" Href="@NavModel.Href(Company, "trips/list")" />
+    </Actions>
+</PageHeader>
+
+@if (_banner is not null)
+{
+    <Banner Tone="Tone.Err" Text="@_banner">
+        <Actions>@if (_missingRate) {<a href="@NavModel.Href(Company, "masters/monthly-rates")">@L["nav.monthlyRates"]</a>}</Actions>
+    </Banner>
+}
+
+<section class="box" style="flex:none;position:relative;z-index:3" aria-label="@L["trip.quickEntry"]">
+    <EditForm Model="_q" OnValidSubmit="Save" id="quick-entry">
+        <ProblemValidator @ref="_problems" />
+        <div style="display:grid;grid-template-columns:116px 120px 1.4fr 1.3fr 1fr 1fr .9fr 88px 88px 88px 88px auto;gap:6px;align-items:start;padding:8px 10px;background:var(--surface-foot);border-bottom:1px solid var(--border)">
+            <TextField @bind-Value="_q.ReceiptNo" Label="@L["trip.receiptNo"]" Required="true" Ltr="true" MaxLength="30" Id="qe-receipt" autofocus />
+            <DateField @bind-Value="_q.TripDate" Label="@L["trip.date"]" Required="true" />
+            <ComboField TValue="string?" @bind-Value="_q.DriverId" SearchAsync="Lookups.SearchDriversAsync" Selected="_driver" Label="@L["trip.driver"]" Required="true" OnSelected="DriverPicked" />
+            <ComboField TValue="string?" @bind-Value="_q.CustomerId" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="true" OnSelected="_ => Quote()" />
+            <ComboField TValue="string?" @bind-Value="_q.LoadingSiteId" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Required="true" OnSelected="_ => Quote()" />
+            <ComboField TValue="string?" @bind-Value="_q.UnloadingSiteId" Options="Lookups.UnloadingSites" Label="@L["trip.unloading"]" Required="true" OnSelected="_ => Quote()" />
+            <ComboField TValue="string?" @bind-Value="_q.MaterialId" Options="Lookups.Materials" Label="@L["trip.material"]" Required="true" OnSelected="_ => Quote()" />
+            <NumberField @bind-Value="_q.LoadedWeight" Label="@L["trip.loaded"]" Required="true" Min="0.001m" />
+            <NumberField @bind-Value="_q.UnloadedWeight" Label="@L["trip.unloaded"]" Min="0m" />
+            <NumberField @bind-Value="_q.CustomerPrice" Label="@L["trip.price"]" Required="true" Min="0m" />
+            @if (_isPartnerTrip)
+            {
+                <NumberField @bind-Value="_q.PartnerRate" Label="@L["trip.partnerRate"]" Required="true" Min="0m" />
+            }
+            else
+            {
+                <NumberField @bind-Value="_q.DriverRate" Label="@L["trip.rate"]" Required="true" Min="0m" ReadOnly="@(_quote?.DriverRate is { Rate: null, CanEnterManualRate: false })" />
+            }
+            <div class="field"><span class="lbl" aria-hidden="true">&nbsp;</span><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Enter" Busy="_saving" /></div>
+        </div>
+        <div class="muted" style="padding:4px 10px;font-size:12px;display:flex;gap:14px;flex-wrap:wrap">
+            @if (_quote?.CustomerPrice is { } cp) {<span class="src"><Icon Name="check" /><Tx Value="@L.F("trip.priceFromTariff", Fmt.Money(cp.Price), cp.Specificity)" /></span>}
+            @if (_quote?.DriverRate is { Rate: not null } dr && !_isPartnerTrip) {<span class="src"><Icon Name="check" /><Tx Value="@L.F("trip.rateFrom", dr.Source ?? dr.RateMonth)" /></span>}
+            @if (_quote?.DriverRate is { Missing: not null } m && !_isPartnerTrip) {<span class="help err"><Icon Name="alert" /><Tx Value="@L.F("trip.rateMissing", m.Missing)" /></span>}
+            @if (_isPartnerTrip) {<span class="src"><Icon Name="info" /><Tx Value="@L["trip.partnerTrip"]" /></span>}
+            <span style="margin-inline-start:auto">@L["trip.keys"]</span>
+        </div>
+    </EditForm>
+</section>
+
+<Box Title="@L["trip.recent"]" NoPad="true" Class="fill">
+    <Actions><Btn Small="true" Icon="layers" Text="@L["trip.created"]" Href="@NavModel.Href(Company, "trips/list")" /></Actions>
+    <ChildContent>
+        <StateView State="_state" ErrorReference="@_reference" OnRetry="LoadRecent">
+            <Empty><EmptyState Icon="truck" Title="@L["trip.noneYet"]" Text="@L["trip.noneYetText"]"><Actions><Btn Icon="import" Text="@L["trip.importExcel"]" Href="@NavModel.Href(Company, "trips/import")" /></Actions></EmptyState></Empty>
+            <ChildContent><TripGrid Items="_recent" Company="@Company" LiveKeys="_live" Compact="true" /></ChildContent>
+        </StateView>
+    </ChildContent>
+</Box>
+
+@code {
+    private QuickModel _q = new();
+    private ProblemValidator? _problems;
+    private PriceQuoteResponse? _quote;
+    private Option<string?>? _driver;
+    private bool _isPartnerTrip;
+    private string? _partnerId;
+    private IReadOnlyList<TripResponse> _recent = [];
+    private readonly HashSet<object> _live = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _banner;
+    private bool _saving, _missingRate;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Shell.Can(PermissionKeys.TripsEdit)) { Nav.NavigateTo(NavModel.Href(Company, "trips/list"), replace: true); return; }
+        try
+        {
+            await Lookups.EnsureAsync();
+            var d = await Api.GetAsync<QuickEntryDefaults>(Api.C("trips/quick-entry"));
+            _q.TripDate = d.Today;
+            _q.DriverId = d.Driver?.Id;
+            _driver = d.Driver is null ? null : new Option<string?>(d.Driver.Id, d.Driver.Name);
+            _q.CustomerId = d.Customer?.Id;
+            _q.MaterialId = d.Material?.Id;
+            _q.LoadingSiteId = d.LoadingSite?.Id;
+            _q.UnloadingSiteId = d.UnloadingSite?.Id;
+            if (_q.DriverId is not null) await Lookups.SearchDriversAsync(d.Driver!.Name, default);
+            UpdatePartner();
+            await Quote();
+        }
+        catch (ApiException e) { _banner = e.Problem.Detail; }
+        await LoadRecent();
+    }
+
+    private async Task LoadRecent()
+    {
+        try
+        {
+            _recent = await Api.GetAsync<IReadOnlyList<TripResponse>>(Api.C("trips/recent"));
+            _state = _recent.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task DriverPicked(Option<string?>? o)
+    {
+        _driver = o;
+        UpdatePartner();
+        await Quote();
+    }
+
+    private void UpdatePartner()
+    {
+        var d = _q.DriverId is { } id && Lookups.Drivers.TryGetValue(id, out var x) ? x : null;
+        _isPartnerTrip = d?.Partner is not null;
+        _partnerId = d?.Partner?.Id;
+    }
+
+    /// <summary>Pre-fills the customer price, driver rate and partner rate from the tariffs and monthly rates (FR-006, FR-022, FR-030).</summary>
+    private async Task Quote()
+    {
+        if (_q.CustomerId is null || _q.DriverId is null || _q.LoadingSiteId is null) return;
+        var date = _q.TripDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var qs = $"customer={U(_q.CustomerId)}&driver={U(_q.DriverId)}&loadingSite={U(_q.LoadingSiteId)}&unloadingSite={U(_q.UnloadingSiteId)}&material={U(_q.MaterialId)}"
+            + (_partnerId is null ? "" : $"&partner={U(_partnerId)}") + (date is null ? "" : $"&tripDate={date}&loadingDate={date}");
+        try
+        {
+            _quote = await Api.GetAsync<PriceQuoteResponse>(Api.C("pricing/quote?" + qs));
+            if (_quote.CustomerPrice is { } cp) _q.CustomerPrice = cp.Price;
+            if (_quote.DriverRate?.Rate is decimal r) _q.DriverRate = r;
+            if (_quote.PartnerRate is { } pr) _q.PartnerRate = pr.Price;
+            if (_quote.DriverRate is { IsPartnerTrip: true }) _q.DriverRate = 0;
+        }
+        catch (ApiException) { _quote = null; }
+    }
+
+    private static string U(string? s) => Uri.EscapeDataString(s ?? "");
+
+    private async Task Save()
+    {
+        _saving = true;
+        _banner = null;
+        _missingRate = false;
+        try
+        {
+            var r = await Api.PostAsync<TripSaveResult>(Api.C("trips"), new TripRequest(_q.ReceiptNo?.Trim(), _q.TripDate, _q.TripDate, null, _q.DriverId, _q.CustomerId,
+                _q.LoadingSiteId, _q.UnloadingSiteId, _q.MaterialId, _partnerId, _q.LoadedWeight, _q.UnloadedWeight, _q.CustomerPrice,
+                _isPartnerTrip ? 0 : _q.DriverRate, _isPartnerTrip ? _q.PartnerRate : null, null, null, _q.ClientId, null));
+            Toasts.Success(L.F("trip.saved", r.Trip.ReceiptNo, Fmt.Money(r.Trip.Revenue)), L["ui.open"], NavModel.Href(Company, $"trips/{r.Trip.Id}"));
+            foreach (var w in r.Warnings) Toasts.Error(w.Message);
+            _recent = [r.Trip, .. _recent.Where(t => t.Id != r.Trip.Id).Take(9)];
+            _state = LoadState.Ready;
+            _live.Clear();
+            _live.Add(r.Trip.Id);
+            // Only the receipt number and the unloaded weight are cleared; the rest stays for the next trip of the same run.
+            _q.ReceiptNo = null;
+            _q.UnloadedWeight = null;
+            _q.NewClientId();
+            await Js.FocusById("qe-receipt");
+        }
+        catch (ApiException e)
+        {
+            _missingRate = e.Problem.Code?.Contains("rate", StringComparison.OrdinalIgnoreCase) == true;
+            _banner = _problems?.Show(e.Problem);
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class QuickModel
+    {
+        public string? ReceiptNo { get; set; }
+        public DateOnly? TripDate { get; set; }
+        public string? DriverId { get; set; }
+        public string? CustomerId { get; set; }
+        public string? LoadingSiteId { get; set; }
+        public string? UnloadingSiteId { get; set; }
+        public string? MaterialId { get; set; }
+        public decimal? LoadedWeight { get; set; }
+        public decimal? UnloadedWeight { get; set; }
+        public decimal? CustomerPrice { get; set; }
+        public decimal? DriverRate { get; set; }
+        public decimal? PartnerRate { get; set; }
+        public string ClientId { get; private set; } = Guid.NewGuid().ToString();
+        public void NewClientId() => ClientId = Guid.NewGuid().ToString();
+    }
+}

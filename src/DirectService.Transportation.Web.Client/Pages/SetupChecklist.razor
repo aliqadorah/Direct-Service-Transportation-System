@@ -1,0 +1,101 @@
+@page "/c/{Company}/setup"
+@* SCR-06 setup checklist (5.4, flow 9.1, G-10): the eight steps in any order with Not started / In progress / Done, a link to each area,
+   manual marks (settings.manage), trial reminder and the demo company for training (core.tenant.manage). *@
+@using DirectService.Transportation.Contracts.Platform
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["setup.title"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
+    <Actions>@if (Shell.Can(PermissionKeys.TenantManage)) {<Btn Icon="building" Text="@L["setup.demo"]" Busy="_demoBusy" OnClick="Demo" />}</Actions>
+</PageHeader>
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+    <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+        <section class="box" aria-labelledby="setup-progress">
+            <div class="bh"><h2 id="setup-progress" style="font-size:inherit"><Tx Value="@L.F("setup.progress", _data!.Done, _data.Total)" /></h2>
+                <span class="a" style="width:180px"><ProgressBar Value="_data.Done" Max="_data.Total" Label="@L.F("setup.progress", _data.Done, _data.Total)" /></span></div>
+            <ul class="steps">
+                @foreach (var s in _data.Steps)
+                {
+                    var step = s;
+                    var (tone, icon) = step.Status switch { "Done" => (Tone.Ok, "check"), "InProgress" => (Tone.Warn, "clock"), _ => (Tone.Mute, (string?)null) };
+                    <li class="step">
+                        <span class="si badge @ToneCss.Badge(tone)" style="padding:0;justify-content:center">@if (icon is not null) {<Icon Name="@icon" />}</span>
+                        <div><b>@step.Title</b>@if (step.Detail is not null) {<div class="muted" style="font-size:13px"><Tx Value="@step.Detail" /></div>}</div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <Badge Tone="tone" Icon="@icon" Text="@L["setup.st." + step.Status]" />
+                            <Btn Small="true" Primary="@(step.Status != "Done")" Text="@L[step.Status switch { "Done" => "setup.review", "InProgress" => "setup.continue", _ => "setup.start" }]" Href="@Links.ForSetupStep(Company, step.Link)" />
+                            @if (Shell.Can(PermissionKeys.SettingsManage) && step.Key != "account")
+                            {
+                                <Btn Small="true" Ghost="true" Icon="@(step.Marked ? "x" : "check")" Text="@L[step.Marked ? "setup.unmark" : "setup.mark"]" OnClick="() => Mark(step)" />
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
+        <div class="stack">
+            <Box Title="@L["setup.anyOrder"]"><p class="muted">@L["setup.anyOrderText"]</p></Box>
+            @if (Shell.Me?.TenantStatus == "Trial" && Shell.Can(PermissionKeys.TenantManage))
+            {
+                <Box Title="@L["setup.trial"]"><Btn Primary="true" Text="@L["banner.choosePlan"]" Href="/tenant/subscription" /></Box>
+            }
+        </div>
+    </div>
+</StateView>
+
+@code {
+    private LoadState _state = LoadState.Loading;
+    private SetupChecklistResponse? _data;
+    private string? _reference;
+    private string? _error;
+    private bool _demoBusy;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _data = await Api.GetAsync<SetupChecklistResponse>(Api.C("setup-checklist"));
+            Shell.SetSetup(_data.Done < _data.Total, Shell.PlanText);
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private async Task Mark(SetupStep step)
+    {
+        _error = null;
+        try
+        {
+            _data = await Api.PostAsync<SetupChecklistResponse>(Api.C($"setup-checklist/{Uri.EscapeDataString(step.Key)}"), new SetupMarkRequest(!step.Marked));
+            Shell.SetSetup(_data.Done < _data.Total, Shell.PlanText);
+            Toasts.Success(L.F("setup.marked", step.Title));
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+    }
+
+    private async Task Demo()
+    {
+        _demoBusy = true;
+        try
+        {
+            var demo = await Api.PostAsync<DemoCompanyResponse>("api/v1/tenant/demo-company", null);
+            // The new company appears in the profile's companies after reloading.
+            Nav.NavigateTo(NavModel.Href(demo.Id, ""), forceLoad: true);
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _demoBusy = false; }
+    }
+}

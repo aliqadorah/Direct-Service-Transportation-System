@@ -1,0 +1,129 @@
+@page "/c/{Company}/masters/drivers"
+@* SCR-60 drivers list (FR-152…156, FR-162…165): saved views (active, documents expiring or expired, external fleet, archived), search by
+   name / national ID / plate, sortable columns, document alerts with icon + text, export; a row opens the profile. *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+@inject NavigationManager Nav
+@inject FormConfig Forms
+
+<PageHeader Title="@L["nav.drivers"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.drivers"])])">
+    <Actions>
+        @if (Shell.Can(PermissionKeys.MastersManage))
+        {
+            <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "masters/import/drivers")" />
+            <Btn Primary="true" Icon="plus" Text="@L["md.newDriver"]" Href="@NavModel.Href(Company, "masters/drivers/new")" />
+        }
+    </Actions>
+</PageHeader>
+
+<SavedViews Items="Views" Selected="@_view" SelectedChanged="View" Label="@L["nav.drivers"]">
+    <Tools>
+        <div class="adorn" style="width:240px"><span class="start"><Icon Name="search" /></span>
+            <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["md.driverSearch"]" value="@_q.Q" @onchange="Search" /></div>
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+    </Tools>
+</SavedViews>
+
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="truck" Title="@(_q.Q is null && _view == "active" ? L["md.noDrivers"] : L["ui.noMatches"])" Text="@(_q.Q is null && _view == "active" ? L["md.noDriversText"] : null)">
+            <Actions>
+                @if (_q.Q is not null || _view != "active") {<Btn Text="@L["ui.clear"]" OnClick="Clear" />}
+                else if (Shell.Can(PermissionKeys.MastersManage)) {<Btn Primary="true" Icon="plus" Text="@L["md.newDriver"]" Href="@NavModel.Href(Company, "masters/drivers/new")" />}
+            </Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.drivers"]">
+            <ChildContent>
+                <DataGrid TItem="DriverResponse" Items="_items" Key="d => d.Id" Caption="@L["nav.drivers"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                          OnRowClick="Open" RowClass="@(d => d.Status == "Archived" ? "void" : null)">
+                    <Columns>
+                        <GridColumn TItem="DriverResponse" Title="@F("fullName", L["md.fullName"])" Value="d => d.FullName" SortKey="fullName" />
+                        <GridColumn TItem="DriverResponse" Title="@F("nationalId", L["md.nationalId"])" Value="d => d.NationalId" Ltr="true" SortKey="nationalId" />
+                        <GridColumn TItem="DriverResponse" Title="@F("plateNumber", L["md.plate"])" Value="d => d.PlateNumber" Ltr="true" SortKey="plateNumber" />
+                        <GridColumn TItem="DriverResponse" Title="@L["md.truck"]" Value="Truck" />
+                        <GridColumn TItem="DriverResponse" Title="@F("ownershipTypeId", L["md.ownership"])" Value="d => d.OwnershipType.Name" />
+                        <GridColumn TItem="DriverResponse" Title="@F("partnerId", L["md.partner"])" Value="d => d.Partner?.Name" />
+                        <GridColumn TItem="DriverResponse" Title="@F("phone1", L["md.phone"])" Value="d => d.Phone1" Ltr="true" />
+                        <GridColumn TItem="DriverResponse" Title="@L["md.statusAlerts"]">
+                            <Template>
+                                <span class="tags">
+                                    <StatusTag Status="@(context.Status == "Archived" ? "archived" : "active")" />
+                                    @foreach (var a in context.Alerts) {<DocAlert Alert="a" />}
+                                </span>
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+            </ChildContent>
+            <Footer><Pager Page="_q.Page" PageSize="_q.PageSize" Total="_total" OnPage="Go" OnPageSize="Size" /></Footer>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "fullName" };
+    private string _view = "active";
+    private IReadOnlyList<DriverResponse> _items = [];
+    private int _total;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private FormView _form = FormView.Empty;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("active", L["md.activeDrivers"]), new("alerts", L["md.docAlerts"]), new("external", L["md.fleetExternal"]), new("archived", L["ml.archived"])];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _form = await Forms.GetAsync(FormConfig.Driver); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string F(string key, string fallback) => _form.Label(key, fallback);
+
+    private async Task Load()
+    {
+        _q.View = _view switch { "archived" => "archived", _ => "active" };
+        _q.Filters.Clear();
+        if (_view == "alerts") _q.Filters["expiry"] = "alerts";
+        if (_view == "external") _q.Filters["fleet"] = "External";
+        try
+        {
+            var page = await Api.GetAsync<PagedResult<DriverResponse>>(Api.C("drivers" + _q.ToQuery()));
+            (_items, _total) = (page.Items, page.TotalCount);
+            _state = _items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private Task View(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(ChangeEventArgs e) { _q.Q = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString()!.Trim(); _q.Page = 1; return Load(); }
+    private Task Clear() { _q.Q = null; _view = "active"; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+    private void Open(DriverResponse d) => Nav.NavigateTo(NavModel.Href(Company, $"masters/drivers/{d.Id}"));
+
+    private string Truck(DriverResponse d) => string.Join(" · ", new[] { d.TruckType, Fmt.Qty(d.CapacityTons, 0) + " " + L["md.tons"] }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private async Task Export(string format)
+    {
+        var q = _q.ToQuery(paged: false);
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"drivers/export{q}{(q.Length == 0 ? "?" : "&")}format={format}"));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+}

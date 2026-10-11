@@ -1,0 +1,9 @@
+@* SCR-00 empty state: a direct link to a screen the role cannot use (UX-13); the API refuses the data as well. *@
+@inject Loc L
+@inject ShellState Shell
+<PageHeader Title="@L["page.noAccessTitle"]" />
+<section class="box fill" style="display:flex">
+    <EmptyState Icon="lock" Title="@L["page.noAccess"]" Text="@L["page.noAccessText"]">
+        <Actions><Btn Primary="true" Icon="home" Text="@L["nav.dashboard"]" Href="@NavModel.Href(Shell.Company?.Id ?? "", "")" /></Actions>
+    </EmptyState>
+</section>

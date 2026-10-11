@@ -25,6 +25,8 @@ internal static class TripEndpoints
             TypedResults.Ok(await svc.RecentAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsEdit);
         g.MapGet("/quick-entry", async (TripService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.QuickEntryAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsEdit);
+        g.MapPost("/calculate", async (TripCalculationRequest r, TripService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.CalculateAsync(r, ct).ConfigureAwait(false))).RequireAnyPermission([PermissionKeys.TripsEdit, PermissionKeys.TripsView]).AllowWhenReadOnly();
         g.MapGet("/{trip}", async (string trip, TripService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(trip, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsView);
         g.MapGet("/{trip}/history", async (string trip, TripService svc, CancellationToken ct) =>

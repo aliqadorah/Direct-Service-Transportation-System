@@ -81,6 +81,23 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             await posting.CurrencyDecimalsAsync(ct).ConfigureAwait(false), await support.TodayAsync(ct).ConfigureAwait(false));
     }
 
+    /// <summary>
+    /// Live calculation for the trip form (UX-17): the same <see cref="TripCalculator"/> and company settings as a save; missing
+    /// inputs count as 0 so the panel can show partial figures while the user types.
+    /// </summary>
+    public async Task<TripCalculationResponse> CalculateAsync(TripCalculationRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var s = await SettingsAsync(ct).ConfigureAwait(false);
+        static decimal Safe(decimal? v) => v is decimal d && d >= 0 && d <= 1_000_000m ? d : 0m;
+        var unloaded = r.UnloadedWeight is decimal u && u >= 0 && u <= 1_000_000m ? u : (decimal?)null;
+        var a = TripCalculator.Calculate(new TripFigures(Safe(r.LoadedWeight), unloaded, Safe(r.CustomerPrice), r.TariffPrice is decimal tp && tp > 0 ? tp : null,
+            Safe(r.DriverRate), r.PartnerRate is null ? null : Safe(r.PartnerRate), r.IsPartnerTrip, s.BillOnUnloadedWeight, s.PayDriverOnLoadedWeight,
+            s.ShortageTolerancePct, s.Decimals));
+        return new TripCalculationResponse(a.BillingQty, a.WageQty, a.Revenue, a.DriverWage, a.PartnerCost, a.Margin, a.ShortageWeight, a.ShortagePct,
+            a.IsShortageFlagged, a.IsTariffBreach, a.BreachAmount, s.BillOnUnloadedWeight, s.PayDriverOnLoadedWeight, s.ShortageTolerancePct, s.Decimals);
+    }
+
     /// <summary>Database prices for a save: the monthly rate row is read WITH (UPDLOCK) so clearing it waits for the trip (B4 review M2).</summary>
     private sealed class DbPriceSource(IMonthlyRateLock rateLock, PricingResolver pricing) : ITripPriceSource
     {

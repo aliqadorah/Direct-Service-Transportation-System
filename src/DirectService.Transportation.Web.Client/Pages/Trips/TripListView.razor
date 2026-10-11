@@ -1,0 +1,163 @@
+@*
+  SCR-10 Created Trips list (FR-009, FR-017) and SCR-13 shortage view (US-04, FR-012): saved views, filter chips (status, billing,
+  settled, fleet, partner trips, shortage, breach, manual, review), date range, party / site filters, search, sort, paging, totals of
+  every matching trip, Excel/CSV export. Dashboard links arrive with their filters in the address (review=true, billing=unbilled …).
+*@
+@using DirectService.Transportation.Contracts.Trips
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject UiJs Js
+@inject NavigationManager Nav
+
+<PageHeader Title="@L[_shortage ? "nav.shortage" : "trip.created"]" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips"))])">
+    <Actions>
+        @if (Shell.Can(PermissionKeys.TripsEdit))
+        {
+            <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "trips/import")" />
+            <Btn Primary="true" Icon="plus" Text="@L["nav.newTrip"]" Href="@NavModel.Href(Company, "trips/new")" />
+        }
+    </Actions>
+</PageHeader>
+
+@if (!_shortage)
+{
+    <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:6px;flex:none">
+        <Chip Text="@L["trip.f.unbilled"]" On="@(F("billing") == "unbilled")" OnClick="@(() => Toggle("billing", "unbilled"))" />
+        <Chip Text="@L["trip.f.invoiced"]" On="@(F("billing") == "invoiced")" OnClick="@(() => Toggle("billing", "invoiced"))" />
+        <Chip Text="@L["trip.f.unsettled"]" On="@(F("settled") == "no")" OnClick="@(() => Toggle("settled", "no"))" />
+        <Chip Text="@L["md.fleetOwn"]" On="@(F("fleet") == "own")" OnClick="@(() => Toggle("fleet", "own"))" />
+        <Chip Text="@L["md.fleetExternal"]" On="@(F("fleet") == "external")" OnClick="@(() => Toggle("fleet", "external"))" />
+        <Chip Text="@L["trip.f.partner"]" On="@(F("partnerTrips") == "yes")" OnClick="@(() => Toggle("partnerTrips", "yes"))" />
+        <Chip Icon="scale" Text="@L["st.short"]" On="@(F("shortage") == "true")" OnClick="@(() => Toggle("shortage", "true"))" />
+        <Chip Icon="alert" Text="@L["st.breach"]" On="@(F("breach") == "true")" OnClick="@(() => Toggle("breach", "true"))" />
+        <Chip Icon="edit" Text="@L["st.manual"]" On="@(F("manual") == "true")" OnClick="@(() => Toggle("manual", "true"))" />
+        <Chip Icon="alert" Text="@L["st.review"]" On="@(F("review") == "true")" OnClick="@(() => Toggle("review", "true"))" />
+        <Chip Icon="x" Text="@L["st.void"]" On="@(F("status") == "void")" OnClick="@(() => Toggle("status", "void"))" />
+    </div>
+}
+<div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+    <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+    <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+    <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+    <ComboField TValue="string?" @bind-Value="_driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+    <ComboField TValue="string?" @bind-Value="_loading" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />
+    <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+    @if (HasFilters) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+    </span>
+</div>
+
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="filter" Title="@L["trip.noMatch"]" Text="@(HasFilters ? L["trip.noMatchText"] : L["trip.noneYetText"])">
+            <Actions>@if (HasFilters) {<Btn Primary="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}</Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@L["trip.created"]">
+            <ChildContent>
+                <TripGrid Items="_page!.Page.Items" Company="@Company" Totals="_page.Totals" Shortage="_shortage"
+                          FooterLabel="@L.F("trip.totalOf", Fmt.Count(_page.Totals.Trips))" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort" />
+            </ChildContent>
+            <Footer><Pager Page="_q.Page" PageSize="_q.PageSize" Total="_page!.Page.TotalCount" OnPage="Go" OnPageSize="Size" /></Footer>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "tripDate", Desc = true };
+    private TripPage? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private DateOnly? _from, _to;
+    private string? _customer, _driver, _loading;
+    private bool _shortage;
+
+    [Parameter, EditorRequired] public string Company { get; set; } = "";
+    /// <summary>The shortage view (SCR-13): trips flagged with a shortage, worst first, with the shortage columns.</summary>
+    [Parameter] public bool Shortage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _shortage = Shortage;
+        // Filters from the address (dashboard drill-downs): every known FR-009 key.
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        foreach (var key in new[] { "status", "billing", "settled", "fleet", "partnerTrips", "shortage", "breach", "manual", "review", "q" })
+            if (query[key] is { Length: > 0 } v) _q.Filters[key] = v;
+        if (_shortage) { _q.Filters["shortage"] = "true"; _q.Sort = "shortagePct"; _q.Desc = true; }
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string? F(string key) => _q.Filters.TryGetValue(key, out var v) ? v : null;
+
+    private bool HasFilters => _q.Filters.Keys.Any(k => !(_shortage && k == "shortage")) || _from is not null || _to is not null || _customer is not null || _driver is not null || _loading is not null;
+
+    private async Task Load()
+    {
+        _q.View = F("status") ?? "active";
+        var extra = new Dictionary<string, string?>
+        {
+            ["from"] = _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            ["to"] = _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            ["customer"] = _customer, ["driver"] = _driver, ["loadingSite"] = _loading,
+        };
+        _q.Fixed.Clear();
+        foreach (var (k, v) in extra) if (v is not null) _q.Fixed[k] = v;
+        try
+        {
+            _page = await Api.GetAsync<TripPage>(Api.C("trips" + Query(paged: true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    /// <summary>Status travels as its own filter key, not as the saved-view status.</summary>
+    private string Query(bool paged)
+    {
+        var filters = new Dictionary<string, string>(_q.Filters);
+        filters.Remove("status");
+        var copy = new ListQuery { Q = _q.Q, View = _q.View, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize, Filters = filters };
+        foreach (var (k, v) in _q.Fixed) copy.Fixed[k] = v;
+        return copy.ToQuery("status", paged);
+    }
+
+    private Task Toggle(string key, string value)
+    {
+        if (F(key) == value) _q.Filters.Remove(key); else _q.Filters[key] = value;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Apply() { _q.Page = 1; return Load(); }
+
+    private Task ClearAll()
+    {
+        _q.Filters.Clear();
+        if (_shortage) _q.Filters["shortage"] = "true";
+        _from = _to = null;
+        _customer = _driver = _loading = null;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private async Task Export(string format)
+    {
+        var q = Query(paged: false);
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"trips/export{q}{(q.Length == 0 ? "?" : "&")}format={format}"));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+}

@@ -1,0 +1,86 @@
+@page "/sign-up"
+@* SCR-02 sign-up (US-31, 5.2, 5.4 step 1): owner name, organisation, email, password, terms. Creates the tenant, the Owner and the first
+   company and starts the trial; the email must be verified (SCR-03) before the first sign-in and the mandatory 2FA set-up (SCR-05). *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
+@using DirectService.Transportation.Contracts.Identity
+@inject AccountService Accounts
+
+@if (_sentTo is not null)
+{
+    <AuthCard Title="@L["acct.checkEmailTitle"]">
+        <ChildContent>
+            <EmptyState Icon="mail" Title="@L["acct.checkEmailTitle"]" Text="@L.F("acct.checkEmailText", _sentTo)" />
+            <a class="btn w100" href="@Href("/sign-in")">@L["acct.signIn"]</a>
+        </ChildContent>
+    </AuthCard>
+}
+else
+{
+    <AuthCard Title="@L["acct.createAccount"]" Lead="@L["acct.signUpLead"]">
+        <ChildContent>
+            <EditForm Model="Input" FormName="sign-up" OnSubmit="Submit" class="stack" method="post">
+                <ProblemValidator @ref="_problems" />
+                <ErrorSummary @ref="_summary" />
+                @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+                <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                    <TextField @bind-Value="Input.FullName" Label="@L["acct.fullName"]" Required="true" Autocomplete="name" MaxLength="150" />
+                    <TextField @bind-Value="Input.OrganisationName" Label="@L["acct.organisation"]" Required="true" Autocomplete="organization" MaxLength="200" />
+                    <TextField @bind-Value="Input.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Required="true" Autocomplete="email" MaxLength="256" Span="2" />
+                    <TextField @bind-Value="Input.Password" Label="@L["acct.password"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="128" Span="2" Help="@L["acct.passwordHelp"]" />
+                </div>
+                <CheckField @bind-Value="Input.AcceptTerms" Label="@L["acct.terms"]" />
+                <Btn Type="submit" Primary="true" Text="@L["acct.signUpSubmit"]" Class="w100" />
+            </EditForm>
+        </ChildContent>
+        <Foot>@L["acct.haveAccount"] <a href="@Href("/sign-in")">@L["acct.signIn"]</a></Foot>
+    </AuthCard>
+}
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); }
+
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private string? _banner;
+    private string? _sentTo;
+
+    [SupplyParameterFromForm] private SignUpInput Input { get; set; } = default!;
+
+    private async Task Submit()
+    {
+        var missing = AccountValidation.Required(L, ("fullName", Input.FullName, "acct.fullName"), ("organisationName", Input.OrganisationName, "acct.organisation"),
+            ("email", Input.Email, "acct.email"), ("password", Input.Password, "acct.password"));
+        if (!Input.AcceptTerms)
+        {
+            var terms = new ApiFieldError("acceptTerms", "validation.required", L["acct.termsRequired"]);
+            missing = missing is null ? new ApiProblem { Status = 400, Errors = [terms] } : missing with { Errors = [.. missing.Errors!, terms] };
+        }
+        if (missing is not null)
+        {
+            _problems?.Show(missing);
+            return;
+        }
+        try
+        {
+            await Accounts.SignUpAsync(new SignUpRequest(Input.FullName!.Trim(), Input.Email!.Trim(), Input.Password!, Input.OrganisationName!.Trim(), true, L.Language), Http.RequestAborted);
+            _sentTo = Input.Email!.Trim();
+        }
+        catch (AppException e)
+        {
+            _banner = _problems?.Show(Problem(e));
+            Input.Password = null;
+        }
+    }
+
+    private sealed class SignUpInput
+    {
+        public string? FullName { get; set; }
+        public string? OrganisationName { get; set; }
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public bool AcceptTerms { get; set; }
+    }
+}

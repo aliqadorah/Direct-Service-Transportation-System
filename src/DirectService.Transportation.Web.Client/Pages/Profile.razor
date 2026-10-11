@@ -1,0 +1,170 @@
+@page "/c/{Company}/profile"
+@* SCR-08 my profile (FR-176, FR-178): language, default company and date format; density on this device (DT-69); active sessions with
+   sign-out of one or all others; password change by an emailed link (the reset flow of SCR-04, DT-143). *@
+@using DirectService.Transportation.Contracts.Identity
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["profile.title"]" Crumbs="@([new Crumb(L["shell.userMenu"])])" />
+
+<div class="cols fill" style="grid-template-columns:380px 1fr;align-items:start">
+    <Box Title="@L["profile.preferences"]">
+        <EditForm Model="_form" OnValidSubmit="Save" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary />
+            <TextField Value="@Shell.Me?.FullName" ValueExpression="() => _nameShown" Label="@L["profile.name"]" ReadOnly="true" Help="@L["profile.nameHelp"]" />
+            <TextField Value="@Shell.Me?.Email" ValueExpression="() => _emailShown" Label="@L["acct.email"]" ReadOnly="true" Ltr="true" />
+            <SelectField TValue="string" @bind-Value="_form.LanguageCode" Options="Languages" Label="@L["shell.language"]" />
+            <SelectField TValue="string?" @bind-Value="_form.DefaultCompany" Options="Companies" Label="@L["profile.defaultCompany"]" />
+            <SelectField TValue="string" @bind-Value="_form.DateFormat" Options="DateFormats" Label="@L["profile.dateFormat"]" />
+            <SelectField TValue="string" Value="@Shell.Density" ValueChanged="Density" ValueExpression="() => _densityShown" Options="Densities" Label="@L["shell.density"]" Help="@L["shell.densityNote"]" />
+            <div class="formbar">
+                <Btn Icon="lock" Text="@L["profile.changePassword"]" Busy="_sendingLink" OnClick="SendPasswordLink" />
+                <Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" />
+            </div>
+        </EditForm>
+    </Box>
+    <Box Title="@L["profile.sessions"]" NoPad="true">
+        <Actions>@if (_sessions is { Count: > 1 }) {<Btn Small="true" Danger="true" Icon="logout" FlipIcon="true" Text="@L["profile.signOutOthers"]" OnClick="SignOutOthers" />}</Actions>
+        <ChildContent>
+            <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="LoadSessions">
+                <DataGrid TItem="SessionResponse" Items="_sessions!" Key="s => s.Id" Caption="@L["profile.sessions"]">
+                    <Columns>
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.device"]" Value="s => Device(s)" Wrap="true" />
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.ip"]" Value="s => s.IpAddress" Ltr="true" />
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.lastSeen"]" Value="s => Fmt.DateTime(s.LastSeenAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @if (context.IsCurrent) {<StatusTag Status="active" />}
+                                else {<Btn Small="true" Text="@L["shell.signOut"]" OnClick="() => Revoke(context)" />}
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+            </StateView>
+        </ChildContent>
+    </Box>
+</div>
+
+@code {
+    private readonly PreferencesForm _form = new();
+    private ProblemValidator? _problems;
+    private IReadOnlyList<SessionResponse>? _sessions;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _saving;
+    private bool _sendingLink;
+    private readonly string? _nameShown = null, _emailShown = null, _densityShown = null;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var me = Shell.Me!;
+        _form.LanguageCode = me.LanguageCode;
+        _form.DefaultCompany = me.DefaultCompany;
+        _form.DateFormat = Fmt.Safe(me.DateFormat);
+        await LoadSessions();
+    }
+
+    private async Task LoadSessions()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            _sessions = await Api.GetAsync<IReadOnlyList<SessionResponse>>("api/v1/me/sessions");
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var languageChanged = _form.LanguageCode != Shell.Me!.LanguageCode;
+            await Api.PutAsync("api/v1/me/preferences", new PreferencesRequest(_form.LanguageCode, _form.DefaultCompany, _form.DateFormat));
+            if (languageChanged) { Nav.Refresh(forceReload: true); return; }   // the server renders the new language
+            Shell.SetMe(Shell.Me with { DefaultCompany = _form.DefaultCompany, DateFormat = _form.DateFormat });
+            Toasts.Success(L["profile.saved"]);
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) Toasts.Error(other);
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task Density(string density)
+    {
+        Shell.SetDensity(density);
+        await Js.SetPref("density", Shell.Density);
+        await Js.ApplyRoot(Shell.Density, L.Language);
+    }
+
+    private async Task SendPasswordLink()
+    {
+        _sendingLink = true;
+        try
+        {
+            await Api.PostAsync("api/v1/auth/password-reset/request", new EmailRequest(Shell.Me!.Email));
+            Toasts.Success(L["profile.linkSent"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _sendingLink = false; }
+    }
+
+    private async Task Revoke(SessionResponse s)
+    {
+        try
+        {
+            await Api.DeleteAsync($"api/v1/me/sessions/{Uri.EscapeDataString(s.Id)}");
+            Toasts.Success(L["profile.revoked"]);
+            await LoadSessions();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task SignOutOthers()
+    {
+        try
+        {
+            await Api.PostAsync("api/v1/me/sessions/sign-out-others", null);
+            Toasts.Success(L["profile.revokedOthers"]);
+            await LoadSessions();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private string Device(SessionResponse s) => (string.IsNullOrWhiteSpace(s.UserAgent) ? L["profile.unknownDevice"] : Browser(s.UserAgent)) + (s.IsCurrent ? " · " + L["profile.thisSession"] : "");
+
+    /// <summary>A short device description from the user agent (system · browser).</summary>
+    private static string Browser(string ua)
+    {
+        var os = ua.Contains("Windows", StringComparison.Ordinal) ? "Windows" : ua.Contains("Android", StringComparison.Ordinal) ? "Android"
+            : ua.Contains("iPhone", StringComparison.Ordinal) || ua.Contains("iPad", StringComparison.Ordinal) ? "iOS" : ua.Contains("Mac OS", StringComparison.Ordinal) ? "macOS" : ua.Contains("Linux", StringComparison.Ordinal) ? "Linux" : "";
+        var br = ua.Contains("Edg/", StringComparison.Ordinal) ? "Edge" : ua.Contains("Firefox/", StringComparison.Ordinal) ? "Firefox" : ua.Contains("Chrome/", StringComparison.Ordinal) ? "Chrome" : ua.Contains("Safari/", StringComparison.Ordinal) ? "Safari" : "";
+        return string.Join(" · ", new[] { os, br }.Where(x => x.Length > 0)) is { Length: > 0 } d ? d : ua[..Math.Min(40, ua.Length)];
+    }
+
+    private IReadOnlyList<Option<string>> Languages => [new("ar", "العربية"), new("en", "English")];
+    private IReadOnlyList<Option<string?>> Companies => (Shell.Me?.Companies ?? []).Select(c => new Option<string?>(c.Id, L.Pick(c.Name, c.NameEn))).ToList();
+    private IReadOnlyList<Option<string>> DateFormats => [new("yyyy-MM-dd", "2026-10-31 (YYYY-MM-DD)"), new("dd/MM/yyyy", "31/10/2026 (DD/MM/YYYY)"), new("MM/dd/yyyy", "10/31/2026 (MM/DD/YYYY)")];
+    private IReadOnlyList<Option<string>> Densities => [new("compact", L["shell.compact"]), new("comfortable", L["shell.comfortable"])];
+
+    private sealed class PreferencesForm
+    {
+        public string LanguageCode { get; set; } = "ar";
+        public string? DefaultCompany { get; set; }
+        public string DateFormat { get; set; } = "yyyy-MM-dd";
+    }
+}

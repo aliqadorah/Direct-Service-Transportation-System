@@ -1,0 +1,181 @@
+@page "/c/{Company}/masters/monthly-rates"
+@* SCR-68 monthly loading-site driver rates (FR-027…037): month strip with None / Partial / Complete, one row per active loading site with
+   the own-fleet and external-fleet rate, no inheritance between months; a warning before saving a month that already has trips (FR-034,
+   B4 L10); clearing a site's rates is refused while trips use it; history and export. *@
+@using DirectService.Transportation.Contracts.Pricing
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+
+<PageHeader Title="@L["nav.monthlyRates"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.monthlyRates"])])">
+    <Actions>
+        <Btn Icon="export" Text="Excel" OnClick="Export" Disabled="_month is null" />
+        @if (CanManage) {<Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="@(!Dirty)" OnClick="AskSave" />}
+    </Actions>
+</PageHeader>
+
+<div class="row" role="group" aria-label="@L["rates.months"]" style="flex-wrap:wrap;align-items:center">
+    <Btn Small="true" Icon="right" FlipIcon="true" AriaLabel="@L["ui.previous"]" OnClick="() => Shift(-6)" />
+    @foreach (var m in _months)
+    {
+        var month = m;
+        <Chip On="@(month.Month == _selected)" OnClick="() => Pick(month.Month)" Title="@L["rates.st." + month.Status]">
+            <bdi class="num">@month.Month</bdi>
+            <Icon Name="@(month.Status == "Complete" ? "check" : month.Status == "Partial" ? "clock" : "x")" Label="@L["rates.st." + month.Status]" />
+        </Chip>
+    }
+    <Btn Small="true" Icon="left" FlipIcon="true" AriaLabel="@L["ui.next"]" OnClick="() => Shift(6)" />
+</div>
+
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="LoadMonth">
+    <Empty><EmptyState Icon="map" Title="@L["rates.noSites"]" Text="@L["rates.noSitesText"]"><Actions><Btn Primary="true" Text="@L["nav.loadingSites"]" Href="@NavModel.Href(Company, "masters/loading-sites")" /></Actions></EmptyState></Empty>
+    <ChildContent>
+        @if (_month!.HasTrips) {<Banner Tone="Tone.Warn" Text="@L["rates.hasTrips"]" />}
+        @if (_warnings is { Count: > 0 }) {<Banner Tone="Tone.Warn">@foreach (var w in _warnings) {<div><Tx Value="@w" /></div>}</Banner>}
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+        <Figures Items="@([new Figure(L["rates.status"], L["rates.st." + _month.Status]), new Figure(L["rates.rated"], $"{Fmt.Count(_month.RatedSites)} / {Fmt.Count(_month.ActiveSites)}")])" />
+        <ListFrame Label="@L["nav.monthlyRates"]">
+            <table class="grid">
+                <caption class="sr-only">@L.F("rates.caption", _selected)</caption>
+                <thead><tr><th scope="col">@L["tar.loading"]</th><th scope="col">@L["md.area"]</th><th scope="col" class="n">@L["rates.own"]</th><th scope="col" class="n">@L["rates.external"]</th><th scope="col" class="n">@L["rates.trips"]</th></tr></thead>
+                <tbody>
+                    @foreach (var r in _rows)
+                    {
+                        var row = r;
+                        <tr class="@(row.Changed ? "live" : null)">
+                            <td><Tx Value="@row.Site.LoadingSite.Name" />@if (row.Site.SiteStatus == "Archived") {<text> </text><StatusTag Status="archived" />}</td>
+                            <td><Tx Value="@row.Site.Area" /></td>
+                            <td class="n" style="width:170px">@RateInput(row, own: true)</td>
+                            <td class="n" style="width:170px">@RateInput(row, own: false)</td>
+                            <td class="n"><bdi class="num">@Fmt.Count(row.Site.TripCount)</bdi></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_confirm" Title="@L["rates.confirmTitle"]" Message="@L["rates.confirmText"]" ConfirmText="@L["ui.save"]" Busy="_saving" OnConfirm="_ => Save()" />
+
+@code {
+    private IReadOnlyList<MonthStatusResponse> _months = [];
+    private string _selected = DateTime.Today.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
+    private DateOnly _from = DateOnly.FromDateTime(DateTime.Today).AddMonths(-5);
+    private MonthRatesResponse? _month;
+    private List<RateRow> _rows = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private IReadOnlyList<string>? _warnings;
+    private bool _saving, _confirm;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanManage => Shell.Can(PermissionKeys.MastersManage);
+    private bool Dirty => _rows.Any(r => r.Changed);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMonths();
+        await LoadMonth();
+    }
+
+    private async Task LoadMonths()
+    {
+        var from = _from.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
+        var to = _from.AddMonths(6).ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
+        try { _months = await Api.GetAsync<IReadOnlyList<MonthStatusResponse>>(Api.C($"monthly-rates/months?from={from}&to={to}")); }
+        catch (ApiException) { _months = []; }
+    }
+
+    private async Task LoadMonth()
+    {
+        _state = LoadState.Loading;
+        _error = null;
+        try
+        {
+            _month = await Api.GetAsync<MonthRatesResponse>(Api.C($"monthly-rates/{_selected}"));
+            _rows = _month.Sites.Select(s => new RateRow(s)).ToList();
+            _state = _rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task Pick(string month)
+    {
+        if (month == _selected) return;
+        _selected = month;
+        _warnings = null;
+        await LoadMonth();
+    }
+
+    private async Task Shift(int months)
+    {
+        _from = _from.AddMonths(months);
+        await LoadMonths();
+    }
+
+    private RenderFragment RateInput(RateRow row, bool own) => __builder =>
+    {
+        var value = own ? row.Own : row.External;
+        <input class="input num" style="height:26px;max-width:150px" inputmode="decimal" aria-label="@L.F(own ? "rates.ownFor" : "rates.externalFor", row.Site.LoadingSite.Name)"
+               readonly="@(!CanManage)" value="@(value is null ? "" : Fmt.Money(value))" @onchange="e => Set(row, own, e.Value?.ToString())" />
+    };
+
+    private void Set(RateRow row, bool own, string? text)
+    {
+        decimal? v = null;
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            if (!Fmt.TryParseDecimal(text, out var d) || d < 0) { _error = L.F("ui.notANumber", row.Site.LoadingSite.Name); return; }
+            v = d;
+        }
+        _error = null;
+        if (own) row.Own = v; else row.External = v;
+    }
+
+    private Task AskSave()
+    {
+        if (_month!.HasTrips) { _confirm = true; return Task.CompletedTask; }
+        return Save();
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var req = new MonthRatesRequest(_rows.Where(r => r.Changed).Select(r => new SiteRateRequest(r.Site.LoadingSite.Id, r.Own, r.External, r.Site.RowVersion)).ToList());
+            var result = await Api.PutAsync<MonthRatesSaveResult>(Api.C($"monthly-rates/{_selected}"), req);
+            _month = result.Month;
+            _rows = _month.Sites.Select(s => new RateRow(s)).ToList();
+            _warnings = result.Warnings;
+            _confirm = false;
+            Toasts.Success(L.F("rates.saved", result.Changed, _selected));
+            await LoadMonths();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; _confirm = false; }
+        finally { _saving = false; }
+    }
+
+    private async Task Export()
+    {
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"monthly-rates/{_selected}/export?format=xlsx"));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed class RateRow(SiteRateResponse site)
+    {
+        public SiteRateResponse Site { get; } = site;
+        public decimal? Own { get; set; } = site.OwnFleetRate;
+        public decimal? External { get; set; } = site.ExternalFleetRate;
+        public bool Changed => Own != Site.OwnFleetRate || External != Site.ExternalFleetRate;
+    }
+}

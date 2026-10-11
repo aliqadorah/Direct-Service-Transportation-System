@@ -1,0 +1,86 @@
+@page "/c/{Company}/masters/customers"
+@* SCR-61 customers (FR-157, FR-162…166, FR-179…184): name unique among active customers, tax number (sent on e-invoices when known, DT-86),
+   payment terms, contact; configured labels / required flags and custom fields; archive, protected delete, history. *@
+@using System.Text.Json
+@inject Loc L
+@inject FormConfig Forms
+
+<SimpleMasterList TItem="CustomerResponse" TModel="CustomerModel" Path="customers" Title="@L["nav.customers"]" AddText="@L["md.newCustomer"]" WideEditor="true"
+                  EmptyIcon="building" EmptyTitle="@L["md.noCustomers"]" EmptyText="@L["md.noCustomersText"]"
+                  IdOf="c => c.Id" NameOf="c => c.Name" StatusOf="c => c.Status" RowVersionOf="c => c.RowVersion" ModelId="m => m.Id" ModelName="m => m.Name"
+                  ToModel="CustomerModel.From" ToRequest="m => m.ToRequest()">
+    <Columns>
+        <GridColumn TItem="CustomerResponse" Title="@F("name", L["md.name"])" Value="c => c.Name" SortKey="name" />
+        <GridColumn TItem="CustomerResponse" Title="@F("taxNumber", L["md.taxNumber"])" Value="c => c.TaxNumber" Ltr="true" SortKey="taxNumber" />
+        <GridColumn TItem="CustomerResponse" Title="@F("phone", L["md.phone"])" Value="c => c.Phone" Ltr="true" />
+        <GridColumn TItem="CustomerResponse" Title="@F("city", L["md.city"])" Value="c => c.City" SortKey="city" />
+        <GridColumn TItem="CustomerResponse" Title="@F("paymentTermsDays", L["md.terms"])" Value="c => Fmt.Count(c.PaymentTermsDays)" Numeric="true" SortKey="paymentTermsDays" />
+        @foreach (var cf in _form.CustomColumns)
+        {
+            var key = cf.Key;
+            <GridColumn TItem="CustomerResponse" Title="@cf.Label" Value="c => Custom(c.CustomValues, key)" />
+        }
+    </Columns>
+    <Editor Context="m">
+        <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <TextField @bind-Value="m.Name" Label="@F("name", L["md.name"])" Required="true" MaxLength="200" Span="2" />
+            <TextField @bind-Value="m.TaxNumber" Label="@F("taxNumber", L["md.taxNumber"])" Required="@_form.Required("taxNumber")" Ltr="true" MaxLength="20" Help="@L["md.taxHelp"]" />
+            @if (!_form.Hidden("registrationNo")) {<TextField @bind-Value="m.RegistrationNo" Label="@F("registrationNo", L["md.registrationNo"])" Required="@_form.Required("registrationNo")" Ltr="true" MaxLength="30" />}
+            @if (!_form.Hidden("phone")) {<TextField @bind-Value="m.Phone" Label="@F("phone", L["md.phone"])" Required="@_form.Required("phone")" Type="tel" Ltr="true" MaxLength="20" />}
+            @if (!_form.Hidden("email")) {<TextField @bind-Value="m.Email" Label="@F("email", L["acct.email"])" Required="@_form.Required("email")" Type="email" Ltr="true" MaxLength="256" />}
+            @if (!_form.Hidden("contactPerson")) {<TextField @bind-Value="m.ContactPerson" Label="@F("contactPerson", L["md.contact"])" Required="@_form.Required("contactPerson")" MaxLength="150" />}
+            @if (!_form.Hidden("city")) {<TextField @bind-Value="m.City" Label="@F("city", L["md.city"])" Required="@_form.Required("city")" MaxLength="100" Help="@L["md.cityHelp"]" />}
+            <IntField @bind-Value="m.PaymentTermsDays" Label="@F("paymentTermsDays", L["md.terms"])" Min="0" Max="365" Unit="@L["md.days"]" />
+            @if (!_form.Hidden("address")) {<TextField @bind-Value="m.Address" Label="@F("address", L["md.address"])" Required="@_form.Required("address")" MaxLength="300" Span="3" />}
+            @if (!_form.Hidden("notes")) {<TextAreaField @bind-Value="m.Notes" Label="@F("notes", L["md.notes"])" MaxLength="1000" Span="3" />}
+        </div>
+        <CustomFieldsEditor Fields="_form.Custom" Values="m.CustomValues" />
+    </Editor>
+</SimpleMasterList>
+
+@code {
+    private FormView _form = FormView.Empty;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _form = await Forms.GetAsync(FormConfig.Customer); } catch (ApiException) { }
+    }
+
+    private string F(string key, string fallback) => _form.Label(key, fallback);
+
+    private static string? Custom(IReadOnlyDictionary<string, JsonElement> values, string key) =>
+        values.TryGetValue(key, out var v) ? v.ValueKind switch { JsonValueKind.True => "✓", JsonValueKind.False => "", _ => v.ToString() } : null;
+
+    public sealed class CustomerModel
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? TaxNumber { get; set; }
+        public string? RegistrationNo { get; set; }
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? ContactPerson { get; set; }
+        public int? PaymentTermsDays { get; set; } = 30;
+        public string? ApArPartyId { get; set; }
+        public string? Notes { get; set; }
+        public Dictionary<string, JsonElement> CustomValues { get; set; } = new();
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+
+        public static CustomerModel From(CustomerResponse c) => new()
+        {
+            Id = c.Id, Name = c.Name, TaxNumber = c.TaxNumber, RegistrationNo = c.RegistrationNo, Phone = c.Phone, Email = c.Email, Address = c.Address,
+            City = c.City, ContactPerson = c.ContactPerson, PaymentTermsDays = c.PaymentTermsDays, ApArPartyId = c.ApArParty?.Id, Notes = c.Notes,
+            CustomValues = new Dictionary<string, JsonElement>(c.CustomValues), RowVersion = c.RowVersion,
+        };
+
+        public CustomerRequest ToRequest() => new(Name?.Trim(), N(TaxNumber), N(RegistrationNo), N(Phone), N(Email), N(Address), N(City), N(ContactPerson),
+            PaymentTermsDays, ApArPartyId, N(Notes), CustomValues, Id is null ? ClientId : null, RowVersion);
+
+        private static string? N(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+}

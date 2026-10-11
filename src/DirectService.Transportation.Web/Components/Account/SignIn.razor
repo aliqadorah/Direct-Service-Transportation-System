@@ -1,0 +1,64 @@
+@page "/sign-in"
+@* SCR-01 sign-in, password step (FR-175): wrong password and lockout messages come from the service; then the mandatory second step. *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
+@using DirectService.Transportation.Web.Security
+@inject AuthFlow Flow
+
+<AuthCard Title="@L["acct.signIn"]" Lead="@L["acct.signInLead"]">
+    <ChildContent>
+        <EditForm Model="Input" FormName="sign-in" OnSubmit="Submit" class="stack" method="post">
+            <ProblemValidator @ref="_problems" />
+            @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            <TextField @bind-Value="Input.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Autocomplete="username" Required="true" Icon="mail" MaxLength="256" />
+            <TextField @bind-Value="Input.Password" Label="@L["acct.password"]" Type="password" Autocomplete="current-password" Required="true" Icon="lock" MaxLength="128" />
+            <div style="display:flex;justify-content:flex-end;font-size:13px"><a href="@Href("/forgot-password")">@L["acct.forgot"]</a></div>
+            <Btn Type="submit" Primary="true" Text="@L["acct.signIn"]" Class="w100" />
+        </EditForm>
+    </ChildContent>
+    <Foot>@L["acct.noAccount"] <a href="@Href("/sign-up")">@L["acct.createAccount"]</a></Foot>
+</AuthCard>
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); }
+
+    private ProblemValidator? _problems;
+    private string? _banner;
+
+    [SupplyParameterFromForm] private SignInInput Input { get; set; } = default!;
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (HttpMethods.IsGet(Http.Request.Method) && Http.User.Identity?.IsAuthenticated == true) Go(LocalUrl(ReturnUrl));
+    }
+
+    private async Task Submit()
+    {
+        if (AccountValidation.Required(L, ("email", Input.Email, "acct.email"), ("password", Input.Password, "acct.password")) is { } missing)
+        {
+            _problems?.Show(missing);
+            return;
+        }
+        SignInNextStep next;
+        try
+        {
+            next = await Flow.PasswordAsync(Http, Input.Email!.Trim(), Input.Password!, Http.RequestAborted);
+        }
+        catch (AppException e)
+        {
+            _banner = _problems?.Show(Problem(e)) ?? Problem(e).Detail;
+            Input.Password = null;
+            return;
+        }
+        Go(Href(next == SignInNextStep.TwoFactorSetup ? "/two-factor/setup" : "/two-factor", LocalUrl(ReturnUrl)));
+    }
+
+    private sealed class SignInInput
+    {
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+    }
+}

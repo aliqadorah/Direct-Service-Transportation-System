@@ -35,6 +35,19 @@ public sealed record TripResponse(
     string Status, string Billing, bool IsSettled, bool CanEdit, DocRef? Invoice, DocRef? Settlement, DocRef? JournalEntry, bool PostingPending,
     string? VoidReason, string? Notes, IReadOnlyDictionary<string, JsonElement> CustomValues, DateTime CreatedAt, string RowVersion);
 
+/// <summary>Inputs of the trip form's live calculation (UX-17): weights and prices as typed; nothing is saved.</summary>
+public sealed record TripCalculationRequest(
+    decimal? LoadedWeight, decimal? UnloadedWeight, decimal? CustomerPrice, decimal? TariffPrice, decimal? DriverRate, decimal? PartnerRate, bool IsPartnerTrip);
+
+/// <summary>
+/// The amounts a save would store (PRD 8.2) with the company's settings that drove them, so the form shows the same figures as the
+/// server (calculation rules stay on the server, NFR-14).
+/// </summary>
+public sealed record TripCalculationResponse(
+    decimal BillingQty, decimal WageQty, decimal Revenue, decimal DriverWage, decimal PartnerCost, decimal Margin, decimal? ShortageWeight,
+    decimal? ShortagePct, bool IsShortageFlagged, bool IsTariffBreach, decimal? BreachAmount, bool BillOnUnloadedWeight, bool PayDriverOnLoadedWeight,
+    decimal ShortageTolerancePct, int Decimals);
+
 /// <summary>A saved trip with the warnings of the save (FR-002).</summary>
 public sealed record TripSaveResult(TripResponse Trip, IReadOnlyList<TripWarning> Warnings);
 

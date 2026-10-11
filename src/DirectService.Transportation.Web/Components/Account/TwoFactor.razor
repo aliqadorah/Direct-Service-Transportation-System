@@ -1,0 +1,80 @@
+@page "/two-factor"
+@* SCR-01 second step (FR-177): authenticator code, or a one-time recovery code. Only reachable after a correct password. *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Web.Security
+@inject AuthFlow Flow
+
+<AuthCard Title="@L[Recovery ? "acct.recoveryTitle" : "acct.codeTitle"]" Lead="@L[Recovery ? "acct.recoveryLead" : "acct.codeLead"]">
+    <ChildContent>
+        <EditForm Model="Input" FormName="two-factor" OnSubmit="Submit" class="stack" method="post">
+            <ProblemValidator @ref="_problems" />
+            @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            @if (Recovery)
+            {
+                <TextField @bind-Value="Input.RecoveryCode" Label="@L["acct.recoveryTitle"]" Ltr="true" Autocomplete="off" Required="true" Icon="key" MaxLength="20" />
+            }
+            else
+            {
+                <TextField @bind-Value="Input.Code" Label="@L["acct.codeField"]" Ltr="true" Autocomplete="one-time-code" Required="true" MaxLength="7"
+                           inputmode="numeric" pattern="[0-9 ]*" class="num" style="font-size:20px;letter-spacing:.3em;text-align:center" />
+            }
+            <Btn Type="submit" Primary="true" Text="@L["acct.verify"]" Class="w100" />
+            <a href="@SwitchHref" style="font-size:13px">@L[Recovery ? "acct.useCode" : "acct.useRecovery"]</a>
+        </EditForm>
+    </ChildContent>
+    <Foot>@L[Recovery ? "acct.recoveryNote" : "acct.mandatory"]</Foot>
+</AuthCard>
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); }
+
+    private ProblemValidator? _problems;
+    private string? _banner;
+
+    [SupplyParameterFromForm] private CodeInput Input { get; set; } = default!;
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "recovery")] private int RecoveryFlag { get; set; }
+
+    private bool Recovery => RecoveryFlag == 1;
+
+    private string SwitchHref => Href("/two-factor", LocalUrl(ReturnUrl)) is var h && !Recovery ? h + (h.Contains('?') ? "&" : "?") + "recovery=1" : Href("/two-factor", LocalUrl(ReturnUrl));
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();   // before the first await: the page renders while waiting
+        // Without a password-verified partial sign-in at the "verify" stage, start again.
+        if (await AuthFlow.StageAsync(Http) != AuthFlow.StageVerify) Go(Href("/sign-in", LocalUrl(ReturnUrl)));
+    }
+
+    private async Task Submit()
+    {
+        var missing = Recovery ? AccountValidation.Required(L, ("recoveryCode", Input.RecoveryCode, "acct.recoveryTitle"))
+            : AccountValidation.Required(L, ("code", Input.Code, "acct.codeField"));
+        if (missing is not null)
+        {
+            _problems?.Show(missing);
+            return;
+        }
+        try
+        {
+            await Flow.VerifyAsync(Http, Recovery ? null : Input.Code!.Replace(" ", "", StringComparison.Ordinal), Recovery ? Input.RecoveryCode!.Trim() : null, Http.RequestAborted);
+        }
+        catch (AppException e)
+        {
+            if (e.Status == 401) { Go(Href("/sign-in", LocalUrl(ReturnUrl))); return; }
+            var p = Problem(e);
+            _banner = _problems?.Show(p with { Field = Recovery ? "recoveryCode" : "code" }) is { } other ? other : null;
+            Input.Code = null;
+            return;
+        }
+        Go(LocalUrl(ReturnUrl));
+    }
+
+    private sealed class CodeInput
+    {
+        public string? Code { get; set; }
+        public string? RecoveryCode { get; set; }
+    }
+}

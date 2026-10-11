@@ -1,0 +1,9 @@
+@* A driver document alert (FR-154): expired (error) or expiring within 30 days (warning), with the document and date. *@
+@inject Loc L
+@inject ShellState Shell
+<Badge Tone="@(Alert.Expired ? Tone.Err : Tone.Warn)" Icon="@(Alert.Expired ? "x" : "alert")"
+       Text="@L.F(Alert.Expired ? "md.docExpired" : "md.docExpiring", L["doc." + Alert.Document] is var t && t.StartsWith("doc.", StringComparison.Ordinal) ? Alert.Document : t, Fmt.Date(Alert.ExpiresOn, Shell.DateFormat))" />
+
+@code {
+    [Parameter, EditorRequired] public DocumentAlert Alert { get; set; } = default!;
+}

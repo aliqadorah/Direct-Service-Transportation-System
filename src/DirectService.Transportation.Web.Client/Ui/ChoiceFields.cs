@@ -70,7 +70,8 @@ public sealed class CheckField : FieldBase<bool>
         builder.OpenElement(2, "input");
         builder.AddAttribute(3, "type", "checkbox");
         builder.AddAttribute(4, "checked", CurrentValue);
-        builder.AddAttribute(5, "onchange", EventCallback.Factory.CreateBinder<bool>(this, v => CurrentValue = v, CurrentValue));
+        builder.AddAttribute(5, "value", "true");
+        builder.AddAttribute(6, "onchange", EventCallback.Factory.CreateBinder<bool>(this, v => CurrentValue = v, CurrentValue));
         builder.SetUpdatesAttributeName("checked");
         ControlAttributes(builder, 10);
         builder.CloseElement();

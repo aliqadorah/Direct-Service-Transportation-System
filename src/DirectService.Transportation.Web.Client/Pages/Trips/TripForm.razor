@@ -1,0 +1,325 @@
+@page "/c/{Company}/trips/new"
+@page "/c/{Company}/trips/{Id}"
+@*
+  SCR-11 trip form (FR-001…006, FR-010, FR-011, FR-014, FR-015, FR-025, BR-039): all fields with configured labels and custom fields, prices
+  pre-filled with their source (UX-17), live calculation from the server's calculator, history panel (UX-21); edit only while unbilled and
+  unsettled (read-only otherwise, with the invoice link); record lock while editing; void with a required reason (reverse entry); clear
+  "Needs review".
+*@
+@using System.Text.Json
+@using DirectService.Transportation.Contracts.Trips
+@using DirectService.Transportation.Contracts.Pricing
+@implements IDisposable
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject FormConfig Forms
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <PageHeader Title="@(_trip?.ReceiptNo ?? L["nav.newTrip"])" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips/list"))])">
+            <Badges>@if (_trip is not null) {<TripTags Trip="_trip" />}</Badges>
+            <Actions>
+                @if (_trip is not null && _trip.Status != "Void")
+                {
+                    @if (_trip.NeedsReview && CanEdit) {<Btn Icon="check" Text="@L["trip.clearReview"]" OnClick="ClearReview" />}
+                    @if (Shell.Can(PermissionKeys.TripsVoid) && _trip.CanEdit && _lockedBy is null) {<Btn Danger="true" Icon="x" Text="@L["trip.void"]" OnClick="() => _voiding = true" />}
+                }
+                @if (CanEdit) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" form="trip-form" />}
+            </Actions>
+        </PageHeader>
+        @if (_trip is not null && _trip.CanEdit && Shell.Can(PermissionKeys.TripsEdit)) {<RecordLockGuard EntityType="TRN.Trip" Id="@_trip.Id" OnState="h => _lockedBy = h" />}
+        @if (_trip?.Status == "Void") {<Banner Tone="Tone.Err" Text="@L.F("trip.voided", _trip.VoidReason ?? "")" />}
+        else if (_trip is { CanEdit: false })
+        {
+            <Banner Tone="Tone.Info" Text="@(_trip.Invoice is not null ? L.F("trip.invoicedRo", _trip.Invoice.Number ?? "") : L["trip.settledRo"])">
+                <Actions>@if (_trip.Invoice is not null) {<a href="@NavModel.Href(Company, $"invoices/{_trip.Invoice.Id}")">@L.F("trip.openInvoice", _trip.Invoice.Number ?? "")</a>}</Actions>
+            </Banner>
+        }
+        @if (_trip?.NeedsReview == true && _trip.ReviewNote is not null) {<Banner Tone="Tone.Warn" Text="@_trip.ReviewNote" />}
+        @foreach (var w in _warnings) {<Banner Tone="Tone.Warn" Text="@w.Message" />}
+        <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+            <EditForm Model="_m" OnValidSubmit="Save" OnInvalidSubmit="Invalid" id="trip-form" class="stack">
+                <ProblemValidator @ref="_problems" />
+                <ErrorSummary @ref="_summary" Extra="_extra" />
+                <section class="box pad">
+                    <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                        <TextField @bind-Value="_m.ReceiptNo" Label="@F("receiptNo", L["trip.receiptNo"])" Required="true" Ltr="true" MaxLength="30" ReadOnly="RO" />
+                        <DateField @bind-Value="_m.TripDate" Label="@F("tripDate", L["trip.tripDate"])" Required="true" ReadOnly="RO" />
+                        <DateField @bind-Value="_m.LoadingDate" Label="@F("loadingDate", L["trip.loadingDate"])" Required="true" ReadOnly="RO" Help="@L["trip.loadingDateHelp"]" />
+                        @if (!_form.Hidden("unloadingDate")) {<DateField @bind-Value="_m.UnloadingDate" Label="@F("unloadingDate", L["trip.unloadingDate"])" Required="@_form.Required("unloadingDate")" ReadOnly="RO" />}
+                        <ComboField TValue="string?" @bind-Value="_m.DriverId" SearchAsync="Lookups.SearchDriversAsync" Selected="_driverOption" Label="@F("driverId", L["trip.driver"])" Required="true" Span="2"
+                                    ReadOnly="RO" OnSelected="DriverPicked" Help="@DriverHelp" />
+                        <ComboField TValue="string?" @bind-Value="_m.CustomerId" Options="Lookups.Customers" Label="@F("customerId", L["trip.customer"])" Required="true" Span="2" ReadOnly="RO" OnSelected="_ => Quote()" />
+                        <ComboField TValue="string?" @bind-Value="_m.MaterialId" Options="Lookups.Materials" Label="@F("materialId", L["trip.material"])" Required="true" ReadOnly="RO" OnSelected="_ => Quote()" />
+                        <ComboField TValue="string?" @bind-Value="_m.LoadingSiteId" Options="Lookups.LoadingSites" Label="@F("loadingSiteId", L["trip.loading"])" Required="true" ReadOnly="RO" OnSelected="_ => Quote()" />
+                        <ComboField TValue="string?" @bind-Value="_m.UnloadingSiteId" Options="Lookups.UnloadingSites" Label="@F("unloadingSiteId", L["trip.unloading"])" Required="true" ReadOnly="RO" OnSelected="_ => Quote()" />
+                        <ComboField TValue="string?" @bind-Value="_m.PartnerId" Options="Lookups.Partners" Label="@F("partnerId", L["md.partner"])" ReadOnly="RO" OnSelected="_ => Quote()" Help="@(IsPartnerTrip ? L["trip.partnerTrip"] : null)" />
+                        <NumberField @bind-Value="_m.LoadedWeight" Label="@F("loadedWeight", L["trip.loadedWeight"])" Required="true" Min="0.001m" Unit="@L["md.tons"]" ReadOnly="RO" @bind-Value:after="Calculate" />
+                        <NumberField @bind-Value="_m.UnloadedWeight" Label="@F("unloadedWeight", L["trip.unloadedWeight"])" Required="@_form.Required("unloadedWeight")" Min="0m" Unit="@L["md.tons"]" ReadOnly="RO" @bind-Value:after="Calculate" />
+                        <NumberField @bind-Value="_m.CustomerPrice" Label="@F("customerPrice", L["trip.customerPrice"])" Required="true" Min="0m" ReadOnly="RO" @bind-Value:after="Calculate"
+                                     Source="@(_quote?.CustomerPrice is { } cp ? L.F("trip.priceFromTariff", Fmt.Money(cp.Price), cp.Specificity) : null)"
+                                     Help="@(_quote is { TariffLock: true, CanDeviateFromTariff: false } ? L["trip.tariffLock"] : null)" />
+                        @if (IsPartnerTrip)
+                        {
+                            <NumberField @bind-Value="_m.PartnerRate" Label="@F("partnerRate", L["trip.partnerRate"])" Required="true" Min="0m" ReadOnly="RO" @bind-Value:after="Calculate"
+                                         Source="@(_quote?.PartnerRate is { } pr ? L.F("trip.partnerRateFromTariff", Fmt.Money(pr.Price)) : null)" />
+                            <NumberField Value="0m" ValueExpression="() => _zero" Label="@F("driverRate", L["trip.driverRate"])" ReadOnly="true" Help="@L["trip.partnerTrip"]" />
+                        }
+                        else
+                        {
+                            <NumberField @bind-Value="_m.DriverRate" Label="@F("driverRate", L["trip.driverRate"])" Required="true" Min="0m" @bind-Value:after="Calculate"
+                                         ReadOnly="@(RO || _quote?.DriverRate is { Rate: not null, CanEnterManualRate: false } || _quote?.DriverRate is { Rate: null, CanEnterManualRate: false })"
+                                         Source="@(_quote?.DriverRate is { Rate: not null } dr ? L.F("trip.rateFrom", dr.Source ?? dr.RateMonth) : null)"
+                                         Error="@(_quote?.DriverRate is { Missing: not null, CanEnterManualRate: false } mr ? L.F("trip.rateMissing", mr.Missing) : null)" />
+                        }
+                        @if (!_form.Hidden("notes")) {<TextAreaField @bind-Value="_m.Notes" Label="@F("notes", L["md.notes"])" MaxLength="1000" Span="3" ReadOnly="RO" />}
+                    </div>
+                    @if (_form.Custom.Count > 0)
+                    {
+                        <h2 class="lbl" style="font-size:14px;margin:12px 0 6px">@L["md.customFields"]</h2>
+                        <CustomFieldsEditor Fields="_form.Custom" Values="_m.CustomValues" Errors="_customErrors" />
+                    }
+                </section>
+            </EditForm>
+            <div class="stack" style="min-height:0">
+                <Box Title="@L["trip.calc"]">
+                    @if (_calc is null) {<p class="muted">@L["trip.calcEmpty"]</p>}
+                    else
+                    {
+                        <div class="ln"><span>@L[_calc.BillOnUnloadedWeight ? "trip.billingQtyUnloaded" : "trip.billingQtyLoaded"]</span><bdi class="num">@Fmt.Qty(_calc.BillingQty) t</bdi></div>
+                        <div class="ln"><span>@L["trip.revenue"]</span><Money Value="_calc.Revenue" Decimals="_calc.Decimals" /></div>
+                        <div class="ln"><span>@L["trip.driverWage"]</span><Money Value="_calc.DriverWage" Decimals="_calc.Decimals" /></div>
+                        @if (IsPartnerTrip) {<div class="ln"><span>@L["trip.partnerCost"]</span><Money Value="_calc.PartnerCost" Decimals="_calc.Decimals" /></div>}
+                        <div class="ln tot big"><span>@L["trip.margin"]</span><Money Value="_calc.Margin" Decimals="_calc.Decimals" /></div>
+                        @if (_calc.ShortageWeight is decimal sw)
+                        {
+                            <div class="ln"><span>@L["trip.shortage"]</span><span><bdi class="num">@Fmt.Qty(sw) t · @Fmt.Percent(_calc.ShortagePct)</bdi> @if (_calc.IsShortageFlagged) {<StatusTag Status="short" />}</span></div>
+                        }
+                        @if (_calc.BreachAmount is decimal b && b != 0) {<div class="ln"><span>@L["st.breach"]</span><span><Money Value="b" Decimals="_calc.Decimals" /> <StatusTag Status="breach" /></span></div>}
+                        <div class="help" style="margin-top:6px">@L.F("trip.calcHelp", Fmt.Percent(_calc.ShortageTolerancePct))</div>
+                    }
+                </Box>
+                @if (_trip is not null)
+                {
+                    <Box Title="@L["ui.history"]" Class="fill"><RecordHistory Items="_history" /></Box>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("trip.voidTitle", _trip?.ReceiptNo ?? "")" Danger="true" AskReason="true" ConfirmText="@L["trip.void"]"
+               Message="@L["trip.voidText"]" Busy="_saving" Error="@_voidError" OnConfirm="Void" />
+
+@code {
+    private TripModel _m = new();
+    private TripResponse? _trip;
+    private IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry> _history = [];
+    private IReadOnlyList<TripWarning> _warnings = [];
+    private PriceQuoteResponse? _quote;
+    private TripCalculationResponse? _calc;
+    private Option<string?>? _driverOption;
+    private FormView _form = FormView.Empty;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy, _voidError;
+    private IReadOnlyList<string>? _extra;
+    private Dictionary<string, string>? _customErrors;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private bool _saving, _voiding;
+    private decimal? _zero = 0;
+    private CancellationTokenSource? _calcCts;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? Id { get; set; }
+
+    private bool CanEdit => Shell.Can(PermissionKeys.TripsEdit) && (_trip is null || _trip.CanEdit) && _lockedBy is null;
+    private bool RO => !CanEdit;
+    private bool IsPartnerTrip => _m.PartnerId is not null;
+
+    private string? DriverHelp => _m.DriverId is { } id && Lookups.Drivers.TryGetValue(id, out var d)
+        ? string.Join(" · ", new[] { L[d.FleetClass == "Own" ? "md.fleetOwn" : "md.fleetExternal"], d.Partner is null ? null : L["md.partner"] + ": " + d.Partner.Name,
+            d.Alerts.Count == 0 ? null : string.Join("، ", d.Alerts.Select(a => L["doc." + a.Document])) + " ⚠" }.Where(x => x is not null))
+        : null;
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            _form = await Forms.GetAsync(FormConfig.Trip);
+            if (Id is null)
+            {
+                var d = await Api.GetAsync<QuickEntryDefaults>(Api.C("trips/quick-entry"));
+                _m = new TripModel { TripDate = d.Today, LoadingDate = d.Today };
+                foreach (var f in _form.Custom.Where(f => f.DefaultValue is not null)) _m.CustomValues[f.Key] = JsonSerializer.SerializeToElement(f.DefaultValue);
+            }
+            else
+            {
+                var details = await Api.GetAsync<TripDetails>(Api.C($"trips/{Uri.EscapeDataString(Id)}"));
+                _trip = details.Trip;
+                _history = details.History;
+                _warnings = details.Warnings;
+                _m = TripModel.From(_trip);
+                _driverOption = new Option<string?>(_trip.Driver.Id, _trip.Driver.Name, _trip.TruckPlate);
+                await Lookups.SearchDriversAsync(_trip.Driver.Name, default);
+            }
+            _state = LoadState.Ready;
+            await Calculate();
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private string F(string key, string fallback) => _form.Label(key, fallback);
+
+    private async Task DriverPicked(Option<string?>? o)
+    {
+        _driverOption = o;
+        if (o?.Value is { } id && Lookups.Drivers.TryGetValue(id, out var d)) _m.PartnerId = d.Partner?.Id;
+        await Quote();
+    }
+
+    private async Task Quote()
+    {
+        if (RO || _m.CustomerId is null || _m.DriverId is null || _m.LoadingSiteId is null) return;
+        string D(DateOnly? x) => x?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        var qs = $"customer={U(_m.CustomerId)}&driver={U(_m.DriverId)}&loadingSite={U(_m.LoadingSiteId)}&unloadingSite={U(_m.UnloadingSiteId)}&material={U(_m.MaterialId)}"
+            + (_m.PartnerId is null ? "" : $"&partner={U(_m.PartnerId)}") + $"&tripDate={D(_m.TripDate)}&loadingDate={D(_m.LoadingDate ?? _m.TripDate)}";
+        try
+        {
+            _quote = await Api.GetAsync<PriceQuoteResponse>(Api.C("pricing/quote?" + qs));
+            // A new trip takes the quoted prices; an edit keeps its frozen prices unless the user changes them (FR-010).
+            if (_trip is null)
+            {
+                if (_quote.CustomerPrice is { } cp) _m.CustomerPrice = cp.Price;
+                if (_quote.PartnerRate is { } pr) _m.PartnerRate = pr.Price;
+                if (_quote.DriverRate?.Rate is decimal r) _m.DriverRate = r;
+            }
+        }
+        catch (ApiException) { _quote = null; }
+        await Calculate();
+    }
+
+    private static string U(string? s) => Uri.EscapeDataString(s ?? "");
+
+    /// <summary>Live calculation from the server (UX-17); the latest request wins.</summary>
+    private async Task Calculate()
+    {
+        if (_m.LoadedWeight is null) { _calc = null; return; }
+        _calcCts?.Cancel();
+        _calcCts?.Dispose();
+        _calcCts = new CancellationTokenSource();
+        var token = _calcCts.Token;
+        try
+        {
+            _calc = await Api.PostAsync<TripCalculationResponse>(Api.C("trips/calculate"), new TripCalculationRequest(_m.LoadedWeight, _m.UnloadedWeight, _m.CustomerPrice,
+                _quote?.CustomerPrice?.Price ?? _trip?.TariffPrice, IsPartnerTrip ? 0 : _m.DriverRate, IsPartnerTrip ? _m.PartnerRate : null, IsPartnerTrip), token);
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiException) { }
+    }
+
+    private Task Invalid() => _summary?.FocusAsync() ?? Task.CompletedTask;
+
+    private async Task Save()
+    {
+        if (RO) return;
+        _saving = true;
+        _extra = null;
+        _customErrors = null;
+        try
+        {
+            var req = _m.ToRequest(IsPartnerTrip, _trip is null);
+            var r = _trip is null
+                ? await Api.PostAsync<TripSaveResult>(Api.C("trips"), req)
+                : await Api.PutAsync<TripSaveResult>(Api.C($"trips/{Uri.EscapeDataString(_trip.Id)}"), req);
+            Toasts.Success(L.F(_trip is null ? "trip.saved" : "trip.edited", r.Trip.ReceiptNo, Fmt.Money(r.Trip.Revenue)));
+            foreach (var w in r.Warnings) Toasts.Error(w.Message);
+            if (_trip is null) Nav.NavigateTo(NavModel.Href(Company, $"trips/{r.Trip.Id}"));
+            else await Load();
+        }
+        catch (ApiException e)
+        {
+            _customErrors = e.Problem.Errors?.Where(x => x.Field?.StartsWith("customValues.", StringComparison.Ordinal) == true).ToDictionary(x => x.Field!, x => x.Message ?? "");
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task Void(string reason)
+    {
+        _saving = true;
+        _voidError = null;
+        try
+        {
+            await Api.PostAsync<TripResponse>(Api.C($"trips/{Uri.EscapeDataString(_trip!.Id)}/void"), new TripVoidRequest(reason, _trip.RowVersion));
+            _voiding = false;
+            Toasts.Success(L.F("trip.voidedToast", _trip.ReceiptNo));
+            await Load();
+        }
+        catch (ApiException e) { _voidError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
+    private async Task ClearReview()
+    {
+        try
+        {
+            await Api.PostAsync<TripResponse>(Api.C($"trips/{Uri.EscapeDataString(_trip!.Id)}/clear-review"), new TripReviewRequest(_trip.RowVersion));
+            Toasts.Success(L["trip.reviewCleared"]);
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    public void Dispose()
+    {
+        _calcCts?.Cancel();
+        _calcCts?.Dispose();
+    }
+
+    private sealed class TripModel
+    {
+        public string? ReceiptNo { get; set; }
+        public DateOnly? TripDate { get; set; }
+        public DateOnly? LoadingDate { get; set; }
+        public DateOnly? UnloadingDate { get; set; }
+        public string? DriverId { get; set; }
+        public string? CustomerId { get; set; }
+        public string? LoadingSiteId { get; set; }
+        public string? UnloadingSiteId { get; set; }
+        public string? MaterialId { get; set; }
+        public string? PartnerId { get; set; }
+        public decimal? LoadedWeight { get; set; }
+        public decimal? UnloadedWeight { get; set; }
+        public decimal? CustomerPrice { get; set; }
+        public decimal? DriverRate { get; set; }
+        public decimal? PartnerRate { get; set; }
+        public string? Notes { get; set; }
+        public Dictionary<string, JsonElement> CustomValues { get; set; } = new();
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+
+        public static TripModel From(TripResponse t) => new()
+        {
+            ReceiptNo = t.ReceiptNo, TripDate = t.TripDate, LoadingDate = t.LoadingDate, UnloadingDate = t.UnloadingDate, DriverId = t.Driver.Id,
+            CustomerId = t.Customer.Id, LoadingSiteId = t.LoadingSite.Id, UnloadingSiteId = t.UnloadingSite.Id, MaterialId = t.Material.Id,
+            PartnerId = t.Partner?.Id, LoadedWeight = t.LoadedWeight, UnloadedWeight = t.UnloadedWeight, CustomerPrice = t.CustomerPrice,
+            DriverRate = t.DriverRate, PartnerRate = t.PartnerRate, Notes = t.Notes, CustomValues = new Dictionary<string, JsonElement>(t.CustomValues),
+            RowVersion = t.RowVersion,
+        };
+
+        public TripRequest ToRequest(bool partnerTrip, bool isNew) => new(ReceiptNo?.Trim(), TripDate, LoadingDate ?? TripDate, UnloadingDate, DriverId, CustomerId,
+            LoadingSiteId, UnloadingSiteId, MaterialId, PartnerId, LoadedWeight, UnloadedWeight, CustomerPrice, partnerTrip ? 0 : DriverRate,
+            partnerTrip ? PartnerRate : null, string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), CustomValues, isNew ? ClientId : null, RowVersion);
+    }
+}

@@ -1,0 +1,29 @@
+@page "/"
+@layout BareLayout
+@* After sign-in: platform staff go to the provider console, everyone else to the dashboard of their default (or first) company. *@
+@inject AppSession Session
+@inject ShellState Shell
+@inject NavigationManager Nav
+@inject Loc L
+<div class="empty" style="height:100vh" role="status">
+    @if (_noCompany)
+    {
+        <EmptyState Icon="building" Title="@L["page.noCompany"]" Text="@L["page.noCompanyText"]" />
+    }
+    else
+    {
+        <div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@L["ui.loading"]</span>
+    }
+</div>
+
+@code {
+    private bool _noCompany;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Shell.Me?.IsPlatformStaff == true) { Nav.NavigateTo("/console/tenants", replace: true); return; }
+        if (Session.HomeCompany is { } c) Nav.NavigateTo(NavModel.Href(c, ""), replace: true);
+        else _noCompany = true;
+    }
+}

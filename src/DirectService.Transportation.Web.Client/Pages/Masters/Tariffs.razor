@@ -1,0 +1,244 @@
+@page "/c/{Company}/masters/tariffs"
+@* SCR-67 tariffs (FR-019…023, FR-026, BR-028): lines by party type × party × material × loading × unloading site, any key "All"; price
+   > 0 with the currency's decimals; validity; specificity shown (8/4/2/1); archive / restore; every change kept in the rate history. *@
+@using DirectService.Transportation.Contracts.Pricing
+@using DirectService.Transportation.Contracts.Accounting
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+
+<PageHeader Title="@L["nav.tariffs"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.tariffs"])])">
+    <Actions>
+        @if (CanManage)
+        {
+            <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "masters/import/tariffs")" />
+            <Btn Primary="true" Icon="plus" Text="@L["tar.new"]" OnClick="New" />
+        }
+    </Actions>
+</PageHeader>
+
+<SavedViews Items="Views" Selected="@_view" SelectedChanged="View" Label="@L["nav.tariffs"]">
+    <Tools>
+        <div class="adorn" style="width:220px"><span class="start"><Icon Name="search" /></span>
+            <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["ui.search"]" value="@_q.Q" @onchange="Search" /></div>
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+    </Tools>
+</SavedViews>
+
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="tag" Title="@L["tar.none"]" Text="@L["tar.noneText"]">
+            <Actions>@if (CanManage) {<Btn Primary="true" Icon="plus" Text="@L["tar.new"]" OnClick="New" />}</Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.tariffs"]">
+            <ChildContent>
+                <DataGrid TItem="TariffResponse" Items="_items" Key="t => t.Id" Caption="@L["nav.tariffs"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                          OnRowClick="Open" RowClass="@(t => t.Status == "Archived" ? "void" : null)">
+                    <Columns>
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.partyType"]" Value="PartyTypeText" SortKey="partyType" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.party"]" Value="t => AllIfNull(t.Party)" SortKey="party" />
+                        <GridColumn TItem="TariffResponse" Title="@L["nav.materials"]" Value="t => AllIfNull(t.Material)" SortKey="material" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.loading"]" Value="t => AllIfNull(t.LoadingSite)" SortKey="loadingSite" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.unloading"]" Value="t => AllIfNull(t.UnloadingSite)" SortKey="unloadingSite" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.price"]" Value="t => Fmt.Money(t.Price)" Numeric="true" SortKey="price" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.from"]" Value="t => Fmt.Date(t.ValidFrom, Shell.DateFormat)" Ltr="true" SortKey="validFrom" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.to"]" Value="t => Fmt.Date(t.ValidTo, Shell.DateFormat)" Ltr="true" SortKey="validTo" />
+                        <GridColumn TItem="TariffResponse" Title="@L["tar.specificity"]" Value="t => Fmt.Count(t.Specificity)" Numeric="true" SortKey="specificity" />
+                        <GridColumn TItem="TariffResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Archived" ? "archived" : "active")" /></Template></GridColumn>
+                    </Columns>
+                </DataGrid>
+            </ChildContent>
+            <Footer><Pager Page="_q.Page" PageSize="_q.PageSize" Total="_total" OnPage="Go" OnPageSize="Size" /></Footer>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(_m.Id is null ? L["tar.new"] : L["tar.line"])" Busy="_saving" Wide="true">
+    <ChildContent>
+        <EditForm Model="_m" OnValidSubmit="Save" id="tariff-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary />
+            @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <SelectField TValue="string" @bind-Value="_m.PartyType" Label="@L["tar.partyType"]" Required="true"
+                             Options="@([new Option<string>("Customer", L["tar.customer"]), new Option<string>("Partner", L["tar.partner"])])" />
+                <ComboField TValue="string?" @bind-Value="_m.PartyId" Options="@(_m.PartyType == "Partner" ? _partners : _customers)" Label="@L["tar.party"]" Placeholder="@L["tar.all"]" Span="2" />
+                <ComboField TValue="string?" @bind-Value="_m.MaterialId" Options="_materials" Label="@L["nav.materials"]" Placeholder="@L["tar.all"]" />
+                <ComboField TValue="string?" @bind-Value="_m.LoadingSiteId" Options="_loading" Label="@L["tar.loading"]" Placeholder="@L["tar.all"]" />
+                <ComboField TValue="string?" @bind-Value="_m.UnloadingSiteId" Options="_unloading" Label="@L["tar.unloading"]" Placeholder="@L["tar.all"]" />
+                <NumberField @bind-Value="_m.Price" Label="@L["tar.pricePerTon"]" Required="true" Min="0.001m" Unit="@Currency" />
+                <DateField @bind-Value="_m.ValidFrom" Label="@L["tar.from"]" />
+                <DateField @bind-Value="_m.ValidTo" Label="@L["tar.to"]" />
+                <TextAreaField @bind-Value="_m.Notes" Label="@L["md.notes"]" MaxLength="500" Span="3" />
+            </div>
+            <p class="help">@L["tar.help"]</p>
+        </EditForm>
+        @if (_m.Id is not null)
+        {
+            <h3 style="font-size:13px;margin-top:8px">@L["ui.history"]</h3>
+    @if (_history is null) {<div role="status" class="muted">@L["ui.loading"]</div>}
+    else if (_history.Count == 0) {<p class="muted">@L["hist.none"]</p>}
+    else
+    {
+        <HistoryList Items="@(_history.SelectMany(h => h.Changes.Count == 0 ? [new Ui.HistoryEntry(h.User ?? L["hist.system"], HistAction(h.Action), Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat))]
+            : h.Changes.Select(c => new Ui.HistoryEntry(h.User ?? L["hist.system"], $"{HistAction(h.Action)} · {c.Field}", Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat), c.OldValue ?? "—", c.NewValue ?? "—"))).ToList())" />
+    }
+        }
+    </ChildContent>
+    <Footer>
+        @if (_m.Id is not null && CanManage)
+        {
+            <Btn Icon="@(_m.Archived ? "refresh" : "archive")" Text="@L[_m.Archived ? "ml.restore" : "ml.archive"]" OnClick="ToggleStatus" />
+        }
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        @if (CanManage) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" form="tariff-form" />}
+    </Footer>
+</Modal>
+
+
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "party" };
+    private string _view = "customers";
+    private IReadOnlyList<TariffResponse> _items = [];
+    private int _total;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _banner;
+    private bool _editing, _saving;
+    private TariffModel _m = new();
+    private ProblemValidator? _problems;
+    private IReadOnlyList<RateHistoryEntry>? _history;
+    private IReadOnlyList<Option<string?>> _customers = [], _partners = [], _materials = [], _loading = [], _unloading = [];
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanManage => Shell.Can(PermissionKeys.MastersManage);
+    private string Currency => L["cur.JOD"];
+
+    private IReadOnlyList<TabItem> Views => [new("customers", L["tar.customers"]), new("partners", L["tar.partners"]), new("today", L["tar.validToday"]), new("archived", L["ml.archived"])];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        try
+        {
+            static IReadOnlyList<Option<string?>> Opt(IReadOnlyList<MasterOption> o) => o.Select(x => new Option<string?>(x.Id, x.Name)).ToList();
+            _customers = Opt(await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("customers/options")));
+            _partners = Opt(await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("partners/options")));
+            _materials = Opt(await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("materials/options")));
+            _loading = Opt(await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("loading-sites/options")));
+            _unloading = Opt(await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("unloading-sites/options")));
+        }
+        catch (ApiException) { }
+    }
+
+    private async Task Load()
+    {
+        _q.Filters.Clear();
+        _q.View = _view == "archived" ? "archived" : "active";
+        if (_view == "customers") _q.Filters["partyType"] = "Customer";
+        if (_view == "partners") _q.Filters["partyType"] = "Partner";
+        if (_view == "today") _q.Filters["validOn"] = DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        try
+        {
+            var page = await Api.GetAsync<PagedResult<TariffResponse>>(Api.C("tariffs" + _q.ToQuery()));
+            (_items, _total) = (page.Items, page.TotalCount);
+            _state = _items.Count == 0 && _q.Page == 1 && _q.Q is null ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task View(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(ChangeEventArgs e) { _q.Q = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString()!.Trim(); _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private void New() { _m = new TariffModel { PartyType = _view == "partners" ? "Partner" : "Customer" }; _banner = null; _editing = true; }
+
+    private async Task Open(TariffResponse t)
+    {
+        _m = TariffModel.From(t);
+        _banner = null;
+        _editing = true;
+        _history = null;
+        try { _history = (await Api.GetAsync<TariffDetails>(Api.C($"tariffs/{Uri.EscapeDataString(t.Id)}"))).History; } catch (ApiException) { _history = []; }
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _banner = null;
+        try
+        {
+            var req = _m.ToRequest();
+            if (_m.Id is null) await Api.PostAsync<TariffResponse>(Api.C("tariffs"), req);
+            else await Api.PutAsync<TariffResponse>(Api.C($"tariffs/{Uri.EscapeDataString(_m.Id)}"), req);
+            _editing = false;
+            Toasts.Success(L["tar.saved"]);
+            await Load();
+        }
+        catch (ApiException e) { _banner = _problems?.Show(e.Problem); }
+        finally { _saving = false; }
+    }
+
+    private async Task ToggleStatus()
+    {
+        try
+        {
+            await Api.PostAsync<TariffResponse>(Api.C($"tariffs/{Uri.EscapeDataString(_m.Id!)}/{(_m.Archived ? "restore" : "archive")}"), new StatusChangeRequest(_m.RowVersion));
+            _editing = false;
+            Toasts.Success(L[_m.Archived ? "tar.restored" : "tar.archived"]);
+            await Load();
+        }
+        catch (ApiException e) { _banner = e.Problem.Detail; }
+    }
+
+    private string AllIfNull(Ref? r) => r?.Name ?? L["tar.all"];
+
+    private string PartyTypeText(TariffResponse t) => L[t.PartyType == "Partner" ? "tar.partner" : "tar.customer"];
+
+    private string HistAction(string a) => L["hist." + a] is var t && t.StartsWith("hist.", StringComparison.Ordinal) ? a : t;
+
+    private async Task Export(string format)
+    {
+        var q = _q.ToQuery(paged: false);
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"tariffs/export{q}{(q.Length == 0 ? "?" : "&")}format={format}"));
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed class TariffModel
+    {
+        public string? Id { get; set; }
+        public string PartyType { get; set; } = "Customer";
+        public string? PartyId { get; set; }
+        public string? MaterialId { get; set; }
+        public string? LoadingSiteId { get; set; }
+        public string? UnloadingSiteId { get; set; }
+        public decimal? Price { get; set; }
+        public DateOnly? ValidFrom { get; set; }
+        public DateOnly? ValidTo { get; set; }
+        public string? Notes { get; set; }
+        public string? RowVersion { get; set; }
+        public bool Archived { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+
+        public static TariffModel From(TariffResponse t) => new()
+        {
+            Id = t.Id, PartyType = t.PartyType, PartyId = t.Party?.Id, MaterialId = t.Material?.Id, LoadingSiteId = t.LoadingSite?.Id,
+            UnloadingSiteId = t.UnloadingSite?.Id, Price = t.Price, ValidFrom = t.ValidFrom, ValidTo = t.ValidTo, Notes = t.Notes, RowVersion = t.RowVersion,
+            Archived = t.Status == "Archived",
+        };
+
+        public TariffRequest ToRequest() => new(PartyType, PartyId, MaterialId, LoadingSiteId, UnloadingSiteId, Price, ValidFrom, ValidTo,
+            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(), Id is null ? ClientId : null, RowVersion);
+    }
+}

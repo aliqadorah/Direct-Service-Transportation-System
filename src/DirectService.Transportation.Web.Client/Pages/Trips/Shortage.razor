@@ -1,0 +1,7 @@
+@page "/c/{Company}/trips/shortage"
+@* SCR-13 shortage view (US-04, FR-012, RPT-03). *@
+<TripListView Company="@Company" Shortage="true" />
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+}

@@ -1,0 +1,99 @@
+@page "/verify-email"
+@* SCR-03 email verification: the link from the email (u, t) is confirmed with a button (a mail scanner opening the link does not use
+   it up); an invalid or expired link offers a new one (the reply never reveals whether the address exists). *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
+@inject AccountService Accounts
+
+<AuthCard Title="@L["acct.verifyTitle"]" Lead="@(_state == State.Ready ? L["acct.verifyLead"] : null)">
+    @switch (_state)
+    {
+        case State.Done:
+            <Banner Tone="Tone.Ok" Text="@L["acct.verifyDone"]" />
+            <a class="btn pri w100" href="@Href("/sign-in")">@L["acct.verifyContinue"]</a>
+            break;
+        case State.Sent:
+            <Banner Tone="Tone.Info" Text="@L["acct.resent"]" Live="true" />
+            <a href="@Href("/sign-in")" style="font-size:13px">@L["acct.backToSignIn"]</a>
+            break;
+        case State.Invalid:
+            <Banner Tone="Tone.Err" Text="@L["acct.linkInvalid"]" />
+            <EditForm Model="Resend" FormName="resend" OnSubmit="SendAgain" class="stack" method="post">
+                <ProblemValidator @ref="_problems" />
+                <TextField @bind-Value="Resend.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Required="true" Autocomplete="email" MaxLength="256" />
+                <Btn Type="submit" Primary="true" Text="@L["acct.resend"]" Class="w100" />
+                <span class="help">@L["acct.resendNote"]</span>
+            </EditForm>
+            break;
+        default:
+            <EditForm Model="Confirm" FormName="verify" OnSubmit="Verify" class="stack" method="post">
+                <EmptyState Icon="mail" Title="@L["acct.verifyTitle"]" />
+                <Btn Type="submit" Primary="true" Text="@L["acct.verifyConfirm"]" Class="w100" />
+            </EditForm>
+            break;
+    }
+</AuthCard>
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Confirm ??= new(); Resend ??= new(); }
+
+    private enum State { Ready, Done, Invalid, Sent }
+
+    private State _state;
+    private ProblemValidator? _problems;
+
+    [SupplyParameterFromQuery(Name = "u")] private string? UserToken { get; set; }
+    [SupplyParameterFromQuery(Name = "t")] private string? LinkToken { get; set; }
+    [SupplyParameterFromForm(FormName = "verify")] private ConfirmInput Confirm { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "resend")] private ResendInput Resend { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrEmpty(UserToken) || string.IsNullOrEmpty(LinkToken)) _state = State.Invalid;
+    }
+
+    private async Task Verify()
+    {
+        try
+        {
+            await Accounts.VerifyEmailAsync(UserToken!, LinkToken!, Http.RequestAborted);
+            _state = State.Done;
+        }
+        catch (AppException)
+        {
+            _state = State.Invalid;
+        }
+    }
+
+    private async Task SendAgain()
+    {
+        if (AccountValidation.Required(L, ("email", Resend.Email, "acct.email")) is { } missing)
+        {
+            _state = State.Invalid;
+            _problems?.Show(missing);
+            return;
+        }
+        try
+        {
+            await Accounts.ResendVerificationAsync(Resend.Email!.Trim(), Http.RequestAborted);
+            _state = State.Sent;
+        }
+        catch (AppException e)
+        {
+            _state = State.Invalid;
+            _problems?.Show(Problem(e) with { Field = "email" });
+        }
+    }
+
+    private sealed class ConfirmInput
+    {
+        public string? Go { get; set; }
+    }
+
+    private sealed class ResendInput
+    {
+        public string? Email { get; set; }
+    }
+}

@@ -131,17 +131,19 @@ public abstract class FieldBase<TValue> : InputBase<TValue>
         b.CloseElement();
     }
 
-    /// <summary>Attributes common to every control: id, aria-invalid, aria-describedby, aria-required, readonly, disabled.</summary>
+    /// <summary>Attributes common to every control: id, name, aria-invalid, aria-describedby, aria-required, readonly, disabled.</summary>
     protected void ControlAttributes(RenderTreeBuilder b, int seq)
     {
         ArgumentNullException.ThrowIfNull(b);
         b.AddAttribute(seq, "id", ElementId);
-        b.AddAttribute(seq + 1, "aria-invalid", Invalid ? "true" : null);
-        b.AddAttribute(seq + 2, "aria-describedby", DescribedBy);
-        b.AddAttribute(seq + 3, "aria-required", Required ? "true" : null);
-        b.AddAttribute(seq + 4, "readonly", ReadOnly);
-        b.AddAttribute(seq + 5, "disabled", Disabled);
-        b.AddMultipleAttributes(seq + 6, AdditionalAttributes);
+        b.AddAttribute(seq + 1, "name", NameAttributeValue);   // server-rendered forms (account pages) post by name
+        b.AddAttribute(seq + 2, "aria-invalid", Invalid ? "true" : null);
+        b.AddAttribute(seq + 3, "aria-describedby", DescribedBy);
+        b.AddAttribute(seq + 4, "aria-required", Required ? "true" : null);
+        b.AddAttribute(seq + 5, "readonly", ReadOnly);
+        b.AddAttribute(seq + 6, "disabled", Disabled);
+        // "class" is already part of CssClass (InputBase merges it with the validation classes).
+        b.AddMultipleAttributes(seq + 7, AdditionalAttributes?.Where(a => a.Key != "class"));
     }
 
     protected override bool TryParseValueFromString(string? value, [MaybeNullWhen(false)] out TValue result, [NotNullWhen(false)] out string? validationErrorMessage)
