@@ -26,7 +26,8 @@ public sealed record MoneyAccountRef(string Kind, string Id, string Name);
 public sealed record CashVoidRequest(string? Reason, string? RowVersion);
 
 /// <summary>Count and amount of a filtered list.</summary>
-public sealed record CashListTotals(int Count, decimal Amount);
+/// <summary>Register totals: <see cref="Count"/> rows matching the filters (paging), <see cref="Amount"/> and <see cref="Included"/> of the documents in the total (active / posted, DT-155).</summary>
+public sealed record CashListTotals(int Count, decimal Amount, int Included = 0);
 
 // ------------------------------------------------------------------ receipts (7.4.1)
 

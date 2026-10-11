@@ -1,0 +1,159 @@
+@page "/tenant/support-access"
+@*
+  SCR-83 support access approvals (D-13, BR-014, P-13; core.tenant.manage): provider staff see the tenant's data only inside a window the
+  Owner approves — time-limited (at most 7 days, default 24 hours), read-only, every request in the audit log. Pending requests are approved
+  for a chosen duration or rejected with a reason; an approved window can be ended at any time. Possible also while suspended.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.supportApprovals"]" Crumbs="@([new Crumb(L["nav.tenant"]), new Crumb(L["nav.supportApprovals"])])" />
+<Banner Tone="Tone.Info" Icon="shield" Text="@L["ten.supportInfo"]" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NoAccessView /></Empty>
+    <ChildContent>
+        @foreach (var g in _rows.Where(r => r.Status == LifecycleCodes.Requested))
+        {
+            var grant = g;
+            <Box Title="@L["ten.supportPending"]">
+                <div class="row" style="gap:12px;align-items:center;flex-wrap:wrap">
+                    <Badge Tone="Tone.Warn" Icon="shield" Text="@L["st.requested"]" />
+                    <div style="flex:1;min-width:220px">
+                        <b>@grant.RequestedBy</b>
+                        <div class="muted">@L.F("ten.supportReason", grant.Reason) · <bdi class="num">@Fmt.DateTime(grant.CreatedAt.ToLocalTime(), Shell.DateFormat)</bdi></div>
+                    </div>
+                    <Btn Text="@L["ten.reject"]" Disabled="_busy" OnClick="() => Ask(grant, false)" />
+                    <Btn Primary="true" Icon="check" Text="@L["ten.approve"]" Disabled="_busy" OnClick="() => Ask(grant, true)" />
+                </div>
+            </Box>
+        }
+        <Box Title="@L["ten.supportWindows"]" NoPad="true" Fill="true">
+            @if (_rows.Count == 0)
+            {
+                <EmptyState Icon="shield" Title="@L["ten.noSupport"]" Text="@L["ten.noSupportText"]" />
+            }
+            else
+            {
+                <DataGrid TItem="SupportAccessResponse" Items="_rows" Key="r => r.Id" Caption="@L["ten.supportWindows"]">
+                    <Columns>
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.staff"]" Value="r => r.RequestedBy" />
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.reason"]" Value="r => r.Reason" />
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.from"]" Value="r => Fmt.DateTime(r.StartsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.decidedBy"]" Value="@(r => r.DecidedBy ?? "—")" />
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Status(context)" /></Template></GridColumn>
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @if (context.Status == LifecycleCodes.Approved && context.EndsAt > DateTime.UtcNow)
+                                {
+                                    <Btn Small="true" Danger="true" Icon="x" Text="@L["ten.endNow"]" Disabled="_busy" OnClick="() => End(context)" />
+                                }
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+                <p class="pad help" style="margin:0">@L["ten.supportAudit"]</p>
+            }
+        </Box>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_approving" Title="@L["ten.approveTitle"]" Busy="_busy" Icon="shield">
+    <ChildContent>
+        <p style="margin:0">@L.F("ten.approveText", _target?.RequestedBy ?? "")</p>
+        <SelectField TValue="int" @bind-Value="_hours" Options="Durations" Label="@L["ten.duration"]" Required="true" />
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _approving = false" />
+        <Btn Primary="true" Icon="check" Text="@L["ten.approve"]" Busy="_busy" OnClick="Approve" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_rejecting" Title="@L["ten.rejectTitle"]" Danger="true" AskReason="true" ConfirmText="@L["ten.reject"]" Message="@L["ten.rejectText"]"
+               Busy="_busy" Error="@_error" OnConfirm="Reject" />
+
+@code {
+    private IReadOnlyList<SupportAccessResponse> _rows = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private SupportAccessResponse? _target;
+    private bool _busy, _approving, _rejecting;
+    private int _hours = 24;
+
+    private IReadOnlyList<Option<int>> Durations =>
+        new[] { 1, 2, 4, 8, 24, 48, 72, 168 }.Select(h => new Option<int>(h, h < 24 ? L.F("ten.hours", h) : L.F("ten.days", h / 24))).ToList();
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _rows = await Api.GetAsync<IReadOnlyList<SupportAccessResponse>>("api/v1/tenant/support-access");
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status is 403 or 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    internal static string Status(SupportAccessResponse r) => r.Status switch
+    {
+        LifecycleCodes.Requested => "requested", LifecycleCodes.Approved => "approved", LifecycleCodes.Rejected => "rejected", _ => "expired",
+    };
+
+    private void Ask(SupportAccessResponse g, bool approve)
+    {
+        _target = g;
+        _error = null;
+        _hours = 24;
+        if (approve) _approving = true;
+        else _rejecting = true;
+    }
+
+    private async Task Approve()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var id = _target.Id;
+            _rows = await Api.PostAsync<IReadOnlyList<SupportAccessResponse>>($"api/v1/tenant/support-access/{Uri.EscapeDataString(id)}/approve",
+                new SupportApprovalRequest(null, null, null, _hours));   // the server starts the window now on its own clock (review M2)
+            _approving = false;
+            var ends = _rows.FirstOrDefault(r => r.Id == id)?.EndsAt;
+            Toasts.Success(L.F("ten.approved", Fmt.DateTime(ends?.ToLocalTime(), Shell.DateFormat)));
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Reject(string reason)
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            _rows = await Api.PostAsync<IReadOnlyList<SupportAccessResponse>>($"api/v1/tenant/support-access/{Uri.EscapeDataString(_target.Id)}/reject", new ReasonRequest(reason));
+            _rejecting = false;
+            Toasts.Success(L["ten.rejected"]);
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task End(SupportAccessResponse g)
+    {
+        _busy = true;
+        try
+        {
+            _rows = await Api.PostAsync<IReadOnlyList<SupportAccessResponse>>($"api/v1/tenant/support-access/{Uri.EscapeDataString(g.Id)}/end", null);
+            Toasts.Success(L["ten.ended"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+}

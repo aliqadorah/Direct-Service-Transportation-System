@@ -285,6 +285,23 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         return await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.RequestedBy == me && !g.IsDeleted), ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The active companies the staff member can open now: those of tenants with an approved, current window of theirs (DT-152), with the
+    /// read-only session permissions — the same rule the request pipeline applies to every support request.
+    /// </summary>
+    public async Task<IReadOnlyList<Contracts.Identity.CompanyAccess>> SupportCompaniesAsync(CancellationToken ct)
+    {
+        var me = StaffId;
+        var now = Now;
+        var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters()
+            .Where(c => !c.IsDeleted && c.Status == "Active" && db.Set<SupportAccessGrant>().IgnoreQueryFilters()
+                .Any(g => g.TenantId == c.TenantId && g.RequestedBy == me && !g.IsDeleted && g.Status == LifecycleCodes.Approved && g.StartsAt <= now && g.EndsAt > now))
+            .OrderBy(c => c.Name).Select(c => new { c.PublicId, c.Name, c.NameEn, c.CurrencyCode, c.CurrencyDecimals }).Take(200).ToListAsync(ct).ConfigureAwait(false);
+        var permissions = SupportAccessService.SessionPermissions.Order(StringComparer.Ordinal).ToList();
+        return companies.Select(c => new Contracts.Identity.CompanyAccess(support.Token<Company>(c.PublicId), c.Name, c.NameEn, "Active", "Support", true, permissions,
+            c.CurrencyCode, c.CurrencyDecimals)).ToList();
+    }
+
     // ============================================================ announcements and health (P-14, P-15)
 
     public async Task<IReadOnlyList<AnnouncementResponse>> AnnouncementsAsync(bool currentOnly, CancellationToken ct)

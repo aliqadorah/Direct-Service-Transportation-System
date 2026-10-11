@@ -10,7 +10,7 @@
 @inject AccountingLookups Lookups
 
 <PageHeader Title="@L["nav.mapping"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.mapping"])])" />
-<PostingBanner />
+<PostingBanner @key="_bannerVersion" />
 <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
     <Empty>
         <EmptyState Icon="book" Title="@L["acc.chartEmpty"]" Text="@L["map.noChart"]"><Actions><Btn Primary="true" Text="@L["nav.chart"]" Href="@NavModel.Href(Company, "accounting/chart")" /></Actions></EmptyState>
@@ -29,7 +29,7 @@
                             <td>@L.Pick(k.NameAr, k.NameEn) @if (k.Required) {<span class="req" aria-label="@L["ui.required"]">*</span>}</td>
                             <td style="min-width:320px">
                                 <ComboField TValue="string?" Value="k.Account?.Id" ValueChanged="v => Set(k, v)" ValueExpression="() => _dummy" Options="_accounts"
-                                            Placeholder="@L["map.choose"]" aria-label="@L.F("map.accountOf", L.Pick(k.NameAr, k.NameEn))" ReadOnly="@(!CanEdit)" />
+                                            Placeholder="@L["map.choose"]" aria-label="@L.F("map.accountOf", L.Pick(k.NameAr, k.NameEn))" ReadOnly="@(!CanEdit || _saving is not null)" />
                             </td>
                             <td><StatusTag Status="@(k.Account is null ? (k.Required ? "missing" : "notRequired") : "mapped")" /></td>
                         </tr>
@@ -45,7 +45,8 @@
     private IReadOnlyList<Option<string?>> _accounts = [];
     private LoadState _state = LoadState.Loading;
     private string? _reference;
-    private string? _dummy = null;
+    private string? _dummy = null, _saving;
+    private int _bannerVersion;
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -67,13 +68,16 @@
 
     private async Task Set(PostingKeyResponse k, string? accountId)
     {
-        if (accountId is null || accountId == k.Account?.Id) return;
+        if (accountId is null || accountId == k.Account?.Id || _saving is not null) return;
+        _saving = k.Key;   // one change at a time, so answers never arrive out of order (review L11)
         try
         {
             var r = await Api.PutAsync<PostingKeyResponse>(Api.C($"accounting/posting-keys/{Uri.EscapeDataString(k.Key)}"), new PostingKeyRequest(accountId));
             _keys = _keys.Select(x => x.Key == r.Key ? r : x).ToList();
+            _bannerVersion++;   // the posting banner reads the status again (review L10)
             Toasts.Success(L.F("map.saved", L.Pick(r.NameAr, r.NameEn)));
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _saving = null; }
     }
 }

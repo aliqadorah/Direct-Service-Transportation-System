@@ -58,9 +58,10 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
     }
 
     /// <summary>The designer's live preview (FR-055): the saved layout of a type with sample trips, as HTML.</summary>
-    public async Task<GeneratedFile> LayoutPreviewAsync(string layoutType, CancellationToken ct)
+    /// <summary>The layout with sample trips: the stored one, or the unsaved one of a request (the designer's live preview, DT-154).</summary>
+    public async Task<GeneratedFile> LayoutPreviewAsync(string layoutType, CancellationToken ct, InvoiceLayoutRequest? draft = null)
     {
-        var layout = await layouts.GetAsync(layoutType, ct).ConfigureAwait(false);
+        var layout = draft is null ? await layouts.GetAsync(layoutType, ct).ConfigureAwait(false) : await layouts.DraftAsync(layoutType, draft, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var customer = new Customer { Name = En ? "Sample customer" : "عميل للمعاينة", TaxNumber = "000000000" };
         var today = await support.TodayAsync(ct).ConfigureAwait(false);

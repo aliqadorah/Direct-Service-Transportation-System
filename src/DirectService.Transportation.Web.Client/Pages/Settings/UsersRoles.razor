@@ -48,8 +48,8 @@
                                     <Template>
                                         @if (context.Status is "Pending" or "Expired")
                                         {
-                                            <Btn Small="true" Icon="send" Text="@L["usr.resend"]" OnClick="@(() => Invitation(context, "resend"))" />
-                                            <Btn Small="true" Ghost="true" Icon="x" Text="@L["ui.cancel"]" OnClick="@(() => Invitation(context, "cancel"))" />
+                                            <Btn Small="true" Icon="send" Text="@L["usr.resend"]" Disabled="_busy" OnClick="@(() => Invitation(context, "resend"))" />
+                                            <Btn Small="true" Ghost="true" Icon="x" Text="@L["ui.cancel"]" Disabled="_busy" OnClick="@(() => Invitation(context, "cancel"))" />
                                         }
                                     </Template>
                                 </GridColumn>
@@ -87,14 +87,15 @@
         <div class="stack">
             <KeyValues Columns="1" Items="@([new KeyValue(L["acct.email"], u.Email), new KeyValue(L["usr.lastSignIn"], Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)),
                 new KeyValue(L["usr.2fa"], L[u.TwoFactorEnabled ? "ui.on" : "ui.off"]), new KeyValue(L["usr.emailConfirmed"], L[u.EmailConfirmed ? "ui.yes" : "ui.no"])])" />
-            <SelectField TValue="string?" Value="u.Role?.Id" ValueChanged="ChangeRole" ValueExpression="() => _dummy" Options="RoleOptions" Label="@L["usr.role"]" Disabled="@(u.Status != "Active")" />
-            <div class="stack" style="gap:6px">
-                @if (u.IsLocked) {<Btn Icon="lock" Text="@L["usr.unlock"]" OnClick="@(() => Act("unlock", null))" />}
-                <Btn Icon="mail" Text="@L["usr.passwordReset"]" OnClick="@(() => Act("password-reset", null))" />
+            @if (Protected(u)) {<Banner Tone="Tone.Lock" Icon="lock" Text="@L["usr.ownerProtected"]" />}
+            <SelectField @key="_roleSelectKey" TValue="string?" Value="u.Role?.Id" ValueChanged="ChangeRole" ValueExpression="() => _dummy" Options="RoleOptions" Label="@L["usr.role"]" Disabled="@(u.Status != "Active" || _busy || Protected(u))" />
+            <div class="stack" style="gap:6px" hidden="@Protected(u)">
+                @if (u.IsLocked) {<Btn Icon="lock" Text="@L["usr.unlock"]" Disabled="_busy" OnClick="@(() => Act("unlock", null))" />}
+                <Btn Icon="mail" Text="@L["usr.passwordReset"]" Disabled="_busy" OnClick="@(() => Act("password-reset", null))" />
                 <Btn Icon="shield" Text="@L["usr.reset2fa"]" OnClick="@(() => Ask("reset-2fa"))" />
-                <Btn Icon="logout" Text="@L["usr.signOut"]" OnClick="@(() => Act("sign-out", null))" />
+                <Btn Icon="logout" Text="@L["usr.signOut"]" Disabled="_busy" OnClick="@(() => Act("sign-out", null))" />
                 @if (u.Status == "Active") {<Btn Icon="lock" Text="@L["usr.disable"]" OnClick="@(() => Ask("disable"))" />}
-                else if (u.Status == "Disabled") {<Btn Icon="check" Text="@L["usr.enable"]" OnClick="@(() => Act("enable", null))" />}
+                else if (u.Status == "Disabled") {<Btn Icon="check" Text="@L["usr.enable"]" Disabled="_busy" OnClick="@(() => Act("enable", null))" />}
                 <Btn Icon="x" Text="@L["usr.remove"]" OnClick="@(() => Ask("remove"))" />
                 @if (u.Status != "Archived") {<Btn Danger="true" Icon="archive" Text="@L["ml.archive"]" OnClick="@(() => Ask("archive"))" />}
                 else {<Btn Danger="true" Icon="trash" Text="@L["usr.erase"]" OnClick="@(() => Ask("anonymise"))" />}
@@ -109,9 +110,10 @@
 <Modal @bind-Open="_roleOpen" Title="@(_role.Id is null ? L["usr.newRole"] : L.F("ml.editTitle", _role.Name ?? ""))" Busy="_busy" Wide="true">
     <ChildContent>
         @if (_role.IsPreset) {<Banner Tone="Tone.Lock" Text="@L["usr.presetLocked"]" />}
+        else if (_role.BeyondCaller) {<Banner Tone="Tone.Lock" Icon="lock" Text="@L["usr.roleBeyondCaller"]" />}
         <div class="field">
             <label for="role-name">@L["md.name"] <span class="req" aria-hidden="true">*</span></label>
-            <input id="role-name" class="input" maxlength="50" @bind="_role.Name" @bind:event="oninput" disabled="@_role.IsPreset" />
+            <input id="role-name" class="input" maxlength="50" @bind="_role.Name" @bind:event="oninput" disabled="@_role.Locked" />
         </div>
         @foreach (var group in _permissions.GroupBy(p => p.Group))
         {
@@ -122,7 +124,7 @@
                     var perm = p;
                     var held = Shell.Can(perm.Key);
                     <label style="display:flex;gap:6px;align-items:flex-start">
-                        <input type="checkbox" checked="@_role.Permissions.Contains(perm.Key)" disabled="@(_role.IsPreset || !held)" @onchange="e => TogglePermission(perm.Key, e.Value is true)" />
+                        <input type="checkbox" checked="@_role.Permissions.Contains(perm.Key)" disabled="@(_role.Locked || !held)" @onchange="e => TogglePermission(perm.Key, e.Value is true)" />
                         <span><bdi class="num muted">@perm.PrdName</bdi> @L.Pick(perm.DescriptionAr, perm.DescriptionEn) @if (!held) {<span class="muted">(@L["usr.notHeld"])</span>}</span>
                     </label>
                 }
@@ -131,9 +133,9 @@
         @if (_roleError is not null) {<Banner Tone="Tone.Err" Text="@_roleError" />}
     </ChildContent>
     <Footer>
-        @if (_role.Id is not null && !_role.IsPreset) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _roleOpen = false; _deletingRole = true; }" />}
+        @if (_role.Id is not null && !_role.Locked) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _roleOpen = false; _deletingRole = true; }" />}
         <Btn Text="@L["ui.cancel"]" OnClick="() => _roleOpen = false" />
-        @if (!_role.IsPreset) {<Btn Primary="true" Text="@L["ui.save"]" Busy="_busy" Disabled="@string.IsNullOrWhiteSpace(_role.Name)" OnClick="SaveRole" />}
+        @if (!_role.Locked) {<Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="@string.IsNullOrWhiteSpace(_role.Name)" OnClick="SaveRole" />}
     </Footer>
 </Modal>
 <ConfirmDialog @bind-Open="_deletingRole" Title="@L.F("ml.deleteTitle", _role.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]" Message="@L["usr.deleteRoleText"]"
@@ -163,7 +165,7 @@
     private LoadState _state = LoadState.Loading;
     private string? _dummy = null;
     private string? _reference, _q, _action, _actError, _roleError, _inviteEmail, _inviteRole, _inviteError;
-    private int _page = 1;
+    private int _page = 1, _version, _roleSelectKey;
     private UserListItem? _user;
     private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting;
     private RoleModel _role = new();
@@ -171,7 +173,7 @@
     [Parameter] public string Company { get; set; } = "";
 
     private IReadOnlyList<TabItem> Tabs => [new("users", L["usr.users"]), new("roles", L["usr.roles"]), new("invitations", L["usr.invitations"])];
-    private IReadOnlyList<Option<string?>> RoleOptions => _roles.Select(r => new Option<string?>(r.Id, RoleName(r))).ToList();
+    private IReadOnlyList<Option<string?>> RoleOptions => _roles.Select(r => new Option<string?>(r.Id, RoleName(r), Grantable(r) ? null : L["usr.roleNotHeld"], !Grantable(r))).ToList();
 
     /// <summary>Preset roles are stored as English codes and shown in the reader's language (DT-15).</summary>
     private string RoleName(RoleResponse r) => r.IsPreset ? RoleName(r.Name) : r.Name;
@@ -191,26 +193,43 @@
 
     private async Task Load()
     {
+        var version = ++_version;
+        var tab = _tab;
         _state = LoadState.Loading;
         try
         {
-            switch (_tab)
+            // The role list feeds the role pickers on every tab; a failed load is tried again here (review L13).
+            if (_roles.Count == 0 && tab != "roles") { try { _roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles")); } catch (ApiException) { } }
+            switch (tab)
             {
                 case "roles":
-                    _roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles"));
+                    var roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles"));
                     if (_permissions.Count == 0) _permissions = await Api.GetAsync<IReadOnlyList<PermissionItem>>(Api.C("roles/permissions"));
+                    if (version != _version) return;
+                    _roles = roles;
                     break;
                 case "invitations":
-                    _invitations = await Api.GetAsync<IReadOnlyList<InvitationResponse>>(Api.C("invitations"));
+                    var invitations = await Api.GetAsync<IReadOnlyList<InvitationResponse>>(Api.C("invitations"));
+                    if (version != _version) return;
+                    _invitations = invitations;
                     break;
                 default:
-                    _users = await Api.GetAsync<PagedResult<UserListItem>>(Api.C($"users?page={_page}" + (_q is null ? "" : "&search=" + Uri.EscapeDataString(_q))));
+                    var users = await Api.GetAsync<PagedResult<UserListItem>>(Api.C($"users?page={_page}" + (_q is null ? "" : "&search=" + Uri.EscapeDataString(_q))));
+                    if (version != _version) return;   // a later search, page or tab is on its way (review M6)
+                    _users = users;
                     break;
             }
             _state = LoadState.Ready;
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
+
+    /// <summary>DT-18 in the UI (review M7): a role can be given only when the caller holds every key in it.</summary>
+    private bool Grantable(RoleResponse r) => r.Permissions.All(Shell.Can);
+
+    /// <summary>Owner-level users (their role holds core.tenant.manage) are acted on only by tenant.manage holders (DT-18).</summary>
+    private bool Protected(UserListItem u) =>
+        !Shell.Can(PermissionKeys.TenantManage) && _roles.FirstOrDefault(r => r.Id == u.Role?.Id)?.Permissions.Contains(PermissionKeys.TenantManage) == true;
 
     private void OpenUser(UserListItem u) { _user = u; _userOpen = true; }
 
@@ -219,13 +238,19 @@
     private async Task ChangeRole(string? roleId)
     {
         if (_user is null || roleId is null || roleId == _user.Role?.Id) return;
+        _busy = true;
         try
         {
             await Api.PutAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/role"), new AssignRoleRequest(roleId));
             Toasts.Success(L.F("usr.roleChanged", _user.FullName));
             await Refresh();
         }
-        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        catch (ApiException e)
+        {
+            Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]);
+            _roleSelectKey++;   // redraw the picker so it shows the role actually held (review L17)
+        }
+        finally { _busy = false; }
     }
 
     /// <summary>A user action (with a reason where the API asks one); erasure goes to the personal-data endpoint (SEC-19).</summary>
@@ -257,7 +282,10 @@
     private async Task EditRole(RoleResponse? r)
     {
         if (_permissions.Count == 0) { try { _permissions = await Api.GetAsync<IReadOnlyList<PermissionItem>>(Api.C("roles/permissions")); } catch (ApiException) { } }
-        _role = r is null ? new RoleModel() : new RoleModel { Id = r.Id, Name = RoleName(r), IsPreset = r.IsPreset, Permissions = r.Permissions.ToHashSet(), RowVersion = r.RowVersion };
+        _role = r is null ? new RoleModel() : new RoleModel
+        {
+            Id = r.Id, Name = RoleName(r), IsPreset = r.IsPreset, Permissions = r.Permissions.ToHashSet(), RowVersion = r.RowVersion, BeyondCaller = !Grantable(r),
+        };
         _roleError = null;
         _roleOpen = true;
     }
@@ -315,6 +343,8 @@
 
     private async Task Invitation(InvitationResponse i, string action)
     {
+        if (_busy) return;
+        _busy = true;
         try
         {
             await Api.PostAsync(Api.C($"invitations/{Uri.EscapeDataString(i.Id)}/{action}"), null);
@@ -322,6 +352,7 @@
             await Load();
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
     }
 
     private sealed class RoleModel
@@ -329,6 +360,11 @@
         public string? Id { get; set; }
         public string? Name { get; set; }
         public bool IsPreset { get; set; }
+
+        /// <summary>The role holds keys the caller does not: read-only for them (the API refuses any change, DT-18).</summary>
+        public bool BeyondCaller { get; set; }
+
+        public bool Locked => IsPreset || BeyondCaller;
         public HashSet<string> Permissions { get; set; } = [];
         public string? RowVersion { get; set; }
     }

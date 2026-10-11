@@ -1,9 +1,24 @@
-@* Page-wide banners of the shell (UX-19): subscription past due or suspended (read-only, BR-012/D-12), trial, archived company (read-only). *@
+@* Page-wide banners of the shell (UX-19): service announcements (P-14, hideable for the session), support session (staff, read-only, BR-014),
+   subscription past due or suspended (read-only, BR-012/D-12), trial, archived company (read-only). *@
 @inject ShellState Shell
+@inject AppSession Session
 @inject Loc L
 @{
     var tenant = Shell.Me?.TenantStatus;
     var canManage = Shell.Can(PermissionKeys.TenantManage);
+}
+@foreach (var a in _announcements.Where(a => !Session.HiddenAnnouncements.Contains(a.Id) && a.StartsAt <= DateTime.UtcNow && a.EndsAt > DateTime.UtcNow))
+{
+    var item = a;
+    <Banner Tone="Tone.Info" Icon="megaphone" Text="@($"{item.Title}: {item.Message}")">
+        <Actions><Btn Small="true" Ghost="true" Text="@L["banner.hide"]" OnClick="() => Session.HiddenAnnouncements.Add(item.Id)" /></Actions>
+    </Banner>
+}
+@if (Shell.Me?.IsPlatformStaff == true)
+{
+    <Banner Tone="Tone.Lock" Icon="shield" Text="@L["banner.support"]">
+        <Actions><a href="/console/support-access">@L["shell.console"]</a></Actions>
+    </Banner>
 }
 @if (Shell.Company?.Status == "Archived")
 {
@@ -26,4 +41,10 @@ else if (tenant == "Trial" && canManage)
     <Banner Tone="Tone.Info" Icon="clock" Text="@L["banner.trial"]">
         <Actions><a href="/tenant/subscription">@L["banner.choosePlan"]</a></Actions>
     </Banner>
+}
+
+@code {
+    private IReadOnlyList<Contracts.Platform.AnnouncementResponse> _announcements = [];
+
+    protected override async Task OnInitializedAsync() => _announcements = await Session.AnnouncementsAsync();
 }

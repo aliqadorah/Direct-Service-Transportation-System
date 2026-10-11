@@ -208,7 +208,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(a => a.Status == CashCodes.Active ? a.Amount : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(a => a.Status == CashCodes.Active ? a.Amount : 0), g.Count(a => a.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-advanceDate").ThenByDescending(a => a.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         return new AdvancePage(new PagedResult<AdvanceResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);

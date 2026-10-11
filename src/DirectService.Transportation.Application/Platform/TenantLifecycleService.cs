@@ -44,7 +44,8 @@ public sealed class SupportAccessService(IAppDbContext db, IRequestContext ctx, 
         var g = await support.FindAsync<SupportAccessGrant>(token, ct).ConfigureAwait(false);
         if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested, g.Reason);
         var starts = (r.StartsAt ?? Now).ToUniversalTime();
-        var ends = (r.EndsAt ?? starts.AddHours(24)).ToUniversalTime();
+        // A length in hours (DT-157) is measured on the server's clock, never the browser's.
+        var ends = (r.EndsAt ?? starts.AddHours(r.Hours is int h and > 0 ? h : 24)).ToUniversalTime();
         if (ends <= starts || ends - starts > TimeSpan.FromDays(MaxWindowDays) || ends <= Now) throw Fail.Rule(ErrorCodes.SupportWindow);
         g.Status = LifecycleCodes.Approved;
         g.ApprovedBy = ctx.UserId;

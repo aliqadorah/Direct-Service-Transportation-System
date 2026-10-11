@@ -219,6 +219,12 @@ public sealed class AccountingTests(ApiFactory f)
         var xlsx = await c.GetAsync(U(owner, "/accounting/journal-entries/export"));
         await xlsx.EnsureOkAsync();
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
+        // FR-115: CSV and the printout (HTML here; PDF is the same page through the PDF engine) with the filters applied.
+        var csv = await c.GetAsync(U(owner, "/accounting/journal-entries/export?format=csv&sourceType=Opening"));
+        await csv.EnsureOkAsync();
+        Assert.Equal("text/csv", csv.Content.Headers.ContentType!.MediaType);
+        var printout = await (await c.GetAsync(U(owner, $"/accounting/journal-entries/export?format=html&number={first.Number}"))).Content.ReadAsStringAsync();
+        Assert.Contains(first.Number, printout, StringComparison.Ordinal);
     }
 
     [Fact]

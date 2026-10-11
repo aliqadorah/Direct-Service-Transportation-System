@@ -1,6 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Platform;
+using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
@@ -17,7 +18,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Automatic entries change only through their source document (FR-112).
 /// </summary>
 public sealed class JournalService(IAppDbContext db, PostingEngine engine, PartyResolver parties, PostingSources sources,
-    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, ISpreadsheetService sheets)
+    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, ReportExporter exporter)
 {
     public const string EntityType = "ACC.JournalEntry";
 
@@ -156,21 +157,30 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
     }
 
     /// <summary>Excel export of the journal list with its lines (FR-115).</summary>
-    public async Task<GeneratedFile> ExportListAsync(JournalQuery q, CancellationToken ct)
+    /// <summary>The filtered journal line by line (FR-115): Excel (default), CSV, or a printout (PDF / HTML) through the shared report exporter.</summary>
+    public async Task<GeneratedFile> ExportListAsync(JournalQuery q, string? format, CancellationToken ct)
     {
         var entries = await ExportRowsAsync(q, 20_000, ct).ConfigureAwait(false);
         var en = ctx.Language == "en";
-        string[] headers = en
-            ? ["Number", "Date", "Description", "Source", "Manual", "Status", "Line", "Account code", "Account", "Debit", "Credit", "Cost centre", "Party", "Note"]
-            : ["الرقم", "التاريخ", "البيان", "المصدر", "يدوي", "الحالة", "السطر", "رمز الحساب", "الحساب", "مدين", "دائن", "مركز الكلفة", "الطرف", "ملاحظة"];
+        string L(string ar, string e) => en ? e : ar;
+        ReportColumn[] columns =
+        [
+            new(L("الرقم", "Number")), new(L("التاريخ", "Date"), ReportValue.Date), new(L("البيان", "Description")), new(L("المصدر", "Source")),
+            new(L("يدوي", "Manual")), new(L("الحالة", "Status")), new(L("السطر", "Line"), ReportValue.Number), new(L("رمز الحساب", "Account code")),
+            new(L("الحساب", "Account")), new(L("مدين", "Debit"), ReportValue.Money), new(L("دائن", "Credit"), ReportValue.Money), new(L("مركز الكلفة", "Cost centre")),
+            new(L("الطرف", "Party")), new(L("ملاحظة", "Note")),
+        ];
         var rows = entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)
         [
             e.Number, e.EntryDate, e.Description, e.Source is null ? null : $"{e.Source.Type} {e.Source.Number}".Trim(), e.IsManual, e.Status,
             l.LineNo, l.Account.Code, en ? l.Account.NameEn ?? l.Account.NameAr : l.Account.NameAr, l.Debit, l.Credit, l.CostCentre?.Name,
             l.Party?.Name, l.Note,
-        ]));
-        return new GeneratedFile("journal.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            sheets.WriteXlsx(en ? "Journal" : "اليومية", headers, rows));
+        ])).ToList();
+        var filters = new List<(string, string)>();
+        if (q.PeriodFrom is not null || q.PeriodTo is not null) filters.Add((L("الفترة", "Period"), $"{q.PeriodFrom ?? "…"} – {q.PeriodTo ?? "…"}"));
+        if (q.SourceType is not null) filters.Add((L("المصدر", "Source"), q.SourceType));
+        if (q.Status is not null) filters.Add((L("الحالة", "Status"), q.Status));
+        return await exporter.ExportAsync(new ReportTable(L("اليومية", "Journal"), filters, columns, rows), format, "journal", ct).ConfigureAwait(false);
     }
 
     private async Task<IQueryable<JournalEntry>> FilterAsync(JournalQuery q, bool automaticOnly, CancellationToken ct)

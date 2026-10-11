@@ -18,7 +18,9 @@ public sealed record LinkTokenRequest(string User, string Token);
 public sealed record PasswordResetConfirmRequest(string User, string Token, string NewPassword);
 public sealed record AntiforgeryResponse(string HeaderName, string Token);
 
-public sealed record CompanyAccess(string Id, string Name, string? NameEn, string Status, string Role, bool IsPresetRole, IReadOnlyList<string> Permissions);
+/// <summary>A company of the user with role and permissions, and its currency (code and decimals) for amounts and defaults on every screen.</summary>
+public sealed record CompanyAccess(string Id, string Name, string? NameEn, string Status, string Role, bool IsPresetRole, IReadOnlyList<string> Permissions,
+    string CurrencyCode = "JOD", int CurrencyDecimals = 3);
 
 public sealed record MeResponse(
     string Id, string FullName, string Email, string LanguageCode, string DateFormat, string? DefaultCompany,

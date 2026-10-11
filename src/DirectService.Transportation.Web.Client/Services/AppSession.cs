@@ -18,6 +18,13 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
 
     public Task EnsureLoadedAsync() => _loading ??= LoadAsync();
 
+    /// <summary>Loads the profile again (a company created, archived or restored), so the switcher and the menu follow.</summary>
+    public Task ReloadAsync()
+    {
+        _loading = null;
+        return EnsureLoadedAsync();
+    }
+
     private async Task LoadAsync()
     {
         var me = await api.GetAsync<MeResponse>("api/v1/me").ConfigureAwait(false);
@@ -29,6 +36,9 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
     public async Task<bool> EnterCompanyAsync(string company)
     {
         await EnsureLoadedAsync().ConfigureAwait(false);
+        // Staff: the window list is read again on every company change, so an ended window shows "not found" (review L3).
+        var staff = shell.Me?.IsPlatformStaff == true;
+        if (staff && company != _companyLoaded && !await LoadSupportCompaniesAsync().ConfigureAwait(false)) return false;
         if (!shell.SelectCompany(company)) return false;
         if (_companyLoaded == company) return true;
         _companyLoaded = company;
@@ -46,7 +56,48 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
         return true;
     }
 
-    /// <summary>The company to open after sign-in: the profile's default, else the first one.</summary>
+    private Task<IReadOnlyList<AnnouncementResponse>>? _announcements;
+    private DateTime _announcementsAt;
+
+    /// <summary>Announcements the user hid in this browser session.</summary>
+    public HashSet<string> HiddenAnnouncements { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Current service announcements (P-14), read again after five minutes so new ones appear without a reload; none when unreadable.</summary>
+    public Task<IReadOnlyList<AnnouncementResponse>> AnnouncementsAsync()
+    {
+        if (_announcements is null || DateTime.UtcNow - _announcementsAt > TimeSpan.FromMinutes(5))
+        {
+            _announcementsAt = DateTime.UtcNow;
+            _announcements = LoadAnnouncementsAsync();
+        }
+        return _announcements;
+    }
+
+    private async Task<IReadOnlyList<AnnouncementResponse>> LoadAnnouncementsAsync()
+    {
+        try { return await api.GetAsync<IReadOnlyList<AnnouncementResponse>>("api/v1/announcements").ConfigureAwait(false); }
+        catch (ApiException) { return []; }
+    }
+
+    /// <summary>
+    /// Platform staff have no companies of their own: inside an approved, current support window the API lists the tenant's active companies
+    /// with read-only view permissions (BR-014, DT-152); every request there is still checked and written to the tenant's audit log.
+    /// </summary>
+    private async Task<bool> LoadSupportCompaniesAsync()
+    {
+        try
+        {
+            var companies = await api.GetAsync<IReadOnlyList<CompanyAccess>>("api/v1/platform/support-access/companies").ConfigureAwait(false);
+            if (shell.Me is { } me) shell.SetMe(me with { Companies = companies });
+            return companies.Count > 0;
+        }
+        catch (ApiException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The company to open after sign-in:the profile's default, else the first one.</summary>
     public string? HomeCompany => shell.Me?.DefaultCompany is { } d && shell.Me.Companies.Any(c => c.Id == d) ? d : (shell.Me is { Companies.Count: > 0 } m ? m.Companies[0].Id : null);
 
     /// <summary>Saves the interface language in the profile (FR-178) and reloads, so the server renders the page in that language.</summary>

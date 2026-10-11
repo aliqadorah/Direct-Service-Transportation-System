@@ -76,7 +76,8 @@ public sealed record LimitExceeded(string Limit, decimal Usage, decimal Max);
 
 public sealed record SupportAccessRequest(string? TenantId, string? Reason);
 
-public sealed record SupportApprovalRequest(DateTime? StartsAt, DateTime? EndsAt, string? Reason);
+/// <summary>An approval: explicit times, or (from the screen) a length in <see cref="Hours"/> starting now on the server's clock.</summary>
+public sealed record SupportApprovalRequest(DateTime? StartsAt, DateTime? EndsAt, string? Reason, int? Hours = null);
 
 public sealed record SupportAccessResponse(string Id, string Tenant, string RequestedBy, string Reason, string Status, DateTime? StartsAt, DateTime? EndsAt, string? DecidedBy,
     DateTime CreatedAt, string RowVersion);

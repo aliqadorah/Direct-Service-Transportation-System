@@ -1,0 +1,143 @@
+@page "/console/announcements"
+@*
+  SCR-93 provider console: service announcements (5.5, P-14): title, text and the time window in which every signed-in user sees it as a
+  banner inside the application (planned maintenance); a live preview of the banner; edit and remove. Times are entered in the browser's
+  local time and stored in UTC.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.announcements"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.announcements"])])">
+    <Actions><Btn Primary="true" Icon="plus" Text="@L["con.newAnnouncement"]" OnClick="() => Edit(null)" /></Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="megaphone" Title="@L["con.noAnnouncements"]">
+            <Actions><Btn Primary="true" Text="@L["con.newAnnouncement"]" OnClick="() => Edit(null)" /></Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.announcements"]">
+            <DataGrid TItem="AnnouncementResponse" Items="_items" Key="a => a.Id" Caption="@L["nav.announcements"]" OnRowClick="Edit">
+                <Columns>
+                    <GridColumn TItem="AnnouncementResponse" Title="@L["con.title"]" Value="a => a.Title" />
+                    <GridColumn TItem="AnnouncementResponse" Title="@L["ten.from"]" Value="a => Fmt.DateTime(a.StartsAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="AnnouncementResponse" Title="@L["ten.to"]" Value="a => Fmt.DateTime(a.EndsAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="AnnouncementResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Phase(context)" /></Template></GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(_target is null ? L["con.newAnnouncement"] : L.F("ml.editTitle", _target.Title))" Busy="_busy" Wide="true" Icon="megaphone">
+    <ChildContent>
+        <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+            <div class="stack">
+                <div class="field">
+                    <label for="ann-title">@L["con.title"] <span class="req" aria-hidden="true">*</span></label>
+                    <input id="ann-title" class="input" maxlength="200" @bind="_title" @bind:event="oninput" />
+                </div>
+                <div class="field">
+                    <label for="ann-text">@L["con.message"] <span class="req" aria-hidden="true">*</span></label>
+                    <textarea id="ann-text" class="input" rows="4" maxlength="1000" @bind="_message" @bind:event="oninput"></textarea>
+                </div>
+                <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                    <div class="field">
+                        <label for="ann-from">@L["con.showFrom"] <span class="req" aria-hidden="true">*</span></label>
+                        <input id="ann-from" class="input num" type="datetime-local" dir="ltr" @bind="_from" @bind:format="yyyy-MM-ddTHH:mm" />
+                    </div>
+                    <div class="field">
+                        <label for="ann-to">@L["con.showUntil"] <span class="req" aria-hidden="true">*</span></label>
+                        <input id="ann-to" class="input num" type="datetime-local" dir="ltr" @bind="_to" @bind:format="yyyy-MM-ddTHH:mm" />
+                    </div>
+                </div>
+            </div>
+            <Box Title="@L["con.preview"]">
+                <Banner Tone="Tone.Info" Icon="megaphone" Text="@($"{_title}: {_message}")" />
+            </Box>
+        </div>
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
+    </ChildContent>
+    <Footer>
+        @if (_target is not null) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" Disabled="_busy" OnClick="() => { _editing = false; _deleting = true; }" />}
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Primary="true" Icon="megaphone" Text="@L["con.publish"]" Busy="_busy" Disabled="@(string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_message) || _from is null || _to is null)" OnClick="Save" />
+    </Footer>
+</Modal>
+
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target?.Title ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["con.deleteAnnouncementText"]"
+               Busy="_busy" Error="@_error" OnConfirm="_ => Delete()" />
+
+@code {
+    private IReadOnlyList<AnnouncementResponse> _items = [];
+    private AnnouncementResponse? _target;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error, _title, _message;
+    private DateTime? _from, _to;
+    private bool _editing, _busy, _deleting;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _items = await Api.GetAsync<IReadOnlyList<AnnouncementResponse>>("api/v1/platform/announcements");
+            _state = _items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private static string Phase(AnnouncementResponse a) => a.EndsAt <= DateTime.UtcNow ? "expired" : a.StartsAt > DateTime.UtcNow ? "pending" : "active";
+
+    private void Edit(AnnouncementResponse? a)
+    {
+        _target = a;
+        _title = a?.Title;
+        _message = a?.Message;
+        var now = DateTime.Now;
+        _from = a?.StartsAt.ToLocalTime() ?? new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Local);
+        _to = a?.EndsAt.ToLocalTime() ?? _from.Value.AddDays(1);
+        _error = null;
+        _editing = true;
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var r = new AnnouncementRequest(_title?.Trim(), _message?.Trim(), Utc(_from), Utc(_to), _target?.RowVersion);
+            if (_target is null) await Api.PostAsync<AnnouncementResponse>("api/v1/platform/announcements", r);
+            else await Api.PutAsync<AnnouncementResponse>($"api/v1/platform/announcements/{Uri.EscapeDataString(_target.Id)}", r);
+            _editing = false;
+            Toasts.Success(L["con.published"]);
+            await Load();
+        }
+        catch (ApiException e) { _error = Tenants.ProblemText(e.Problem) ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync($"api/v1/platform/announcements/{Uri.EscapeDataString(_target.Id)}/delete", null);
+            _deleting = false;
+            Toasts.Success(L["con.announcementRemoved"]);
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    /// <summary>A time entered in the browser's local time, sent as UTC.</summary>
+    private static DateTime? Utc(DateTime? local) => local is { } v ? DateTime.SpecifyKind(v, DateTimeKind.Local).ToUniversalTime() : null;
+}

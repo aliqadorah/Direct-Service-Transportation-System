@@ -29,7 +29,7 @@
     <EmptyActions>@if (Shell.Can(PermissionKeys.RcptManage)) {<Btn Primary="true" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, "receipts/new")" />}</EmptyActions>
     <ChildContent>
         <DataGrid TItem="ReceiptResponse" Items="_page!.Page.Items" Key="r => r.Id" Caption="@L["nav.receipts"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
-                  OnRowClick="Open" RowClass="@(r => r.Status == "Void" ? "void" : null)" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+                  OnRowClick="Open" RowClass="@(r => r.Status == "Void" ? "void" : null)" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Included))">
             <Columns>
                 <GridColumn TItem="ReceiptResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" SortKey="number" />
                 <GridColumn TItem="ReceiptResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReceiptDate, Shell.DateFormat)" Ltr="true" SortKey="receiptDate" />

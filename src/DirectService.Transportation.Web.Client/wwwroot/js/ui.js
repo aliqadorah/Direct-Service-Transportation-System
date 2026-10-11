@@ -45,8 +45,12 @@ function onShortcut(e) {
     if (b) b.click();
   }
   else if ((e.ctrlKey || e.metaKey) && k === "s") {
-    // Ctrl+S: the screen's save button (shown with its shortcut on the button).
-    const b = document.querySelector('button[data-shortcut="Ctrl S"]:not([disabled])');
+    // Ctrl+S: the save button of the open dialog (the top one), else the screen's (shown with its shortcut on the button); never the page
+    // behind an open dialog.
+    const dialogs = document.querySelectorAll('[aria-modal="true"]');
+    const scope = dialogs.length ? dialogs[dialogs.length - 1] : document;
+    const b = scope.querySelector('button[data-shortcut="Ctrl S"]:not([disabled])');
+    if (dialogs.length) e.preventDefault();
     if (b) {
       e.preventDefault();
       // Commit the field being typed in first (fields bind on change).

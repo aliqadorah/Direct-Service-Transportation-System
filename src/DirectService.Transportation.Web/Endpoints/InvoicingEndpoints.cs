@@ -65,12 +65,14 @@ internal static class InvoicingEndpoints
             TypedResults.Ok(await svc.VoidAsync(creditNote, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvVoid);
 
         var l = company.MapGroup("/invoice-layouts").WithTags("Invoice layouts");
-        l.MapGet("/{layoutType}", async (string layoutType, InvoiceLayoutService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.GetAsync(layoutType, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
+        l.MapGet("/{layoutType}", async (string layoutType, bool? builtIn, InvoiceLayoutService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.GetAsync(layoutType, ct, builtIn == true).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
         l.MapPut("/{layoutType}", async (string layoutType, InvoiceLayoutRequest r, InvoiceLayoutService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.SaveAsync(layoutType, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
         l.MapGet("/{layoutType}/preview", async (string layoutType, InvoicePrintService svc, CancellationToken ct) =>
             File(await svc.LayoutPreviewAsync(layoutType, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
+        l.MapPost("/{layoutType}/preview", async (string layoutType, InvoiceLayoutRequest r, InvoicePrintService svc, CancellationToken ct) =>
+            File(await svc.LayoutPreviewAsync(layoutType, ct, r).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue).AllowWhenReadOnly();   // nothing is stored
     }
 
     private static FileContentHttpResult File(GeneratedFile f) => TypedResults.File(f.Content, f.ContentType, f.FileName);

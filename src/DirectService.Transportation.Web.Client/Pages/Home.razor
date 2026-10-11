@@ -21,7 +21,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Session.EnsureLoadedAsync();
+        try { await Session.EnsureLoadedAsync(); }
+        catch (ApiException) { return; }   // 401: the API client already sends the browser to sign-in
         if (Shell.Me?.IsPlatformStaff == true) { Nav.NavigateTo("/console/tenants", replace: true); return; }
         if (Session.HomeCompany is { } c) Nav.NavigateTo(NavModel.Href(c, ""), replace: true);
         else _noCompany = true;

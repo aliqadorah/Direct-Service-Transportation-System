@@ -23,35 +23,33 @@ public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, 
 
     private bool En => ctx.Language == "en";
 
-    /// <summary>The stored layout or the built-in default (RowVersion null) of a document type.</summary>
-    public async Task<InvoiceLayoutResponse> GetAsync(string layoutType, CancellationToken ct)
+    /// <summary>
+    /// The stored layout or the built-in default (RowVersion null) of a document type; with <paramref name="builtIn"/> the default content
+    /// carrying the stored row version, so "restore default" can be saved over the stored layout (DT-154).
+    /// </summary>
+    public async Task<InvoiceLayoutResponse> GetAsync(string layoutType, CancellationToken ct, bool builtIn = false)
     {
         var type = Type(layoutType);
         var row = await db.Set<InvoiceLayout>().AsNoTracking().SingleOrDefaultAsync(l => l.LayoutType == type, ct).ConfigureAwait(false);
         var available = await AvailableAsync(ct).ConfigureAwait(false);
-        return row is null ? Default(type, available) : ToResponse(row, available);
+        if (row is null) return Default(type, available);
+        return builtIn ? Default(type, available) with { RowVersion = Convert.ToBase64String(row.RowVersion) } : ToResponse(row, available);
+    }
+
+    /// <summary>The layout a request describes, validated like a save but not stored — the designer's live preview (FR-055, DT-154).</summary>
+    public async Task<InvoiceLayoutResponse> DraftAsync(string layoutType, InvoiceLayoutRequest r, CancellationToken ct)
+    {
+        var type = Type(layoutType);
+        var available = await AvailableAsync(ct).ConfigureAwait(false);
+        var v = Validate(r, available);
+        return new InvoiceLayoutResponse(type, v.Title, v.Band, r.Grouping ?? "LoadingSite", v.Columns, v.Labels, v.Footer, v.Signatures, r.ShowLogo, r.ShowQr, available, null);
     }
 
     public async Task<InvoiceLayoutResponse> SaveAsync(string layoutType, InvoiceLayoutRequest r, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(r);
         var type = Type(layoutType);
         var available = await AvailableAsync(ct).ConfigureAwait(false);
-        var title = TextNormalizer.CleanText(r.Title);
-        var band = TextNormalizer.CleanText(r.BandText);
-        var footer = TextNormalizer.CleanText(r.FooterText);
-        var columns = (r.AnnexColumns ?? []).Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList();
-        var signatures = (r.Signatures ?? []).Select(TextNormalizer.CleanText).Where(s => s is not null).Select(s => s!).ToList();
-        var labels = (r.Labels ?? new Dictionary<string, string>()).Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
-            .ToDictionary(kv => kv.Key.Trim(), kv => TextNormalizer.CleanText(kv.Value)!, StringComparer.Ordinal);
-        new Validator()
-            .Require("title", title).MaxLength("title", title, 200).MaxLength("bandText", band, 300).MaxLength("footerText", footer, 500)
-            .Check(r.Grouping is null || Groupings.Contains(r.Grouping, StringComparer.Ordinal), "grouping")
-            .Check(columns.Count is > 0 and <= 30 && columns.All(c => available.Contains(c, StringComparer.Ordinal)), "annexColumns")
-            .Check(columns.Contains("amount", StringComparer.Ordinal), "annexColumns", ErrorCodes.ValidationRequired)
-            .Check(signatures.Count <= 6 && signatures.All(s => s.Length <= 60), "signatures", ErrorCodes.ValidationRange)
-            .Check(labels.Count <= 60 && labels.All(kv => kv.Key.Length <= 60 && kv.Value.Length <= 100), "labels", ErrorCodes.ValidationRange)
-            .ThrowIfInvalid();
+        var (title, band, footer, columns, signatures, labels) = Validate(r, available);
         var row = await db.Set<InvoiceLayout>().SingleOrDefaultAsync(l => l.LayoutType == type, ct).ConfigureAwait(false);
         if (row is null)
         {
@@ -64,7 +62,7 @@ public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, 
             if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
             db.ExpectRowVersion(row, r.RowVersion);
         }
-        row.Title = title!;
+        row.Title = title;
         row.BandText = band;
         row.Grouping = r.Grouping ?? "LoadingSite";
         row.AnnexColumns = JsonSerializer.Serialize(columns);
@@ -75,6 +73,30 @@ public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, 
         row.ShowQr = r.ShowQr;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return ToResponse(row, available);
+    }
+
+    private static (string Title, string? Band, string? Footer, List<string> Columns, List<string> Signatures, Dictionary<string, string> Labels) Validate(
+        InvoiceLayoutRequest r, IReadOnlyList<string> available)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var title = TextNormalizer.CleanText(r.Title);
+        var band = TextNormalizer.CleanText(r.BandText);
+        var footer = TextNormalizer.CleanText(r.FooterText);
+        var columns = (r.AnnexColumns ?? []).Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList();
+        var signatures = (r.Signatures ?? []).Select(TextNormalizer.CleanText).Where(s => s is not null).Select(s => s!).ToList();
+        // Keys equal after trimming keep the last label (no 500 on "amount" and "amount "), and only known columns are kept (review L5).
+        var labels = (r.Labels ?? new Dictionary<string, string>()).Where(kv => !string.IsNullOrWhiteSpace(kv.Value) && available.Contains(kv.Key.Trim(), StringComparer.Ordinal))
+            .GroupBy(kv => kv.Key.Trim(), StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => TextNormalizer.CleanText(g.Last().Value)!, StringComparer.Ordinal);
+        new Validator()
+            .Require("title", title).MaxLength("title", title, 200).MaxLength("bandText", band, 300).MaxLength("footerText", footer, 500)
+            .Check(r.Grouping is null || Groupings.Contains(r.Grouping, StringComparer.Ordinal), "grouping")
+            .Check(columns.Count is > 0 and <= 30 && columns.All(c => available.Contains(c, StringComparer.Ordinal)), "annexColumns")
+            .Check(columns.Contains("amount", StringComparer.Ordinal), "annexColumns", ErrorCodes.ValidationRequired)
+            .Check(signatures.Count <= 6 && signatures.All(s => s.Length <= 60), "signatures", ErrorCodes.ValidationRange)
+            .Check(labels.Count <= 60 && labels.All(kv => kv.Key.Length <= 60 && kv.Value.Length <= 100), "labels", ErrorCodes.ValidationRange)
+            .ThrowIfInvalid();
+        return (title!, band, footer, columns, signatures, labels);
     }
 
     private async Task<IReadOnlyList<string>> AvailableAsync(CancellationToken ct) =>

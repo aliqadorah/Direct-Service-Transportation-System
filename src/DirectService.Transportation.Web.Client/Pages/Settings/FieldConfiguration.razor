@@ -16,7 +16,7 @@
         <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="SaveStandard" />
     </Actions>
 </PageHeader>
-<TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="SetEntity" Label="@L["nav.fields"]" />
+<TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="AskEntity" Label="@L["nav.fields"]" />
 <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
     <ChildContent>
         <div class="cols fill" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;min-height:0">
@@ -96,19 +96,23 @@
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cf-form" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" form="cf-form" />
     </Footer>
 </Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _c.LabelAr ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
                Message="@L["fld.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="DeleteCustom" />
+<UnsavedGuard Dirty="_dirty" />
+<ConfirmDialog @bind-Open="_confirmSwitch" Title="@L["lay.unsavedTitle"]" ConfirmText="@L["lay.discard"]" Danger="true" Message="@L["fld.unsavedText"]"
+               OnConfirm="_ => SetEntity(_pendingEntity!)" />
 
 @code {
     private string _entity = "TRN.Trip";
     private List<StandardRow> _standard = [];
     private IReadOnlyList<CustomFieldResponse> _custom = [];
     private LoadState _state = LoadState.Loading;
-    private string? _reference, _deleteError;
-    private bool _busy, _dirty, _editing, _deleting;
+    private string? _reference, _deleteError, _pendingEntity;
+    private bool _busy, _dirty, _editing, _deleting, _confirmSwitch;
+    private int _version;
     private CustomModel _c = new();
     private EditContext _ctx = new(new CustomModel());
     private ProblemValidator? _problems;
@@ -121,24 +125,37 @@
 
     protected override Task OnInitializedAsync() => Load();
 
-    private Task SetEntity(string e) { _entity = e; return Load(); }
+    /// <summary>Unsaved standard-field changes are confirmed before switching entity (review M3).</summary>
+    private void AskEntity(string e)
+    {
+        if (e == _entity) return;
+        if (_dirty) { _pendingEntity = e; _confirmSwitch = true; }
+        else _ = SetEntity(e);
+    }
+
+    private Task SetEntity(string e) { _entity = e; _confirmSwitch = false; return Load(); }
 
     private async Task Load()
     {
+        var version = ++_version;
+        var entity = _entity;
         _state = LoadState.Loading;
         try
         {
-            var standard = await Api.GetAsync<IReadOnlyList<StandardFieldResponse>>(Api.C($"standard-fields/{_entity}"));
+            var standard = await Api.GetAsync<IReadOnlyList<StandardFieldResponse>>(Api.C($"standard-fields/{entity}"));
+            var custom = await Api.GetAsync<IReadOnlyList<CustomFieldResponse>>(Api.C($"custom-fields/{entity}"));
+            if (version != _version) return;   // both lists of the entity on screen, never a late answer of another (review M3)
             _standard = standard.OrderBy(s => s.SortOrder).Select(s => new StandardRow(s)).ToList();
-            _custom = await Api.GetAsync<IReadOnlyList<CustomFieldResponse>>(Api.C($"custom-fields/{_entity}"));
+            _custom = custom;
             _dirty = false;
             _state = LoadState.Ready;
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
     private async Task SaveStandard()
     {
+        if (_state != LoadState.Ready) return;
         _busy = true;
         try
         {

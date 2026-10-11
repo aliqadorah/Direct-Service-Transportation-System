@@ -264,6 +264,16 @@ public sealed class InvoiceTests(ApiFactory f)
         Assert.Equal("Route", saved.Grouping);
         var preview = await o.Client.GetAsync(U(o, "/invoice-layouts/claim/preview"));
         Assert.Contains("Claim statement — October", await preview.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        // DT-154: live preview of an unsaved layout (validated, nothing stored) and the built-in default with the stored row version.
+        var draft = await o.Client.PostAsJsonAsync(U(o, "/invoice-layouts/claim/preview"),
+            new InvoiceLayoutRequest("Draft title", null, "Route", ["receiptNo", "amount"], null, null, null, false, false, null));
+        Assert.Contains("Draft title", await draft.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.BadRequest, (await o.Client.PostAsJsonAsync(U(o, "/invoice-layouts/claim/preview"),
+            new InvoiceLayoutRequest("No amount", null, "Route", ["receiptNo"], null, null, null, false, false, null))).StatusCode);
+        Assert.Equal("Route", (await ReadAsync<InvoiceLayoutResponse>(await o.Client.GetAsync(U(o, "/invoice-layouts/claim")))).Grouping);   // unchanged
+        var builtIn = await ReadAsync<InvoiceLayoutResponse>(await o.Client.GetAsync(U(o, "/invoice-layouts/claim?builtIn=true")));
+        Assert.Equal("LoadingSite", builtIn.Grouping);
+        Assert.Equal(saved.RowVersion, builtIn.RowVersion);
 
         var inv = await ReadAsync<InvoiceDetails>(await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Take(4), approve: true)));
         var html = await (await o.Client.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/print?format=html"))).Content.ReadAsStringAsync();

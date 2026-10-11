@@ -60,8 +60,19 @@ internal sealed class ExportAuditFilter(IAppDbContext db, IRequestContext ctx) :
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
-        var result = await next(context).ConfigureAwait(false);
         var path = context.HttpContext.Request.Path.Value ?? string.Empty;
+        // A support session only views (D-13, BR-014): exports, prints and other files are refused before anything runs (prints are logged,
+        // so they would also write); any file a route returns anyway is refused as well.
+        // Unlogged on-screen previews (DT-149) stay possible: they are viewing, not a file handed out.
+        var preview = path.EndsWith("/preview", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(context.HttpContext.Request.Query["preview"], "true", StringComparison.OrdinalIgnoreCase);
+        if (ctx.IsSupportSession && !preview && (path.EndsWith("/export", StringComparison.OrdinalIgnoreCase) || path.Contains("/exports", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith("/backup", StringComparison.OrdinalIgnoreCase) || path.EndsWith("/print", StringComparison.OrdinalIgnoreCase)
+                || context.HttpContext.Request.Query.ContainsKey("format")))
+            throw new AppException(Contracts.Errors.ErrorCodes.SupportReadOnly, StatusCodes.Status403Forbidden);
+        var result = await next(context).ConfigureAwait(false);
+        if (ctx.IsSupportSession && !preview && result is FileContentHttpResult)
+            throw new AppException(Contracts.Errors.ErrorCodes.SupportReadOnly, StatusCodes.Status403Forbidden);
         if (result is FileContentHttpResult file && (path.EndsWith("/export", StringComparison.OrdinalIgnoreCase) || path.Contains("/exports", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith("/backup", StringComparison.OrdinalIgnoreCase)) && ctx.CompanyId is not null)
         {

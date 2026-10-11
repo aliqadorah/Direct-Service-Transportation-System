@@ -291,7 +291,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         if (q.To is DateOnly to) query = query.Where(s => s.SettlementDate <= to);
         if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(s => s.Number.Contains(text));
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(s => s.Status == CashCodes.Active ? s.NetPayable : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(s => s.Status == CashCodes.Active ? s.NetPayable : 0), g.Count(s => s.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-settlementDate").ThenByDescending(s => s.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         return new SettlementPage(new PagedResult<SettlementResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);

@@ -117,7 +117,8 @@
     [Parameter] public string Company { get; set; } = "";
 
     private bool CanManage => Shell.Can(PermissionKeys.MastersManage);
-    private string Currency => L["cur.JOD"];
+    /// <summary>The company's currency (its name where the catalogue has one, else the code).</summary>
+    private string Currency => Shell.Company?.CurrencyCode is { } code && L["cur." + code] is var t && !t.StartsWith("cur.", StringComparison.Ordinal) ? t : Shell.Company?.CurrencyCode ?? "";
 
     private IReadOnlyList<TabItem> Views => [new("customers", L["tar.customers"]), new("partners", L["tar.partners"]), new("today", L["tar.validToday"]), new("archived", L["ml.archived"])];
 

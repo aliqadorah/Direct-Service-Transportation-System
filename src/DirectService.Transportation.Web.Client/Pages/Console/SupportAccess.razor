@@ -1,0 +1,123 @@
+@page "/console/support-access"
+@*
+  SCR-92 provider console: support access (D-13, BR-014, P-13): the staff member's requests and windows; a new request names the tenant and
+  the reason and notifies its Owners, who approve a time-limited window. Inside an approved, current window the tenant's active companies
+  open read-only (view permissions only, writes and exports refused, every request in the tenant's audit log — DT-152).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.supportAccess"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.supportAccess"])])">
+    <Actions><Btn Primary="true" Icon="shield" Text="@L["con.requestSupport"]" OnClick="New" /></Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="shield" Title="@L["ten.noSupport"]" Text="@L["con.noSupportText"]">
+            <Actions><Btn Primary="true" Text="@L["con.requestSupport"]" OnClick="New" /></Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        @if (_open.Count > 0)
+        {
+            <Box Title="@L["con.openNow"]">
+                <p class="muted" style="margin:0 0 8px">@L["con.openNowHelp"]</p>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                    @foreach (var c in _open)
+                    {
+                        <Btn Small="true" Primary="true" Icon="eye" Text="@L.Pick(c.Name, c.NameEn ?? c.Name)" Href="@NavModel.Href(c.Id, "")" />
+                    }
+                </div>
+            </Box>
+        }
+        <ListFrame Label="@L["nav.supportAccess"]">
+            <DataGrid TItem="SupportAccessResponse" Items="_rows" Key="r => r.Id" Caption="@L["nav.supportAccess"]">
+                <Columns>
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["con.tenant"]" Value="r => r.Tenant" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ten.reason"]" Value="r => r.Reason" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ten.from"]" Value="r => Fmt.DateTime(r.StartsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ten.decidedBy"]" Value="@(r => r.DecidedBy ?? "—")" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@SupportApprovals.Status(context)" /></Template></GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_requesting" Title="@L["con.requestSupport"]" Busy="_busy" Icon="shield">
+    <ChildContent>
+        <div class="row" style="gap:6px;align-items:flex-end">
+            <div class="field" style="flex:1">
+                <label for="tenant-q">@L["con.findTenant"]</label>
+                <input id="tenant-q" class="input" maxlength="100" @bind="_find" @bind:event="oninput" @onkeydown="@(e => e.Key == "Enter" ? Find() : Task.CompletedTask)" />
+            </div>
+            <Btn Icon="search" Text="@L["ui.search"]" OnClick="Find" />
+        </div>
+        <SelectField TValue="string?" @bind-Value="_tenant" Options="_tenants" Empty="@L["ui.choose"]" Label="@L["con.tenant"]" Required="true" />
+        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" />
+        <p class="help" style="margin:0">@L["con.supportText"]</p>
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _requesting = false" />
+        <Btn Primary="true" Icon="send" Text="@L["con.sendRequest"]" Busy="_busy" Disabled="@(_tenant is null || string.IsNullOrWhiteSpace(_reason))" OnClick="Request" />
+    </Footer>
+</Modal>
+
+@code {
+    private IReadOnlyList<SupportAccessResponse> _rows = [];
+    private IReadOnlyList<CompanyAccess> _open = [];
+    private IReadOnlyList<Option<string?>> _tenants = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _find, _tenant, _reason, _error;
+    private bool _requesting, _busy;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _rows = await Api.GetAsync<IReadOnlyList<SupportAccessResponse>>("api/v1/platform/support-access");
+            _open = await Api.GetAsync<IReadOnlyList<CompanyAccess>>("api/v1/platform/support-access/companies");
+            _state = _rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task New()
+    {
+        _tenant = _reason = _error = null;
+        _requesting = true;
+        await Find();
+    }
+
+    private async Task Find()
+    {
+        try
+        {
+            var q = string.IsNullOrWhiteSpace(_find) ? "" : "&q=" + Uri.EscapeDataString(_find.Trim());
+            var page = await Api.GetAsync<PagedResult<ConsoleTenantResponse>>("api/v1/platform/tenants?page=1&pageSize=50" + q);
+            _tenants = page.Items.Where(t => t.Status != LifecycleCodes.Deleted).Select(t => new Option<string?>(t.Id, t.Name, t.OwnerEmail)).ToList();
+            if (_tenants.All(t => t.Value != _tenant)) _tenant = null;
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+    }
+
+    private async Task Request()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<SupportAccessResponse>("api/v1/platform/support-access", new SupportAccessRequest(_tenant, _reason));
+            _requesting = false;
+            Toasts.Success(L["con.done.support"]);
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+}

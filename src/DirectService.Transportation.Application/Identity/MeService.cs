@@ -22,10 +22,14 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
             .Where(t => t.Id == u.TenantId).Select(t => new { t.Name, t.Status }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
         var grants = await access.GrantsAsync(userId, ct).ConfigureAwait(false);
         var isOwner = grants.Any(g => g.Permissions.Contains(Contracts.Security.PermissionKeys.TenantManage));
-        var companies = grants
-            .Where(g => g.CompanyStatus == "Active" || isOwner)
+        var visible = grants.Where(g => g.CompanyStatus == "Active" || isOwner).ToList();
+        var ids = visible.Select(g => g.CompanyId).ToList();
+        var currencies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => ids.Contains(c.Id))
+            .Select(c => new { c.Id, c.CurrencyCode, c.CurrencyDecimals }).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+        var companies = visible
             .Select(g => new CompanyAccess(tokens.Encode<Company>(g.CompanyPublicId), g.CompanyName, g.CompanyNameEn, g.CompanyStatus,
-                g.RoleName, g.IsPresetRole, g.Permissions.Order(StringComparer.Ordinal).ToList()))
+                g.RoleName, g.IsPresetRole, g.Permissions.Order(StringComparer.Ordinal).ToList(),
+                currencies.TryGetValue(g.CompanyId, out var cur) ? cur.CurrencyCode : "JOD", currencies.TryGetValue(g.CompanyId, out cur) ? cur.CurrencyDecimals : 3))
             .ToList();
         var defaultCompany = grants.FirstOrDefault(g => g.CompanyId == u.DefaultCompanyId && g.CompanyStatus == "Active")
             ?? grants.FirstOrDefault(g => g.CompanyStatus == "Active");

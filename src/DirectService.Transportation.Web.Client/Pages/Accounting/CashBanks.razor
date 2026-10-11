@@ -209,7 +209,7 @@
 
     private void EditBank(BankAccountResponse? b)
     {
-        _m = b is null ? new EditorModel { IsBank = true, CurrencyCode = "JOD" }
+        _m = b is null ? new EditorModel { IsBank = true, CurrencyCode = Shell.Company?.CurrencyCode }
             : new EditorModel { IsBank = true, Id = b.Id, Name = b.Name, BankName = b.BankName, AccountNumber = b.AccountNumber, Iban = b.Iban, CurrencyCode = b.CurrencyCode,
                 AccountId = b.Account.Id, Status = b.Status, RowVersion = b.RowVersion };
         Open();

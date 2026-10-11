@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Common;
@@ -103,6 +104,12 @@ public sealed class CollaborationTests(ApiFactory f)
         Assert.Contains(exports.Items, e => e.Changes.Any(ch => ch.Field == "route" && ch.New!.Contains("audit-log/export", StringComparison.Ordinal)));
         var facets = await c.GetAsync(U(o, "/audit-log/facets"));
         await facets.EnsureOkAsync();
+        // FR-189 user filter: the people of the log are offered with their tokens, and the token filters the log.
+        using var facetJson = JsonDocument.Parse(await facets.Content.ReadAsStringAsync());
+        var me = facetJson.RootElement.GetProperty("users").EnumerateArray().Single(u => u.GetProperty("name").GetString() == o.Me.FullName);
+        var mine = await ReadAsync<PagedResult<AuditLogEntry>>(await c.GetAsync(U(o, "/audit-log?user=" + Uri.EscapeDataString(me.GetProperty("id").GetString()!))));
+        Assert.NotEmpty(mine.Items);
+        Assert.All(mine.Items, e => Assert.Equal(o.Me.FullName, e.User));
         var viewer = await SecurityTests.InviteAndAcceptAsync(f, o, PresetRoles.Viewer);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.Client.GetAsync(U(o, "/audit-log"))).StatusCode);
         Assert.Empty((await ReadAsync<NotificationPage>(await viewer.Client.GetAsync(U(o, "/notifications")))).Items);   // notifications are personal

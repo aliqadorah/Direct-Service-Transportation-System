@@ -39,6 +39,9 @@ public static partial class UiText
         ["ui.fixErrors"] = ("يرجى تصحيح {0} حقول قبل الحفظ:", "Please correct {0} fields before saving:"),
         ["ui.fixError"] = ("يرجى تصحيح حقل واحد قبل الحفظ:", "Please correct 1 field before saving:"),
         ["ui.reason"] = ("السبب", "Reason"),
+        ["ui.unsavedTitle"] = ("تغييرات غير محفوظة", "Unsaved changes"),
+        ["ui.unsavedText"] = ("لم تُحفظ تغييراتك على هذه الشاشة. مغادرتها تتجاهلها.", "Your changes on this screen are not saved. Leaving discards them."),
+        ["ui.discard"] = ("تجاهل والمغادرة", "Discard and leave"),
         ["ui.typeToConfirm"] = ("اكتب «{0}» للتأكيد", "Type “{0}” to confirm"),
         ["ui.search"] = ("بحث", "Search"),
         ["ui.noMatches"] = ("لا نتائج مطابقة", "No matches"),
@@ -517,6 +520,8 @@ public static partial class UiText
         ["banner.updatePayment"] = ("تحديث طريقة الدفع", "Update the payment method"),
         ["banner.trial"] = ("أنت في الفترة التجريبية.", "You are on the trial."),
         ["banner.choosePlan"] = ("اختيار خطة", "Choose a plan"),
+        ["banner.hide"] = ("إخفاء", "Hide"),
+        ["banner.support"] = ("جلسة دعم فني: للقراءة فقط بموافقة مالك المشترك، وكل طلب يُسجَّل في سجل التدقيق لديه.", "Support session: read-only with the tenant Owner's approval; every request is written to the tenant's audit log."),
         ["page.notFoundTitle"] = ("الصفحة غير موجودة", "Page not found"),
         ["page.notFound"] = ("لم نعثر على هذا السجل", "We could not find this record"),
         ["page.notFoundText"] = ("قد يكون الرابط قديماً أو أن السجل في شركة أخرى ليست لديك صلاحية فيها.", "The link may be old, or the record belongs to a company you cannot open."),
@@ -669,5 +674,7 @@ public static partial class UiText
         ["st.requested"] = ("مطلوب", "Requested"),
         ["st.approved"] = ("موافق عليه", "Approved"),
         ["st.expired"] = ("منتهٍ", "Expired"),
+        ["st.credited"] = ("مُسترد برصيد", "Credited"),
+        ["st.deleted"] = ("محذوف", "Deleted"),
     };
 }

@@ -48,7 +48,10 @@ public abstract class PageTestBase : UiTestBase
     /// <summary>The visible text of a rendered screen (numbers inside Arabic text are isolated in their own elements).</summary>
     protected static string Text<T>(IRenderedComponent<T> cut) where T : Microsoft.AspNetCore.Components.IComponent => string.Concat(cut.Nodes.Select(n => n.TextContent));
 
-    /// <summary>Answers requests whose company-relative path starts with <paramref name="path"/> with <paramref name="body"/> as JSON.</summary>
+    /// <summary>
+    /// Answers requests whose company-relative path (or, with a leading slash, API path after <c>/api/v1</c>) starts with
+    /// <paramref name="path"/> with <paramref name="body"/> as JSON.
+    /// </summary>
     protected void Respond(string path, object? body) => _routes[path] = _ => body;
 
     protected void Respond(string path, Func<HttpRequestMessage, object?> body) => _routes[path] = body;
@@ -63,8 +66,11 @@ public abstract class PageTestBase : UiTestBase
             var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
             if (path.StartsWith("/api/v1/auth/antiforgery", StringComparison.Ordinal))
                 return Json(new { headerName = "X-XSRF-TOKEN", token = "t" });
-            if (!path.StartsWith(Prefix, StringComparison.Ordinal)) return NotFound();
-            var relative = path[Prefix.Length..];
+            // Company paths are relative to the company ("trips?…"); tenant, platform and other API paths keep a leading slash ("/tenant/…").
+            string relative;
+            if (path.StartsWith(Prefix, StringComparison.Ordinal)) relative = path[Prefix.Length..];
+            else if (path.StartsWith("/api/v1/", StringComparison.Ordinal)) relative = path["/api/v1".Length..];
+            else return NotFound();
             test.Requests.Add((request.Method.Method, relative, body));
             var match = test._routes.Keys.Where(k => relative.StartsWith(k, StringComparison.Ordinal)).OrderByDescending(k => k.Length).FirstOrDefault();
             if (match is null) return NotFound();

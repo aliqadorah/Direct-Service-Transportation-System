@@ -39,6 +39,7 @@ internal static class PlatformEndpoints
             TypedResults.Ok(await s.ReactivateAsync(tenant, r, ct).ConfigureAwait(false)));
         p.MapGet("/support-access", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.MySupportAsync(ct).ConfigureAwait(false)));
         p.MapPost("/support-access", async (SupportAccessRequest r, ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.RequestSupportAsync(r, ct).ConfigureAwait(false)));
+        p.MapGet("/support-access/companies", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.SupportCompaniesAsync(ct).ConfigureAwait(false)));
         p.MapGet("/announcements", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.AnnouncementsAsync(false, ct).ConfigureAwait(false)));
         p.MapPost("/announcements", async (AnnouncementRequest r, ConsoleService s, CancellationToken ct) =>
             TypedResults.Ok(await s.SaveAnnouncementAsync(null, r, ct).ConfigureAwait(false)));

@@ -1,7 +1,7 @@
 @page "/c/{Company}/settings/audit-log"
 @*
   SCR-77 audit log (FR-189, DT-121; settings.manage or users.manage): every change with time, user, action, record type and reference, reason,
-  field changes old → new and IP address; filters by action, record type, period and text; Excel / CSV / PDF and background export. Driver
+  field changes old → new and IP address; filters by action, record type, user, period (applied with Apply) and text; Excel / CSV / PDF and background export. Driver
   personal fields are masked for readers without drv.view; erased records show *** (DT-134).
 *@
 @inject Api Api
@@ -17,6 +17,7 @@
     <Filters>
         <SelectField TValue="string?" @bind-Value="_action" Options="Actions" Empty="@L["tar.all"]" Label="@L["aud.action"]" FieldClass="w200" />
         <SelectField TValue="string?" @bind-Value="_type" Options="Types" Empty="@L["tar.all"]" Label="@L["aud.type"]" FieldClass="w200" />
+        <SelectField TValue="string?" @bind-Value="_user" Options="Users" Empty="@L["tar.all"]" Label="@L["mnt.user"]" FieldClass="w200" />
         <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
         <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
         <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
@@ -45,57 +46,60 @@
 
 @code {
     private PagedResult<AuditLogEntry>? _result;
-    private IReadOnlyList<string> _actions = [], _types = [];
+    private Facets? _facets;
     private LoadState _state = LoadState.Loading;
-    private string? _reference, _q, _action, _type;
+    private string? _reference, _q, _action, _type, _user;
     private DateOnly? _from, _to;
-    private int _page = 1;
+    private Filter _applied = new(null, null, null, null, null);
+    private int _page = 1, _version;
 
     [Parameter] public string Company { get; set; } = "";
 
-    private bool Filtered => _q is not null || _action is not null || _type is not null || _from is not null || _to is not null;
-    private IReadOnlyList<Option<string?>> Actions => _actions.Select(a => new Option<string?>(a, ActionName(a))).ToList();
-    private IReadOnlyList<Option<string?>> Types => _types.Select(t => new Option<string?>(t, t)).ToList();
+    /// <summary>The filters of the list on screen: pages and exports use these, never values chosen but not applied (review M4).</summary>
+    private sealed record Filter(string? Action, string? Type, string? User, DateOnly? From, DateOnly? To);
+
+    private bool Filtered => _q is not null || _applied != new Filter(null, null, null, null, null);
+    private IReadOnlyList<Option<string?>> Actions => (_facets?.Actions ?? []).Select(a => new Option<string?>(a, ActionName(a))).ToList();
+    private IReadOnlyList<Option<string?>> Types => (_facets?.EntityTypes ?? []).Select(t => new Option<string?>(t, t)).ToList();
+    private IReadOnlyList<Option<string?>> Users => (_facets?.Users ?? []).Select(u => new Option<string?>(u.Id, u.Name)).ToList();
 
     private string ActionName(string a) => L["hist." + a] is var t && !t.StartsWith("hist.", StringComparison.Ordinal) ? t : a;
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var f = await Api.GetAsync<Facets>(Api.C("audit-log/facets"));
-            _actions = f.Actions;
-            _types = f.EntityTypes;
-        }
-        catch (ApiException) { }
-        await Load();
-    }
+    protected override Task OnInitializedAsync() => Load();
 
     private string Query(bool paged)
     {
         var p = new List<string>();
         void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
-        Add("q", _q); Add("action", _action); Add("entityType", _type);
-        Add("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
-        Add("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Add("q", _q); Add("action", _applied.Action); Add("entityType", _applied.Type); Add("user", _applied.User);
+        Add("from", _applied.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Add("to", _applied.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         if (paged) Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
     }
 
     private async Task Load()
     {
+        var version = ++_version;
+        if (_facets is null)
+        {
+            // Filter options; a failed load is tried again with the next list request (review L13).
+            try { _facets = await Api.GetAsync<Facets>(Api.C("audit-log/facets")); } catch (ApiException) { }
+        }
         try
         {
-            _result = await Api.GetAsync<PagedResult<AuditLogEntry>>(Api.C("audit-log" + Query(true)));
+            var result = await Api.GetAsync<PagedResult<AuditLogEntry>>(Api.C("audit-log" + Query(true)));
+            if (version != _version) return;   // a later page, search or filter is on its way (review M6)
+            _result = result;
             _state = _result.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
     private Task Search(string? q) { _q = q; _page = 1; return Load(); }
-    private Task Apply() { _page = 1; return Load(); }
+    private Task Apply() { _applied = new Filter(_action, _type, _user, _from, _to); _page = 1; return Load(); }
     private Task Go(int p) { _page = p; return Load(); }
-    private Task ClearAll() { _q = _action = _type = null; _from = _to = null; _page = 1; return Load(); }
+    private Task ClearAll() { _q = _action = _type = _user = null; _from = _to = null; return Apply(); }
     private Task Export(string format) => Files.SaveAsync(Api.C("audit-log/export" + Query(false)), format);
 
     private async Task Background()
@@ -104,12 +108,14 @@
         {
             await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new
             {
-                Kind = "audit-log", Audit = new AuditLogQuery(null, _action, _type, _from, _to, _q), From = _from, To = _to, Format = "xlsx",
+                Kind = "audit-log", Audit = new AuditLogQuery(_applied.User, _applied.Action, _applied.Type, _applied.From, _applied.To, _q), From = _applied.From, To = _applied.To, Format = "xlsx",
             });
             Toasts.Success(L["rep.backgroundQueued"]);
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }
 
-    private sealed record Facets(IReadOnlyList<string> EntityTypes, IReadOnlyList<string> Actions);
+    private sealed record Facets(IReadOnlyList<string> EntityTypes, IReadOnlyList<string> Actions, IReadOnlyList<FacetUser>? Users);
+
+    private sealed record FacetUser(string Id, string Name);
 }

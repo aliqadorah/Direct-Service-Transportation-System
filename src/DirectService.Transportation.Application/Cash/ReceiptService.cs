@@ -205,7 +205,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(r => r.Status == CashCodes.Active ? r.Amount : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(r => r.Status == CashCodes.Active ? r.Amount : 0), g.Count(r => r.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-receiptDate").ThenByDescending(r => r.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         return new ReceiptPage(new PagedResult<ReceiptResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);

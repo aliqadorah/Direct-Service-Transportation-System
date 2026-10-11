@@ -157,8 +157,8 @@ internal static class AccountingEndpoints
     {
         g.MapGet("/", async ([AsParameters] JournalQuery q, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(q, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
-        g.MapGet("/export", async ([AsParameters] JournalQuery q, JournalService svc, CancellationToken ct) =>
-            File(await svc.ExportListAsync(q, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
+        g.MapGet("/export", async ([AsParameters] JournalQuery q, string? format, JournalService svc, CancellationToken ct) =>
+            File(await svc.ExportListAsync(q, format, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}", async (string entry, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(entry, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}/voucher", async (string entry, JournalService svc, CancellationToken ct) =>

@@ -20,7 +20,7 @@
     <ChildContent>
         <DataGrid TItem="SettlementResponse" Items="_page!.Page.Items" Key="s => s.Id" Caption="@L["drv.settlementsList"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
                   OnRowClick="@(s => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}")))" RowClass="@(s => s.Status == "Void" ? "void" : null)"
-                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Included))">
             <Columns>
                 <GridColumn TItem="SettlementResponse" Title="@L["doc.number"]" Value="s => s.Number" Ltr="true" SortKey="number" />
                 <GridColumn TItem="SettlementResponse" Title="@L["trip.date"]" Value="s => Fmt.Date(s.SettlementDate, Shell.DateFormat)" Ltr="true" SortKey="settlementDate" />

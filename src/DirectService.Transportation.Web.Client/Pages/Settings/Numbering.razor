@@ -17,6 +17,7 @@
                     <GridColumn TItem="NumberSequenceResponse" Title="@L["num.document"]" Value="@(s => L["num.doc." + s.DocumentType] is var t && t.StartsWith("num.", StringComparison.Ordinal) ? s.DocumentType : t)" />
                     <GridColumn TItem="NumberSequenceResponse" Title="@L["num.prefix"]" Value="s => s.Prefix" Ltr="true" />
                     <GridColumn TItem="NumberSequenceResponse" Title="@L["num.digits"]" Value="s => Fmt.Count(s.Digits)" Numeric="true" />
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["num.last"]" Value="@(s => s.NextNumber > 1 ? s.Prefix + (s.NextNumber - 1).ToString(new string('0', Math.Clamp(s.Digits, 1, 10)), System.Globalization.CultureInfo.InvariantCulture) : "—")" Ltr="true" />
                     <GridColumn TItem="NumberSequenceResponse" Title="@L["num.next"]" Value="s => s.NextFormatted" Ltr="true" />
                     <GridColumn TItem="NumberSequenceResponse" Title="@L["ml.edit"]" HideTitle="true"><Template><Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L.F("ml.editTitle", context.Prefix)" OnClick="() => Edit(context)" /></Template></GridColumn>
                 </Columns>
@@ -37,7 +38,7 @@
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="num-form" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" form="num-form" />
     </Footer>
 </Modal>
 

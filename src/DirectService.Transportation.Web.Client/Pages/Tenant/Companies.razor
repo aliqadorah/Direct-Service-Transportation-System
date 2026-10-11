@@ -1,0 +1,253 @@
+@page "/tenant/companies"
+@*
+  SCR-81 companies (5.1, D-09, Q-06; core.tenant.manage): the tenant's companies with status — create within the plan (only active, non-demo
+  companies count; the plan-limit refusal offers the subscription screen), archive and restore with a reason (archived companies are
+  read-only and visible to the Owner only), the demo company for training (P-09) — and the tenant's sign-in security (D-08: password rules,
+  idle timeout, Q-03…Q-05).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject AppSession Session
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.companies"]" Crumbs="@([new Crumb(L["nav.tenant"]), new Crumb(L["nav.companies"])])">
+    <Actions>
+        @if (_tab == "companies" && _state == LoadState.Ready)
+        {
+            @if (!_companies.Any(c => c.IsDemo)) {<Btn Icon="building" Text="@L["setup.demo"]" Busy="_demoBusy" OnClick="Demo" />}
+            <Btn Primary="true" Icon="plus" Text="@L["ten.newCompany"]" OnClick="New" />
+        }
+    </Actions>
+</PageHeader>
+<TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="SetTab" Label="@L["nav.companies"]" />
+<StateView State="_state" Kind="@(_tab == "security" ? SkeletonKind.Form : SkeletonKind.List)" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NoAccessView /></Empty>
+    <ChildContent>
+        @if (_tab == "security")
+        {
+            <EditForm EditContext="_secCtx" OnValidSubmit="SaveSecurity" class="box pad stack" style="max-width:720px">
+                <ProblemValidator @ref="_secProblems" />
+                <ErrorSummary Extra="_extra" />
+                <p class="muted" style="margin:0">@L["ten.securityHelp"]</p>
+                <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                    <IntField @bind-Value="_sec.PasswordMinLength" Label="@L["ten.passwordMin"]" Required="true" Min="8" Max="64" Help="@L["ten.passwordMinHelp"]" />
+                    <IntField @bind-Value="_sec.IdleMinutes" Label="@L["ten.idle"]" Required="true" Min="5" Max="1440" Unit="@L["ten.minutes"]" Help="@L["ten.idleHelp"]" />
+                    <ToggleField @bind-Value="_sec.RequireLetter" Label="@L["ten.requireLetter"]" />
+                    <ToggleField @bind-Value="_sec.RequireDigit" Label="@L["ten.requireDigit"]" />
+                </div>
+                <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
+            </EditForm>
+        }
+        else
+        {
+            @if (_limitError is not null)
+            {
+                <Banner Tone="Tone.Err" Text="@_limitError" Live="true"><Actions><a href="/tenant/subscription">@L["ten.changePlan"]</a></Actions></Banner>
+            }
+            <ListFrame Label="@L["nav.companies"]">
+                <DataGrid TItem="CompanyResponse" Items="_companies" Key="c => c.Id" Caption="@L["nav.companies"]" RowClass="@(c => c.Status == "Active" ? null : "void")">
+                    <Columns>
+                        <GridColumn TItem="CompanyResponse" Title="@L["ten.company"]">
+                            <Template>
+                                @if (context.Status == "Active" || Shell.Me?.Companies.Any(x => x.Id == context.Id) == true) {<a href="@NavModel.Href(context.Id, "")">@context.Name</a>}
+                                else {@context.Name}
+                                @if (context.IsDemo) {<Badge Tone="Tone.Info" Text="@L["ten.demo"]" />}
+                            </Template>
+                        </GridColumn>
+                        <GridColumn TItem="CompanyResponse" Title="@L["set.nameEn"]" Value="@(c => c.NameEn ?? "—")" Ltr="true" />
+                        <GridColumn TItem="CompanyResponse" Title="@L["ten.created"]" Value="c => Fmt.Date(c.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                        <GridColumn TItem="CompanyResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
+                        <GridColumn TItem="CompanyResponse" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @if (context.Status == "Active") {<Btn Small="true" Icon="archive" Text="@L["ml.archive"]" AriaLabel="@L.F("ten.archiveTitle", context.Name)" OnClick="() => Ask(context, true)" />}
+                                else {<Btn Small="true" Icon="refresh" Text="@L["ml.restore"]" AriaLabel="@L.F("ten.restoreTitle", context.Name)" OnClick="() => Ask(context, false)" />}
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+                <p class="pad help" style="margin:0">@L["ten.companiesHelp"]</p>
+            </ListFrame>
+        }
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_creating" Title="@L["ten.newCompany"]" Busy="_busy" Icon="building">
+    <ChildContent>
+        <EditForm EditContext="_newCtx" OnValidSubmit="Create" id="company-form" class="stack">
+            <ProblemValidator @ref="_newProblems" />
+            <ErrorSummary Extra="_newExtra" />
+            <TextField @bind-Value="_new.Name" Label="@L["set.nameAr"]" Required="true" MaxLength="200" />
+            <TextField @bind-Value="_new.NameEn" Label="@L["set.nameEn"]" MaxLength="200" Ltr="true" />
+            <p class="help" style="margin:0">@L["ten.newCompanyHelp"]</p>
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _creating = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ten.create"]" Shortcut="Ctrl S" Busy="_busy" form="company-form" />
+    </Footer>
+</Modal>
+
+<ConfirmDialog @bind-Open="_asking" Title="@L.F(_archive ? "ten.archiveTitle" : "ten.restoreTitle", _target?.Name ?? "")" Danger="_archive" AskReason="true"
+               ConfirmText="@L[_archive ? "ml.archive" : "ml.restore"]" Message="@L[_archive ? "ten.archiveText" : "ten.restoreText"]" Busy="_busy" Error="@_error" OnConfirm="Act" />
+
+@code {
+    private string _tab = "companies";
+    private IReadOnlyList<CompanyResponse> _companies = [];
+    private TenantResponse? _tenant;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error, _limitError;
+    private IReadOnlyList<string>? _extra, _newExtra;
+    private bool _busy, _demoBusy, _creating, _asking, _archive;
+    private CompanyResponse? _target;
+    private NewModel _new = new();
+    private EditContext _newCtx = new(new NewModel());
+    private ProblemValidator? _newProblems, _secProblems;
+    private SecurityModel _sec = new();
+    private EditContext _secCtx = new(new SecurityModel());
+    private int _version;
+
+    private IReadOnlyList<TabItem> Tabs => [new("companies", L["nav.companies"]), new("security", L["ten.security"])];
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private Task SetTab(string t) { _tab = t; _extra = null; return Load(); }
+
+    private async Task Load()
+    {
+        var version = ++_version;
+        _state = LoadState.Loading;
+        try
+        {
+            if (_tab == "security")
+            {
+                var t = await Api.GetAsync<TenantResponse>("api/v1/tenant");
+                if (version != _version) return;
+                ShowSecurity(t);
+            }
+            else
+            {
+                var list = await Api.GetAsync<IReadOnlyList<CompanyResponse>>("api/v1/tenant/companies");
+                if (version != _version) return;
+                _companies = list;
+            }
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (version == _version && e.Problem.Status is 403 or 404) { _state = LoadState.Empty; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void ShowSecurity(TenantResponse t)
+    {
+        _tenant = t;
+        _sec = new SecurityModel
+        {
+            PasswordMinLength = t.PasswordMinLength, RequireLetter = t.PasswordRequireLetter, RequireDigit = t.PasswordRequireDigit, IdleMinutes = t.SessionIdleTimeoutMinutes,
+        };
+        _secCtx = new EditContext(_sec);
+    }
+
+    private async Task SaveSecurity()
+    {
+        if (_tenant is null) return;
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var t = await Api.PutAsync<TenantResponse>("api/v1/tenant/security",
+                new TenantSecurityRequest(_sec.PasswordMinLength ?? 8, _sec.RequireLetter, _sec.RequireDigit, _sec.IdleMinutes ?? 30, _tenant.RowVersion));
+            ShowSecurity(t);
+            Toasts.Success(L["set.saved"]);
+        }
+        catch (ApiException e) { if (_secProblems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private void New()
+    {
+        _new = new NewModel();
+        _newCtx = new EditContext(_new);
+        _newExtra = null;
+        _creating = true;
+    }
+
+    private async Task Create()
+    {
+        _busy = true;
+        _newExtra = null;
+        try
+        {
+            var c = await Api.PostAsync<CompanyResponse>("api/v1/tenant/companies", new CreateCompanyRequest(_new.Name?.Trim() ?? "", string.IsNullOrWhiteSpace(_new.NameEn) ? null : _new.NameEn.Trim()));
+            _creating = false;
+            _limitError = null;
+            await Session.ReloadAsync();
+            Toasts.Success(L.F("ten.companyCreated", c.Name));
+            await Load();
+        }
+        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.ErrorCodes.PlanLimitReached)
+        {
+            // Plan limit (BR-013): shown on the page with the way to upgrade (board SCR-81 error state).
+            _creating = false;
+            _limitError = e.Problem.Detail;
+        }
+        catch (ApiException e) { if (_newProblems?.Show(e.Problem) is { } other) _newExtra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private void Ask(CompanyResponse c, bool archive)
+    {
+        _target = c;
+        _archive = archive;
+        _error = null;
+        _asking = true;
+    }
+
+    private async Task Act(string reason)
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync($"api/v1/tenant/companies/{Uri.EscapeDataString(_target.Id)}/{(_archive ? "archive" : "restore")}", new ReasonRequest(reason));
+            _asking = false;
+            await Session.ReloadAsync();
+            Toasts.Success(L.F(_archive ? "ten.archived" : "ten.restored", _target.Name));
+            await Load();
+        }
+        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.ErrorCodes.PlanLimitReached)
+        {
+            _asking = false;   // restoring beyond the plan: the page banner with the upgrade link, like creating
+            _limitError = e.Problem.Detail;
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Demo()
+    {
+        _demoBusy = true;
+        try
+        {
+            var demo = await Api.PostAsync<DemoCompanyResponse>("api/v1/tenant/demo-company", null);
+            Nav.NavigateTo(NavModel.Href(demo.Id, ""), forceLoad: true);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _demoBusy = false; }
+    }
+
+    private sealed class NewModel
+    {
+        public string? Name { get; set; }
+        public string? NameEn { get; set; }
+    }
+
+    private sealed class SecurityModel
+    {
+        public int? PasswordMinLength { get; set; }
+        public bool RequireLetter { get; set; }
+        public bool RequireDigit { get; set; }
+        public int? IdleMinutes { get; set; }
+    }
+}

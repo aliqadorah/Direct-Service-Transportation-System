@@ -1,13 +1,14 @@
 @page "/c/{Company}/accounting/journal"
 @*
   SCR-31 journal list (FR-111…115, FR-102): views All / Manual / Automatic / Reversed or void, period (months), number, account, cost centre and
-  status filters, links to the entry, its source document and its reversal; export. Users with acct.je.view but not acct.acct.view see the
+  status filters, party and source-document filters (FR-102), links to the entry, its source document and its reversal; Excel / CSV / PDF export (FR-115). Users with acct.je.view but not acct.acct.view see the
   automatic entries only (DT-32).
 *@
 @inject Api Api
 @inject Loc L
 @inject ShellState Shell
 @inject AccountingLookups Lookups
+@inject TripLookups Transport
 @inject Downloads Files
 @inject NavigationManager Nav
 
@@ -24,7 +25,7 @@
 </PageHeader>
 }
 <ListShell Label="@L["nav.journal"]" Views="@(AutomaticOnly ? null : Views)" View="@_view" ViewChanged="SetView" Search="@_number" SearchPlaceholder="@L["je.number"]" OnSearch="Search"
-           Exports="@(FullList ? ["xlsx"] : [])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           Exports="@(FullList ? ["xlsx", "csv", "pdf"] : [])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="book" EmptyTitle="@L["je.none"]" EmptyText="@L["je.noneText"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_page" PageSize="_size" Total="_result?.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
@@ -34,7 +35,9 @@
         {
             <ComboField TValue="string?" @bind-Value="_account" Options="Lookups.AccountOptions()" Label="@L["je.account"]" Placeholder="@L["tar.all"]" FieldClass="w260" />
             <SelectField TValue="string?" @bind-Value="_costCentre" Options="Lookups.CostCentres" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />
+            <ComboField TValue="string?" @bind-Value="_party" SearchAsync="SearchParties" Selected="_partyOption" Label="@L["je.party"]" Placeholder="@L["tar.all"]" FieldClass="w260" />
         }
+        <SelectField TValue="string?" @bind-Value="_source" Options="Sources" Empty="@L["tar.all"]" Label="@L["je.source"]" FieldClass="w200" />
         <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
         @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
     </Filters>
@@ -58,9 +61,17 @@
 @code {
     private PagedResult<JournalEntrySummary>? _result;
     private LoadState _state = LoadState.Loading;
-    private string? _reference, _number, _from, _to, _account, _costCentre;
+    private string? _reference, _number, _from, _to, _account, _costCentre, _party, _source;
+    private Option<string?>? _partyOption;
+    private List<Option<string?>> _parties = [];
     private string _view = "all";
-    private int _page = 1, _size = 50;
+    private int _page = 1, _size = 50, _version;
+
+    /// <summary>Source documents of automatic entries (FR-102), as stored on the entry.</summary>
+    private static readonly string[] SourceTypes =
+        ["Trip", "Invoice", "CreditNote", "Receipt", "Advance", "Settlement", "PartnerPayment", "SupplierBill", "Receivable", "ApArPayment", "ApArReturn", "Opening"];
+
+    private IReadOnlyList<Option<string?>> Sources => SourceTypes.Select(s => new Option<string?>(s, L["je.src." + s])).ToList();
 
     [Parameter] public string Company { get; set; } = "";
     /// <summary>Embedded in the automatic-entries screen (SCR-34): automatic entries only, no page header or views.</summary>
@@ -73,12 +84,39 @@
         ? [new("all", L["ml.all"]), new("manual", L["je.manualView"]), new("auto", L["je.autoView"]), new("Reversed", L["st.reversed"]), new("Void", L["st.void"])]
         : [new("all", L["nav.automatic"])];
 
-    private bool Filtered => _number is not null || _from is not null || _to is not null || _account is not null || _costCentre is not null;
+    private bool Filtered => _number is not null || _from is not null || _to is not null || _account is not null || _costCentre is not null || _party is not null || _source is not null;
 
     protected override async Task OnInitializedAsync()
     {
-        if (FullList) { try { await Lookups.EnsureAsync(); } catch (ApiException) { } }
+        if (FullList)
+        {
+            try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+            await LoadParties();
+        }
         await Load();
+    }
+
+    /// <summary>Parties of entry lines (FR-102): customers and accounting parties, suppliers, partners; drivers are searched.</summary>
+    private async Task LoadParties()
+    {
+        Option<string?> Opt(ApArPartyOption p) => new($"{p.Type}|{p.Id}", p.Name, L["party." + p.Type] is var t && !t.StartsWith("party.", StringComparison.Ordinal) ? t : null);
+        try { _parties.AddRange((await Lookups.PartiesAsync("Customer")).Select(Opt)); } catch (ApiException) { }
+        try { _parties.AddRange((await Lookups.PartiesAsync("Supplier")).Select(Opt)); } catch (ApiException) { }
+        try
+        {
+            await Transport.EnsureAsync();
+            _parties.AddRange(Transport.Partners.Select(p => new Option<string?>($"Partner|{p.Value}", p.Text, L["party.Partner"])));
+        }
+        catch (ApiException) { }
+        _parties = _parties.DistinctBy(p => p.Value).ToList();
+    }
+
+    private async Task<IReadOnlyList<Option<string?>>> SearchParties(string text, CancellationToken ct)
+    {
+        var found = _parties.Where(p => p.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
+        try { found.AddRange((await Transport.SearchDriversAsync(text, ct)).Select(o => new Option<string?>($"Driver|{o.Value}", o.Text, L["party.Driver"]))); }
+        catch (ApiException) { }
+        return found;
     }
 
     private string Query(bool paged)
@@ -90,6 +128,8 @@
         Add("number", _number);
         Add("accountId", _account);
         Add("costCentreId", _costCentre);
+        if (_party?.Split('|') is [var partyType, var partyId]) { Add("partyType", partyType); Add("partyId", partyId); }
+        Add("sourceType", _source);
         Add("manual", AutomaticOnly && FullList ? "false" : _view switch { "manual" => "true", "auto" => "false", _ => null });
         Add("status", _view is "Reversed" or "Void" ? _view : null);
         if (paged) { Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture)); Add("pageSize", _size.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
@@ -98,12 +138,15 @@
 
     private async Task Load()
     {
+        var version = ++_version;
         try
         {
-            _result = await Api.GetAsync<PagedResult<JournalEntrySummary>>(Api.C((FullList ? "accounting/journal-entries" : "ledger/entries") + Query(true)));
+            var result = await Api.GetAsync<PagedResult<JournalEntrySummary>>(Api.C((FullList ? "accounting/journal-entries" : "ledger/entries") + Query(true)));
+            if (version != _version) return;   // a later view, page or filter is on its way
+            _result = result;
             _state = _result.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
     private Task SetView(string v) { _view = v; _page = 1; return Load(); }
@@ -111,8 +154,8 @@
     private Task Apply() { _page = 1; return Load(); }
     private Task Go(int p) { _page = p; return Load(); }
     private Task Size(int s) { _size = s; _page = 1; return Load(); }
-    private Task ClearAll() { _number = _from = _to = _account = _costCentre = null; _page = 1; return Load(); }
-    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/journal-entries/export" + Query(false)));
+    private Task ClearAll() { _number = _from = _to = _account = _costCentre = _party = _source = null; _partyOption = null; _page = 1; return Load(); }
+    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/journal-entries/export" + Query(false)), format);
 
     private void Open(JournalEntrySummary e) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{e.Id}"));
 }

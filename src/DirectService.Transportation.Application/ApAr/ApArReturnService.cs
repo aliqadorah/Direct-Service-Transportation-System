@@ -202,7 +202,7 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(ApArRules.Kind(kind), q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(x => x.Status == ApArCodes.Posted ? x.Total : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false)
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(x => x.Status == ApArCodes.Posted ? x.Total : 0), g.Count(x => x.Status == ApArCodes.Posted))).SingleOrDefaultAsync(ct).ConfigureAwait(false)
             ?? new CashListTotals(0, 0);
         var ids = await MasterDataSupport.Sort(query, q.Sort, SortFields, "-returnDate").ThenByDescending(x => x.Id).Skip(paging.Skip).Take(paging.SafePageSize)
             .Select(x => x.Id).ToListAsync(ct).ConfigureAwait(false);

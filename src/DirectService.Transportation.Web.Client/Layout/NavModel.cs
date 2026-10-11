@@ -83,7 +83,7 @@ public static class NavModel
             new("nav.mapping", "settings/mapping", PermissionKeys.SettingsManage),
             new("nav.numbering", "settings/numbering", PermissionKeys.SettingsManage),
             new("nav.einvoiceSettings", "settings/e-invoicing", PermissionKeys.SettingsManage),
-            new("nav.layoutDesigner", "settings/invoice-layout", PermissionKeys.SettingsManage),
+            new("nav.layoutDesigner", "settings/invoice-layout", PermissionKeys.InvIssue),   // FR-055: the layout designer belongs to inv.issue
             new("nav.fields", "settings/fields", PermissionKeys.SettingsManage),
             new("nav.users", "settings/users", PermissionKeys.UsersManage),
             new("nav.audit", "settings/audit-log", PermissionKeys.UsersManage, PermissionKeys.SettingsManage),

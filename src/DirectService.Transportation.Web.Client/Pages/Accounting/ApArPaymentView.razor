@@ -70,15 +70,21 @@
         new(L["cash.reference"], p.Reference),
     ];
 
-    private IReadOnlyList<KeyValue> ReturnDetails(ApArReturnResponse r) =>
-    [
-        new(L["ap.document"], null, @<a href="@DocLink(r.Document, r.Kind)"><bdi>@r.Document.Number</bdi></a>),
-        new(L["ap.party"], r.Party.Name),
-        new(L["trip.date"], Fmt.Date(r.ReturnDate, Shell.DateFormat)),
-        new(L["ap.returnAmount"], Fmt.Money(r.Amount)),
-        new(L["inv.tax"], Fmt.Money(r.Tax)),
-        new(L["ui.reason"], r.Reason),
-    ];
+    private IReadOnlyList<KeyValue> ReturnDetails(ApArReturnResponse r)
+    {
+        List<KeyValue> list =
+        [
+            new(L["ap.document"], null, @<a href="@DocLink(r.Document, r.Kind)"><bdi>@r.Document.Number</bdi></a>),
+            new(L["ap.party"], r.Party.Name),
+            new(L["trip.date"], Fmt.Date(r.ReturnDate, Shell.DateFormat)),
+            new(L["ap.returnAmount"], Fmt.Money(r.Amount)),
+            new(L["inv.tax"], Fmt.Money(r.Tax)),
+            new(L["ui.reason"], r.Reason),
+        ];
+        // A return on a receivable is a credit note for national e-invoicing (D-15): its submission status is shown like the invoice's.
+        if (r.EInvoiceStatus is not null && r.Status != "Void") list.Add(new(L["inv.einvoice"], null, @<StatusTag Status="@BillingStatus.EInvoice(r.EInvoiceStatus)" />));
+        return list;
+    }
 
     private async Task<string?> Void(string reason)
     {

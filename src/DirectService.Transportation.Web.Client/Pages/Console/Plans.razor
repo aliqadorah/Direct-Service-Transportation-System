@@ -1,0 +1,153 @@
+@page "/console/plans"
+@*
+  SCR-91 provider console: plans (5.3, P-03, DT-08): price, billing cycle and limits of each plan, whether it is on sale, and how many
+  tenants use it — create and edit without code changes (issued invoices never change), delete only while no tenant uses it (BR-040).
+  Codes are unique among all plans, retired ones included.
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.plans"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.plans"])])">
+    <Actions><Btn Primary="true" Icon="plus" Text="@L["con.newPlan"]" OnClick="() => Edit(null)" /></Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="layers" Title="@L["con.noPlans"]"><Actions><Btn Primary="true" Icon="plus" Text="@L["con.newPlan"]" OnClick="() => Edit(null)" /></Actions></EmptyState></Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.plans"]">
+            <DataGrid TItem="PlanResponse" Items="_plans" Key="p => p.Id" Caption="@L["nav.plans"]" OnRowClick="Edit">
+                <Columns>
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.plan"]" Value="@(p => $"{L.Pick(p.NameAr, p.NameEn)} ({p.Code})")" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.price"]" Value="p => Fmt.Money(p.Price)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.cycle"]" Value="@(p => L["ten.cycle." + p.BillingCycle])" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.companies"]" Value="p => Fmt.Count(p.MaxCompanies)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.activeUsers"]" Value="p => Fmt.Count(p.MaxActiveUsers)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.tripsMonth"]" Value="p => Fmt.Count(p.MaxTripsPerMonth)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["ten.storage"]" Value="p => Fmt.Count(p.MaxStorageMb)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["con.onSale"]"><Template><Badge Tone="@(context.IsActive ? Tone.Ok : Tone.Mute)" Icon="@(context.IsActive ? "check" : null)" Text="@L[context.IsActive ? "ui.yes" : "ui.no"]" /></Template></GridColumn>
+                    <GridColumn TItem="PlanResponse" Title="@L["nav.tenants"]" Value="p => Fmt.Count(p.Tenants)" Numeric="true" />
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(_target is null ? L["con.newPlan"] : L.F("ml.editTitle", _target.Code))" Busy="_busy" Wide="true">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" id="plan-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            @if (_target is { Tenants: > 0 } t) {<Banner Tone="Tone.Info" Text="@L.F("con.planInUse", Fmt.Count(t.Tenants))" />}
+            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <TextField @bind-Value="_m.Code" Label="@L["con.code"]" Required="true" MaxLength="30" Ltr="true" />
+                <TextField @bind-Value="_m.NameAr" Label="@L["set.nameAr"]" Required="true" MaxLength="100" />
+                <TextField @bind-Value="_m.NameEn" Label="@L["set.nameEn"]" Required="true" MaxLength="100" Ltr="true" />
+                <NumberField @bind-Value="_m.Price" Label="@L["ten.price"]" Required="true" Min="0m" Decimals="3" />
+                <SelectField TValue="string?" @bind-Value="_m.BillingCycle" Options="Cycles" Label="@L["ten.cycle"]" Required="true" />
+                <ToggleField @bind-Value="_m.IsActive" Label="@L["con.onSale"]" />
+                <IntField @bind-Value="_m.MaxCompanies" Label="@L["ten.companies"]" Required="true" Min="1" />
+                <IntField @bind-Value="_m.MaxActiveUsers" Label="@L["ten.activeUsers"]" Required="true" Min="1" />
+                <IntField @bind-Value="_m.MaxTripsPerMonth" Label="@L["ten.tripsMonth"]" Required="true" Min="1" />
+                <IntField @bind-Value="_m.MaxStorageMb" Label="@L["ten.storage"]" Required="true" Min="1" />
+            </div>
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        @if (_target is { Tenants: 0 }) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _editing = false; _error = null; _deleting = true; }" />}
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" form="plan-form" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target?.Code ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["con.deletePlanText"]" Busy="_busy" Error="@_error" OnConfirm="Delete" />
+
+@code {
+    private IReadOnlyList<PlanResponse> _plans = [];
+    private PlanResponse? _target;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private bool _editing, _deleting, _busy;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    private IReadOnlyList<Option<string?>> Cycles =>
+        [new(LifecycleCodes.Monthly, L["ten.cycle.Monthly"]), new(LifecycleCodes.Annual, L["ten.cycle.Annual"])];
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _plans = await Api.GetAsync<IReadOnlyList<PlanResponse>>("api/v1/platform/plans");
+            _state = _plans.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Edit(PlanResponse? p)
+    {
+        _target = p;
+        _m = p is null
+            ? new Model { BillingCycle = LifecycleCodes.Monthly, IsActive = true }
+            : new Model
+            {
+                Code = p.Code, NameAr = p.NameAr, NameEn = p.NameEn, Price = p.Price, BillingCycle = p.BillingCycle, IsActive = p.IsActive,
+                MaxCompanies = p.MaxCompanies, MaxActiveUsers = p.MaxActiveUsers, MaxTripsPerMonth = p.MaxTripsPerMonth, MaxStorageMb = p.MaxStorageMb,
+            };
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var r = new PlanRequest(_m.Code?.Trim(), _m.NameAr?.Trim(), _m.NameEn?.Trim(), _m.Price, _m.BillingCycle, _m.MaxCompanies, _m.MaxActiveUsers, _m.MaxTripsPerMonth,
+                _m.MaxStorageMb, _m.IsActive, _target?.RowVersion);
+            var saved = _target is null
+                ? await Api.PostAsync<PlanResponse>("api/v1/platform/plans", r)
+                : await Api.PutAsync<PlanResponse>($"api/v1/platform/plans/{Uri.EscapeDataString(_target.Id)}", r);
+            _editing = false;
+            Toasts.Success(L.F("con.planSaved", L.Pick(saved.NameAr, saved.NameEn)));
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete(string reason)
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync($"api/v1/platform/plans/{Uri.EscapeDataString(_target.Id)}/delete", new { reason });
+            _deleting = false;
+            Toasts.Success(L["con.planDeleted"]);
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Model
+    {
+        public string? Code { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public decimal? Price { get; set; }
+        public string? BillingCycle { get; set; }
+        public bool IsActive { get; set; }
+        public int? MaxCompanies { get; set; }
+        public int? MaxActiveUsers { get; set; }
+        public int? MaxTripsPerMonth { get; set; }
+        public int? MaxStorageMb { get; set; }
+    }
+}

@@ -163,7 +163,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? p.Amount : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? p.Amount : 0), g.Count(p => p.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-paymentDate").ThenByDescending(p => p.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         return new PartnerPaymentPage(new PagedResult<PartnerPaymentResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);

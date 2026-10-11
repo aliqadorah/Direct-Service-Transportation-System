@@ -183,6 +183,7 @@ public sealed class AdministrationTests(ApiFactory f)
         await (await owner.Client.PostAsJsonAsync("/api/v1/tenant/companies", new CreateCompanyRequest("Third Co", null))).EnsureOkAsync();
         var me = await owner.Client.GetFromJsonAsync<MeResponse>("/api/v1/me");
         Assert.Equal(3, me!.Companies.Count);
+        Assert.All(me.Companies, c => { Assert.Equal("JOD", c.CurrencyCode); Assert.Equal(3, c.CurrencyDecimals); });   // currency for every screen
     }
 
     [Fact]

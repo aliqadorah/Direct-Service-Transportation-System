@@ -24,7 +24,7 @@
     <ChildContent>
         <DataGrid TItem="PartnerPaymentResponse" Items="_page!.Page.Items" Key="p => p.Id" Caption="@L["prt.paymentsList"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
                   OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"partner-accounts/payments/{p.Id}")))" RowClass="@(p => p.Status == "Void" ? "void" : null)"
-                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Included))">
             <Columns>
                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" SortKey="number" />
                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" SortKey="paymentDate" />

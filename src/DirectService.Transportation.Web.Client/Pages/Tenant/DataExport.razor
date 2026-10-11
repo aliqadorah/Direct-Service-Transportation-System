@@ -1,0 +1,78 @@
+@page "/tenant/export"
+@*
+  SCR-82 data export (5.6, P-16, DX-04, FR-151; core.tenant.manage): a full copy of one company — every table as Excel and as JSON with
+  public ids, in one ZIP — prepared in the background; a notification links to the file when it is ready (kept 7 days). Possible at any
+  time, also for archived companies and during the 90-day retention after cancellation (DT-153: the package always holds every part).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.dataExport"]" Crumbs="@([new Crumb(L["nav.tenant"]), new Crumb(L["nav.dataExport"])])" />
+@if (Shell.Me?.Companies.Any(c => c.Permissions.Contains(PermissionKeys.TenantManage)) != true)   @* tenant.manage held in any company (DT-17) *@
+{
+    <Box Fill="true"><NoAccessView /></Box>
+}
+else
+{
+<Box Style="max-width:860px">
+    <div class="stack">
+        <SelectField TValue="string?" @bind-Value="_company" Options="Companies" Empty="@L["ui.choose"]" Label="@L["ten.company"]" Required="true" />
+        <ul class="stack" style="gap:4px;margin:0;padding-inline-start:18px">
+            <li>@L["ten.exportExcel"]</li>
+            <li>@L["ten.exportJson"]</li>
+            <li>@L["ten.exportIds"]</li>
+        </ul>
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
+        <div><Btn Primary="true" Icon="export" Text="@L["ten.startExport"]" Busy="_busy" Disabled="@(_company is null)" OnClick="Start" /></div>
+        <p class="help" style="margin:0">@L["ten.exportHelp"]</p>
+    </div>
+</Box>
+<Box Title="@L["ten.exportsStarted"]" NoPad="true" Style="max-width:860px">
+    @if (_started.Count == 0)
+    {
+        <EmptyState Icon="export" Title="@L["ten.noExports"]" Text="@L["ten.noExportsText"]" />
+    }
+    else
+    {
+        <DataGrid TItem="Started" Items="_started" Key="s => s.Id" Caption="@L["ten.exportsStarted"]">
+            <Columns>
+                <GridColumn TItem="Started" Title="@L["ten.time"]" Value="s => Fmt.DateTime(s.At, Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="Started" Title="@L["ten.company"]" Value="s => s.Company" />
+                <GridColumn TItem="Started" Title="@L["profile.action"]" HideTitle="true">
+                    <Template><a href="@($"/c/{Uri.EscapeDataString(context.CompanyId)}/exports/{Uri.EscapeDataString(context.Id)}")">@L["exp.download"]</a></Template>
+                </GridColumn>
+            </Columns>
+        </DataGrid>
+    }
+</Box>
+}
+
+@code {
+    private string? _company, _error;
+    private bool _busy;
+    private readonly List<Started> _started = [];
+
+    private sealed record Started(string Id, string CompanyId, string Company, DateTime At);
+
+    /// <summary>Every company the Owner can see, archived ones included (exports stay possible, BR-013).</summary>
+    private IReadOnlyList<Option<string?>> Companies => (Shell.Me?.Companies ?? [])
+        .Select(c => new Option<string?>(c.Id, L.Pick(c.Name, c.NameEn ?? c.Name), c.Status == "Active" ? null : L["st.archived"])).ToList();
+
+    private async Task Start()
+    {
+        if (_company is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var job = await Api.PostAsync<ExportJobResponse>($"api/v1/companies/{Uri.EscapeDataString(_company)}/exports", new { kind = "company" });
+            var name = Companies.FirstOrDefault(c => c.Value == _company)?.Text ?? "";
+            _started.Insert(0, new Started(job.Id, _company, name, DateTime.Now));
+            Toasts.Success(L["ten.exportQueued"]);
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+}

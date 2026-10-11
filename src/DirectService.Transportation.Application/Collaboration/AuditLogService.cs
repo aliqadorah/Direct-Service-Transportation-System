@@ -78,7 +78,13 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
         var types = await db.Set<AuditLog>().AsNoTracking().Where(a => a.CompanyId == companyId && a.EntityType != null).Select(a => a.EntityType!).Distinct().OrderBy(t => t).ToListAsync(ct)
             .ConfigureAwait(false);
         var actions = await db.Set<AuditLog>().AsNoTracking().Where(a => a.CompanyId == companyId).Select(a => a.Action).Distinct().OrderBy(t => t).ToListAsync(ct).ConfigureAwait(false);
-        return new { entityTypes = types, actions };
+        // FR-189 "filter by user": the people found in this company's log (their tokens are what the user filter takes).
+        // Users with a row in this company's log (EXISTS per user rather than DISTINCT over the whole log, review L6).
+        var users = (await db.Set<User>().AsNoTracking().IgnoreQueryFilters()
+                .Where(u => db.Set<AuditLog>().Any(a => a.CompanyId == companyId && a.UserId == u.Id))
+                .Select(u => new { u.PublicId, u.FullName }).OrderBy(u => u.FullName).Take(500).ToListAsync(ct).ConfigureAwait(false))
+            .Select(u => new { id = support.Token<User>(u.PublicId), name = u.FullName }).ToList();
+        return new { entityTypes = types, actions, users };
     }
 
     public async Task<GeneratedFile> ExportAsync(AuditLogQuery q, string? format, CancellationToken ct)

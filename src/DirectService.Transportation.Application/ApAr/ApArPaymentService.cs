@@ -171,7 +171,7 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(ApArRules.Kind(kind), q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? p.Amount : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false)
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? p.Amount : 0), g.Count(p => p.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false)
             ?? new CashListTotals(0, 0);
         var ids = await MasterDataSupport.Sort(query, q.Sort, SortFields, "-paymentDate").ThenByDescending(p => p.Id).Skip(paging.Skip).Take(paging.SafePageSize)
             .Select(p => p.Id).ToListAsync(ct).ConfigureAwait(false);

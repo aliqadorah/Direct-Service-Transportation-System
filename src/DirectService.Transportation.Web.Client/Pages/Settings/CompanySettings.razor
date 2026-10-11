@@ -11,7 +11,7 @@
 @inject ToastService Toasts
 
 <PageHeader Title="@L["nav.companySettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.companySettings"])])" />
-<TabStrip Items="Tabs" @bind-Selected="_tab" Label="@L["nav.companySettings"]" />
+<TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="@(t => { _tab = t; _extra = null; })" Label="@L["nav.companySettings"]" />
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <ChildContent>
         @switch (_tab)
@@ -77,7 +77,7 @@
                         else {<span class="muted">@L["set.noLogo"]</span>}
                         <div class="field">
                             <label for="logo-file">@L["set.chooseLogo"]</label>
-                            <InputFile id="logo-file" class="input" style="padding-top:4px" accept=".png,.jpg,.jpeg" OnChange="UploadLogo" />
+                            <InputFile id="logo-file" class="input" style="padding-top:4px" accept=".png,.jpg,.jpeg" OnChange="UploadLogo" disabled="@_uploading" />
                             <span class="help">@L["set.logoHelp"]</span>
                         </div>
                     </div>
@@ -94,7 +94,7 @@
     private string _tab = "profile";
     private LoadState _state = LoadState.Loading;
     private string? _reference, _basisMessage, _migrationError;
-    private bool _busy, _hasLogo, _confirmBasis, _migration;
+    private bool _busy, _hasLogo, _confirmBasis, _migration, _uploading;
     private int _logoVersion;
     private IReadOnlyList<string>? _extra;
     private ProfileModel _profile = new();
@@ -195,7 +195,8 @@
             await Api.PostAsync(Api.C("settings/migration-complete"), new MigrationCompleteRequest(true));
             _migration = false;
             Toasts.Success(L["set.migrationClosed"]);
-            await Load();
+            // Only the operations figures change; unsaved profile and market edits stay (review L15).
+            _opsResponse = await Api.GetAsync<OperationSettingsResponse>(Api.C("settings/operations"));
         }
         catch (ApiException e) { _migrationError = e.Problem.Detail; }
         finally { _busy = false; }
@@ -203,16 +204,19 @@
 
     private async Task UploadLogo(InputFileChangeEventArgs e)
     {
+        if (_uploading) return;
+        _uploading = true;
         try
         {
-            await using var s = e.File.OpenReadStream(1024 * 1024);
+            await using var s = e.File.OpenReadStream(512 * 1024);   // the API's limit (CompanySettingsService.MaxLogoBytes)
             await Api.UploadAsync<object>(Api.C("settings/logo"), s, e.File.Name, method: HttpMethod.Put);
             _hasLogo = true;
             _logoVersion++;
             Toasts.Success(L["set.logoSaved"]);
         }
         catch (IOException) { Toasts.Error(L["set.logoTooLarge"]); }
-        catch (ApiException x) { Toasts.Error(x.Problem.Detail ?? L["ui.loadFailed"]); }
+        catch (ApiException x) { Toasts.Error(x.Problem.Errors is { Count: > 0 } list ? string.Join(" · ", list.Select(f => f.Message)) : x.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _uploading = false; }
     }
 
     private sealed class ProfileModel

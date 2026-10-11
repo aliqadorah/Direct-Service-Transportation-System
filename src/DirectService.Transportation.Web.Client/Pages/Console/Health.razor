@@ -1,0 +1,71 @@
+@page "/console/health"
+@*
+  SCR-94 provider console: platform health (5.5, P-15): database reachable, tenants by status, users, companies, trips this month across all
+  tenants, pending postings, e-invoices waiting, process memory and uptime. Usage and health figures only — no tenant business data.
+  Refreshed by hand and every minute while the screen is open.
+*@
+@implements IDisposable
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+
+<PageHeader Title="@L["nav.health"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.health"])])">
+    <Actions><Btn Icon="refresh" Text="@L["con.refresh"]" Busy="_busy" OnClick="Load" /></Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.Dashboard" ErrorTitle="@L["con.healthFailed"]" ErrorText="@L["con.healthFailedText"]" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        @if (_h is { } h)
+        {
+            <Figures Items="@([new Figure(L["con.tripsMonth"], Fmt.Count(h.TripsThisMonth)), new Figure(L["con.pendingPostings"], Fmt.Count(h.PendingPostings)),
+                new Figure(L["con.einvoicesWaiting"], Fmt.Count(h.EInvoicesWaiting)), new Figure(L["con.users"], Fmt.Count(h.Users)),
+                new Figure(L["ten.companies"], Fmt.Count(h.Companies))])" />
+            <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+                <Box Title="@L["con.services"]">
+                    <KeyValues Columns="1" Items="@Services(h)" />
+                </Box>
+                <Box Title="@L["con.byStatus"]">
+                    <KeyValues Columns="1" Items="@(h.TenantsByStatus.OrderByDescending(kv => kv.Value).Select(kv => new KeyValue(L["st." + Subscription.TenantStatus(kv.Key)], Fmt.Count(kv.Value))).ToList())" />
+                </Box>
+            </div>
+        }
+    </ChildContent>
+</StateView>
+
+@code {
+    private HealthResponse? _h;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _busy;
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+        _timer = new Timer(_ => InvokeAsync(async () => { await Load(); StateHasChanged(); }), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    private async Task Load()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            _h = await Api.GetAsync<HealthResponse>("api/v1/platform/health");
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        finally { _busy = false; }
+    }
+
+    private IReadOnlyList<KeyValue> Services(HealthResponse h) =>
+    [
+        new(L["con.database"], null, @<Badge Tone="@(h.Database ? Tone.Ok : Tone.Err)" Icon="@(h.Database ? "check" : "alert")" Text="@L[h.Database ? "con.up" : "con.down"]" />),
+        new(L["con.memory"], $"{Fmt.Count(h.ProcessMemoryMb)} MB"),
+        new(L["con.uptime"], Uptime(h.Uptime)),
+        new(L["con.checkedAt"], Fmt.DateTime(h.GeneratedAt.ToLocalTime(), Shell.DateFormat)),
+    ];
+
+    private string Uptime(TimeSpan t) => t.TotalDays >= 1 ? L.F("con.uptimeDays", (int)t.TotalDays, t.Hours) : L.F("con.uptimeHours", t.Hours, t.Minutes);
+
+    public void Dispose() => _timer?.Dispose();
+}

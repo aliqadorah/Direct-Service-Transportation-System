@@ -1,0 +1,226 @@
+@page "/console/tenants"
+@*
+  SCR-90 provider console: tenants (5.5, P-11, P-12; platform staff only): status, plan, usage against limits, sign-up and renewal, with
+  views by status and a search. A tenant's panel shows its dates, usage, subscription invoices and support requests, and the account actions
+  — extend a trial, credit an invoice (D-11: the full amount marks it Credited, a part lowers amount and tax), suspend, reactivate — each with
+  a reason written to the tenant's audit log; staff can also request a support window from here. No tenant business data is shown.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.tenants"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.tenants"])])" />
+<ListShell Label="@L["nav.tenants"]" Views="Views" View="@_status" ViewChanged="SetView" Search="@_q" OnSearch="Search" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="users" EmptyTitle="@L["con.noTenants"]" Filtered="@(_q is not null || _status != "")" OnClear="Clear"
+           Page="_page" PageSize="50" Total="_list?.TotalCount" OnPage="Go">
+    <DataGrid TItem="ConsoleTenantResponse" Items="@(_list?.Items ?? [])" Key="t => t.Id" Caption="@L["nav.tenants"]" OnRowClick="Open">
+        <Columns>
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["con.tenant"]" Value="t => t.Name" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ten.plan"]" Value="t => t.Plan.Name" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Subscription.TenantStatus(context.Status)" /></Template></GridColumn>
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ten.companies"]" Value="@(t => $"{Fmt.Count(t.Usage.Companies)} / {Fmt.Count(t.Usage.MaxCompanies)}")" Numeric="true" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ten.activeUsers"]" Value="@(t => $"{Fmt.Count(t.Usage.ActiveUsers)} / {Fmt.Count(t.Usage.MaxActiveUsers)}")" Numeric="true" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ten.tripsMonth"]" Value="@(t => $"{Fmt.Count(t.Usage.TripsThisMonth)} / {Fmt.Count(t.Usage.MaxTripsPerMonth)}")" Numeric="true" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["con.signedUp"]" Value="t => Fmt.Date(t.SignedUpAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+            <GridColumn TItem="ConsoleTenantResponse" Title="@L["ten.renewal"]" Value="t => Fmt.Date((t.Status == LifecycleCodes.Trial ? t.TrialEndsAt : t.CurrentPeriodEnd)?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+        </Columns>
+    </DataGrid>
+</ListShell>
+
+<SidePanel @bind-Open="_panel" Title="@(_details?.Tenant.Name ?? "")">
+    @if (_details is { } d)
+    {
+        var t = d.Tenant;
+        <div class="stack">
+            <KeyValues Columns="1" Items="@Facts(t)" />
+            <div class="stack" style="gap:6px">
+                @foreach (var (label, used, max, text) in Subscription.UsageRows(L, t.Usage))
+                {
+                    <div>
+                        <div class="row" style="justify-content:space-between"><span>@label</span><bdi class="num">@text</bdi></div>
+                        <ProgressBar Value="used" Max="max" Label="@label" />
+                    </div>
+                }
+            </div>
+            <div class="row" style="gap:6px;flex-wrap:wrap">
+                @* The server's rules (ConsoleService): extend a trial or a suspended ended trial; reactivate Suspended / PastDue / Cancelled; suspend the others. *@
+                @if (t.Status == LifecycleCodes.Trial || t.Status == LifecycleCodes.Suspended && t.CurrentPeriodEnd is null) {<Btn Icon="clock" Text="@L["con.extendTrial"]" OnClick="@(() => Ask("extend"))" />}
+                @if (t.Status is LifecycleCodes.Suspended or LifecycleCodes.PastDue or LifecycleCodes.Cancelled) {<Btn Icon="check" Text="@L["con.reactivate"]" OnClick="@(() => Ask("reactivate"))" />}
+                @if (t.Status is not (LifecycleCodes.Suspended or LifecycleCodes.Cancelled or LifecycleCodes.Deleted)) {<Btn Danger="true" Icon="lock" Text="@L["con.suspend"]" OnClick="@(() => Ask("suspend"))" />}
+                @if (t.Status != LifecycleCodes.Deleted) {<Btn Icon="shield" Text="@L["con.requestSupport"]" OnClick="@(() => Ask("support"))" />}
+            </div>
+            <h3 class="lbl" style="margin:8px 0 0">@L["ten.invoices"]</h3>
+            @if (d.Invoices.Count == 0) {<p class="muted" style="margin:0">@L["ten.noInvoices"]</p>}
+            else
+            {
+                <DataGrid TItem="SubscriptionInvoiceResponse" Items="d.Invoices" Key="i => i.Id" Caption="@L["ten.invoices"]">
+                    <Columns>
+                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
+                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
+                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Subscription.InvoiceStatus(context.Status)" /></Template></GridColumn>
+                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @if (context.Status is LifecycleCodes.Due or LifecycleCodes.Failed) {<Btn Small="true" Ghost="true" Text="@L["con.credit"]" AriaLabel="@L.F("con.creditTitle", context.Number)" OnClick="() => AskCredit(context)" />}
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+            }
+            <h3 class="lbl" style="margin:8px 0 0">@L["nav.supportAccess"]</h3>
+            @if (d.SupportAccess.Count == 0) {<p class="muted" style="margin:0">@L["ten.noSupport"]</p>}
+            else
+            {
+                @foreach (var g in d.SupportAccess)
+                {
+                    <div class="row" style="gap:6px;align-items:center"><StatusTag Status="@SupportApprovals.Status(g)" /><span>@g.RequestedBy · @g.Reason</span></div>
+                }
+            }
+        </div>
+    }
+</SidePanel>
+
+<Modal @bind-Open="_acting" Title="@ActionTitle" Busy="_busy" Icon="@(_action == "support" ? "shield" : null)">
+    <ChildContent>
+        @if (_action == "extend")
+        {
+            <IntField @bind-Value="_days" Label="@L["con.days"]" Required="true" Min="1" Max="90" />
+        }
+        @if (_action == "credit" && _invoice is not null)
+        {
+            <p style="margin:0">@L.F("con.creditText", _invoice.Number, Fmt.Money(_invoice.Total))</p>
+            <NumberField @bind-Value="_amount" Label="@L["con.creditAmount"]" Required="true" Min="0.001m" Max="_invoice.Total" Help="@L["con.creditHelp"]" />
+        }
+        @if (_action is "suspend") {<Banner Tone="Tone.Warn" Text="@L["con.suspendText"]" />}
+        @if (_action is "support") {<p class="muted" style="margin:0">@L["con.supportText"]</p>}
+        <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" />
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _acting = false" />
+        <Btn Primary="@(_action != "suspend")" DangerPrimary="@(_action == "suspend")" Text="@L["ui.confirm"]" Busy="_busy" Disabled="@string.IsNullOrWhiteSpace(_reason)" OnClick="Act" />
+    </Footer>
+</Modal>
+
+@code {
+    private PagedResult<ConsoleTenantResponse>? _list;
+    private ConsoleTenantDetails? _details;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _action, _reason, _error;
+    private string _status = "";
+    private int _page = 1, _version, _detailsVersion;
+    private bool _panel, _acting, _busy;
+    private int? _days = 7;
+    private decimal? _amount;
+    private SubscriptionInvoiceResponse? _invoice;
+
+    private IReadOnlyList<TabItem> Views =>
+    [
+        new("", L["con.all"]), new(LifecycleCodes.Trial, L["st.trial"]), new(LifecycleCodes.Active, L["st.active"]), new(LifecycleCodes.PastDue, L["st.pastDue"]),
+        new(LifecycleCodes.Suspended, L["st.suspended"]), new(LifecycleCodes.Cancelled, L["st.cancelled"]),
+    ];
+
+    private string ActionTitle => _action switch
+    {
+        "extend" => L["con.extendTrial"], "suspend" => L["con.suspend"], "reactivate" => L["con.reactivate"],
+        "credit" => L.F("con.creditTitle", _invoice?.Number ?? ""), "support" => L["con.requestSupport"], _ => "",
+    };
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private Task SetView(string v) { _status = v; _page = 1; return Load(); }
+    private Task Search(string? q) { _q = string.IsNullOrWhiteSpace(q) ? null : q; _page = 1; return Load(); }
+    private Task Go(int p) { _page = p; return Load(); }
+    private Task Clear() { _q = null; _status = ""; _page = 1; return Load(); }
+
+    private async Task Load()
+    {
+        var version = ++_version;
+        _state = LoadState.Loading;
+        try
+        {
+            var qs = $"page={_page}&pageSize=50" + (_status == "" ? "" : "&status=" + Uri.EscapeDataString(_status)) + (_q is null ? "" : "&q=" + Uri.EscapeDataString(_q));
+            var list = await Api.GetAsync<PagedResult<ConsoleTenantResponse>>("api/v1/platform/tenants?" + qs);
+            if (version != _version) return;   // a later view, search or page is on its way
+            _list = list;
+            _state = list.TotalCount == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Facts(ConsoleTenantResponse t)
+    {
+        var list = new List<KeyValue>
+        {
+            new(L["ml.status"], null, @<StatusTag Status="@Subscription.TenantStatus(t.Status)" />),
+            new(L["ten.plan"], $"{t.Plan.Name} · {L["ten.cycle." + t.BillingCycle]}"),
+            new(L["con.owner"], t.OwnerEmail ?? "—"),
+            new(L["con.signedUp"], Fmt.Date(t.SignedUpAt.ToLocalTime(), Shell.DateFormat)),
+        };
+        void Add(string key, DateTime? d) { if (d is { } v) list.Add(new(L[key], Fmt.Date(v.ToLocalTime(), Shell.DateFormat))); }
+        Add("ten.trialEnds", t.TrialEndsAt);
+        Add("ten.renewal", t.CurrentPeriodEnd);
+        Add("ten.graceEnds", t.GraceEndsAt);
+        Add("con.cancelledAt", t.CancelledAt);
+        Add("ten.retentionEnds", t.RetentionEndsAt);
+        return list;
+    }
+
+    private async Task Open(ConsoleTenantResponse t)
+    {
+        var version = ++_detailsVersion;
+        _details = null;   // no action on the previous tenant while this one loads
+        try
+        {
+            var details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{Uri.EscapeDataString(t.Id)}");
+            if (version != _detailsVersion) return;   // another tenant was clicked meanwhile
+            _details = details;
+            _panel = true;
+        }
+        catch (ApiException e) when (version == _detailsVersion) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    /// <summary>A refusal's text: the detail, else the field messages (e.g. days out of range).</summary>
+    internal static string? ProblemText(ApiProblem p) => p.Detail ?? (p.Errors is { Count: > 0 } e ? string.Join(" · ", e.Select(x => x.Message)) : null);
+
+    private void Ask(string action)
+    {
+        _action = action;
+        _reason = null;
+        _error = null;
+        _days = 7;
+        _acting = true;
+    }
+
+    private void AskCredit(SubscriptionInvoiceResponse i)
+    {
+        _invoice = i;
+        _amount = i.Total;
+        Ask("credit");
+    }
+
+    private async Task Act()
+    {
+        if (_details is null || _action is null) return;
+        var id = Uri.EscapeDataString(_details.Tenant.Id);
+        _busy = true;
+        _error = null;
+        try
+        {
+            switch (_action)
+            {
+                case "extend": await Api.PostAsync<ConsoleTenantResponse>($"api/v1/platform/tenants/{id}/extend-trial", new ExtendTrialRequest(_days, _reason)); break;
+                case "suspend": await Api.PostAsync<ConsoleTenantResponse>($"api/v1/platform/tenants/{id}/suspend", new TenantStatusRequest(_reason)); break;
+                case "reactivate": await Api.PostAsync<ConsoleTenantResponse>($"api/v1/platform/tenants/{id}/reactivate", new TenantStatusRequest(_reason)); break;
+                case "credit": await Api.PostAsync<SubscriptionInvoiceResponse>($"api/v1/platform/tenants/{id}/credit", new ApplyCreditRequest(_invoice?.Id, _amount, _reason)); break;
+                case "support": await Api.PostAsync<SupportAccessResponse>("api/v1/platform/support-access", new SupportAccessRequest(_details.Tenant.Id, _reason)); break;
+            }
+            _acting = false;
+            Toasts.Success(L["con.done." + _action]);
+            _details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{id}");
+            await Load();
+        }
+        catch (ApiException e) { _error = ProblemText(e.Problem) ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+}

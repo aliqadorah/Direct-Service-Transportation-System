@@ -1,0 +1,241 @@
+@page "/tenant/subscription"
+@*
+  SCR-80 subscription and billing (5.2, 5.3, P-04…P-07, BR-010…013; core.tenant.manage): status, plan, renewal and grace dates, usage
+  against the plan's limits, the plans on offer — pay / upgrade through the gateway's hosted page (card data never reaches the platform,
+  SEC-10), downgrade (refused with the exceeded limits, BR-012), cancel (90-day retention) — and the SUB- invoices with their printout.
+  Paying and cancelling stay possible while suspended (BR-011).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.subscription"]" Crumbs="@([new Crumb(L["nav.tenant"]), new Crumb(L["nav.subscription"])])">
+    <Actions>
+        @if (_sub is { } s && s.Status is not (LifecycleCodes.Cancelled or LifecycleCodes.Deleted))
+        {
+            <Btn Danger="true" Icon="x" Text="@L["ten.cancelSubscription"]" OnClick="() => { _error = null; _cancelling = true; }" />
+        }
+    </Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NoAccessView /></Empty>
+    <ChildContent>
+        @if (_sub is { } s)
+        {
+            @if (_planError is not null) {<Banner Tone="Tone.Err" Text="@_planError" Live="true" />}
+            @if (s.Status == LifecycleCodes.Cancelled)
+            {
+                <Banner Tone="Tone.Warn" Icon="archive" Text="@L.F("ten.cancelledText", Fmt.Date(s.RetentionEndsAt?.ToLocalTime(), Shell.DateFormat))">
+                    <Actions><a href="/tenant/export">@L["nav.dataExport"]</a></Actions>
+                </Banner>
+            }
+            <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));flex:none">
+                <Box Title="@L.F("ten.currentPlan", L.Pick(s.Plan.NameAr, s.Plan.NameEn), L["ten.cycle." + s.BillingCycle])">
+                    <KeyValues Columns="2" Items="@Facts(s)" />
+                </Box>
+                <Box Title="@L["ten.usage"]">
+                    <div class="stack" style="gap:8px">
+                        @foreach (var (label, used, max, text) in Usage(s.Usage))
+                        {
+                            <div>
+                                <div class="row" style="justify-content:space-between"><span>@label</span><bdi class="num">@text</bdi></div>
+                                <ProgressBar Value="used" Max="max" Label="@label" />
+                            </div>
+                        }
+                    </div>
+                </Box>
+            </div>
+            <Box Title="@L["ten.plans"]" NoPad="true">
+                @if (s.Plans.Count == 0)
+                {
+                    <EmptyState Icon="layers" Title="@L["ten.noPlans"]" Text="@L["ten.noPlansText"]" />
+                }
+                else
+                {
+                <DataGrid TItem="PlanResponse" Items="s.Plans" Key="p => p.Id" Caption="@L["ten.plans"]">
+                    <Columns>
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.plan"]" Value="p => L.Pick(p.NameAr, p.NameEn)" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.price"]" Value="p => Fmt.Money(p.Price)" Numeric="true" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.cycle"]" Value="@(p => L["ten.cycle." + p.BillingCycle])" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.companies"]" Value="p => Fmt.Count(p.MaxCompanies)" Numeric="true" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.activeUsers"]" Value="p => Fmt.Count(p.MaxActiveUsers)" Numeric="true" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.tripsMonth"]" Value="p => Fmt.Count(p.MaxTripsPerMonth)" Numeric="true" />
+                        <GridColumn TItem="PlanResponse" Title="@L["ten.storage"]" Value="p => Fmt.Count(p.MaxStorageMb)" Numeric="true" />
+                        <GridColumn TItem="PlanResponse" Title="@L["profile.action"]" HideTitle="true">
+                            <Template>
+                                @switch (Action(s, context))
+                                {
+                                    case "current": <Badge Tone="Tone.Ok" Icon="check" Text="@L["ten.current"]" />break;
+                                    case "pay": <Btn Small="true" Primary="true" Icon="cash" Text="@L["ten.payNow"]" Busy="@(_busyPlan == context.Id)" Disabled="@(_busyPlan is not null)" OnClick="() => Checkout(context)" />break;
+                                    case "downgrade": <Btn Small="true" Icon="down" Text="@L["ten.downgrade"]" Disabled="@(_busyPlan is not null)" OnClick="() => AskDowngrade(context)" />break;
+                                    case "choose": <Btn Small="true" Primary="true" Icon="up" Text="@L[s.Status == LifecycleCodes.Active ? "ten.upgrade" : "ten.choose"]" Busy="@(_busyPlan == context.Id)" Disabled="@(_busyPlan is not null)" OnClick="() => Checkout(context)" />break;
+                                }
+                            </Template>
+                        </GridColumn>
+                    </Columns>
+                </DataGrid>
+                }
+                <p class="pad help" style="margin:0">@L["ten.plansHelp"]</p>
+            </Box>
+            <Box Title="@L["ten.invoices"]" NoPad="true" Fill="true">
+                @if (_invoices.Count == 0)
+                {
+                    <EmptyState Icon="file" Title="@L["ten.noInvoices"]" />
+                }
+                else
+                {
+                    <DataGrid TItem="SubscriptionInvoiceResponse" Items="_invoices" Key="i => i.Id" Caption="@L["ten.invoices"]">
+                        <Columns>
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.date"]" Value="i => Fmt.Date(i.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.period"]" Value="@(i => Fmt.Date(i.PeriodStart, Shell.DateFormat) + " – " + Fmt.Date(i.PeriodEnd, Shell.DateFormat))" Ltr="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.amount"]" Value="i => Fmt.Money(i.Amount)" Numeric="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.tax"]" Value="i => Fmt.Money(i.Tax)" Numeric="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@InvoiceStatus(context.Status)" /></Template></GridColumn>
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
+                                <Template>
+                                    <Btn Small="true" Icon="import" Text="@L["ten.download"]" AriaLabel="@L.F("ten.downloadInvoice", context.Number)" OnClick="() => Print(context)" />
+                                </Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                }
+            </Box>
+        }
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_downgrading" Title="@L.F("ten.downgradeTitle", _target is null ? "" : L.Pick(_target.NameAr, _target.NameEn))" ConfirmText="@L["ten.downgrade"]"
+               Message="@L["ten.downgradeText"]" Busy="_busy" Error="@_error" OnConfirm="_ => Downgrade()" />
+<ConfirmDialog @bind-Open="_cancelling" Title="@L["ten.cancelSubscription"]" Danger="true" AskReason="true" ConfirmText="@L["ten.cancelSubscription"]"
+               Message="@L["ten.cancelText"]" TypedWord="@L["ten.cancelWord"]" Busy="_busy" Error="@_error" OnConfirm="Cancel" />
+
+@code {
+    private SubscriptionResponse? _sub;
+    private IReadOnlyList<SubscriptionInvoiceResponse> _invoices = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error, _planError, _busyPlan;
+    private PlanResponse? _target;
+    private bool _busy, _downgrading, _cancelling;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _sub = await Api.GetAsync<SubscriptionResponse>("api/v1/tenant/subscription");
+            _invoices = await Api.GetAsync<IReadOnlyList<SubscriptionInvoiceResponse>>("api/v1/tenant/subscription/invoices");
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status is 403 or 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Facts(SubscriptionResponse s)
+    {
+        var list = new List<KeyValue>
+        {
+            new(L["ml.status"], null, @<StatusTag Status="@TenantStatus(s.Status)" />),
+            new(L["ten.price"], $"{Fmt.Money(s.Plan.Price)} / {L["ten.per." + s.BillingCycle]}"),
+        };
+        if (s.TrialEndsAt is { } trial && s.Status == LifecycleCodes.Trial) list.Add(new(L["ten.trialEnds"], Fmt.Date(trial.ToLocalTime(), Shell.DateFormat)));
+        if (s.CurrentPeriodEnd is { } end && s.Status != LifecycleCodes.Trial) list.Add(new(L["ten.renewal"], Fmt.Date(end.ToLocalTime(), Shell.DateFormat)));
+        if (s.GraceEndsAt is { } grace) list.Add(new(L["ten.graceEnds"], Fmt.Date(grace.ToLocalTime(), Shell.DateFormat)));
+        if (s.RetentionEndsAt is { } keep) list.Add(new(L["ten.retentionEnds"], Fmt.Date(keep.ToLocalTime(), Shell.DateFormat)));
+        return list;
+    }
+
+    internal IEnumerable<(string Label, decimal Used, decimal Max, string Text)> Usage(UsageResponse u) => UsageRows(L, u);
+
+    /// <summary>Usage against the plan's limits (P-07), shared with the provider console.</summary>
+    internal static IEnumerable<(string Label, decimal Used, decimal Max, string Text)> UsageRows(Loc l, UsageResponse u) =>
+    [
+        (l["ten.companies"], u.Companies, u.MaxCompanies, $"{Fmt.Count(u.Companies)} / {Fmt.Count(u.MaxCompanies)}"),
+        (l["ten.activeUsers"], u.ActiveUsers, u.MaxActiveUsers, $"{Fmt.Count(u.ActiveUsers)} / {Fmt.Count(u.MaxActiveUsers)}"),
+        (l["ten.tripsMonth"], u.TripsThisMonth, u.MaxTripsPerMonth, $"{Fmt.Count(u.TripsThisMonth)} / {Fmt.Count(u.MaxTripsPerMonth)}"),
+        (l["ten.storage"], u.StorageMb, u.MaxStorageMb, $"{Fmt.Qty(u.StorageMb, 1)} / {Fmt.Count(u.MaxStorageMb)}"),
+    ];
+
+    /// <summary>
+    /// What a plan row offers (the API decides and refuses otherwise): the current plan is paid again only when the subscription is not
+    /// active; a cheaper plan of the same cycle is a downgrade while active; any other plan starts a checkout (subscribe or pro-rated upgrade).
+    /// </summary>
+    private static string? Action(SubscriptionResponse s, PlanResponse p)
+    {
+        if (s.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) return null;
+        if (p.Id == s.Plan.Id) return s.Status == LifecycleCodes.Active ? "current" : "pay";
+        if (s.Status == LifecycleCodes.Active && p.BillingCycle == s.Plan.BillingCycle && p.Price < s.Plan.Price) return "downgrade";
+        return "choose";
+    }
+
+    internal static string TenantStatus(string s) => s switch
+    {
+        LifecycleCodes.Trial => "trial", LifecycleCodes.PastDue => "pastDue", LifecycleCodes.Suspended => "suspended",
+        LifecycleCodes.Cancelled => "cancelled", LifecycleCodes.Deleted => "deleted", _ => "active",
+    };
+
+    internal static string InvoiceStatus(string s) => s switch
+    {
+        LifecycleCodes.Paid => "paid", LifecycleCodes.Failed => "failed", LifecycleCodes.Credited => "credited", _ => "due",
+    };
+
+    private async Task Checkout(PlanResponse p)
+    {
+        _busyPlan = p.Id;
+        _planError = null;
+        try
+        {
+            var r = await Api.PostAsync<CheckoutResponse>("api/v1/tenant/subscription/checkout", new CheckoutRequest(p.Id));
+            // The gateway's hosted page (SEC-10): only an https address or a path of this site is followed.
+            if (Uri.TryCreate(r.PaymentUrl, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps) Nav.NavigateTo(url.AbsoluteUri, forceLoad: true);
+            else if (SafeHref.Of(r.PaymentUrl) is { } local) Nav.NavigateTo(local, forceLoad: true);
+            else _planError = L["ten.paymentUnavailable"];
+        }
+        catch (ApiException e) { _planError = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busyPlan = null; }
+    }
+
+    private void AskDowngrade(PlanResponse p)
+    {
+        _target = p;
+        _error = null;
+        _downgrading = true;
+    }
+
+    private async Task Downgrade()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            _sub = await Api.PostAsync<SubscriptionResponse>("api/v1/tenant/subscription/downgrade", new PlanChangeRequest(_target.Id));
+            _downgrading = false;
+            _planError = null;
+            Toasts.Success(L.F("ten.downgraded", L.Pick(_target.NameAr, _target.NameEn)));
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Cancel(string reason)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _sub = await Api.PostAsync<SubscriptionResponse>("api/v1/tenant/subscription/cancel", new ReasonRequest(reason));
+            _cancelling = false;
+            Toasts.Success(L["ten.cancelled"]);
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private Task Print(SubscriptionInvoiceResponse i) => Files.SaveAsync($"api/v1/tenant/subscription/invoices/{Uri.EscapeDataString(i.Id)}/print", "pdf");
+}

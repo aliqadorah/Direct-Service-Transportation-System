@@ -1,0 +1,31 @@
+@*
+  Guards a form with unsaved changes: leaving the screen inside the application asks first (discard or stay); closing or reloading the tab
+  gets the browser's own prompt. Screens set Dirty while their form differs from what was loaded or saved.
+*@
+@inject NavigationManager Nav
+@inject Loc L
+
+<NavigationLock ConfirmExternalNavigation="Dirty" OnBeforeInternalNavigation="Leaving" />
+<ConfirmDialog @bind-Open="_asking" Title="@L["ui.unsavedTitle"]" ConfirmText="@L["ui.discard"]" Danger="true" Message="@L["ui.unsavedText"]" OnConfirm="_ => Leave()" />
+
+@code {
+    private bool _asking, _leaving;
+    private string? _target;
+
+    [Parameter] public bool Dirty { get; set; }
+
+    private void Leaving(LocationChangingContext context)
+    {
+        if (!Dirty || _leaving) return;
+        context.PreventNavigation();
+        _target = context.TargetLocation;
+        _asking = true;
+    }
+
+    private void Leave()
+    {
+        _asking = false;
+        _leaving = true;
+        if (_target is not null) Nav.NavigateTo(_target);
+    }
+}

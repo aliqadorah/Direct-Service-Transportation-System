@@ -50,7 +50,7 @@
                    EmptyTitle="@L[Payables ? "ap.noPayments" : "ap.noCollections"]" Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/payments/export?kind={Kind}&status=all"), f))"
                    Page="_page" PageSize="50" Total="_payments?.Page.TotalCount" OnPage="Go">
             <DataGrid TItem="ApArPaymentResponse" Items="_payments!.Page.Items" Key="p => p.Id" Caption="@L[Payables ? "ap.payments" : "ap.collections"]" RowClass="@(p => p.Status == "Void" ? "void" : null)"
-                      OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-payments/{p.Id}")))" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_payments.Totals.Count))">
+                      OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-payments/{p.Id}")))" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_payments.Totals.Included))">
                 <Columns>
                     <GridColumn TItem="ApArPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" />
                     <GridColumn TItem="ApArPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" />

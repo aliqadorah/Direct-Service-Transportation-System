@@ -267,21 +267,31 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal("Requested", requested.Status);
         Assert.Contains((await ReadAsync<NotificationPage>(await owner.Client.GetAsync(U(owner, "/notifications")))).Items, n => n.Type == "CORE.SupportRequested");
         Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);   // not approved yet
+        Assert.DoesNotContain(await ReadAsync<List<CompanyAccess>>(await staff.Client.GetAsync("/api/v1/platform/support-access/companies")), c => c.Id == owner.CompanyId);
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/support-access/companies")).StatusCode);   // staff only
 
         var grants = await ReadAsync<List<SupportAccessResponse>>(await owner.Client.GetAsync("/api/v1/tenant/support-access"));
         Assert.Equal("support.window", await (await owner.Client.PostAsJsonAsync($"/api/v1/tenant/support-access/{grants[0].Id}/approve",
             new SupportApprovalRequest(DateTime.UtcNow, DateTime.UtcNow.AddDays(8), null))).ProblemCodeAsync());
         await (await owner.Client.PostAsJsonAsync($"/api/v1/tenant/support-access/{grants[0].Id}/approve", new SupportApprovalRequest(null, null, "OK for today"))).EnsureOkAsync();
 
+        // DT-152: the window's companies are listed for the staff member with the read-only session permissions.
+        var open = Assert.Single(await ReadAsync<List<CompanyAccess>>(await staff.Client.GetAsync("/api/v1/platform/support-access/companies")), c => c.Id == owner.CompanyId);
+        Assert.Equal("Support", open.Role);
+        Assert.DoesNotContain(PermissionKeys.MastersManage, open.Permissions);
         var list = await ReadAsync<PagedResult<CustomerResponse>>(await staff.Client.GetAsync(U(owner, "/customers")));
         Assert.Contains(list.Items, c => c.Name == "Support Co");
         // Read-only (G-09): the session holds view permissions only; the write guard also refuses (support.readOnly).
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.PostAsJsonAsync(U(owner, "/customers"),
             new CustomerRequest("By support", null, null, "0781234567", null, null, null, null, 0, null, null, null, null, null))).StatusCode);
         Assert.True(await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.Action == "SupportRequest" && a.NewValues!.Contains("/customers"))));
+        // Views only: synchronous exports and files are refused too (review M1), the list itself stays readable.
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.GetAsync(U(owner, "/customers/export"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.Client.GetAsync(U(owner, "/accounting/journal-entries/export?format=csv"))).StatusCode);
 
         // The Owner ends the window → no access.
         await (await owner.Client.PostAsync($"/api/v1/tenant/support-access/{grants[0].Id}/end", null)).EnsureOkAsync();
         Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);
+        Assert.DoesNotContain(await ReadAsync<List<CompanyAccess>>(await staff.Client.GetAsync("/api/v1/platform/support-access/companies")), c => c.Id == owner.CompanyId);
     }
 }

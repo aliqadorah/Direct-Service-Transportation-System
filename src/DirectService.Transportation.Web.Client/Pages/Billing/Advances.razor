@@ -24,7 +24,7 @@
     <ChildContent>
         <DataGrid TItem="AdvanceResponse" Items="_page!.Page.Items" Key="a => a.Id" Caption="@L["drv.advancesList"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
                   OnRowClick="@(a => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/advances/{a.Id}")))" RowClass="@(a => a.Status == "Void" ? "void" : null)"
-                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Included))">
             <Columns>
                 <GridColumn TItem="AdvanceResponse" Title="@L["doc.number"]" Value="a => a.Number" Ltr="true" SortKey="number" />
                 <GridColumn TItem="AdvanceResponse" Title="@L["trip.date"]" Value="a => Fmt.Date(a.AdvanceDate, Shell.DateFormat)" Ltr="true" SortKey="advanceDate" />

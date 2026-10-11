@@ -1,25 +1,32 @@
 @page "/c/{Company}/settings/invoice-layout"
 @*
-  SCR-74 invoice layout designer (FR-054…056): claim statement and tax invoice layouts — title, header band, grouping of the claim's first
-  page (loading site / route / material), annex columns in order (the amount column is required), column labels, footer text, signature
-  boxes, logo and QR; saved, then shown in the live preview with sample trips (sandboxed frame without scripts).
+  SCR-74 invoice layout designer (FR-054…056; inv.issue): claim statement and tax invoice layouts — title, header band, grouping of the
+  claim's first page (loading site / route / material), annex columns in order (the amount column is required; trip custom fields by their
+  labels), column labels, footer text, signature boxes (at most six), logo and QR. The preview follows the unsaved form live (the server
+  renders it with sample trips without storing anything, DT-154) in a sandboxed frame without scripts; "Restore default" fills the form with
+  the built-in layout, saved only with Save. Unsaved changes are confirmed before switching document type.
 *@
+@implements IDisposable
 @inject Api Api
 @inject Loc L
+@inject FormConfig Forms
 @inject ToastService Toasts
 
 <PageHeader Title="@L["nav.layoutDesigner"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.layoutDesigner"])])">
-    <Actions><Btn Primary="true" Text="@L["lay.savePreview"]" Shortcut="Ctrl S" Busy="_busy" Disabled="_layout is null" OnClick="Save" /></Actions>
+    <Actions>
+        <Btn Icon="refresh" Text="@L["lay.restoreDefault"]" Disabled="@(_layout is null || _busy)" OnClick="RestoreDefault" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="@(_layout is null)" OnClick="Save" />
+    </Actions>
 </PageHeader>
-<TabStrip Items="Tabs" Selected="@_type" SelectedChanged="SetType" Label="@L["nav.layoutDesigner"]" />
-<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+<TabStrip Items="Tabs" Selected="@_type" SelectedChanged="AskType" Label="@L["nav.layoutDesigner"]" />
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="() => Load()">
     <ChildContent>
         <div class="cols fill" style="grid-template-columns:420px 1fr;min-height:0">
             <EditForm EditContext="_ctx" OnValidSubmit="Save" class="box pad stack" style="overflow:auto">
                 <ProblemValidator @ref="_problems" />
                 <ErrorSummary Extra="_extra" />
-                <TextField @bind-Value="_m.Title" Label="@L["lay.title"]" Required="true" MaxLength="100" />
-                <TextField @bind-Value="_m.BandText" Label="@L["lay.band"]" MaxLength="200" />
+                <TextField @bind-Value="_m.Title" Label="@L["lay.title"]" Required="true" MaxLength="200" />
+                <TextField @bind-Value="_m.BandText" Label="@L["lay.band"]" MaxLength="300" />
                 @if (_type == InvoiceCodes.Claim) {<SelectField TValue="string?" @bind-Value="_m.Grouping" Options="Groupings" Label="@L["lay.grouping"]" />}
                 <fieldset class="stack" style="border:0;padding:0;margin:0;gap:4px">
                     <legend class="lbl">@L["lay.columns"]</legend>
@@ -28,21 +35,22 @@
                         var col = _m.Columns[i];
                         var index = i;
                         <div class="row" style="gap:6px;align-items:center">
-                            <input type="checkbox" id="@($"lay-col-{col.Key}")" checked="@col.On" disabled="@(col.Key == "amount")" @onchange="e => col.On = e.Value is true" />
+                            <input type="checkbox" id="@($"lay-col-{col.Key}")" checked="@col.On" disabled="@(col.Key == "amount")" @onchange="e => Changed(() => col.On = e.Value is true)" />
                             <label for="@($"lay-col-{col.Key}")" style="min-width:110px">@ColumnName(col.Key)</label>
-                            <input class="input" style="height:26px;flex:1" aria-label="@L.F("lay.labelOf", ColumnName(col.Key))" placeholder="@ColumnName(col.Key)" maxlength="60"
-                                   value="@col.Label" @onchange="e => col.Label = e.Value?.ToString()" />
+                            <input class="input" style="height:26px;flex:1" aria-label="@L.F("lay.labelOf", ColumnName(col.Key))" placeholder="@ColumnName(col.Key)" maxlength="100"
+                                   value="@col.Label" @onchange="e => Changed(() => col.Label = e.Value?.ToString())" />
                             <Btn Small="true" Ghost="true" Icon="up" AriaLabel="@L.F("lay.up", ColumnName(col.Key))" Disabled="index == 0" OnClick="() => Move(index, -1)" />
                             <Btn Small="true" Ghost="true" Icon="down" AriaLabel="@L.F("lay.down", ColumnName(col.Key))" Disabled="index == _m.Columns.Count - 1" OnClick="() => Move(index, 1)" />
                         </div>
                     }
                 </fieldset>
                 <TextAreaField @bind-Value="_m.Footer" Label="@L["lay.footer"]" MaxLength="500" Rows="2" />
-                <TextAreaField @bind-Value="_m.Signatures" Label="@L["lay.signatures"]" MaxLength="300" Rows="3" Help="@L["lay.signaturesHelp"]" />
+                <TextAreaField @bind-Value="_m.Signatures" Label="@L["lay.signatures"]" MaxLength="400" Rows="3" Help="@L["lay.signaturesHelp"]" />
                 <CheckField @bind-Value="_m.ShowLogo" Label="@L["lay.logo"]" />
                 <CheckField @bind-Value="_m.ShowQr" Label="@L["lay.qr"]" />
             </EditForm>
-            <div class="box" style="display:flex;justify-content:center;background:var(--surface-sunk);padding:12px;min-height:0">
+            <div class="box" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface-sunk);padding:12px;min-height:0">
+                <span class="muted" role="status">@(_dirty ? L["lay.previewUnsaved"] : L["lay.preview"])</span>
                 @if (_preview is null) {<p class="muted">@L["ui.loading"]</p>}
                 else
                 {
@@ -53,81 +61,172 @@
     </ChildContent>
 </StateView>
 
+<UnsavedGuard Dirty="_dirty" />
+<ConfirmDialog @bind-Open="_confirmSwitch" Title="@L["lay.unsavedTitle"]" ConfirmText="@L["lay.discard"]" Danger="true" Message="@L["lay.unsavedText"]"
+               OnConfirm="_ => SetType(_pendingType!)" />
+
 @code {
     private string _type = InvoiceCodes.Claim;
+    private string? _pendingType;
     private InvoiceLayoutResponse? _layout;
     private string? _preview, _reference;
     private Model _m = new();
     private EditContext _ctx = new(new Model());
     private LoadState _state = LoadState.Loading;
-    private bool _busy;
+    private bool _busy, _dirty, _confirmSwitch;
     private ProblemValidator? _problems;
     private IReadOnlyList<string>? _extra;
+    private int _version, _previewVersion;
+    private CancellationTokenSource? _previewDelay;
+    private FormView _tripForm = FormView.Empty;
 
     [Parameter] public string Company { get; set; } = "";
 
     private IReadOnlyList<TabItem> Tabs => [new(InvoiceCodes.Claim, L["inv.layoutClaim"]), new(InvoiceCodes.TaxInvoice, L["inv.layoutTax"])];
     private IReadOnlyList<Option<string?>> Groupings => [new("LoadingSite", L["trip.loading"]), new("Route", L["drv.route"]), new("Material", L["trip.material"])];
 
-    private string ColumnName(string key) => L["lay.col." + key] is var t && t.StartsWith("lay.", StringComparison.Ordinal) ? key : t;
-
-    protected override Task OnInitializedAsync() => Load();
-
-    private Task SetType(string t) { _type = t; return Load(); }
-
-    private async Task Load()
+    /// <summary>Built-in columns by their text; trip custom fields ("custom.key") by their configured label.</summary>
+    private string ColumnName(string key)
     {
-        _state = LoadState.Loading;
+        if (key.StartsWith("custom.", StringComparison.Ordinal))
+        {
+            var field = key["custom.".Length..];
+            return _tripForm.Custom.FirstOrDefault(f => f.Key == key || f.Key == field)?.Label ?? field;
+        }
+        return L["lay.col." + key] is var t && t.StartsWith("lay.", StringComparison.Ordinal) ? key : t;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _tripForm = await Forms.GetAsync(FormConfig.Trip); } catch (ApiException) { }
+        await Load();
+    }
+
+    private void AskType(string t)
+    {
+        if (t == _type) return;
+        if (_dirty) { _pendingType = t; _confirmSwitch = true; }
+        else _ = SetType(t);
+    }
+
+    private Task SetType(string t)
+    {
+        _type = t;
+        _confirmSwitch = false;
+        return Load();
+    }
+
+    private async Task Load(bool builtIn = false)
+    {
+        var version = ++_version;
+        var type = _type;
+        _layout = null;   // no save until this type's layout is here
+        _preview = null;
+        if (!builtIn) _state = LoadState.Loading;
         try
         {
-            _layout = await Api.GetAsync<InvoiceLayoutResponse>(Api.C($"invoice-layouts/{_type}"));
-            var chosen = _layout.AnnexColumns.ToList();
-            _m = new Model
-            {
-                Title = _layout.Title, BandText = _layout.BandText, Grouping = _layout.Grouping, Footer = _layout.FooterText, Signatures = string.Join('\n', _layout.Signatures),
-                ShowLogo = _layout.ShowLogo, ShowQr = _layout.ShowQr,
-                // Chosen columns first in their order, then the others.
-                Columns = chosen.Concat(_layout.AvailableColumns.Except(chosen)).Select(k => new ColumnModel(k)
-                    { On = chosen.Contains(k) || k == "amount", Label = _layout.Labels.GetValueOrDefault(k) }).ToList(),
-            };
-            _ctx = new EditContext(_m);
+            var layout = await Api.GetAsync<InvoiceLayoutResponse>(Api.C($"invoice-layouts/{type}" + (builtIn ? "?builtIn=true" : "")));
+            if (version != _version || type != _type) return;   // the user moved to the other document type meanwhile
+            _layout = layout;
+            Fill(layout);
+            _dirty = builtIn;
             _state = LoadState.Ready;
             await Preview();
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Fill(InvoiceLayoutResponse layout)
+    {
+        var chosen = layout.AnnexColumns.ToList();
+        _m = new Model
+        {
+            Title = layout.Title, BandText = layout.BandText, Grouping = layout.Grouping, Footer = layout.FooterText, Signatures = string.Join('\n', layout.Signatures),
+            ShowLogo = layout.ShowLogo, ShowQr = layout.ShowQr,
+            // Chosen columns first in their order, then the others.
+            Columns = chosen.Concat(layout.AvailableColumns.Except(chosen)).Select(k => new ColumnModel(k)
+                { On = chosen.Contains(k) || k == "amount", Label = layout.Labels.GetValueOrDefault(k) }).ToList(),
+        };
+        _ctx = new EditContext(_m);
+        _ctx.OnFieldChanged += (_, _) => { _dirty = true; SchedulePreview(); };
+        _extra = null;
+    }
+
+    private Task RestoreDefault() => Load(builtIn: true);
+
+    private InvoiceLayoutRequest Request()
+    {
+        var labels = _m.Columns.Where(c => !string.IsNullOrWhiteSpace(c.Label)).ToDictionary(c => c.Key, c => c.Label!.Trim());
+        var signatures = (_m.Signatures ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        return new InvoiceLayoutRequest(_m.Title?.Trim(), string.IsNullOrWhiteSpace(_m.BandText) ? null : _m.BandText.Trim(), _m.Grouping,
+            _m.Columns.Where(c => c.On).Select(c => c.Key).ToList(), labels, string.IsNullOrWhiteSpace(_m.Footer) ? null : _m.Footer.Trim(), signatures,
+            _m.ShowLogo, _m.ShowQr, _layout?.RowVersion);
+    }
+
+    private void Changed(Action change)
+    {
+        change();
+        _dirty = true;
+        SchedulePreview();
+    }
+
+    /// <summary>The live preview follows the form after a short pause in typing; only the latest answer is shown.</summary>
+    private void SchedulePreview()
+    {
+        _previewDelay?.Cancel();
+        _previewDelay = new CancellationTokenSource();
+        var token = _previewDelay.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try { await Task.Delay(400, token); }
+            catch (TaskCanceledException) { return; }
+            await Preview();
+            StateHasChanged();
+        });
     }
 
     private async Task Preview()
     {
-        try { _preview = System.Text.Encoding.UTF8.GetString((await Api.FileAsync(Api.C($"invoice-layouts/{_type}/preview"))).Bytes); }
-        catch (ApiException) { _preview = null; }
+        var version = ++_previewVersion;
+        var type = _type;
+        try
+        {
+            var file = _dirty ? await Api.FileAsync(Api.C($"invoice-layouts/{type}/preview"), Request()) : await Api.FileAsync(Api.C($"invoice-layouts/{type}/preview"));
+            if (version == _previewVersion && type == _type) _preview = System.Text.Encoding.UTF8.GetString(file.Bytes);
+        }
+        catch (ApiException)
+        {
+            // An unfinished form (e.g. an empty title) keeps the last good preview; Save shows the field errors.
+        }
     }
 
-    private void Move(int index, int delta)
+    private void Move(int index, int delta) => Changed(() =>
     {
         var c = _m.Columns[index];
         _m.Columns.RemoveAt(index);
         _m.Columns.Insert(index + delta, c);
-    }
+    });
 
     private async Task Save()
     {
         if (_layout is null) return;
+        var type = _type;
         _busy = true;
         _extra = null;
         try
         {
-            var labels = _m.Columns.Where(c => !string.IsNullOrWhiteSpace(c.Label)).ToDictionary(c => c.Key, c => c.Label!.Trim());
-            var signatures = (_m.Signatures ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-            _layout = await Api.PutAsync<InvoiceLayoutResponse>(Api.C($"invoice-layouts/{_type}"), new InvoiceLayoutRequest(_m.Title?.Trim(),
-                string.IsNullOrWhiteSpace(_m.BandText) ? null : _m.BandText.Trim(), _m.Grouping, _m.Columns.Where(c => c.On).Select(c => c.Key).ToList(), labels,
-                string.IsNullOrWhiteSpace(_m.Footer) ? null : _m.Footer.Trim(), signatures, _m.ShowLogo, _m.ShowQr, _layout.RowVersion));
+            var saved = await Api.PutAsync<InvoiceLayoutResponse>(Api.C($"invoice-layouts/{type}"), Request());
+            if (type != _type) return;
+            _layout = saved;
+            _dirty = false;
             Toasts.Success(L["lay.saved"]);
             await Preview();
         }
         catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
         finally { _busy = false; }
     }
+
+    public void Dispose() => _previewDelay?.Cancel();
 
     private sealed class Model
     {
