@@ -1,0 +1,16 @@
+@* Load failure with retry and the reference number to quote to support (the problem's trace id). *@
+@inject Loc L
+<div class="empty errstate" role="alert">
+    <div class="ei"><Icon Name="alert" /></div>
+    <h2><Tx Value="@(Title ?? L["ui.loadFailed"])" /></h2>
+    <p><Tx Value="@(Text ?? L["ui.loadFailedText"])" /></p>
+    @if (OnRetry.HasDelegate) {<div class="acts"><Btn Primary="true" Icon="refresh" Text="@L["ui.retry"]" OnClick="OnRetry" /></div>}
+    @if (Reference is not null) {<div class="help">@L["ui.trackingRef"] <bdi class="num">@Reference</bdi></div>}
+</div>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Reference { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

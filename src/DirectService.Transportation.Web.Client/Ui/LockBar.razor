@@ -1,0 +1,21 @@
+@*
+  Record-lock / live-change bar on edit forms (BR-039, UX-20): "{name} is editing this record" (read-only) or "{name} has just changed
+  this record" with Reload.
+*@
+@inject Loc L
+@if (LockedBy is not null)
+{
+    <Banner Tone="Tone.Lock" Icon="lock" Live="true"><span class="lockbar">@L.F("ui.lockedBy", LockedBy)</span></Banner>
+}
+else if (ChangedBy is not null)
+{
+    <Banner Tone="Tone.Warn" Icon="refresh" Live="true" Text="@L.F("ui.changedByOther", ChangedBy)">
+        <Actions><Btn Small="true" Icon="refresh" Text="@L["ui.reload"]" OnClick="OnReload" /></Actions>
+    </Banner>
+}
+
+@code {
+    [Parameter] public string? LockedBy { get; set; }
+    [Parameter] public string? ChangedBy { get; set; }
+    [Parameter] public EventCallback OnReload { get; set; }
+}

@@ -1,0 +1,151 @@
+using DirectService.Transportation.Contracts.Security;
+using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Transportation.Web.Client.Ui;
+
+namespace DirectService.Transportation.UI.Tests;
+
+/// <summary>Text catalogue, bidi isolation, formats, search folding and the permission-filtered menu.</summary>
+public sealed class FoundationTests
+{
+    [Fact]
+    public void Every_interface_text_has_Arabic_and_English()
+    {
+        var missing = UiText.All.Where(kv => string.IsNullOrWhiteSpace(kv.Value.Ar) || string.IsNullOrWhiteSpace(kv.Value.En)).Select(kv => kv.Key).ToList();
+        Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void Every_status_tag_and_menu_entry_has_its_text()
+    {
+        var keys = Statuses.All.Keys.Select(k => "st." + k)
+            .Concat(NavModel.Company.Select(g => g.Key)).Concat(NavModel.Company.SelectMany(g => g.Items).Select(i => i.Key))
+            .Concat(NavModel.Console.Select(c => c.Key));
+        Assert.All(keys, k => Assert.True(UiText.All.ContainsKey(k), k));
+    }
+
+    [Fact]
+    public void Text_used_by_the_components_exists()
+    {
+        // Keys referenced in the component sources (L["…"], L.F("…")) must be in the catalogue.
+        var root = FindRepoRoot();
+        var sources = Directory.EnumerateFiles(Path.Combine(root, "src", "DirectService.Transportation.Web.Client"), "*.*", SearchOption.AllDirectories)
+            .Where(p => (p.EndsWith(".razor", StringComparison.Ordinal) || p.EndsWith(".cs", StringComparison.Ordinal)) && !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+        var used = sources.SelectMany(p => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(p), "L(?:\\.F\\(|\\[)\"((?:ui|shell|nav|st)\\.[A-Za-z]+)\"").Select(m => m.Groups[1].Value)).Distinct();
+        Assert.All(used, k => Assert.True(UiText.All.ContainsKey(k), k));
+    }
+
+    [Theory]
+    [InlineData("الرحلة TRP-10481 بتاريخ 2026-10-10", new[] { "TRP-10481", "2026-10-10" })]
+    [InlineData("فولفو FH · 32 t", new[] { "FH · 32 t" })]
+    [InlineData("المبلغ 1,624.000 دينار", new[] { "1,624.000" })]
+    [InlineData("IBAN JO71 CBJO 0010", new[] { "IBAN JO71 CBJO 0010" })]
+    [InlineData("حد النقص 0.5٪", new[] { "0.5٪" })]
+    [InlineData("بدون أرقام", new string[0])]
+    public void Left_to_right_runs_are_isolated_as_one_unit(string text, string[] runs)
+    {
+        var parts = Bidi.Split(text).ToList();
+        Assert.Equal(runs, parts.Where(p => p.Ltr).Select(p => p.Text).ToArray());
+        Assert.Equal(text, string.Concat(parts.Select(p => p.Text)));
+    }
+
+    [Theory]
+    [InlineData(1624.5, 3, "1,624.500")]
+    [InlineData(0, 3, "0.000")]
+    [InlineData(-12.345, 3, "-12.345")]
+    [InlineData(1234567.891, 2, "1,234,567.89")]
+    [InlineData(15, 0, "15")]
+    public void Amounts_use_Western_digits_and_the_currency_decimals(double value, int decimals, string expected) =>
+        Assert.Equal(expected, Fmt.Money((decimal)value, decimals));
+
+    [Theory]
+    [InlineData("١٬٢٣٤٫٥", 1234.5)]
+    [InlineData("1,234.500", 1234.5)]
+    [InlineData("  ٣١٫٨٥ ", 31.85)]
+    [InlineData("-7", -7)]
+    public void Typed_amounts_accept_Arabic_Indic_digits(string text, double expected)
+    {
+        Assert.True(Fmt.TryParseDecimal(text, out var v));
+        Assert.Equal((decimal)expected, v);
+    }
+
+    [Theory]
+    [InlineData("1,5")]
+    [InlineData("12,34")]
+    [InlineData("abc")]
+    public void Badly_grouped_or_invalid_amounts_are_refused(string text) => Assert.False(Fmt.TryParseDecimal(text, out _));
+
+    [Theory]
+    [InlineData("/c/abc/invoices/x", "/c/abc/invoices/x")]
+    [InlineData("//evil.example", null)]
+    [InlineData("javascript:alert(1)", null)]
+    [InlineData("https://evil.example", null)]
+    public void Links_from_data_stay_inside_the_application(string href, string? expected) => Assert.Equal(expected, SafeHref.Of(href));
+
+    [Fact]
+    public void Only_offered_date_formats_are_used()
+    {
+        Assert.Equal("dd/MM/yyyy", Fmt.Safe("dd/MM/yyyy"));
+        Assert.Equal("yyyy-MM-dd", Fmt.Safe("'<script>'"));
+        Assert.Equal("10/10/2026", Fmt.Date(new DateOnly(2026, 10, 10), "dd/MM/yyyy"));
+    }
+
+    [Theory]
+    [InlineData("أحمد صالح", "احمد")]
+    [InlineData("شركة البوتاس", "شركه")]
+    [InlineData("مصطفى", "مصطفي")]
+    [InlineData("مُحَمَّد", "محمد")]
+    [InlineData("TRP-١٠٤٨١", "trp-10481")]
+    public void Search_folding_matches_the_server_rules(string text, string typed) => Assert.True(Fold.Contains(text, typed));
+
+    [Fact]
+    public void A_dispatcher_sees_operations_but_not_accounting_settings_or_tenant()
+    {
+        var menu = NavModel.For([PermissionKeys.TripsView, PermissionKeys.TripsEdit, PermissionKeys.DrvView], setupIncomplete: false);
+        var keys = menu.Select(g => g.Key).ToList();
+        Assert.Contains("nav.operations", keys);
+        Assert.DoesNotContain("nav.accounting", keys);
+        Assert.DoesNotContain("nav.settings", keys);
+        Assert.DoesNotContain("nav.tenant", keys);
+        Assert.DoesNotContain("nav.setup", keys);
+        Assert.Equal(["nav.driverAccounts", "nav.partnerAccounts"], menu.Single(g => g.Key == "nav.billing").Items.Select(i => i.Key));
+    }
+
+    [Fact]
+    public void The_setup_checklist_shows_while_setup_is_incomplete_and_tenant_only_with_tenant_manage()
+    {
+        var all = typeof(PermissionKeys).GetFields().Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!).ToList();
+        var menu = NavModel.For(all, setupIncomplete: true);
+        Assert.Contains(menu, g => g.Key == "nav.setup");
+        Assert.Contains(menu, g => g.Key == "nav.tenant");
+        Assert.Equal("/c/abc/trips/new", NavModel.Href("abc", "trips/new"));
+        Assert.Equal("/c/abc", NavModel.Href("abc", ""));
+        Assert.Equal("/tenant/export", NavModel.Href("abc", "/tenant/export"));
+    }
+
+    private sealed class Line { public decimal Amount { get; set; } }
+
+    [Fact]
+    public void Api_field_paths_find_the_last_segment_and_the_line()
+    {
+        var model = new object();
+        var ctx = new Microsoft.AspNetCore.Components.Forms.EditContext(model);
+        var l0 = new Line();
+        var l1 = new Line();
+        FieldRegistry.Register(ctx, new(model, "Date"), "f1");
+        FieldRegistry.Register(ctx, new(l0, nameof(Line.Amount)), "f2");
+        FieldRegistry.Register(ctx, new(l1, nameof(Line.Amount)), "f3");
+        Assert.Equal("Date", FieldRegistry.Find(ctx, "date")!.Value.FieldName);
+        Assert.Same(l1, FieldRegistry.Find(ctx, "lines[1].amount")!.Value.Model);
+        Assert.Same(l0, FieldRegistry.Find(ctx, "lines[0].amount")!.Value.Model);
+        Assert.Null(FieldRegistry.Find(ctx, "lines[5].amount"));
+        Assert.Null(FieldRegistry.Find(ctx, "address.city"));
+    }
+
+    internal static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DirectService.Transportation.slnx"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Repository root not found.");
+    }
+}

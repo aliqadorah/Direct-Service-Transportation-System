@@ -1,0 +1,84 @@
+@*
+  Button that opens a menu (WAI-ARIA menu button): Enter/Space/↓ open and focus the first item, ↑/↓ move, Escape closes and returns focus,
+  a click or focus outside closes. Items are <button role="menuitem"> inside ChildContent; the menu closes after an item is used.
+*@
+@implements IAsyncDisposable
+@inject UiJs Js
+<div class="anchor" @ref="_wrap" @onkeydown="Key" @onkeydown:stopPropagation="_open">
+    <Btn Text="@Text" Icon="@Icon" Ghost="Ghost" Small="Small" AriaLabel="@AriaLabel" Class="@ButtonClass" HasPopup="menu" Expanded="@(_open ? "true" : "false")"
+         aria-controls="@_id" OnClick="Toggle">@Inner<Icon Name="down" /></Btn>
+    @if (_open)
+    {
+        <div class="menu" role="menu" id="@_id" aria-label="@(AriaLabel ?? Text)" @onclick="Chosen" style="@MenuStyle">@ChildContent</div>
+    }
+</div>
+
+@code {
+    private readonly string _id = Ids.Next("menu");
+    private ElementReference _wrap;
+    private DotNetObjectReference<MenuButton>? _ref;
+    private bool _open;
+
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Ghost { get; set; } = true;
+    [Parameter] public bool Small { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? ButtonClass { get; set; }
+    [Parameter] public string? MenuStyle { get; set; }
+    [Parameter] public RenderFragment? Inner { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private async Task Toggle()
+    {
+        if (_open) { await Close(); return; }
+        _open = true;
+        _ref ??= DotNetObjectReference.Create(this);
+        await Js.OnOutside(_wrap, _ref, _id);
+        await Js.FocusMenu(_id, 0);
+    }
+
+    private async Task Close()
+    {
+        if (!_open) return;
+        _open = false;
+        await Js.OffOutside(_id);
+    }
+
+    /// <summary>An item was used: close and return focus to the menu button (WAI-ARIA menu button, WCAG 2.4.3).</summary>
+    private async Task Chosen()
+    {
+        await Close();
+        await Js.FocusFirst(_wrap);
+    }
+
+    [JSInvokable]
+    public async Task Outside()
+    {
+        await Close();
+        StateHasChanged();
+    }
+
+    private async Task Key(KeyboardEventArgs e)
+    {
+        if (!_open)
+        {
+            if (e.Key == "ArrowDown") await Toggle();
+            return;
+        }
+        switch (e.Key)
+        {
+            case "Escape": await Close(); await Js.FocusFirst(_wrap); break;
+            case "ArrowDown": await Js.FocusMenu(_id, 1); break;
+            case "ArrowUp": await Js.FocusMenu(_id, -1); break;
+            case "Home": await Js.FocusMenu(_id, 0); break;
+            case "End": await Js.FocusMenu(_id, 9999); break;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_open) await Js.OffOutside(_id);
+        _ref?.Dispose();
+    }
+}

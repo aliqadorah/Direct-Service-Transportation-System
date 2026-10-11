@@ -35,15 +35,14 @@ public sealed class ChromiumPdfRenderer(IConfiguration config, ILogger<ChromiumP
         {
             var browser = await BrowserAsync().ConfigureAwait(false);
             await using var page = await browser.NewPageAsync().ConfigureAwait(false);
-            // Defence in depth (review M4): no JavaScript in documents; only data: URIs and the brand web fonts may load, so a
-            // document can never make the server fetch anything else (SSRF); without internet the fonts fall back after 4 s.
+            // Defence in depth (review M4): no JavaScript in documents and only data: URIs may load (the brand fonts, logo and QR
+            // are embedded), so a document can never make the server fetch anything (SSRF).
             await page.SetJavaScriptEnabledAsync(false).ConfigureAwait(false);
             await page.SetRequestInterceptionAsync(true).ConfigureAwait(false);
             page.Request += async (_, e) =>
             {
                 var url = e.Request.Url;
-                var allowed = url.StartsWith("data:", StringComparison.Ordinal) || url.StartsWith("about:", StringComparison.Ordinal)
-                    || url.StartsWith("https://fonts.googleapis.com/", StringComparison.Ordinal) || url.StartsWith("https://fonts.gstatic.com/", StringComparison.Ordinal);
+                var allowed = url.StartsWith("data:", StringComparison.Ordinal) || url.StartsWith("about:", StringComparison.Ordinal);
                 if (allowed) await e.Request.ContinueAsync().ConfigureAwait(false);
                 else await e.Request.AbortAsync().ConfigureAwait(false);
             };
@@ -53,11 +52,11 @@ public sealed class ChromiumPdfRenderer(IConfiguration config, ILogger<ChromiumP
             }
             catch (WaitTaskTimeoutException)
             {
-                // Fonts unreachable: render with the fallback fonts.
+                // Load did not finish in time (all resources are embedded, so this should not happen): render what is set.
             }
             catch (NavigationException)
             {
-                // Same: the content is set; only the font download did not finish.
+                // Same: the content is set.
             }
             var dir = footer.RightToLeft ? "rtl" : "ltr";
             var footerHtml = $"<div style=\"width:100%;font-size:8px;color:#5B6570;padding:0 12mm;display:flex;justify-content:space-between;direction:{dir};font-family:Segoe UI,Tahoma,sans-serif\">"

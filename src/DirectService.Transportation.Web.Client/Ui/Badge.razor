@@ -1,0 +1,9 @@
+@* Square tag with icon + text (UX-05: never colour alone). *@
+<span class="badge @ToneCss.Badge(Tone)">@if (Icon is not null) {<Icon Name="@Icon" />}<Tx Value="@Text" />@ChildContent</span>
+
+@code {
+    [Parameter] public Tone Tone { get; set; } = Tone.Info;
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

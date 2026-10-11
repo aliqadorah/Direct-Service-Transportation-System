@@ -1,0 +1,9 @@
+<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Pct" aria-label="@Label"><i style="width:@(Pct)%"></i></div>
+
+@code {
+    [Parameter] public decimal Value { get; set; }
+    [Parameter] public decimal Max { get; set; } = 100;
+    [Parameter] public string? Label { get; set; }
+
+    private int Pct => Max <= 0 ? 0 : (int)Math.Clamp(Math.Round(Value * 100 / Max), 0, 100);
+}

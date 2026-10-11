@@ -1,0 +1,69 @@
+@*
+  Confirmation for consequential actions: optional reason (void, archive, disable — required where the PRD asks for one) and optional
+  typed confirmation (maintenance zone: the word «حذف» / DELETE, FR-135). The confirm button stays disabled until both are satisfied.
+*@
+@inject Loc L
+<Modal Open="Open" OpenChanged="OpenChanged" Title="@Title" Icon="@(Danger ? "alert" : Icon)" Alert="Danger" Busy="Busy" OnClose="OnCancel">
+    <ChildContent>
+        @if (Message is not null) {<p><Tx Value="@Message" /></p>}
+        @ChildContent
+        @if (AskReason)
+        {
+            <div class="field">
+                <label for="@_id-r">@L["ui.reason"] <span class="req" aria-hidden="true">*</span></label>
+                <textarea id="@_id-r" class="input" maxlength="@ReasonMax" required aria-required="true" @bind="_reason" @bind:event="oninput" autofocus></textarea>
+            </div>
+        }
+        @if (TypedWord is not null)
+        {
+            <div class="field">
+                <label for="@_id-w">@L.F("ui.typeToConfirm", TypedWord)</label>
+                <input id="@_id-w" class="input" autocomplete="off" @bind="_typed" @bind:event="oninput" />
+            </div>
+        }
+        @if (Error is not null) {<Banner Tone="Tone.Err" Text="@Error" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" Disabled="Busy" OnClick="Cancel" />
+        <Btn Text="@(ConfirmText ?? L["ui.confirm"])" Primary="!Danger" DangerPrimary="Danger" Busy="Busy" Disabled="!Ready" OnClick="Confirm" />
+    </Footer>
+</Modal>
+
+@code {
+    private readonly string _id = Ids.Next("cf");
+    private string _reason = "";
+    private string _typed = "";
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? ConfirmText { get; set; }
+    [Parameter] public bool Danger { get; set; }
+    [Parameter] public bool AskReason { get; set; }
+    [Parameter] public int ReasonMax { get; set; } = 500;
+    [Parameter] public string? TypedWord { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Receives the reason (empty when not asked).</summary>
+    [Parameter] public EventCallback<string> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private bool Ready => (!AskReason || !string.IsNullOrWhiteSpace(_reason))
+        && (TypedWord is null || string.Equals(_typed.Trim(), TypedWord, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnParametersSet()
+    {
+        if (!Open) { _reason = ""; _typed = ""; }
+    }
+
+    private async Task Cancel()
+    {
+        await OpenChanged.InvokeAsync(false);
+        await OnCancel.InvokeAsync();
+    }
+
+    private Task Confirm() => Ready ? OnConfirm.InvokeAsync(_reason.Trim()) : Task.CompletedTask;
+}

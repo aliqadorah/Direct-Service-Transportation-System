@@ -1,0 +1,23 @@
+@implements IDisposable
+@inject ToastService Toasts
+@inject Loc L
+<div class="toasts" role="status" aria-live="polite" aria-atomic="false">
+    @foreach (var t in Toasts.Items)
+    {
+        var toast = t;
+        <div class="toast @(toast.IsError ? "err" : null)" @key="toast.Id">
+            <Icon Name="@(toast.IsError ? "alert" : "check")" />
+            <span><Tx Value="@toast.Text" /></span>
+            @if (SafeHref.Of(toast.Href) is { } href) {<a href="@href"><Tx Value="@toast.LinkText" /></a>}
+            <button type="button" class="x" aria-label="@L["ui.dismiss"]" @onclick="() => Toasts.Dismiss(toast.Id)"><Icon Name="close" /></button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.Changed += Refresh;
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Toasts.Changed -= Refresh;
+}

@@ -1,0 +1,8 @@
+@* One isolated left-to-right run in tabular figures: a number, code, date or IBAN. *@
+<bdi class="num @Class" title="@Title">@Value</bdi>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Title { get; set; }
+}

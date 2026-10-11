@@ -1,0 +1,19 @@
+@* Bordered surface with an optional header (title + actions). NoPad for tables; Fill to take the remaining height. *@
+<section class="box @(Fill ? "fill" : null) @Class" style="@Style" aria-labelledby="@(Title is null ? null : _id)">
+    @if (Title is not null || Actions is not null)
+    {
+        <div class="bh"><h2 id="@_id"><Tx Value="@Title" /></h2>@if (Actions is not null) {<span class="a">@Actions</span>}</div>
+    }
+    @if (NoPad) { @ChildContent } else { <div class="pad">@ChildContent</div> }
+</section>
+
+@code {
+    private readonly string _id = Ids.Next("box");
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool NoPad { get; set; }
+    [Parameter] public bool Fill { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+}

@@ -1,0 +1,58 @@
+@*
+  Puts the API's answer into the form (UX-16): each field error (and the "field" of a business refusal) next to its field and in the
+  error summary; a refusal without a known field is returned for a page-level banner. Messages clear when the field is edited.
+*@
+@implements IDisposable
+@code {
+    private ValidationMessageStore? _store;
+    private EditContext? _ctx;
+
+    [CascadingParameter] private EditContext? EditContext { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_ctx, EditContext)) return;
+        if (_ctx is not null) { _ctx.OnFieldChanged -= FieldChanged; _ctx.OnValidationRequested -= ValidationRequested; }
+        _ctx = EditContext ?? throw new InvalidOperationException("ProblemValidator must be inside an EditForm.");
+        _store = new ValidationMessageStore(_ctx);
+        _ctx.OnFieldChanged += FieldChanged;
+        _ctx.OnValidationRequested += ValidationRequested;
+    }
+
+    /// <summary>A new submit starts without the previous answer of the server, so the form can always be sent again.</summary>
+    private void ValidationRequested(object? sender, ValidationRequestedEventArgs e) => _store?.Clear();
+
+    /// <summary>Shows the problem in the form; returns the message that belongs to no field (for a banner), or null.</summary>
+    public string? Show(ApiProblem problem)
+    {
+        ArgumentNullException.ThrowIfNull(problem);
+        Clear();
+        string? unplaced = null;
+        var errors = problem.Errors is { Count: > 0 } list ? list.Select(e => (e.Field, e.Message)).ToList() : [(problem.Field, problem.Detail)];
+        foreach (var (field, message) in errors)
+        {
+            if (string.IsNullOrEmpty(message)) continue;
+            if (field is not null && FieldRegistry.Find(_ctx!, field) is { } f) _store!.Add(f, message);
+            else unplaced = unplaced is null ? message : unplaced + " " + message;
+        }
+        _ctx!.NotifyValidationStateChanged();
+        return unplaced;
+    }
+
+    public void Clear()
+    {
+        _store?.Clear();
+        _ctx?.NotifyValidationStateChanged();
+    }
+
+    private void FieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _store?.Clear(e.FieldIdentifier);
+        _ctx?.NotifyValidationStateChanged();
+    }
+
+    public void Dispose()
+    {
+        if (_ctx is not null) { _ctx.OnFieldChanged -= FieldChanged; _ctx.OnValidationRequested -= ValidationRequested; }
+    }
+}

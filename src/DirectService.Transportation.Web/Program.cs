@@ -44,6 +44,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddOpenApi("v1", OpenApiSetup.Configure);
 builder.Services.AddSignalR();
+builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddHealthChecks().AddDbContextCheck<MasterDbContext>("database", tags: ["ready"]);
 
@@ -102,6 +103,7 @@ app.UseRateLimiter(); // after authentication so the API limit is partitioned pe
 app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 if (app.Environment.IsDevelopment())
 {
@@ -134,6 +136,14 @@ api.MapPlatformEndpoints();
 company.MapOnboardingEndpoints();
 app.MapBillingWebhook();
 app.MapHub<LiveHub>(LiveHub.Path);
+
+// Blazor Web App (ADR-02): static assets (fingerprinted, compressed) and the WebAssembly UI.
+// Short-circuited: static files skip session validation, the API rate limiter and the request-context queries
+// (security headers and HTTPS redirection run before routing and still apply).
+app.MapStaticAssets().ShortCircuit();
+app.MapRazorComponents<DirectService.Transportation.Web.Components.App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(DirectService.Transportation.Web.Client.Routes).Assembly);
 
 await app.RunAsync().ConfigureAwait(false);
 

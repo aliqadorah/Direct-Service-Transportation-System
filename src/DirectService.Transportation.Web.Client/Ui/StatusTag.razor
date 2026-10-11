@@ -1,0 +1,14 @@
+@* Status from the catalogue (Statuses + st.* text). Unknown keys show the key as a muted tag. *@
+@inject Loc L
+@if (Statuses.All.TryGetValue(Status, out var s))
+{
+    <Badge Tone="s.Tone" Icon="@s.Icon" Text="@L["st." + Status]" />
+}
+else
+{
+    <Badge Tone="Tone.Mute" Text="@Status" />
+}
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+}

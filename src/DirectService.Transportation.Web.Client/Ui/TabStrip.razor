@@ -1,0 +1,45 @@
+@* Tabs (WAI-ARIA tabs pattern: arrow keys move in reading order, Home/End jump). The selected panel is rendered by the parent. *@
+<div class="@(Views ? "views" : "tabs")">
+    <div role="tablist" aria-label="@Label" style="display:contents">
+    @foreach (var t in Items)
+    {
+        var tab = t;
+        var on = tab.Key == Selected;
+        <button type="button" role="tab" id="@TabId(tab.Key)" aria-controls="@(PanelId is null ? null : PanelId)" aria-selected="@(on ? "true" : "false")" tabindex="@(on ? 0 : -1)"
+                @onclick="() => Select(tab.Key)" @onkeydown="Key" @ref="_refs[tab.Key]"><Tx Value="@tab.Text" />@if (tab.Count is int c) {<text> </text><bdi class="num muted">(@Fmt.Count(c))</bdi>}</button>
+    }
+    </div>
+    @Extra
+</div>
+
+@code {
+    private readonly Dictionary<string, ElementReference> _refs = [];
+    private readonly string _id = Ids.Next("tab");
+    [Parameter, EditorRequired] public IReadOnlyList<TabItem> Items { get; set; } = [];
+    [Parameter] public string? Selected { get; set; }
+    [Parameter] public EventCallback<string> SelectedChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool Views { get; set; }
+    [Parameter] public RenderFragment? Extra { get; set; }
+    /// <summary>The id of the panel the tabs control (the panel uses aria-labelledby="@TabId(selected)").</summary>
+    [Parameter] public string? PanelId { get; set; }
+
+    /// <summary>Element id of a tab, for the panel's aria-labelledby.</summary>
+    public string TabId(string key) => $"{_id}-{key}";
+    [Inject] private Loc L { get; set; } = default!;
+
+    private Task Select(string key) => SelectedChanged.InvokeAsync(key);
+
+    private async Task Key(KeyboardEventArgs e)
+    {
+        if (Items.Count == 0) return;
+        var i = Math.Max(0, Items.ToList().FindIndex(t => t.Key == Selected));
+        // In RTL the visual order is reversed: ArrowLeft moves to the next tab.
+        var forward = L.En ? "ArrowRight" : "ArrowLeft";
+        var back = L.En ? "ArrowLeft" : "ArrowRight";
+        int? to = e.Key == forward ? (i + 1) % Items.Count : e.Key == back ? (i - 1 + Items.Count) % Items.Count : e.Key == "Home" ? 0 : e.Key == "End" ? Items.Count - 1 : null;
+        if (to is not int n) return;
+        await Select(Items[n].Key);
+        if (_refs.TryGetValue(Items[n].Key, out var r)) await r.FocusAsync();
+    }
+}

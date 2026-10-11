@@ -1,0 +1,12 @@
+@* Record history (FR-016, FR-160): newest first; a change shows old → new as one LTR run. *@
+<ol class="hist">
+    @foreach (var h in Items)
+    {
+        <li class="@(h.IsVoid ? "v" : null)"><b><Tx Value="@h.What" /> — <Tx Value="@h.Who" /></b>
+            <span class="w"><Tx Value="@h.When" />@if (h.OldValue is not null || h.NewValue is not null) {<text> · </text><span class="chg">@h.OldValue → @h.NewValue</span>}</span></li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<HistoryEntry> Items { get; set; } = [];
+}

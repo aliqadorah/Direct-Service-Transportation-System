@@ -27,7 +27,11 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.17.14" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <!-- Blazor Web App: interactive WebAssembly UI (ADR-02) -->
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.12" />
     <!-- Tests -->
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="bunit" Version="2.11.3" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,11 @@
+@* The list block of the board: a box filling the page height with a scrolling table and a fixed footer (pager / totals). *@
+<section class="box fill gridwrap" aria-label="@Label" style="display:flex">
+    <div class="fill">@ChildContent</div>
+    @Footer
+</section>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+}

@@ -1,0 +1,8 @@
+@* An amount with the company currency's decimals (3 for JOD); negative amounts keep the minus inside the isolated run. *@
+<bdi class="num @Class">@Fmt.Money(Value, Decimals)</bdi>
+
+@code {
+    [Parameter] public decimal? Value { get; set; }
+    [Parameter] public int Decimals { get; set; } = 3;
+    [Parameter] public string? Class { get; set; }
+}

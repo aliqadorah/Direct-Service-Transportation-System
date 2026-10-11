@@ -1,0 +1,5 @@
+<span class="tags">@foreach (var s in Statuses) {<StatusTag Status="@s" />}</span>
+
+@code {
+    [Parameter] public IEnumerable<string> Statuses { get; set; } = [];
+}

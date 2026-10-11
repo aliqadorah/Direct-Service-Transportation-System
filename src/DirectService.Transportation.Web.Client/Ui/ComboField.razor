@@ -1,0 +1,203 @@
+@*
+  Searchable selection (WAI-ARIA combobox with listbox popup) for long lists: drivers, customers, sites, accounts. Typing filters (in the
+  page with Arabic folding, or through SearchAsync on the server); ↓/↑ move, Enter or Tab accept, Escape closes. While focused the
+  control widens to show the full name and the list shows full names with a secondary code (owner fix 4 of step 6); the full value is
+  also in the title for hover. Leaving with text that matches nothing restores the selection.
+*@
+@typeparam TValue
+@inherits FieldBase<TValue>
+@implements IAsyncDisposable
+@inject UiJs Js
+@Frame(Control)
+
+@code {
+    private readonly string _list = Ids.Next("lb");
+    private readonly string _ctl = Ids.Next("cb");
+    private ElementReference _wrap;
+    private ElementReference _input;
+    private DotNetObjectReference<ComboField<TValue>>? _ref;
+    private bool _open;
+    private bool _listening;
+    private int _active = -1;
+    private string _text = "";
+    private bool _editing;
+    private IReadOnlyList<Option<TValue>> _shown = [];
+    private Option<TValue>? _picked;
+    private CancellationTokenSource? _search;
+
+    /// <summary>Options filtered in the page (lists up to a few hundred items).</summary>
+    [Parameter] public IReadOnlyList<Option<TValue>>? Options { get; set; }
+    /// <summary>Server-side search for long lists (debounced 200 ms); receives the typed text.</summary>
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<Option<TValue>>>>? SearchAsync { get; set; }
+    /// <summary>The option of the current value when it is not in Options (server search).</summary>
+    [Parameter] public Option<TValue>? Selected { get; set; }
+    [Parameter] public bool Wide { get; set; } = true;
+    [Parameter] public int MaxShown { get; set; } = 50;
+    [Parameter] public EventCallback<Option<TValue>?> OnSelected { get; set; }
+
+    private Option<TValue>? Current =>
+        Options?.FirstOrDefault(o => EqualityComparer<TValue>.Default.Equals(o.Value, CurrentValue))
+        ?? (Selected is not null && EqualityComparer<TValue>.Default.Equals(Selected.Value, CurrentValue) ? Selected : null)
+        ?? (_picked is not null && EqualityComparer<TValue>.Default.Equals(_picked.Value, CurrentValue) ? _picked : null);
+
+    private string Display => Current?.Text ?? "";
+
+    private RenderFragment Control => __builder =>
+    {
+        <div class="combo @(Wide ? "wide" : null) @(_open ? "open" : null)" @ref="_wrap">
+            <div class="adorn">
+                <input @ref="_input" id="@ElementId" class="input @CssClass" type="text" role="combobox" autocomplete="off" spellcheck="false"
+                       aria-autocomplete="list" aria-expanded="@(_open ? "true" : "false")" aria-controls="@_list"
+                       aria-activedescendant="@(_open && _active >= 0 ? $"{_list}-{_active}" : null)"
+                       aria-invalid="@(Invalid ? "true" : null)" aria-describedby="@DescribedBy" aria-required="@(Required ? "true" : null)"
+                       placeholder="@(Placeholder ?? L["ui.choose"])" title="@Display" readonly="@ReadOnly" disabled="@Disabled"
+                       value="@(_editing ? _text : Display)" @oninput="Input" @onfocus="Focus" @onkeydown="Key" @onkeydown:stopPropagation="_open" @onclick="Toggle" />
+                <span class="end"><Icon Name="down" /></span>
+            </div>
+            @if (_open)
+            {
+                <ul class="ddlist" role="listbox" id="@_list" aria-label="@Label">
+                    @if (_shown.Count == 0)
+                    {
+                        <li class="none" role="presentation">@L["ui.noMatches"]</li>
+                    }
+                    @for (var i = 0; i < _shown.Count; i++)
+                    {
+                        var index = i;
+                        var o = _shown[i];
+                        <li role="option" id="@($"{_list}-{index}")" aria-selected="@(index == _active ? "true" : "false")" aria-disabled="@(o.Disabled ? "true" : null)"
+                            @onpointerdown="() => Pick(index)" @onpointerdown:preventDefault="true">
+                            <span><Tx Value="@o.Text" /></span>@if (o.Sub is not null) {<small><Tx Value="@o.Sub" /></small>}
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    };
+
+    private async Task Focus()
+    {
+        if (ReadOnly || Disabled) return;
+        _text = Display;
+        _editing = true;
+        await Listen();
+    }
+
+    private async Task Toggle()
+    {
+        if (ReadOnly || Disabled) return;
+        if (_open) { Close(); return; }
+        await OpenList(string.Empty);
+    }
+
+    private async Task Input(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? "";
+        _editing = true;
+        await OpenList(_text);
+    }
+
+    private async Task OpenList(string text)
+    {
+        _open = true;
+        await Listen();
+        if (SearchAsync is not null)
+        {
+            _search?.Cancel();
+            _search?.Dispose();
+            _search = new CancellationTokenSource();
+            var token = _search.Token;
+            _shown = [];
+            _active = -1;
+            try
+            {
+                await Task.Delay(200, token);
+                var found = (await SearchAsync(text, token)).Take(MaxShown).ToList();
+                if (token.IsCancellationRequested || !_open) return;
+                _shown = found;
+            }
+            catch (OperationCanceledException) { return; }
+        }
+        else
+        {
+            _shown = (Options ?? []).Where(o => Fold.Contains(o.Text, text) || Fold.Contains(o.Sub, text)).Take(MaxShown).ToList();
+        }
+        var cur = Current;
+        _active = _shown.Count == 0 ? -1 : Math.Max(0, cur is null ? 0 : _shown.ToList().FindIndex(o => EqualityComparer<TValue>.Default.Equals(o.Value, cur.Value)));
+        StateHasChanged();
+    }
+
+    private async Task Key(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (!_open) { await OpenList(_editing ? _text : string.Empty); return; }
+                if (_shown.Count > 0) _active = (_active + 1) % _shown.Count;
+                break;
+            case "ArrowUp":
+                if (_open && _shown.Count > 0) _active = (_active - 1 + _shown.Count) % _shown.Count;
+                break;
+            case "Enter":
+            case "Tab":
+                if (_open && _active >= 0 && _active < _shown.Count) await Pick(_active);
+                else Close();
+                break;
+            case "Escape":
+                Close();
+                _text = Display;
+                break;
+        }
+    }
+
+    private async Task Pick(int index)
+    {
+        var o = _shown[index];
+        if (o.Disabled) return;
+        _picked = o;
+        CurrentValue = o.Value;
+        _text = o.Text;
+        Close();
+        await OnSelected.InvokeAsync(o);
+    }
+
+    private void Close()
+    {
+        _search?.Cancel();
+        _open = false;
+        _active = -1;
+    }
+
+    private async Task Listen()
+    {
+        if (_listening) return;
+        _listening = true;
+        _ref ??= DotNetObjectReference.Create(this);
+        await Js.OnOutside(_wrap, _ref, _ctl);
+        await Js.GuardComboKeys(_input);
+    }
+
+    /// <summary>Focus or pointer left the control: close, and clear or restore the text.</summary>
+    [JSInvokable]
+    public async Task Outside()
+    {
+        _listening = false;
+        await Js.OffOutside(_ctl);
+        if (_editing && string.IsNullOrWhiteSpace(_text) && !Required && Current is not null)
+        {
+            CurrentValue = default!;
+            await OnSelected.InvokeAsync(null);
+        }
+        _editing = false;
+        Close();
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_listening) await Js.OffOutside(_ctl);
+        _search?.Cancel();
+        _search?.Dispose();
+        _ref?.Dispose();
+    }
+}

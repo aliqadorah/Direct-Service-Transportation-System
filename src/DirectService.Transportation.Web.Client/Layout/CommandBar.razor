@@ -1,0 +1,83 @@
+@*
+  Ctrl+K command bar (from direction C; FR-187 global search): one field searches records through SearchAsync (trips, invoices, drivers…
+  by permission, Arabic-insensitive on the server) and also lists menu commands that match. ↑/↓ move, Enter opens, Escape closes.
+*@
+@inject Loc L
+@inject NavigationManager Nav
+<Modal Open="Open" OpenChanged="OpenChanged" Title="@L["shell.commandBar"]" Icon="search" Wide="true" Describe="false" CloseOnScrim="true">
+    <div class="combo">
+        <input class="input" type="search" role="combobox" aria-expanded="true" aria-controls="@_list" aria-autocomplete="list" autocomplete="off" autofocus
+               aria-label="@L["shell.commandBar"]" placeholder="@L["shell.search"]" aria-activedescendant="@(_active >= 0 ? $"{_list}-{_active}" : null)"
+               value="@_text" @oninput="Input" @onkeydown="Key" @ref="_input" />
+    </div>
+    <ul class="ddlist" role="listbox" id="@_list" style="position:static;box-shadow:none;max-height:360px" aria-label="@L["shell.commandBar"]">
+        @if (_results.Count == 0) {<li class="none" role="presentation">@(_busy ? L["ui.loading"] : L["ui.noMatches"])</li>}
+        @for (var i = 0; i < _results.Count; i++)
+        {
+            var index = i;
+            var r = _results[i];
+            <li role="option" id="@($"{_list}-{index}")" aria-selected="@(index == _active ? "true" : "false")" @onpointerdown="() => Go(index)" @onpointerdown:preventDefault="true">
+                <span><Tx Value="@r.Text" /></span><small><Tx Value="@r.Kind" /></small>
+            </li>
+        }
+    </ul>
+</Modal>
+
+@code {
+    private readonly string _list = Ids.Next("cmd");
+    private ElementReference _input;
+    private string _text = "";
+    private int _active = -1;
+    private bool _busy;
+    private List<CommandResult> _results = [];
+    private CancellationTokenSource? _cts;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    /// <summary>Menu commands available to the user (already filtered by permission).</summary>
+    [Parameter] public IReadOnlyList<CommandResult> Commands { get; set; } = [];
+    /// <summary>Record search (global search API); returns results with their links.</summary>
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<CommandResult>>>? SearchAsync { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!Open) { _text = ""; _results = []; _active = -1; }
+    }
+
+    private async Task Input(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? "";
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+        var commands = string.IsNullOrWhiteSpace(_text) ? [] : Commands.Where(c => Fold.Contains(c.Text, _text)).Take(6).ToList();
+        _results = commands;
+        _active = _results.Count > 0 ? 0 : -1;
+        if (SearchAsync is null || _text.Trim().Length < 2) return;
+        _busy = true;
+        try
+        {
+            await Task.Delay(250, token);
+            var found = await SearchAsync(_text.Trim(), token);
+            _results = [.. found, .. commands];
+            _active = _results.Count > 0 ? 0 : -1;
+        }
+        catch (OperationCanceledException) { }
+        finally { if (!token.IsCancellationRequested) _busy = false; }
+    }
+
+    private async Task Key(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown" && _results.Count > 0) _active = (_active + 1) % _results.Count;
+        else if (e.Key == "ArrowUp" && _results.Count > 0) _active = (_active - 1 + _results.Count) % _results.Count;
+        else if (e.Key == "Enter" && _active >= 0) await Go(_active);
+    }
+
+    private async Task Go(int index)
+    {
+        var r = _results[index];
+        await OpenChanged.InvokeAsync(false);
+        if (SafeHref.Of(r.Href) is { } href) Nav.NavigateTo(href);
+    }
+}

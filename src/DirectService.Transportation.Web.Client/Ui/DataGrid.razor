@@ -1,0 +1,197 @@
+@*
+  Dense data table of the Ledger direction (32 px rows compact / 40 px comfortable): sticky header, filter row under the headers (from C),
+  server-side sort (aria-sort), row selection with select-all, clickable rows reachable by keyboard (Enter), totals footer, group rows,
+  void rows muted, rows changed by another user highlighted briefly (UX-20). Paging is a separate <Pager>.
+*@
+@typeparam TItem
+@inject Loc L
+<CascadingValue Value="this" IsFixed="true">@Columns</CascadingValue>
+<table class="grid @Class" aria-rowcount="@(TotalCount ?? Items.Count)">
+    @if (Caption is not null) {<caption class="sr-only">@Caption</caption>}
+    <thead>
+        <tr>
+            @if (Selectable)
+            {
+                <th style="width:30px" scope="col"><input type="checkbox" aria-label="@L["ui.selectAll"]" checked="@AllSelected" @onchange="ToggleAll" /></th>
+            }
+            @foreach (var c in Visible)
+            {
+                var col = c;
+                <th scope="col" class="@(col.Numeric ? "n" : null)" style="@(col.Width is null ? null : $"width:{col.Width}")" aria-sort="@AriaSort(col)">
+                    @if (col.HideTitle) {<span class="sr-only">@col.Title</span>}
+                    else if (col.SortKey is not null && OnSort.HasDelegate)
+                    {
+                        <button type="button" class="sort" @onclick="() => SortBy(col)" aria-label="@L.F("ui.sortBy", col.Title)">
+                            <Tx Value="@col.Title" />@if (SortKey == col.SortKey) {<Icon Name="@(SortDesc ? "down" : "up")" Class="s" />}
+                        </button>
+                    }
+                    else {<Tx Value="@col.Title" />}
+                </th>
+            }
+        </tr>
+        @if (ShowFilters)
+        {
+            <tr class="flt">
+                @if (Selectable) {<td></td>}
+                @foreach (var c in Visible)
+                {
+                    var col = c;
+                    <td>
+                        @if (col.FilterKey is not null)
+                        {
+                            <input class="input @(col.Numeric ? "num" : null)" type="search" aria-label="@L.F("ui.filterBy", col.Title)"
+                                   placeholder="@(col.FilterPlaceholder ?? (col.Numeric ? L["ui.atLeast"] : L["ui.filter"]))"
+                                   value="@FilterValue(col.FilterKey)" @onchange="e => SetFilter(col.FilterKey, e.Value?.ToString())" />
+                        }
+                    </td>
+                }
+            </tr>
+        }
+    </thead>
+    <tbody>
+        @if (Items.Count == 0)
+        {
+            <tr><td colspan="@ColSpan" class="muted" style="text-align:center">@(NoRowsText ?? L["ui.noMatches"])</td></tr>
+        }
+        @{ string? group = null; }
+        @foreach (var item in Items)
+        {
+            var row = item;
+            if (GroupBy is not null)
+            {
+                var g = GroupBy(row);
+                if (g != group) { group = g; <tr class="grp"><td colspan="@ColSpan"><Tx Value="@g" /></td></tr> }
+            }
+            var key = Key(row);
+            var clickable = OnRowClick.HasDelegate;
+            <tr @key="key" class="@RowCss(row, key, clickable)" tabindex="@(clickable ? 0 : null)"
+                @onclick="() => RowClick(row)" @onkeydown="e => RowKey(e, row)">
+                @if (Selectable)
+                {
+                    <td @onclick:stopPropagation="true" @onkeydown:stopPropagation="true"><input type="checkbox" aria-label="@L["ui.selectRow"]" checked="@_selected.Contains(key)" @onchange="() => ToggleRow(key)" /></td>
+                }
+                @foreach (var c in Visible)
+                {
+                    var col = c;
+                    @* Keys on controls inside a template cell (buttons, links) do not open the row. *@
+                    <td class="@CellCss(col)" @onkeydown:stopPropagation="col.Template is not null">
+                        @if (col.Template is not null) {@col.Template(row)}
+                        else if (col.Numeric || col.Ltr) {<bdi class="num">@col.Value?.Invoke(row)</bdi>}
+                        else {<Tx Value="@(col.Value?.Invoke(row))" />}
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+    @if (Visible.Any(c => c.Footer is not null))
+    {
+        <tfoot>
+            <tr>
+                @if (Selectable) {<td></td>}
+                @for (var i = 0; i < Visible.Count; i++)
+                {
+                    var col = Visible[i];
+                    <td class="@(col.Numeric ? "n" : null)">@if (col.Footer is not null) {<bdi class="num">@col.Footer</bdi>} else if (i == 0) {<Tx Value="@(FooterLabel ?? L["ui.total"])" />}</td>
+                }
+            </tr>
+        </tfoot>
+    }
+</table>
+
+@code {
+    private readonly List<GridColumn<TItem>> _columns = [];
+    private HashSet<object> _selected = [];
+
+    [Parameter, EditorRequired] public IReadOnlyList<TItem> Items { get; set; } = [];
+    [Parameter, EditorRequired] public Func<TItem, object> Key { get; set; } = default!;
+    [Parameter] public RenderFragment? Columns { get; set; }
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public int? TotalCount { get; set; }
+    [Parameter] public string? NoRowsText { get; set; }
+    [Parameter] public string? FooterLabel { get; set; }
+    [Parameter] public Func<TItem, string?>? GroupBy { get; set; }
+    [Parameter] public Func<TItem, string?>? RowClass { get; set; }
+    /// <summary>Keys of rows just changed by another user (highlighted).</summary>
+    [Parameter] public IReadOnlySet<object>? LiveKeys { get; set; }
+
+    [Parameter] public string? SortKey { get; set; }
+    [Parameter] public bool SortDesc { get; set; }
+    /// <summary>Raised with (sort key, descending) when a sortable header is used; the page reloads from the API.</summary>
+    [Parameter] public EventCallback<(string Key, bool Desc)> OnSort { get; set; }
+
+    [Parameter] public bool ShowFilters { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Filters { get; set; }
+    [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> OnFilter { get; set; }
+
+    [Parameter] public bool Selectable { get; set; }
+    [Parameter] public IReadOnlySet<object>? Selected { get; set; }
+    [Parameter] public EventCallback<IReadOnlySet<object>> SelectedChanged { get; set; }
+
+    [Parameter] public EventCallback<TItem> OnRowClick { get; set; }
+
+    private List<GridColumn<TItem>> Visible => _columns.Where(c => c.Visible).ToList();
+
+    private int ColSpan => Visible.Count + (Selectable ? 1 : 0);
+
+    private bool AllSelected => Items.Count > 0 && Items.All(i => _selected.Contains(Key(i)));
+
+    internal void AddColumn(GridColumn<TItem> c)
+    {
+        if (_columns.Contains(c)) return;
+        _columns.Add(c);
+        StateHasChanged();
+    }
+
+    internal void ColumnChanged() => StateHasChanged();
+
+    internal void RemoveColumn(GridColumn<TItem> c)
+    {
+        if (_columns.Remove(c)) StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Selected is not null) _selected = [.. Selected];
+    }
+
+    private string? AriaSort(GridColumn<TItem> c) => c.SortKey is null || c.SortKey != SortKey ? null : SortDesc ? "descending" : "ascending";
+
+    private Task SortBy(GridColumn<TItem> c) => OnSort.InvokeAsync((c.SortKey!, c.SortKey == SortKey && !SortDesc));
+
+    private string FilterValue(string key) => Filters is not null && Filters.TryGetValue(key, out var v) ? v : "";
+
+    private Task SetFilter(string key, string? value)
+    {
+        var next = Filters is null ? new Dictionary<string, string>() : new Dictionary<string, string>(Filters);
+        if (string.IsNullOrWhiteSpace(value)) next.Remove(key); else next[key] = value.Trim();
+        return OnFilter.InvokeAsync(next);
+    }
+
+    private string RowCss(TItem row, object key, bool clickable) => string.Join(' ', new[]
+    {
+        clickable ? "click" : null,
+        _selected.Contains(key) ? "sel" : null,
+        LiveKeys?.Contains(key) == true ? "live" : null,
+        RowClass?.Invoke(row),
+    }.Where(x => x is not null));
+
+    private static string? CellCss(GridColumn<TItem> c) => string.Join(' ', new[] { c.Numeric ? "n" : null, c.Wrap ? "wrap" : null, c.Clip ? "clip" : null }.Where(x => x is not null)) is { Length: > 0 } s ? s : null;
+
+    private Task RowClick(TItem row) => OnRowClick.HasDelegate ? OnRowClick.InvokeAsync(row) : Task.CompletedTask;
+
+    private Task RowKey(KeyboardEventArgs e, TItem row) => e.Key == "Enter" ? RowClick(row) : Task.CompletedTask;
+
+    private Task ToggleRow(object key)
+    {
+        if (!_selected.Remove(key)) _selected.Add(key);
+        return SelectedChanged.InvokeAsync(_selected);
+    }
+
+    private Task ToggleAll()
+    {
+        if (AllSelected) foreach (var i in Items) _selected.Remove(Key(i));
+        else foreach (var i in Items) _selected.Add(Key(i));
+        return SelectedChanged.InvokeAsync(_selected);
+    }
+}

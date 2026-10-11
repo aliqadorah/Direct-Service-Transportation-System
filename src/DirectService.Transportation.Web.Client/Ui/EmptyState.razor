@@ -1,0 +1,14 @@
+@* Empty state: what will appear here and the next action (first use, or "clear filters" when filtered). *@
+<div class="empty">
+    <div class="ei"><Icon Name="@Icon" /></div>
+    <h2><Tx Value="@Title" /></h2>
+    @if (Text is not null) {<p><Tx Value="@Text" /></p>}
+    @if (Actions is not null) {<div class="acts">@Actions</div>}
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "file";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

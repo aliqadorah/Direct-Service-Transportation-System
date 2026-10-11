@@ -1,0 +1,17 @@
+@* Saved views above a list (from direction C; DT-68): built-in and saved views as tabs, "+ Save view", and the list tools at the far end. *@
+@inject Loc L
+<TabStrip Items="Items" Selected="@Selected" SelectedChanged="SelectedChanged" Views="true" Label="@Label">
+    <Extra>
+        @if (OnSaveView.HasDelegate) {<button type="button" class="add" @onclick="OnSaveView"><Icon Name="plus" />@L["ui.saveView"]</button>}
+        @if (Tools is not null) {<span class="tools">@Tools</span>}
+    </Extra>
+</TabStrip>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TabItem> Items { get; set; } = [];
+    [Parameter] public string? Selected { get; set; }
+    [Parameter] public EventCallback<string> SelectedChanged { get; set; }
+    [Parameter] public EventCallback OnSaveView { get; set; }
+    [Parameter] public RenderFragment? Tools { get; set; }
+    [Parameter] public string? Label { get; set; }
+}

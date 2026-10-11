@@ -1,0 +1,60 @@
+@*
+  Modal dialog (WAI-ARIA dialog pattern): focus moves inside and is trapped, Escape closes (unless Busy), focus returns to the opener.
+  Footer holds the actions, primary last (at the far end).
+*@
+@implements IAsyncDisposable
+@inject UiJs Js
+@inject Loc L
+@if (Open)
+{
+    <div class="scrim" @onclick="ScrimClick">
+        <div class="dialog @(Wide ? "wide" : null)" role="@(Alert ? "alertdialog" : "dialog")" aria-modal="true" aria-labelledby="@_id-t" aria-describedby="@(Describe ? _id + "-b" : null)"
+             @ref="_el" @onclick:stopPropagation="true" @onkeydown="Key">
+            <div class="dh">@if (Icon is not null) {<Icon Name="@Icon" />}<h2 id="@_id-t"><Tx Value="@Title" /></h2>
+                <Btn Ghost="true" Small="true" Icon="close" AriaLabel="@L["ui.close"]" Class="x" Disabled="Busy" OnClick="Close" /></div>
+            <div class="db" id="@_id-b">@ChildContent</div>
+            @if (Footer is not null) {<div class="df">@Footer</div>}
+        </div>
+    </div>
+}
+
+@code {
+    private readonly string _id = Ids.Next("dlg");
+    private ElementReference _el;
+    private bool _trapped;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Wide { get; set; }
+    [Parameter] public bool Alert { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool Describe { get; set; } = true;
+    [Parameter] public bool CloseOnScrim { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open && !_trapped) { _trapped = true; await Js.TrapFocus(_el, _id); }
+        else if (!Open && _trapped) { _trapped = false; await Js.ReleaseFocus(_id); }
+    }
+
+    public async Task Close()
+    {
+        if (Busy) return;
+        await OpenChanged.InvokeAsync(false);
+        await OnClose.InvokeAsync();
+    }
+
+    private Task ScrimClick() => CloseOnScrim ? Close() : Task.CompletedTask;
+
+    private Task Key(KeyboardEventArgs e) => e.Key == "Escape" ? Close() : Task.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_trapped) await Js.ReleaseFocus(_id);
+    }
+}

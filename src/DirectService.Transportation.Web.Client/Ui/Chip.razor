@@ -1,0 +1,11 @@
+@* Toggle chip (month strip, quick filters). *@
+<button type="button" class="chip" aria-pressed="@(On ? "true" : "false")" @onclick="OnClick" title="@Title">@if (Icon is not null) {<Icon Name="@Icon" />}<Tx Value="@Text" />@ChildContent</button>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool On { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+}

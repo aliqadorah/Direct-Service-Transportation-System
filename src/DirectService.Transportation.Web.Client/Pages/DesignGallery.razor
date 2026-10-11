@@ -1,0 +1,277 @@
+@page "/design"
+@*
+  Component gallery (development only): every design-system component in its states, inside the real shell, with sample data from the
+  approved board, for visual comparison with docs/step6 and for the accessibility check of step 9. Not reachable in production.
+*@
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@inject IWebAssemblyHostEnvironment Env
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@if (!Env.IsDevelopment())
+{
+    <p>404</p>
+}
+else
+{
+    <AppShell OnLanguage="Language">
+        <Banners><Banner Tone="Tone.Info" Text="Component gallery — step 7 (development only)" /></Banners>
+        <ChildContent>
+            <PageHeader Title="@(L.En ? "Trips" : "الرحلات")" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"])])">
+                <Badges><StatusTag Status="review" /></Badges>
+                <Actions>
+                    <Btn Icon="import" Text="@(L.En ? "Import" : "استيراد")" />
+                    <Btn Icon="export" Text="Excel" />
+                    <Btn Primary="true" Icon="plus" Text="@L["nav.newTrip"]" Shortcut="Ctrl N" />
+                </Actions>
+            </PageHeader>
+
+            <TabStrip Items="_sections" @bind-Selected="_section" Label="Gallery sections" />
+
+            @switch (_section)
+            {
+                case "list":
+                    <Figures Items="@([new Figure(L.En ? "Trips" : "الرحلات", "17", "2026-10"), new Figure(L.En ? "Revenue" : "الإيراد", Fmt.Money(2_956.367m)), new Figure(L.En ? "Wages" : "الأجور", Fmt.Money(1_617.586m)), new Figure(L.En ? "Unbilled" : "غير مفوترة", "6", "TRP-10482 …")])" />
+                    <SavedViews Items="_views" @bind-Selected="_view" OnSaveView="SaveView">
+                        <Tools><Btn Small="true" Icon="columns" Text="@L["ui.columns"]" /><Btn Small="true" Icon="export" Text="Excel" /><Btn Small="true" Icon="export" Text="PDF" /></Tools>
+                    </SavedViews>
+                    <ListFrame Label="Trips">
+                        <ChildContent>
+                            <DataGrid TItem="Trip" Items="Trips" Key="t => t.No" Caption="Trips" ShowFilters="true" Filters="_filters" OnFilter="f => _filters = f"
+                                      Selectable="true" @bind-Selected="_selected" SortKey="@_sort" SortDesc="_desc" OnSort="s => { _sort = s.Key; _desc = s.Desc; }"
+                                      OnRowClick="t => Toasts.Success(t.No)" LiveKeys="_live" RowClass="VoidRow">
+                                <Columns>
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Trip no." : "رقم السند")" Value="t => t.No" Ltr="true" SortKey="no" FilterKey="no" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Date" : "التاريخ")" Value="t => t.Date" Ltr="true" SortKey="date" FilterKey="date" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Driver" : "السائق")" Value="t => t.Driver" SortKey="driver" FilterKey="driver" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Plate" : "اللوحة")" Value="t => t.Plate" Ltr="true" FilterKey="plate" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Customer" : "العميل")" Value="t => t.Customer" FilterKey="customer" Clip="true" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Unloaded (t)" : "منزّل (طن)")" Value="t => Fmt.Qty(t.Unloaded)" Numeric="true" FilterKey="uw" Footer="@Fmt.Qty(Trips.Sum(t => t.Unloaded ?? 0))" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Revenue" : "الإيراد")" Value="t => Fmt.Money(t.Revenue)" Numeric="true" SortKey="rev" Footer="@Fmt.Money(Trips.Sum(t => t.Revenue))" />
+                                    <GridColumn TItem="Trip" Title="@(L.En ? "Status" : "الحالة")"><Template><StatusTags Statuses="context.Status" /></Template></GridColumn>
+                                </Columns>
+                            </DataGrid>
+                        </ChildContent>
+                        <Footer><Pager Page="_page" Total="1284" PageSize="_pageSize" OnPage="p => _page = p" OnPageSize="s => _pageSize = s" /></Footer>
+                    </ListFrame>
+                    break;
+
+                case "form":
+                    <EditForm Model="_form" OnValidSubmit="Save" OnInvalidSubmit="Invalid" class="stack">
+                        <DataAnnotationsValidator />
+                        <ProblemValidator @ref="_problems" />
+                        <ErrorSummary @ref="_summary" />
+                        <LockBar LockedBy="@(_locked ? (L.En ? "Sara Haddad" : "سارة حداد") : null)" ChangedBy="@(_changed ? (L.En ? "Rana Khatib" : "رنا الخطيب") : null)" OnReload="() => _changed = false" />
+                        <Box Title="@(L.En ? "Trip" : "الرحلة")">
+                            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                                <DateField @bind-Value="_form.Date" Label="@(L.En ? "Date" : "التاريخ")" Required="true" />
+                                <ComboField TValue="string" @bind-Value="_form.Driver" Options="Drivers" Label="@(L.En ? "Driver" : "السائق")" Required="true" Help="@(L.En ? "Type part of the name or the plate." : "اكتب جزءاً من الاسم أو اللوحة.")" />
+                                <ComboField TValue="string" @bind-Value="_form.Customer" Options="Customers" Label="@(L.En ? "Customer" : "العميل")" Required="true" />
+                                <NumberField @bind-Value="_form.Loaded" Label="@(L.En ? "Loaded weight" : "الوزن المحمّل")" Unit="@(L.En ? "t" : "طن")" Required="true" Min="0" />
+                                <NumberField @bind-Value="_form.Unloaded" Label="@(L.En ? "Unloaded weight" : "الوزن المنزّل")" Unit="@(L.En ? "t" : "طن")" Min="0" Help="@(L.En ? "Shortage tolerance 0.5%" : "حد النقص المسموح 0.5٪")" />
+                                <NumberField @bind-Value="_form.Price" Label="@(L.En ? "Price per tonne" : "السعر للطن")" Unit="JOD" Source="@(L.En ? "From tariff TRF-0012" : "من التعرفة TRF-0012")" />
+                                <SelectField TValue="string" @bind-Value="_form.Method" Options="Methods" Label="@(L.En ? "Payment method" : "طريقة الدفع")" Empty="@L["ui.choose"]" />
+                                <TextField @bind-Value="_form.Plate" Label="@(L.En ? "Plate" : "اللوحة")" Ltr="true" MaxLength="20" />
+                                <TextField @bind-Value="_form.Reference" Label="@(L.En ? "Customer reference" : "مرجع العميل")" ReadOnly="true" />
+                                <TextAreaField @bind-Value="_form.Notes" Label="@(L.En ? "Notes" : "ملاحظات")" Span="3" MaxLength="500" />
+                            </div>
+                        </Box>
+                        <Box Title="@L["nav.companySettings"]">
+                            <ToggleField @bind-Value="_form.Approval" Label="@(L.En ? "Invoice approval" : "اعتماد الفواتير")" Help="@(L.En ? "On: “Save” creates a draft." : "مفعّل: «حفظ» ينشئ مسودة.")" />
+                            <ToggleField @bind-Value="_form.Accrual" Label="@(L.En ? "Accrue driver wage when the trip is saved" : "استحقاق أجر السائق عند حفظ الرحلة")" />
+                            <CheckField @bind-Value="_form.Copy" Label="@(L.En ? "Print a copy" : "طباعة نسخة")" />
+                        </Box>
+                        <div class="formbar">
+                            <Btn Text="@(L.En ? "Simulate API refusal" : "محاكاة رفض الخادم")" OnClick="ServerError" />
+                            <Btn Text="@(L.En ? "Toggle lock" : "تبديل القفل")" OnClick="() => _locked = !_locked" />
+                            <Btn Text="@(L.En ? "Changed by other" : "تعديل من مستخدم آخر")" OnClick="() => _changed = !_changed" />
+                            <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" />
+                        </div>
+                    </EditForm>
+                    break;
+
+                case "feedback":
+                    <div class="stack">
+                        <Banner Tone="Tone.Info" Text="@(L.En ? "Invoice draft: no number and no entry until approval." : "مسودة: بلا رقم وبلا قيد. الرحلات محجوزة لها حتى الاعتماد أو الحذف.")" />
+                        <Banner Tone="Tone.Ok" Text="@(L.En ? "Accepted by the national e-invoicing system." : "قبلها نظام الفوترة الإلكترونية الوطني.")" />
+                        <Banner Tone="Tone.Warn" Text="@(L.En ? "Account mapping is incomplete (discount allowed)." : "ربط الحسابات غير مكتمل (الخصم المسموح).")"><Actions><Btn Small="true" Text="@L["nav.mapping"]" /></Actions></Banner>
+                        <Banner Tone="Tone.Err" Text="@(L.En ? "Rejected: buyer tax number 200003311 is not valid." : "رفض نظام الفوترة الإلكترونية: الرقم الضريبي للمشتري غير صحيح (200003311).")" />
+                        <Banner Tone="Tone.Lock" Text="@(L.En ? "Period 2026-09 is closed." : "الفترة 2026-09 مغلقة.")" />
+                        <div class="row" style="flex-wrap:wrap">
+                            @foreach (var s in Statuses.All.Keys) {<StatusTag Status="@s" />}
+                        </div>
+                        <div class="row" style="flex-wrap:wrap">
+                            <Btn Text="Default" /><Btn Primary="true" Text="Primary" /><Btn Ghost="true" Text="Ghost" /><Btn Danger="true" Icon="trash" Text="Danger" />
+                            <Btn DangerPrimary="true" Text="Danger primary" /><Btn Disabled="true" Text="Disabled" /><Btn Busy="true" Text="Busy" /><Btn Small="true" Icon="print" Text="Small" />
+                            <Btn Icon="more" AriaLabel="@L["ui.more"]" />
+                            <Chip Text="2026-09" On="true" /><Chip Text="2026-10" />
+                        </div>
+                        <div class="row">
+                            <Btn Text="@(L.En ? "Success toast" : "إشعار نجاح")" OnClick="@(() => Toasts.Success(L.En ? "Invoice INV-02210 approved." : "تم اعتماد الفاتورة INV-02210.", L.En ? "Open" : "فتح", "/design"))" />
+                            <Btn Text="@(L.En ? "Error toast" : "إشعار خطأ")" OnClick="@(() => Toasts.Error(L.En ? "Export failed." : "فشل التصدير."))" />
+                            <Btn Text="@(L.En ? "Dialog" : "حوار")" OnClick="() => _dialog = true" />
+                            <Btn Danger="true" Text="@(L.En ? "Void with reason" : "إلغاء مع سبب")" OnClick="() => _void = true" />
+                            <Btn Danger="true" Text="@(L.En ? "Typed confirmation" : "تأكيد بالكتابة")" OnClick="() => _typed = true" />
+                            <Btn Text="@L["ui.history"]" Icon="history" OnClick="() => _panel = true" />
+                        </div>
+                        <div class="cols" style="grid-template-columns:1fr 1fr">
+                            <Box Title="@L["ui.history"]"><HistoryList Items="History" /></Box>
+                            <Box Title="@(L.En ? "Details" : "التفاصيل")">
+                                <KeyValues Items="Details" />), new KeyValue(L.En ? "Truck" : "الشاحنة", "فولفو FH · 32 t")])" />
+                                <div style="margin-top:12px"><ProgressBar Value="62" Label="Setup" /></div>
+                                <ol class="steps" style="margin-top:12px">
+                                    <StepItem Number="1" Title="@(L.En ? "Company details" : "بيانات الشركة")" State="done" />
+                                    <StepItem Number="2" Title="@(L.En ? "Chart of accounts" : "دليل الحسابات")" Text="@(L.En ? "Use the transport template." : "استخدم قالب النقل.")" State="current"><Actions><Btn Small="true" Primary="true" Text="@(L.En ? "Start" : "ابدأ")" /></Actions></StepItem>
+                                    <StepItem Number="3" Title="@(L.En ? "Drivers and trucks" : "السائقون والشاحنات")" />
+                                </ol>
+                            </Box>
+                        </div>
+                    </div>
+                    <Modal @bind-Open="_dialog" Title="@(L.En ? "Approval not possible" : "تعذّر الاعتماد")" Icon="alert">
+                        <ChildContent><Banner Tone="Tone.Err" Text="@(L.En ? "The invoice cannot be approved:" : "لا يمكن اعتماد الفاتورة:")" /><ul style="margin:0;padding-inline-start:18px"><li><Tx Value="@(L.En ? "Invoice date 2026-09-30 is in a closed period." : "تاريخ الفاتورة 2026-09-30 في فترة مغلقة.")" /></li><li><Tx Value="@(L.En ? "Trip TRP-10476 is no longer unbilled." : "الرحلة TRP-10476 لم تعد غير مفوترة.")" /></li></ul></ChildContent>
+                        <Footer><Btn Text="@L["ui.close"]" OnClick="() => _dialog = false" /><Btn Primary="true" Text="@L["nav.mapping"]" OnClick="() => _dialog = false" /></Footer>
+                    </Modal>
+                    <ConfirmDialog @bind-Open="_void" Title="@(L.En ? "Void invoice INV-02199" : "إلغاء الفاتورة INV-02199")" Danger="true" AskReason="true" ConfirmText="@(L.En ? "Void" : "إلغاء الفاتورة")"
+                                   Message="@(L.En ? "A reversing entry is posted and its trips are released." : "يُرحّل قيد عكسي وتُطلق الرحلات.")" OnConfirm="@(r => { _void = false; Toasts.Success((L.En ? "Voided: " : "أُلغيت: ") + r); })" />
+                    <ConfirmDialog @bind-Open="_typed" Title="@L["nav.maintenance"]" Danger="true" TypedWord="@(L.En ? "DELETE" : "حذف")" OnConfirm="_ => _typed = false" />
+                    <SidePanel @bind-Open="_panel" Title="@L["ui.history"]"><HistoryList Items="History" /></SidePanel>
+                    break;
+
+                case "states":
+                    <TabStrip Items="_states" @bind-Selected="_state" Label="States" />
+                    <StateView State="@State" Kind="SkeletonKind.List" ErrorReference="7F3A-21C9" OnRetry="() => _state = nameof(LoadState.Ready)">
+                        <Empty><EmptyState Icon="truck" Title="@(L.En ? "No trips yet" : "لا رحلات بعد")" Text="@(L.En ? "Enter the first trip in the quick-entry row or import a file." : "أدخل أول رحلة في سطر الإدخال السريع أو استورد ملفاً.")"><Actions><Btn Icon="import" Text="@(L.En ? "Import" : "استيراد")" /><Btn Primary="true" Icon="plus" Text="@L["nav.newTrip"]" /></Actions></EmptyState></Empty>
+                        <ChildContent><Box Title="Ready"><p><Tx Value="@(L.En ? "Content of the screen (17 trips, 2026-10)." : "محتوى الشاشة (17 رحلة، 2026-10).")" /></p></Box></ChildContent>
+                    </StateView>
+                    <div class="row"><Skeleton Kind="SkeletonKind.Form" /></div>
+                    break;
+            }
+        </ChildContent>
+    </AppShell>
+}
+
+@code {
+    private string _section = "list";
+    private string _view = "all";
+    private string? _sort = "date";
+    private bool _desc = true;
+    private int _page = 1;
+    private int _pageSize = 50;
+    private IReadOnlyDictionary<string, string> _filters = new Dictionary<string, string> { ["customer"] = "البوتاس" };
+    private IReadOnlySet<object> _selected = new HashSet<object> { "TRP-10481" };
+    private readonly HashSet<object> _live = ["TRP-10479"];
+    private readonly FormModel _form = new();
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private bool _saving, _locked, _changed, _dialog, _void, _typed, _panel;
+    private string _state = nameof(LoadState.Loading);
+
+    private IReadOnlyList<TabItem> _sections => [new("list", "List / grid"), new("form", "Form"), new("feedback", "Feedback"), new("states", "States")];
+    private IReadOnlyList<TabItem> _views => [new("all", L.En ? "All" : "الكل"), new("unbilled", L.En ? "Unbilled" : "غير مفوترة", 6), new("review", L["st.review"], 1), new("mine", L.En ? "My trips" : "رحلاتي")];
+    private static readonly IReadOnlyList<TabItem> _states = [new(nameof(LoadState.Loading), "Loading"), new(nameof(LoadState.Empty), "Empty"), new(nameof(LoadState.Error), "Error"), new(nameof(LoadState.Ready), "Ready")];
+    private LoadState State => Enum.Parse<LoadState>(_state);
+
+    protected override void OnInitialized()
+    {
+        Shell.SetMe(new DirectService.Transportation.Contracts.Identity.MeResponse("u1", "رنا الخطيب", "rana@example.jo", L.Language, "yyyy-MM-dd", "c1", false, "Arab Transport", "Active",
+            [new("c1", "الشركة العربية للنقل", "Arab Transport Co.", "Active", "Owner", true, [.. typeof(PermissionKeys).GetFields().Where(f => f.IsLiteral && f.Name != "Owner").Select(f => (string)f.GetRawConstantValue()!)]),
+             new("c2", "شركة الجنوب للشحن", "South Freight", "Active", "Accountant", true, [PermissionKeys.AcctView])]));
+        Shell.SelectCompany("c1");
+        Shell.SetSetup(true, L.F("shell.plan", L.En ? "Professional" : "احترافية", "18/25"));
+        Shell.SetNotifications(4);
+    }
+
+    private Task Language(string lang)
+    {
+        L.SetLanguage(lang);
+        return Task.CompletedTask;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        await Task.Delay(600);
+        _saving = false;
+        Toasts.Success(L.En ? "Trip TRP-10483 saved." : "تم حفظ الرحلة TRP-10483.", L.En ? "Open" : "فتح", "/design");
+    }
+
+    private Task Invalid() => _summary?.FocusAsync() ?? Task.CompletedTask;
+
+    private async Task ServerError()
+    {
+        var unplaced = _problems?.Show(new ApiProblem
+        {
+            Status = 400, Code = "validation",
+            Errors = [new("loaded", "validation.range", L.En ? "Loaded weight must be above 0." : "الوزن المحمّل يجب أن يكون أكبر من 0."),
+                      new("date", "period.closed", L.En ? "The date is in a closed period (2026-09)." : "التاريخ في فترة مغلقة (2026-09).")],
+        });
+        if (unplaced is not null) Toasts.Error(unplaced);
+        if (_summary is not null) await _summary.FocusAsync();
+    }
+
+    private IReadOnlyList<Option<string>> Drivers =>
+    [
+        new("d1", "أحمد صالح", "10-11111"), new("d2", "سامي العبادي", "10-22222"), new("d3", "محمود الحويطات", "11-40312"),
+        new("d4", "خالد الزعبي", "12-77801"), new("d5", "يوسف النعيمات", "10-55290"),
+    ];
+
+    private IReadOnlyList<Option<string>> Customers =>
+    [
+        new("c1", "شركة البوتاس العربية", "200014587"), new("c2", "مناجم الفوسفات الأردنية", "200003311"), new("c3", "الإسمنت الأردنية", "200118020"),
+        new("c4", "مصانع الأسمدة الوطنية", "200450117", true),
+    ];
+
+    private IReadOnlyList<Option<string?>> Methods => [new("Cash", L.En ? "Cash" : "نقداً"), new("Bank", L.En ? "Bank transfer" : "تحويل بنكي"), new("CliQ", "CliQ")];
+
+    private IReadOnlyList<HistoryEntry> History =>
+    [
+        new("رنا الخطيب", L.En ? "Edit" : "تعديل", L.En ? "Today 10:42" : "اليوم 10:42", "31.700", "31.850"),
+        new("سارة حداد", L.En ? "Added to invoice INV-02211" : "أضيفت إلى الفاتورة INV-02211", "2026-10-09 16:05"),
+        new("سارة حداد", L.En ? "Void" : "إلغاء", "2026-10-08 12:30", IsVoid: true),
+        new("رنا الخطيب", L.En ? "Created" : "إنشاء", "2026-10-08 09:12"),
+    ];
+
+    private void SaveView() => Toasts.Success(L.En ? "View saved." : "تم حفظ العرض.");
+
+    private static string? VoidRow(Trip t) => t.Status.Contains("void") ? "void" : null;
+
+    private IReadOnlyList<KeyValue> Details =>
+    [
+        new(L.En ? "Invoice" : "الفاتورة", "INV-02210"), new(L.En ? "Customer" : "العميل", "شركة البوتاس العربية"),
+        new("IBAN", "JO71 CBJO 0010 0000 0000 0131 0003 02"), new(L.En ? "Total" : "الإجمالي", Fmt.Money(2671.5m)),
+        new(L.En ? "Status" : "الحالة", null, PartialTag), new(L.En ? "Truck" : "الشاحنة", "فولفو FH · 32 t"),
+    ];
+
+    private static readonly RenderFragment PartialTag = @<StatusTag Status="partial" />;
+
+    private sealed record Trip(string No, string Date, string Driver, string Plate, string Customer, decimal? Unloaded, decimal Revenue, string[] Status);
+
+    private static readonly IReadOnlyList<Trip> Trips =
+    [
+        new("TRP-10482", "2026-10-10", "أحمد صالح", "10-11111", "شركة البوتاس العربية", 31.850m, 191.100m, ["unbilled"]),
+        new("TRP-10481", "2026-10-10", "سامي العبادي", "10-22222", "شركة البوتاس العربية", 31.020m, 186.120m, ["unbilled", "short"]),
+        new("TRP-10480", "2026-10-09", "محمود الحويطات", "11-40312", "مناجم الفوسفات الأردنية", 33.150m, 174.038m, ["invoiced"]),
+        new("TRP-10479", "2026-10-09", "خالد الزعبي", "12-77801", "مناجم الفوسفات الأردنية", 32.790m, 163.950m, ["unbilled", "breach"]),
+        new("TRP-10478", "2026-10-09", "يوسف النعيمات", "10-55290", "الإسمنت الأردنية", 29.980m, 142.405m, ["invoiced", "manual"]),
+        new("TRP-10477", "2026-10-08", "أحمد صالح", "10-11111", "شركة البوتاس العربية", 32.300m, 193.800m, ["invoiced", "settled"]),
+        new("TRP-10475", "2026-10-08", "محمود الحويطات", "11-40312", "مناجم الفوسفات الأردنية", null, 173.250m, ["void"]),
+        new("TRP-10473", "2026-10-07", "يوسف النعيمات", "10-55290", "شركة البوتاس العربية", 31.950m, 191.700m, ["unbilled", "review"]),
+    ];
+
+    private sealed class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "التاريخ مطلوب · Date is required")] public DateOnly? Date { get; set; } = new(2026, 10, 10);
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "اختر السائق · Choose the driver")] public string? Driver { get; set; }
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "اختر العميل · Choose the customer")] public string? Customer { get; set; } = "c1";
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "أدخل الوزن المحمّل · Enter the loaded weight")] public decimal? Loaded { get; set; }
+        public decimal? Unloaded { get; set; } = 31.850m;
+        public decimal? Price { get; set; } = 6m;
+        public string? Method { get; set; }
+        public string? Plate { get; set; } = "10-11111";
+        public string? Reference { get; set; } = "PO 2026/88";
+        public string? Notes { get; set; }
+        public bool Approval { get; set; } = true;
+        public bool Accrual { get; set; } = true;
+        public bool Copy { get; set; }
+    }
+}

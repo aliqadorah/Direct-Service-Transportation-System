@@ -62,8 +62,7 @@ public sealed class DocumentPrinter(IAppDbContext db, IRequestContext ctx, IPdfR
     /// <summary>The document: title, body, optional diagonal stamp (DRAFT / VOID) and an optional "Copy" mark (FR-090).</summary>
     public string Shell(string title, string body, string? stamp, string? mark = null) =>
         "<!doctype html><html lang=\"" + (En ? "en" : "ar") + "\" dir=\"" + (En ? "ltr" : "rtl") + "\"><head><meta charset=\"utf-8\"><title>" + E(title) + "</title>"
-        + "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Inter:wght@400;600&display=swap\">"
-        + "<style>" + Css + "body { font-family: " + (En ? "Inter" : "'IBM Plex Sans Arabic'") + ", 'Segoe UI', Tahoma, sans-serif; font-size: 10.5pt; color: #171A1C; margin: 0; position: relative; }</style></head><body>"
+        + "<style>" + BrandFonts.Css + Css + "body { font-family: " + (En ? "Inter" : "'IBM Plex Sans Arabic'") + ", 'Segoe UI', Tahoma, sans-serif; font-size: 10.5pt; color: #171A1C; margin: 0; position: relative; }</style></head><body>"
         + (stamp is null ? string.Empty : "<div class=\"stamp\">" + E(stamp) + "</div>")
         + (mark is null ? string.Empty : "<div class=\"copy\">" + E(mark) + "</div>") + body + "</body></html>";
 

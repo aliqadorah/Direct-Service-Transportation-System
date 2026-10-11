@@ -164,7 +164,10 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
         h.XFrameOptions = "DENY";
         h["Referrer-Policy"] = "no-referrer";
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-        h.ContentSecurityPolicy = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
+        // WebAssembly needs 'wasm-unsafe-eval' (no 'unsafe-eval'); inline style attributes are used by components (no inline scripts);
+        // fonts and images are served by the application or embedded as data: (logos, QR codes).
+        h.ContentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+            + "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
         h["Cross-Origin-Opener-Policy"] = "same-origin";
         return next(http);
     }

@@ -1,0 +1,34 @@
+@* Document shell of the Blazor Web App (ADR-02): language and direction from the user's profile (or the browser for anonymous pages),
+   brand fonts and design tokens served locally, the application rendered with interactive WebAssembly (no server prerendering: the
+   UI reaches data only through the REST API); account pages opt out of interactive routing and render statically on the server. *@
+@using DirectService.Transportation.Application.Abstractions
+@inject IRequestContext RequestContext
+<!DOCTYPE html>
+<html lang="@Lang" dir="@(Lang == "en" ? "ltr" : "rtl")" data-density="compact">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="preload" href="@Assets["fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2"]" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="@Assets["css/fonts.css"]" />
+    <link rel="stylesheet" href="@Assets["css/tokens.css"]" />
+    <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <link rel="icon" type="image/png" href="@Assets["img/logo.png"]" />
+    <title>@(Lang == "en" ? "Direct Service Transportation" : "دايركت سيرفس للنقل")</title>
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+<body>
+    <Routes @rendermode="PageRenderMode" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+</html>
+
+@code {
+    private static readonly IComponentRenderMode Wasm = new InteractiveWebAssemblyRenderMode(prerender: false);
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    private string Lang => RequestContext.Language == "en" ? "en" : "ar";
+
+    private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? Wasm : null;
+}

@@ -7,10 +7,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
+    <ProjectReference Include="..\DirectService.Transportation.Web.Client\DirectService.Transportation.Web.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
   </ItemGroup>

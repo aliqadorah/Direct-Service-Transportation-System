@@ -1,0 +1,58 @@
+@* List footer: "1–50 of 1,284" (or a summary), page buttons and rows per page (API-04 paging: pageSize ≤ 200). *@
+@inject Loc L
+<nav class="tbl-foot" aria-label="@L["ui.pages"]">
+    <span>@if (Summary is not null) {@Summary} else {<Tx Value="@L.F("ui.rowsOf", Fmt.Count(First), Fmt.Count(Last), Fmt.Count(Total))" />}</span>
+    <span class="pg">
+        <Btn Small="true" Icon="right" FlipIcon="true" AriaLabel="@L["ui.previous"]" Disabled="Page <= 1" OnClick="() => Go(Page - 1)" />
+        @foreach (var p in Pages)
+        {
+            if (p == 0) {<span aria-hidden="true">…</span>}
+            else
+            {
+                var n = p;
+                <button type="button" class="chip" style="height:24px;padding:0 8px" aria-current="@(n == Page ? "page" : null)"
+                        aria-label="@L.F("ui.page", n)" @onclick="() => Go(n)"><bdi class="num">@n</bdi></button>
+            }
+        }
+        <Btn Small="true" Icon="left" FlipIcon="true" AriaLabel="@L["ui.next"]" Disabled="Page >= PageCount" OnClick="() => Go(Page + 1)" />
+        <select aria-label="@L["ui.rowsPerPage"]" value="@PageSize" @onchange="Size">
+            @foreach (var s in Sizes) {<option value="@s">@L.F("ui.rows", s)</option>}
+        </select>
+    </span>
+</nav>
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 50;
+    [Parameter] public int Total { get; set; }
+    [Parameter] public EventCallback<int> OnPage { get; set; }
+    [Parameter] public EventCallback<int> OnPageSize { get; set; }
+    [Parameter] public RenderFragment? Summary { get; set; }
+    [Parameter] public IReadOnlyList<int> Sizes { get; set; } = [25, 50, 100, 200];
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(Total / (double)Math.Max(1, PageSize)));
+    private int Current => Math.Clamp(Page, 1, PageCount);
+    private int First => Total == 0 ? 0 : (Current - 1) * PageSize + 1;
+    private int Last => Math.Min(Total, Current * PageSize);
+
+    /// <summary>1 … around the current page … last; 0 marks a gap.</summary>
+    private IEnumerable<int> Pages
+    {
+        get
+        {
+            var set = new SortedSet<int> { 1, PageCount };
+            for (var p = Page - 1; p <= Page + 1; p++) if (p >= 1 && p <= PageCount) set.Add(p);
+            var prev = 0;
+            foreach (var p in set)
+            {
+                if (p - prev > 1) yield return 0;
+                yield return p;
+                prev = p;
+            }
+        }
+    }
+
+    private Task Go(int p) => p < 1 || p > PageCount || p == Page ? Task.CompletedTask : OnPage.InvokeAsync(p);
+
+    private Task Size(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var s) ? OnPageSize.InvokeAsync(s) : Task.CompletedTask;
+}

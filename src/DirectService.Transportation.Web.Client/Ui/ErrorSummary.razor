@@ -1,0 +1,69 @@
+@*
+  Error summary above a form (UX-16): the count and one link per invalid field; a link moves focus to the field. Reads the messages of
+  the cascading EditContext (client checks and the API's field errors, see ProblemValidator) plus page-level messages.
+*@
+@implements IDisposable
+@inject Loc L
+@inject UiJs Js
+@if (Messages.Count > 0)
+{
+    <div class="errsum" role="alert" tabindex="-1" @ref="_el">
+        <b>@(Messages.Count == 1 ? L["ui.fixError"] : L.F("ui.fixErrors", Messages.Count))</b>
+        <ul>
+            @foreach (var m in Messages)
+            {
+                var item = m;
+                <li>@if (item.FieldId is not null) {<a href="@("#" + item.FieldId)" @onclick="() => Js.FocusById(item.FieldId)" @onclick:preventDefault="true"><Tx Value="@item.Text" /></a>} else {<Tx Value="@item.Text" />}</li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    private ElementReference _el;
+    private EditContext? _ctx;
+
+    [CascadingParameter] private EditContext? EditContext { get; set; }
+    /// <summary>Messages not tied to a field (business refusals that name several fields).</summary>
+    [Parameter] public IReadOnlyList<string>? Extra { get; set; }
+
+    private List<(string Text, string? FieldId)> Messages
+    {
+        get
+        {
+            var list = new List<(string, string?)>();
+            if (EditContext is not null)
+            {
+                // Messages of registered fields first (in form order, with a link), then any other message without a link.
+                foreach (var (fid, id) in FieldRegistry.For(EditContext))
+                    foreach (var msg in EditContext.GetValidationMessages(fid)) list.Add((msg, id));
+                foreach (var msg in EditContext.GetValidationMessages())
+                    if (!list.Any(x => x.Item1 == msg)) list.Add((msg, null));
+            }
+            if (Extra is not null) list.AddRange(Extra.Select(x => (x, (string?)null)));
+            return list;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_ctx, EditContext)) return;
+        if (_ctx is not null) _ctx.OnValidationStateChanged -= Changed;
+        _ctx = EditContext;
+        if (_ctx is not null) _ctx.OnValidationStateChanged += Changed;
+    }
+
+    private void Changed(object? sender, ValidationStateChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    /// <summary>Moves focus to the summary after a failed submit, so screen-reader users hear it.</summary>
+    public async Task FocusAsync()
+    {
+        await Task.Yield();
+        if (Messages.Count > 0) await _el.FocusAsync();
+    }
+
+    public void Dispose()
+    {
+        if (_ctx is not null) _ctx.OnValidationStateChanged -= Changed;
+    }
+}

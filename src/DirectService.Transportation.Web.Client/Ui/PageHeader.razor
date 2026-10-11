@@ -1,0 +1,19 @@
+@* Page title with breadcrumbs, status badges and page actions (at the far end). The title is the page's h1. *@
+<header class="ph">
+    <div class="t">
+        @if (Crumbs is { Count: > 0 })
+        {
+            <nav class="crumbs" aria-label="@L["ui.breadcrumbs"]"><ol>@foreach (var c in Crumbs) {<li>@if (c.Href is null) {<Tx Value="@c.Text" />} else {<a href="@c.Href"><Tx Value="@c.Text" /></a>}</li>}</ol></nav>
+        }
+        <h1 tabindex="-1" id="page-title"><Tx Value="@Title" />@Badges</h1>
+    </div>
+    @if (Actions is not null) {<div class="act">@Actions</div>}
+</header>
+
+@code {
+    [Inject] private Loc L { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public IReadOnlyList<Crumb>? Crumbs { get; set; }
+    [Parameter] public RenderFragment? Badges { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

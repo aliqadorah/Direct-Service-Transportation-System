@@ -1,0 +1,15 @@
+@* A step of a checklist (setup checklist SCR-06). State: todo | current | done. Place inside <ol class="steps">. *@
+@inject Loc L
+<li class="step @(State == "done" ? "done" : State == "current" ? "cur" : null)" aria-current="@(State == "current" ? "step" : null)">
+    <span class="si">@if (State == "done") {<Icon Name="check" Label="@L["ui.done"]" />} else {<bdi class="num">@Number</bdi>}</span>
+    <div><b><Tx Value="@Title" /></b>@if (Text is not null) {<div class="help"><Tx Value="@Text" /></div>}</div>
+    <div>@Actions</div>
+</li>
+
+@code {
+    [Parameter] public int Number { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string State { get; set; } = "todo";
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

@@ -1,0 +1,41 @@
+@* Loading placeholder shaped like the screen (list, form, report, detail, dash), with a "loading" status for screen readers. *@
+@inject Loc L
+<div class="stack fill" aria-busy="true">
+    @switch (Kind)
+    {
+        case SkeletonKind.Form:
+            <div class="box pad"><div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+                @for (var i = 0; i < 12; i++) {<div style="display:flex;flex-direction:column;gap:6px"><div class="sk" style="width:40%;height:10px"></div><div class="sk" style="width:100%;height:30px"></div></div>}
+            </div></div>
+            break;
+        case SkeletonKind.Report:
+            <div class="box pad stack"><div class="sk" style="width:30%;height:16px"></div>@Rows(12, "3fr 1fr 1fr 1fr")</div>
+            break;
+        case SkeletonKind.Detail:
+            <div class="box pad"><div class="sk" style="width:25%;height:18px"></div><div style="height:10px"></div>
+                <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">@for (var i = 0; i < 8; i++) {<div class="sk" style="width:90%;height:12px"></div>}</div></div>
+            <div class="box fill">@Rows(8, "1fr 1fr 2fr 1fr 1fr")</div>
+            break;
+        case SkeletonKind.Dashboard:
+            <div class="box" style="height:62px"><div class="sk" style="height:100%"></div></div>
+            <div class="cols fill" style="grid-template-columns:1.5fr 1fr"><div class="box">@Rows(8, "3fr 1fr 1fr")</div><div class="box">@Rows(6, "2fr 1fr")</div></div>
+            break;
+        default:
+            <div class="box fill">@Rows(RowCount, "1fr 1fr 2fr 2fr 1fr 1fr 1fr")</div>
+            break;
+    }
+    <span class="muted" role="status" style="font-size:var(--fs-sm)">@L["ui.loading"]</span>
+</div>
+
+@code {
+    [Parameter] public SkeletonKind Kind { get; set; } = SkeletonKind.List;
+    [Parameter] public int RowCount { get; set; } = 14;
+
+    private static RenderFragment Rows(int n, string cols) => __builder =>
+    {
+        for (var i = 0; i < n; i++)
+        {
+            <div class="skrow" style="grid-template-columns:@cols">@foreach (var _ in cols.Split(' ')) {<div class="sk" style="height:12px"></div>}</div>
+        }
+    };
+}

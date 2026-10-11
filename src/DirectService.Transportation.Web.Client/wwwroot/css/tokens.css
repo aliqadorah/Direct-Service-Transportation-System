@@ -1,0 +1,127 @@
+/*
+  Direct Service Transportation — design tokens (step 7).
+  Source: the approved step 6 board (docs/step6/index.html), direction A · Ledger with C's saved views, filter row, Ctrl+K bar and density switch.
+  Brand per PRD UX-06 / UX-07: primary teal, IBM Plex Sans Arabic + Inter, light theme only (UX-10). Every colour pair used for text meets
+  WCAG 2.1 AA (4.5:1) on its background; see docs/step7/Design_System.md for the contrast table.
+*/
+:root {
+  color-scheme: light;
+
+  /* ---- colour: brand */
+  --primary: #0F4C5C;
+  --primary-dark: #0A3540;
+  --primary-hover: #0C3F4D;
+  --tint: #E4EDEE;
+  --focus-ring: rgba(15, 76, 92, .22);
+
+  /* ---- colour: neutrals */
+  --text: #171A1C;
+  --muted: #5B6570;
+  --placeholder: #6B757D;      /* 4.7:1 on white (the board's #8A949C was 3.1:1) */
+  --page: #F6F8F7;
+  --surface: #FFFFFF;
+  --surface-sunk: #F4F6F6;     /* read-only inputs */
+  --surface-head: #F1F5F5;     /* table headers */
+  --surface-foot: #F8FAFA;     /* table totals */
+  --surface-filter: #FBFCFC;   /* filter row, command bar */
+  --surface-group: #F6F9F9;    /* grouped table rows */
+  --surface-mute: #EEF1F0;     /* muted badges, bars, lock banner */
+  --border: #E3E7E6;
+  --border-control: #CDD5D3;   /* buttons, chips, command bar (identified by their text) */
+  --border-input: #8A9592;     /* text fields, selects, toggles off: 3.09:1 on white (WCAG 1.4.11; the board's #CDD5D3 was 1.5:1) */
+  --line-strong: #CBD3D1;
+  --skeleton-a: #ECF0EF;
+  --skeleton-b: #F5F7F7;
+  --live-row: #FFF9E8;         /* a row changed by another user (UX-20) */
+
+  /* ---- colour: semantic (text / background / border) */
+  --ok: #1D6B45;   --ok-bg: #E3F2EA;   --ok-line: #B9DCC8;
+  --warn: #8A5300; --warn-bg: #FFF2D6; --warn-line: #F1D9A6;
+  --err: #B42318;  --err-bg: #FDECEA;  --err-line: #F0B8B1; --err-input: #FFFBFA; --danger-line: #E7B4AE;
+  --info: #1D5C9E; --info-bg: #E7F0FA; --info-line: #C3D7EE;
+
+  /* ---- colour: side menu (dark) */
+  --side-bg: var(--primary-dark);
+  --side-bg-provider: #1E2A2E;
+  --side-text: #DCE7E9;
+  --side-group: #C3D5D9;
+  --side-foot: #9FB8BD;
+  --side-line: rgba(255, 255, 255, .12);
+  --side-current: rgba(255, 255, 255, .12);
+
+  /* ---- typography */
+  --font-ar: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --font-en: "Inter", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --font-num: "Inter", "Segoe UI", Tahoma, system-ui, sans-serif;
+  --fs-xs: 11.5px;   /* sources, footnotes */
+  --fs-sm: 12.5px;   /* labels, table headers, crumbs, badges */
+  --fs-md: 13.5px;   /* controls, table cells, body of boxes */
+  --fs-base: 14px;   /* body */
+  --fs-lg: 15px;     /* dialog titles, grand totals */
+  --fs-xl: 16px;     /* empty-state titles */
+  --fs-title: 18px;  /* page titles */
+  --fs-fig: 17px;    /* figure values */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --lh: 1.5;
+
+  /* ---- spacing (4 px base; the board's 6/10/14 steps kept where the layout needs them) */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 10px;
+  --sp-6: 12px;
+  --sp-7: 14px;
+  --sp-8: 16px;
+  --sp-10: 20px;
+  --sp-12: 24px;
+
+  /* ---- shape */
+  --r: 3px;          /* controls, boxes, badges (Ledger: square-ish) */
+  --r-lg: 4px;       /* dialogs, toasts */
+  --r-pill: 10px;    /* toggles */
+  --bw: 1px;
+
+  /* ---- elevation (only floating layers have shadows) */
+  --shadow-dropdown: 0 8px 24px rgba(10, 53, 64, .16);
+  --shadow-panel: -6px 0 24px rgba(10, 53, 64, .12);
+  --shadow-toast: 0 6px 20px rgba(10, 53, 64, .25);
+  --shadow-dialog: 0 12px 40px rgba(10, 30, 36, .3);
+  --scrim: rgba(10, 30, 36, .32);
+
+  /* ---- motion */
+  --dur-fast: .15s;
+  --dur-live: 1s;
+  --dur-skeleton: 1.4s;
+  --ease: ease;
+
+  /* ---- layers */
+  --z-sticky: 1;
+  --z-input-expanded: 6;
+  --z-dropdown: 7;
+  --z-panel: 12;
+  --z-scrim: 15;
+  --z-toast: 20;
+
+  /* ---- layout */
+  --side-w: 224px;
+  --top-h: 46px;
+  --cmdk-w: 360px;
+  --dialog-w: 480px;
+  --panel-w: 360px;
+
+  /* ---- density (DT-67: compact by default; comfortable = 40 px rows) */
+  --row: 32px;
+  --ctl: 32px;
+  --fs: var(--fs-base);
+  --ic: 17px;
+}
+
+[data-density="comfortable"] {
+  --row: 40px;
+  --ctl: 36px;
+  --fs: 14.5px;
+}

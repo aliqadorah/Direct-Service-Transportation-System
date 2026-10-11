@@ -1,0 +1,21 @@
+@* Side panel over the page (history, notifications, quick details). Not modal: the page stays usable; Escape closes. *@
+@inject Loc L
+@if (Open)
+{
+    <aside class="panel-side" aria-labelledby="@_id" @onkeydown="Key">
+        <div class="bh"><h2 id="@_id" style="font-size:inherit"><Tx Value="@Title" /></h2><Btn Ghost="true" Small="true" Icon="close" AriaLabel="@L["ui.close"]" Class="x" OnClick="Close" /></div>
+        <div class="pb">@ChildContent</div>
+    </aside>
+}
+
+@code {
+    private readonly string _id = Ids.Next("panel");
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task Close() => OpenChanged.InvokeAsync(false);
+
+    private Task Key(KeyboardEventArgs e) => e.Key == "Escape" ? Close() : Task.CompletedTask;
+}

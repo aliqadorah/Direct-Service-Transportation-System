@@ -1,0 +1,12 @@
+@* Read-only details as a description list. *@
+<dl class="kv" style="grid-template-columns:repeat(@Columns,minmax(0,1fr))">
+    @foreach (var kv in Items)
+    {
+        <div><dt><Tx Value="@kv.Key" /></dt><dd>@if (kv.Content is not null) {@kv.Content} else {<Tx Value="@kv.Value" />}</dd></div>
+    }
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<KeyValue> Items { get; set; } = [];
+    [Parameter] public int Columns { get; set; } = 3;
+}

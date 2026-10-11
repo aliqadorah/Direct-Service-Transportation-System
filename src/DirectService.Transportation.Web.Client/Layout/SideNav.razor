@@ -1,0 +1,82 @@
+@*
+  Dark side menu at the inline start (right in Arabic) with the PRD groups (UX-11). The group holding the current page is open and marked;
+  other groups open on click (one at a time). Current entries carry aria-current="page".
+*@
+@implements IDisposable
+@inject NavigationManager Nav
+@inject Loc L
+<aside class="side" aria-label="@L[Provider ? "shell.providerMenu" : "shell.mainMenu"]">
+    <div class="brand"><img src="img/logo.png" alt="" /><span>@L[Provider ? "shell.console" : "shell.product"]</span></div>
+    <nav>
+        @if (Provider)
+        {
+            @foreach (var (key, route, icon) in NavModel.Console)
+            {
+                var cur = IsCurrent(route);
+                <a class="g @(cur ? "cur" : null)" href="@route" aria-current="@(cur ? "page" : null)"><Icon Name="@icon" /><span class="lbl">@L[key]</span></a>
+            }
+        }
+        else
+        {
+            @foreach (var g in Groups)
+            {
+                var group = g;
+                if (group.Route is not null)
+                {
+                    var href = NavModel.Href(Company, group.Route);
+                    var cur = IsCurrent(href, exact: group.Route.Length == 0);
+                    <a class="g @(cur ? "cur" : null)" href="@href" aria-current="@(cur ? "page" : null)"><Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span></a>
+                    continue;
+                }
+                var open = _open == group.Key;
+                <button type="button" class="g @(open ? "open" : null)" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(group.Key)">
+                    <Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span><Icon Name="@(open ? "down" : "left")" Flip="!open" Class="ch" />
+                </button>
+                @if (open)
+                {
+                    foreach (var i in group.Items)
+                    {
+                        var href = NavModel.Href(Company, i.Route);
+                        var cur = IsCurrent(href);
+                        <a class="it @(cur ? "cur" : null)" href="@href" aria-current="@(cur ? "page" : null)">@L[i.Key]</a>
+                    }
+                }
+            }
+        }
+    </nav>
+    <div class="foot">@if (Provider) {@L["shell.consoleFoot"]} else if (Foot is not null) {<Tx Value="@Foot" />}</div>
+</aside>
+
+@code {
+    private string? _open;
+
+    [Parameter] public IReadOnlyList<NavGroup> Groups { get; set; } = [];
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? Foot { get; set; }
+    [Parameter] public bool Provider { get; set; }
+
+    protected override void OnInitialized() => Nav.LocationChanged += Moved;
+
+    protected override void OnParametersSet() => _open ??= CurrentGroup();
+
+    private void Moved(object? sender, LocationChangedEventArgs e)
+    {
+        _open = CurrentGroup() ?? _open;
+        StateHasChanged();
+    }
+
+    private string Path => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+
+    private bool IsCurrent(string href, bool exact = false)
+    {
+        var h = href.TrimEnd('/');
+        return exact ? string.Equals(Path, h, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(Path, h, StringComparison.OrdinalIgnoreCase) || Path.StartsWith(h + "/", StringComparison.OrdinalIgnoreCase) && !Groups.SelectMany(g => g.Items).Any(i => i.Route.Length > 0 && NavModel.Href(Company, i.Route).Length > h.Length && Path.StartsWith(NavModel.Href(Company, i.Route), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string? CurrentGroup() => Groups.FirstOrDefault(g => g.Items.Any(i => IsCurrent(NavModel.Href(Company, i.Route))))?.Key;
+
+    private void Toggle(string key) => _open = _open == key ? null : key;
+
+    public void Dispose() => Nav.LocationChanged -= Moved;
+}

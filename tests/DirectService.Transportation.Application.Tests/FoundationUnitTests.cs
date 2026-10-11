@@ -117,4 +117,16 @@ public sealed class FoundationUnitTests
         Assert.Equal(30, "JO94CBJO0010000000000131000302".Length);
         Assert.DoesNotMatch(iban, "JO94CBJO001000000000013100030");
     }
+
+    [Fact]
+    public void Printouts_embed_the_brand_fonts_without_any_network_request()
+    {
+        // Open issue B6: the fonts are bundled; the PDF engine loads only data: resources.
+        var css = BrandFonts.Css;
+        Assert.Equal(9, css.Split("@font-face").Length - 1);
+        Assert.Contains("font-family:'IBM Plex Sans Arabic'", css, StringComparison.Ordinal);
+        Assert.Contains("font-family:'Inter'", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("url(http", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(9, css.Split("data:font/woff2;base64,").Length - 1);
+    }
 }

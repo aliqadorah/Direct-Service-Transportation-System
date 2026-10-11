@@ -1,0 +1,12 @@
+@* Key figures strip (dashboard, statements, totals). *@
+<div class="box figs" style="grid-template-columns:repeat(@(Columns ?? Items.Count),minmax(0,1fr))">
+    @foreach (var f in Items)
+    {
+        <div><span class="k"><Tx Value="@f.Label" /></span><bdi class="num v">@f.Value</bdi>@if (f.Note is not null) {<small><Tx Value="@f.Note" /></small>}</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Figure> Items { get; set; } = [];
+    [Parameter] public int? Columns { get; set; }
+}
