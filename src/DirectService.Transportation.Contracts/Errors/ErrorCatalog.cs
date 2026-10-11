@@ -164,7 +164,6 @@ public static class ErrorCatalog
         [ErrorCodes.ApArControlAccount] = ("حساب الرقابة يجب أن يكون حساب رقابة فعّالاً قابلاً للترحيل من نوع «{0}».", "The control account must be an active, postable control account of type «{0}»."),
         [ErrorCodes.ApArPartyRole] = ("الطرف «{0}» ليس {1}.", "Party «{0}» is not a {1}."),
         [ErrorCodes.ApArLineAccount] = ("السطر {0}: لا يمكن استخدام الحساب {1} في هذا المستند (فواتير الموردين: مصروف أو أصل؛ المستندات المدينة: إيراد؛ دون حسابات الرقابة).", "Line {0}: account {1} cannot be used on this document (supplier bills: expense or asset; receivables: revenue; no control accounts)."),
-        [ErrorCodes.ApArTaxNumberRequired] = ("الفوترة الإلكترونية مفعّلة: أدخل الرقم الضريبي للطرف «{0}» قبل إصدار فاتورة ضريبية له.", "E-invoicing is on: enter the tax number of «{0}» before issuing a tax invoice to it."),
         [ErrorCodes.ApArDocumentIsVoid] = ("المستند {0} ملغى.", "Document {0} is void."),
         [ErrorCodes.ApArDocumentNotOpen] = ("لا يوجد رصيد متبقٍ على المستند {0}.", "Document {0} has no remaining balance."),
         [ErrorCodes.ApArExceedsRemaining] = ("المبلغ {0} أكبر من الرصيد المتبقي للمستند {1}.", "The amount {0} is above the document remaining balance {1}."),
@@ -362,7 +361,6 @@ public static class ErrorCodes
     public const string ApArControlAccount = "apar.controlAccount";
     public const string ApArPartyRole = "apar.partyRole";
     public const string ApArLineAccount = "apar.lineAccount";
-    public const string ApArTaxNumberRequired = "apar.taxNumberRequired";
     public const string ApArDocumentIsVoid = "apar.documentVoid";
     public const string ApArDocumentNotOpen = "apar.documentNotOpen";
     public const string ApArExceedsRemaining = "apar.exceedsRemaining";

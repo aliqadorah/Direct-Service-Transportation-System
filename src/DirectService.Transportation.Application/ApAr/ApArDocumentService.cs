@@ -30,7 +30,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// </summary>
 public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes,
     IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ChartOfAccountsService chart, ApArPartyService parties,
-    EInvoiceService einvoice, EInvoiceSettingsService einvoiceSettings, ISpreadsheetService sheets)
+    EInvoiceService einvoice, ISpreadsheetService sheets)
 {
     public const string EntityType = "ACC.ApArDocument";
     public const int MaxLines = 200;
@@ -81,10 +81,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         if (total > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
         if (total <= 0) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
 
-        // Design: the tax number is required on parties receiving a tax invoice while e-invoicing is on (application rule, DT-102).
-        var taxNumber = party?.TaxNumber ?? customer?.TaxNumber;
-        if (k == ApArCodes.Receivable && tax > 0 && string.IsNullOrWhiteSpace(taxNumber) && await einvoiceSettings.EnabledAsync(ct).ConfigureAwait(false) is not null)
-            throw Fail.RuleOn("partyId", ErrorCodes.ApArTaxNumberRequired, party?.Name ?? customer!.Name);
+        // The buyer's tax number is sent when known and may be missing (PRD 7.8.2; same rule as transport invoices: DT-86, DT-102 as revised by the owner).
 
         var doc = new ApArDocument
         {

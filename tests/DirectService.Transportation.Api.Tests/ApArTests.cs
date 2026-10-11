@@ -216,17 +216,22 @@ public sealed class ApArTests(ApiFactory f)
         Assert.Contains("ARD-00001", credit.RequestPayload, StringComparison.Ordinal);
         Assert.Equal(0m, (await ReadAsync<ApArDocumentDetails>(await o.Client.GetAsync(U(o, $"/apar/receivables/{doc.Document.Id}")))).Document.RemainingAmount);
 
-        // A party without a tax number cannot receive a tax invoice while e-invoicing is on (design rule, DT-102).
+        // A buyer without a tax number is accepted: the document is issued and sent without the TN identification (PRD 7.8.2, DT-102 as revised).
         var noTin = await ReadAsync<ApArPartyResponse>(await o.Client.PostAsJsonAsync(U(o, "/apar/parties"),
             new ApArPartyRequest("Customer", "Walk-in", null, null, null, w.Accounts["110302"].Id, 0, null, null)));
-        Assert.Equal("apar.taxNumberRequired", await (await o.Client.PostAsJsonAsync(U(o, "/apar/receivables"), new ApArDocumentRequest(noTin.Id, null, Today, null, null,
-            [new ApArLineRequest("Scrap sale", w.Accounts["4102"].Id, 50m, 16m, null)], null))).ProblemCodeAsync());
+        var walkIn = await ReadAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/receivables"), new ApArDocumentRequest(noTin.Id, null, Today, null, null,
+            [new ApArLineRequest("Scrap sale", w.Accounts["4102"].Id, 50m, 16m, null)], null)));
+        Assert.Equal(8.000m, walkIn.Document.Tax);
+        await RunWorkerAsync();
+        var walkInSubmission = await ReadAsync<EInvoiceSubmissionDetails>(await o.Client.GetAsync(U(o, $"/apar/receivables/{walkIn.Document.Id}/e-invoice")));
+        Assert.Equal(EInvoiceCodes.Submitted, walkInSubmission.Submission.Status);
+        Assert.DoesNotContain("schemeID=\"TN\"", walkInSubmission.RequestPayload, StringComparison.Ordinal);
         // A supplier is not a receivable party.
         var supplier = await SupplierAsync(w);
         Assert.Equal("apar.partyRole", await (await o.Client.PostAsJsonAsync(U(o, "/apar/receivables"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
             [new ApArLineRequest("x", w.Accounts["4102"].Id, 50m, 0m, null)], null))).ProblemCodeAsync());
         var list = await ReadAsync<Contracts.Common.PagedResult<EInvoiceSubmissionResponse>>(await o.Client.GetAsync(U(o, "/apar/e-invoice-submissions?status=submitted")));
-        Assert.Equal(2, list.TotalCount);
+        Assert.Equal(3, list.TotalCount);
     }
 
     [Fact]
