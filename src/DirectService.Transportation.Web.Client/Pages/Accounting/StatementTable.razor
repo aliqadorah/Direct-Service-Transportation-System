@@ -15,7 +15,8 @@
         @foreach (var row in Rows)
         {
             var r = row;
-            <tr @key="r.Account.Id" style="@(r.IsLeaf ? null : "font-weight:600")" class="@(r.IsLeaf ? "clk" : null)" tabindex="@(r.IsLeaf ? 0 : null)"
+            <tr @key="r.Account.Id" style="@(r.IsLeaf ? null : "font-weight:600")" class="@(r.IsLeaf ? "clk" : null)" tabindex="@(r.IsLeaf ? 0 : null)" role="@(r.IsLeaf ? "link" : null)"
+                aria-label="@(r.IsLeaf ? L.F("rep.openLedger", r.Account.Code) : null)"
                 @onclick="() => Open(r)" @onkeydown="@(e => { if (e.Key == "Enter") Open(r); })">
                 <td><span style="padding-inline-start:@((r.Level - 1) * 16)px"><bdi class="num">@r.Account.Code</bdi> @L.Pick(r.Account.NameAr, r.Account.NameEn)</span></td>
                 <td class="n"><bdi class="num">@Fmt.Money(r.Amount)</bdi></td>

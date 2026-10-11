@@ -30,7 +30,8 @@ else
             }
             else
             {
-                @Body
+                @* A new page instance per path: routes that share a component (new / edit, payables / receivables) never carry state over. *@
+                <div @key="PageKey" style="display:contents">@Body</div>
             }
             <NotificationsPanel @bind-Open="_notes" />
         </ChildContent>
@@ -63,6 +64,8 @@ else
             _state = LoadState.Error;
         }
     }
+
+    private string PageKey => Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath;
 
     private void Moved(object? sender, LocationChangedEventArgs e)
     {

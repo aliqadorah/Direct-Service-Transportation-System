@@ -10,6 +10,8 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 @inject UiJs Js
+@inject AccountingLookups Lookups
+@inject MoneyAccounts Money
 
 <PageHeader Title="@L["nav.maintenance"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.maintenance"])])">
     <Actions><Btn Icon="export" Text="@L["mnt.backup"]" Busy="_busy" OnClick="Backup" /></Actions>
@@ -103,6 +105,7 @@
     private IReadOnlyList<JournalEntrySummary> _entries = [];
     private IReadOnlySet<object> _picked = new HashSet<object>();
     private bool _busy;
+    private int _previewVersion;
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -138,10 +141,16 @@
     private async Task Preview()
     {
         if (_action is null) return;
+        // Only the preview of the current action and selection may be confirmed (review: a late answer must not replace it).
+        var version = ++_previewVersion;
         _preview = null;
         _previewError = null;
-        try { _preview = await Api.PostAsync<MaintenancePreview>(Api.C($"accounting/maintenance/{_action}/preview"), Request()); }
-        catch (ApiException e) { _previewError = e.Problem.Detail; }
+        try
+        {
+            var p = await Api.PostAsync<MaintenancePreview>(Api.C($"accounting/maintenance/{_action}/preview"), Request());
+            if (version == _previewVersion) _preview = p;
+        }
+        catch (ApiException e) { if (version == _previewVersion) _previewError = e.Problem.Detail; }
     }
 
     private async Task Backup()
@@ -166,6 +175,8 @@
         {
             var r = await Api.PostAsync<MaintenanceResult>(Api.C($"accounting/maintenance/{_action}"), Request());
             Toasts.Success(L.F("mnt.done", L["mnt." + r.Action]));
+            Lookups.Invalidate();
+            Money.Invalidate();
             _action = null;
             _preview = null;
             _entries = [];

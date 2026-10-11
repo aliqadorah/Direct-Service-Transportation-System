@@ -24,7 +24,18 @@ public sealed class TripLookups(Api api, ShellState shell)
     public Task EnsureAsync()
     {
         if (_company != shell.Company?.Id) { _company = shell.Company?.Id; _loading = null; Drivers.Clear(); }
-        return _loading ??= LoadAsync();
+        return _loading ??= LoadOnceAsync();
+    }
+
+    /// <summary>A failed load is tried again by the next screen (review M3 of step 8).</summary>
+    private async Task LoadOnceAsync()
+    {
+        try { await LoadAsync().ConfigureAwait(false); }
+        catch
+        {
+            _loading = null;
+            throw;
+        }
     }
 
     /// <summary>Reloads after master data changed in another screen.</summary>

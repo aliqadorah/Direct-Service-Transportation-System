@@ -152,5 +152,9 @@ else
     private Task Size(int s) { _size = s; _page = 1; return Load(); }
     private Task Export(string format) => Files.SaveAsync(Api.C(Path + "/export" + Query(false)), format);
 
-    private void Open(LedgerLine l) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{l.Entry.Id}"));
+    /// <summary>A line opens its entry for readers of the journal (report readers see the statement only).</summary>
+    private void Open(LedgerLine l)
+    {
+        if (Shell.Can(PermissionKeys.AcctView) || Shell.Can(PermissionKeys.JeView)) Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{l.Entry.Id}"));
+    }
 }

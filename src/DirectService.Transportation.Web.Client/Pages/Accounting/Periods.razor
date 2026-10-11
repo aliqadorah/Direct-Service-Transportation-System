@@ -8,6 +8,7 @@
 @inject Loc L
 @inject ShellState Shell
 @inject ToastService Toasts
+@inject MoneyAccounts Money
 
 <PageHeader Title="@L["nav.periods"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.periods"])])">
     <Actions>
@@ -83,7 +84,12 @@
 
     [Parameter] public string Company { get; set; } = "";
 
-    protected override Task OnInitializedAsync() => Load();
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Money.EnsureAsync(); } catch (ApiException) { }
+        if (Money.Today is { } today) _year = today.Year;   // the company's year, not the browser's
+        await Load();
+    }
 
     private async Task Load()
     {

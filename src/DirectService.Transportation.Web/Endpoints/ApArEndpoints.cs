@@ -25,7 +25,8 @@ internal static class ApArEndpoints
         p.MapGet("/", async ([AsParameters] ApArPartyListQuery q, ApArPartyService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(q, ct).ConfigureAwait(false))).RequireAnyPermission(read);
         p.MapGet("/options", async (string? role, ApArPartyService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.OptionsAsync(role, ct).ConfigureAwait(false))).RequireAnyPermission(read);
+            TypedResults.Ok(await svc.OptionsAsync(role, ct).ConfigureAwait(false)))
+            .RequireAnyPermission(PermissionKeys.AcctApar, PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.ReportsView);   // journal and statement party pick lists (DT-147)
         p.MapGet("/{party}", async (string party, ApArPartyService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(party, ct).ConfigureAwait(false))).RequireAnyPermission(read);
         p.MapPost("/", async (ApArPartyRequest req, ApArPartyService svc, CancellationToken ct) =>

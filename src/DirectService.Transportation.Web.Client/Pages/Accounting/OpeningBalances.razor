@@ -45,11 +45,11 @@
                                 <td>@r.Name</td>
                                 <td>@L["acc.t." + r.Type]</td>
                                 <td class="n" style="width:160px">
-                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.debitOf", r.Code)" value="@Show(r.Debit)" @onchange="e => Set(r, e.Value?.ToString(), true)" />}
+                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.debitOf", r.Code)" value="@Show(r.Debit)" @key="(r.Id, r.Rev)" @onchange="e => Set(r, e.Value?.ToString(), true)" />}
                                     else {<bdi class="num">@Show(r.Debit)</bdi>}
                                 </td>
                                 <td class="n" style="width:160px">
-                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.creditOf", r.Code)" value="@Show(r.Credit)" @onchange="e => Set(r, e.Value?.ToString(), false)" />}
+                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.creditOf", r.Code)" value="@Show(r.Credit)" @key="(r.Id, r.Rev, 2)" @onchange="e => Set(r, e.Value?.ToString(), false)" />}
                                     else {<bdi class="num">@Show(r.Credit)</bdi>}
                                 </td>
                             </tr>
@@ -120,6 +120,7 @@
     private void Set(Row r, string? text, bool debit)
     {
         var value = string.IsNullOrWhiteSpace(text) ? 0m : Fmt.TryParseDecimal(text, out var v) && v >= 0 ? v : (debit ? r.Debit : r.Credit);
+        r.Rev++;   // re-creates the input so an unreadable entry shows the value actually kept
         if (debit) { r.Debit = value; if (value > 0) r.Credit = 0; }
         else { r.Credit = value; if (value > 0) r.Debit = 0; }
         _dirty = _rows.Any(x => x.Debit != x.SavedDebit || x.Credit != x.SavedCredit);
@@ -162,5 +163,6 @@
         public decimal Credit { get; set; }
         public decimal SavedDebit { get; set; }
         public decimal SavedCredit { get; set; }
+        public int Rev { get; set; }
     }
 }

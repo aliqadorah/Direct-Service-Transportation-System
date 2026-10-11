@@ -36,7 +36,7 @@
                             <GridColumn TItem="PendingPostingResponse" Title="@L["ei.lastAttempt"]" Value="p => Fmt.DateTime(p.LastAttemptAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                             <GridColumn TItem="PendingPostingResponse" Title="@L["auto.since"]" Value="p => Fmt.DateTime(p.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                             <GridColumn TItem="PendingPostingResponse" Title="@L["profile.action"]" HideTitle="true">
-                                <Template>@if (CanExport) {<Btn Small="true" Icon="refresh" Text="@L["auto.retry"]" OnClick="() => Retry(context)" />}</Template>
+                                <Template>@if (CanExport) {<Btn Small="true" Icon="refresh" Text="@L["auto.retry"]" Disabled="_busy" OnClick="() => Retry(context)" />}</Template>
                             </GridColumn>
                         </Columns>
                     </DataGrid>
@@ -90,6 +90,7 @@
     private string? _reference, _exportFrom, _exportTo, _exportError;
     private string? _exportFormat = "json";
     private bool _busy;
+    private int _version;
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -103,7 +104,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tab"] is { Length: > 0 } t) _tab = t;
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tab"] is { Length: > 0 } t) _tab = t == "exports" && !CanExport ? "entries" : t;
         await Load();
     }
 
@@ -113,28 +114,37 @@
         await Load();
     }
 
+    /// <summary>The latest tab's request wins; an earlier answer arriving late is ignored.</summary>
     private async Task Load()
     {
+        var version = ++_version;
+        var tab = _tab;
         _state = LoadState.Loading;
         try
         {
-            if (_tab == "pending")
+            if (tab == "pending")
             {
-                _pending = await Api.GetAsync<IReadOnlyList<PendingPostingResponse>>(Api.C("ledger/pending-postings"));
-                _state = _pending.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                var pending = await Api.GetAsync<IReadOnlyList<PendingPostingResponse>>(Api.C("ledger/pending-postings"));
+                if (version != _version) return;
+                _pending = pending;
+                _state = pending.Count == 0 ? LoadState.Empty : LoadState.Ready;
             }
-            else if (_tab == "exports")
+            else if (tab == "exports")
             {
-                _batches = await Api.GetAsync<IReadOnlyList<JournalExportBatchResponse>>(Api.C("ledger/exports"));
-                _state = _batches.Count == 0 ? LoadState.Empty : LoadState.Ready;
+                var batches = await Api.GetAsync<IReadOnlyList<JournalExportBatchResponse>>(Api.C("ledger/exports"));
+                if (version != _version) return;
+                _batches = batches;
+                _state = batches.Count == 0 ? LoadState.Empty : LoadState.Ready;
             }
             else _state = LoadState.Ready;
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) { if (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; } }
     }
 
     private async Task Retry(PendingPostingResponse p)
     {
+        if (_busy) return;
+        _busy = true;
         try
         {
             var r = await Api.PostAsync<RetryResult>(Api.C($"ledger/pending-postings/{Uri.EscapeDataString(p.Id)}/retry"), null);
@@ -142,6 +152,7 @@
             await Load();
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
     }
 
     private async Task RetryAll()

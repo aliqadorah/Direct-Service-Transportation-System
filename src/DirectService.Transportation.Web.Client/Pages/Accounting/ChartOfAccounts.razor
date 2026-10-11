@@ -133,7 +133,8 @@
         get
         {
             var excluded = _model.Id is null ? new HashSet<string>() : Descendants(_model.Id);
-            return _all.Where(a => !excluded.Contains(a.Id)).Select(a => new Option<string?>(a.Id, $"{a.Code} · {L.Pick(a.NameAr, a.NameEn)}")).ToList();
+            // A parent of the same type (FR-108); the API refuses others.
+            return _all.Where(a => !excluded.Contains(a.Id) && (_model.AccountType is null || a.AccountType == _model.AccountType)).Select(a => new Option<string?>(a.Id, $"{a.Code} · {L.Pick(a.NameAr, a.NameEn)}")).ToList();
         }
     }
 
@@ -224,6 +225,7 @@
             else
             {
                 saved = await Api.PutAsync<AccountResponse>(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}"), req);
+                _model.RowVersion = saved.RowVersion;   // a failed move must not leave a stale version behind
                 // Moving under another parent is its own action (FR-108).
                 if (saved.ParentId != _model.ParentId)
                     saved = await Api.PostAsync<AccountResponse>(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}/move"), new MoveAccountRequest(_model.ParentId, saved.RowVersion));

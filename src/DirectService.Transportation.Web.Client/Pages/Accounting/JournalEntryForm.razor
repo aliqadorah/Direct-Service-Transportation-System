@@ -76,7 +76,7 @@
                                     <td>@L["ui.total"]</td>
                                     <td class="n"><bdi class="num">@Fmt.Money(Debit)</bdi></td>
                                     <td class="n"><bdi class="num">@Fmt.Money(Credit)</bdi></td>
-                                    <td colspan="4">
+                                    <td colspan="4" aria-live="polite">
                                         @if (Debit == Credit && Debit > 0) {<Badge Tone="Tone.Ok" Icon="check" Text="@L["je.balanced"]" />}
                                         else {<Badge Tone="Tone.Err" Icon="alert" Text="@L.F("je.difference", Fmt.Money(Debit - Credit))" />}
                                     </td>

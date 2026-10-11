@@ -182,6 +182,7 @@
     private ApArReturnPage? _returns;
     private AgeingReport? _ageing;
     private LoadState _state = LoadState.Loading;
+    private int _version;
     private string? _reference, _q, _deleteError;
     private DateOnly? _from, _to, _asOf;
     private int _page = 1;
@@ -236,6 +237,7 @@
 
     private async Task Load()
     {
+        var version = ++_version;
         _state = LoadState.Loading;
         try
         {
@@ -243,29 +245,39 @@
             switch (_tab)
             {
                 case "parties":
-                    _parties = await Api.GetAsync<PagedResult<ApArPartyResponse>>(Api.C($"apar/parties?role={Role}&status=all&page={page}" + (_q is null ? "" : "&q=" + Uri.EscapeDataString(_q))));
+                    var partiesAnswer = await Api.GetAsync<PagedResult<ApArPartyResponse>>(Api.C($"apar/parties?role={Role}&status=all&page={page}" + (_q is null ? "" : "&q=" + Uri.EscapeDataString(_q))));
+                    if (version != _version) return;   // a later request is under way
+                    _parties = partiesAnswer;
                     _state = _parties.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
                     break;
                 case "payments":
-                    _payments = await Api.GetAsync<ApArPaymentPage>(Api.C($"apar/payments?kind={Kind}&status=all&page={page}"));
+                    var paymentsAnswer = await Api.GetAsync<ApArPaymentPage>(Api.C($"apar/payments?kind={Kind}&status=all&page={page}"));
+                    if (version != _version) return;   // a later request is under way
+                    _payments = paymentsAnswer;
                     _state = _payments.Page.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
                     break;
                 case "returns":
-                    _returns = await Api.GetAsync<ApArReturnPage>(Api.C($"apar/returns?kind={Kind}&status=all&page={page}"));
+                    var returnsAnswer = await Api.GetAsync<ApArReturnPage>(Api.C($"apar/returns?kind={Kind}&status=all&page={page}"));
+                    if (version != _version) return;   // a later request is under way
+                    _returns = returnsAnswer;
                     _state = _returns.Page.Items.Count == 0 ? LoadState.Empty : LoadState.Ready;
                     break;
                 case "ageing":
-                    _ageing = await Api.GetAsync<AgeingReport>(Api.C($"apar/ageing/{AgeingKind}{AsOf}"));
+                    var ageingAnswer = await Api.GetAsync<AgeingReport>(Api.C($"apar/ageing/{AgeingKind}{AsOf}"));
+                    if (version != _version) return;   // a later request is under way
+                    _ageing = ageingAnswer;
                     _asOf ??= _ageing.AsOf;
                     _state = _ageing.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
                     break;
                 default:
-                    _docs = await Api.GetAsync<ApArDocumentPage>(Api.C(DocPath + DocQuery(true)));
+                    var docsAnswer = await Api.GetAsync<ApArDocumentPage>(Api.C(DocPath + DocQuery(true)));
+                    if (version != _version) return;   // a later request is under way
+                    _docs = docsAnswer;
                     _state = _docs.Page.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
                     break;
             }
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+        catch (ApiException e) { if (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; } }
     }
 
     private Task SetTab(string t) { _tab = t; _page = 1; _q = null; return Load(); }

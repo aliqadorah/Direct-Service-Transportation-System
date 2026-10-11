@@ -34,13 +34,24 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
 
     private async Task LoadAsync()
     {
-        Accounts = await api.GetAsync<IReadOnlyList<AccountOption>>(api.C("accounting/accounts/options")).ConfigureAwait(false);
+        var company = _company;
+        IReadOnlyList<AccountOption> accounts;
+        try { accounts = await api.GetAsync<IReadOnlyList<AccountOption>>(api.C("accounting/accounts/options")).ConfigureAwait(false); }
+        catch
+        {
+            _loading = null;   // tried again by the next screen
+            throw;
+        }
+        IReadOnlyList<Option<string?>> centres;
         try
         {
             var cc = await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("accounting/cost-centres/options")).ConfigureAwait(false);
-            CostCentres = cc.Select(c => new Option<string?>(c.Id, c.Name)).ToList();
+            centres = cc.Select(c => new Option<string?>(c.Id, c.Name)).ToList();
         }
-        catch (ApiException) { CostCentres = []; }
+        catch (ApiException) { centres = []; }
+        if (company != _company) return;   // the company changed meanwhile
+        Accounts = accounts;
+        CostCentres = centres;
     }
 
     /// <summary>"code · name" in the reader's language.</summary>
@@ -57,8 +68,9 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
     public async Task<IReadOnlyList<ApArPartyOption>> PartiesAsync(string role)
     {
         if (_parties.TryGetValue(role, out var list)) return list;
+        var company = _company;
         list = await api.GetAsync<IReadOnlyList<ApArPartyOption>>(api.C("apar/parties/options?role=" + Uri.EscapeDataString(role))).ConfigureAwait(false);
-        _parties[role] = list;
+        if (company == _company) _parties[role] = list;
         return list;
     }
 }

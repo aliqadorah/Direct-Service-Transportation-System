@@ -17,6 +17,7 @@ public static partial class UiText
         ["rep.background"] = ("تصدير في الخلفية", "Export in the background"),
         ["rep.backgroundHelp"] = ("للنتائج الكبيرة: يصلك إشعار عند جاهزية الملف.", "For large results: you are notified when the file is ready."),
         ["rep.backgroundQueued"] = ("بدأ التصدير في الخلفية؛ سيصلك إشعار عند جاهزية الملف.", "The export runs in the background; you will be notified when the file is ready."),
+        ["rep.openLedger"] = ("فتح أستاذ الحساب {0}", "Open the ledger of {0}"),
         ["rec.ok"] = ("الحسابات المساعدة مطابقة لحسابات الرقابة.", "The sub-ledgers match the control accounts."),
         ["rec.notOk"] = ("توجد فروق بين حسابات الرقابة والحسابات المساعدة.", "There are differences between control accounts and sub-ledgers."),
         ["rec.ledger"] = ("رصيد الأستاذ", "Ledger balance"),
