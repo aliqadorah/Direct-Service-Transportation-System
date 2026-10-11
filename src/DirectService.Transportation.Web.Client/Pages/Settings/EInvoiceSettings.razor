@@ -1,0 +1,103 @@
+@page "/c/{Company}/settings/e-invoicing"
+@*
+  SCR-73 e-invoicing settings (FR-059, DT-87, DT-91): on / off, connector (JoFotara; the simulator only in development), seller tax number,
+  registration type, income-source sequence, environment, and the credentials — write-only: an empty field keeps the stored value and they
+  are never shown again. The invoice counter (ICV) is shown read-only. Changing connector or environment is refused while documents wait.
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.einvoiceSettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.einvoiceSettings"])])" />
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="box pad stack" style="max-width:900px">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <ToggleField @bind-Value="_m.IsEnabled" Label="@L["eis.enabled"]" Help="@L["eis.enabledHelp"]" />
+            <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                <SelectField TValue="string?" @bind-Value="_m.Connector" Options="Connectors" Label="@L["eis.connector"]" Required="true" />
+                <SelectField TValue="string?" @bind-Value="_m.Environment" Options="Environments" Label="@L["eis.environment"]" Required="true" Help="@L["eis.environmentHelp"]" />
+                <TextField @bind-Value="_m.SellerTaxNumber" Label="@L["eis.sellerTax"]" Required="@_m.IsEnabled" MaxLength="20" Ltr="true" />
+                <SelectField TValue="string?" @bind-Value="_m.RegistrationType" Options="RegistrationTypes" Label="@L["eis.registration"]" Required="true" />
+                <TextField @bind-Value="_m.IncomeSourceSequence" Label="@L["eis.sequence"]" Required="@_m.IsEnabled" MaxLength="20" Ltr="true" Help="@L["eis.sequenceHelp"]" />
+                <div class="field"><span class="lbl">@L["eis.icv"]</span><bdi class="num">@Fmt.Count(_icv)</bdi></div>
+                <TextField @bind-Value="_m.ClientId" Label="@L["eis.clientId"]" MaxLength="200" Ltr="true" Autocomplete="off"
+                           Placeholder="@(_hasClientId ? L["eis.stored"] : null)" Help="@L["eis.secretHelp"]" />
+                <TextField @bind-Value="_m.SecretKey" Label="@L["eis.secret"]" Type="password" MaxLength="500" Ltr="true" Autocomplete="new-password"
+                           Placeholder="@(_hasSecret ? L["eis.stored"] : null)" Help="@L["eis.secretHelp"]" />
+            </div>
+            <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private IReadOnlyList<string> _connectors = [];
+    private long _icv;
+    private bool _hasClientId, _hasSecret, _busy;
+    private string? _rowVersion, _reference;
+    private LoadState _state = LoadState.Loading;
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<Option<string?>> Connectors => _connectors.Select(c => new Option<string?>(c, L["eis.conn." + c] is var t && t.StartsWith("eis.", StringComparison.Ordinal) ? c : t)).ToList();
+    private IReadOnlyList<Option<string?>> Environments => [new(EInvoiceCodes.Test, L["ei.envTest"]), new(EInvoiceCodes.Production, L["ei.envProduction"])];
+    private IReadOnlyList<Option<string?>> RegistrationTypes => [new(EInvoiceCodes.Income, L["eis.reg.Income"]), new(EInvoiceCodes.Sales, L["eis.reg.Sales"]), new(EInvoiceCodes.Special, L["eis.reg.Special"])];
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            Fill(await Api.GetAsync<EInvoiceSettingsResponse>(Api.C("settings/e-invoicing")));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Fill(EInvoiceSettingsResponse s)
+    {
+        _m = new Model { IsEnabled = s.IsEnabled, Connector = s.Connector, SellerTaxNumber = s.SellerTaxNumber, RegistrationType = s.RegistrationType,
+            IncomeSourceSequence = s.IncomeSourceSequence, Environment = s.Environment };
+        _ctx = new EditContext(_m);
+        _connectors = s.Connectors;
+        _icv = s.IcvCounter;
+        _hasClientId = s.HasClientId;
+        _hasSecret = s.HasSecretKey;
+        _rowVersion = s.RowVersion;
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            static string? C(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+            var r = await Api.PutAsync<EInvoiceSettingsResponse>(Api.C("settings/e-invoicing"), new EInvoiceSettingsRequest(_m.IsEnabled, _m.Connector, C(_m.SellerTaxNumber),
+                _m.RegistrationType, C(_m.IncomeSourceSequence), C(_m.ClientId), C(_m.SecretKey), _m.Environment, _rowVersion));
+            Fill(r);
+            Toasts.Success(L["set.saved"]);
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Model
+    {
+        public bool IsEnabled { get; set; }
+        public string? Connector { get; set; }
+        public string? SellerTaxNumber { get; set; }
+        public string? RegistrationType { get; set; }
+        public string? IncomeSourceSequence { get; set; }
+        public string? ClientId { get; set; }
+        public string? SecretKey { get; set; }
+        public string? Environment { get; set; }
+    }
+}

@@ -46,14 +46,14 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
     }
 
     /// <summary>Uploads a file as multipart form data (imports: <c>file</c> and an optional <c>mapping</c>).</summary>
-    public async Task<T> UploadAsync<T>(string path, Stream file, string fileName, IReadOnlyDictionary<string, string>? fields = null, CancellationToken ct = default)
+    public async Task<T> UploadAsync<T>(string path, Stream file, string fileName, IReadOnlyDictionary<string, string>? fields = null, HttpMethod? method = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(file);
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct).ConfigureAwait(false);
         using var form = new MultipartFormDataContent { { new ByteArrayContent(ms.ToArray()), "file", fileName } };
         foreach (var (k, v) in fields ?? new Dictionary<string, string>()) form.Add(new StringContent(v), k);
-        return await SendAsync<T>(HttpMethod.Post, path, form, ct).ConfigureAwait(false);
+        return await SendAsync<T>(method ?? HttpMethod.Post, path, form, ct).ConfigureAwait(false);
     }
 
     private static async Task<HttpContent> Clone(MultipartFormDataContent source)

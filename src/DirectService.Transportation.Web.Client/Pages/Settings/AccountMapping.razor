@@ -1,0 +1,79 @@
+@page "/c/{Company}/settings/mapping"
+@*
+  SCR-71 account mapping (FR-092…095): every posting key with its account and status (mapped / not mapped, required or not); choosing an
+  account saves it. Until every required key is mapped, automatic posting and invoicing stay disabled (FR-094, banner on those screens).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+
+<PageHeader Title="@L["nav.mapping"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.mapping"])])" />
+<PostingBanner />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="book" Title="@L["acc.chartEmpty"]" Text="@L["map.noChart"]"><Actions><Btn Primary="true" Text="@L["nav.chart"]" Href="@NavModel.Href(Company, "accounting/chart")" /></Actions></EmptyState>
+    </Empty>
+    <ChildContent>
+        <p class="muted" style="margin:0">@L["map.help"]</p>
+        <ListFrame Label="@L["nav.mapping"]">
+            <table class="grid">
+                <caption class="sr-only">@L["nav.mapping"]</caption>
+                <thead><tr><th scope="col">@L["map.key"]</th><th scope="col">@L["je.account"]</th><th scope="col">@L["ml.status"]</th></tr></thead>
+                <tbody>
+                    @foreach (var key in _keys)
+                    {
+                        var k = key;
+                        <tr @key="k.Key">
+                            <td>@L.Pick(k.NameAr, k.NameEn) @if (k.Required) {<span class="req" aria-label="@L["ui.required"]">*</span>}</td>
+                            <td style="min-width:320px">
+                                <ComboField TValue="string?" Value="k.Account?.Id" ValueChanged="v => Set(k, v)" ValueExpression="() => _dummy" Options="_accounts"
+                                            Placeholder="@L["map.choose"]" aria-label="@L.F("map.accountOf", L.Pick(k.NameAr, k.NameEn))" ReadOnly="@(!CanEdit)" />
+                            </td>
+                            <td><StatusTag Status="@(k.Account is null ? (k.Required ? "missing" : "notRequired") : "mapped")" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private IReadOnlyList<PostingKeyResponse> _keys = [];
+    private IReadOnlyList<Option<string?>> _accounts = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private string? _dummy = null;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanEdit => Shell.Can(PermissionKeys.SettingsManage);
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            _accounts = Lookups.AccountOptions();
+            _keys = await Api.GetAsync<IReadOnlyList<PostingKeyResponse>>(Api.C("accounting/posting-keys"));
+            _state = Lookups.Accounts.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task Set(PostingKeyResponse k, string? accountId)
+    {
+        if (accountId is null || accountId == k.Account?.Id) return;
+        try
+        {
+            var r = await Api.PutAsync<PostingKeyResponse>(Api.C($"accounting/posting-keys/{Uri.EscapeDataString(k.Key)}"), new PostingKeyRequest(accountId));
+            _keys = _keys.Select(x => x.Key == r.Key ? r : x).ToList();
+            Toasts.Success(L.F("map.saved", L.Pick(r.NameAr, r.NameEn)));
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+}

@@ -173,7 +173,7 @@
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.close"]" OnClick="() => _blocked = false" />
-        @if (Shell.Can(PermissionKeys.AcctSetup)) {<Btn Primary="true" Text="@L["post.complete"]" Href="@NavModel.Href(Company, "settings/mapping")" />}
+        @if (Shell.Can(PermissionKeys.SettingsManage)) {<Btn Primary="true" Text="@L["post.complete"]" Href="@NavModel.Href(Company, "settings/mapping")" />}
     </Footer>
 </Modal>
 

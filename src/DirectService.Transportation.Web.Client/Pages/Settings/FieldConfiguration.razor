@@ -1,0 +1,234 @@
+@page "/c/{Company}/settings/fields"
+@*
+  SCR-75 field configuration (FR-179…184, DT-41…43): for trips, drivers and customers — standard fields with their label, hidden and required
+  flags and order (core and business-required fields are locked by the API), and custom fields (text, number, date, list, checkbox, long text)
+  with label in both languages, options, default, help, required, shown as a list column, order and hidden; a custom field with data cannot be
+  deleted — hide it instead.
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+@inject FormConfig Forms
+
+<PageHeader Title="@L["nav.fields"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.fields"])])">
+    <Actions>
+        <Btn Icon="plus" Text="@L["fld.newCustom"]" OnClick="() => EditCustom(null)" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="SaveStandard" />
+    </Actions>
+</PageHeader>
+<TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="SetEntity" Label="@L["nav.fields"]" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        <div class="cols fill" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;min-height:0">
+            <Box Title="@L["fld.standard"]" NoPad="true">
+                <table class="grid">
+                    <caption class="sr-only">@L["fld.standard"]</caption>
+                    <thead><tr><th scope="col">@L["fld.field"]</th><th scope="col">@L["fld.label"]</th><th scope="col">@L["fld.hidden"]</th><th scope="col">@L["ui.required"]</th><th scope="col" class="n">@L["fld.order"]</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in _standard)
+                        {
+                            var row = f;
+                            var name = L.Pick(row.DefaultLabelAr, row.DefaultLabelEn);
+                            <tr @key="row.FieldKey">
+                                <td>@name @if (row.IsCore) {<Badge Tone="Tone.Mute" Icon="lock" Text="@L["fld.core"]" />}</td>
+                                <td><input class="input" style="height:26px" maxlength="60" aria-label="@L.F("fld.labelOf", name)" placeholder="@name" value="@row.Label" disabled="@row.IsCore"
+                                           @onchange="e => { row.Label = e.Value?.ToString(); _dirty = true; }" /></td>
+                                <td><input type="checkbox" aria-label="@L.F("fld.hiddenOf", name)" checked="@row.IsHidden" disabled="@(row.IsCore || row.AlwaysRequired)"
+                                           @onchange="e => { row.IsHidden = e.Value is true; _dirty = true; }" /></td>
+                                <td><input type="checkbox" aria-label="@L.F("fld.requiredOf", name)" checked="@(row.IsRequired || row.AlwaysRequired)" disabled="@(row.IsCore || row.AlwaysRequired)"
+                                           @onchange="e => { row.IsRequired = e.Value is true; _dirty = true; }" /></td>
+                                <td class="n" style="width:90px"><input class="input num" style="height:26px;width:70px" inputmode="numeric" aria-label="@L.F("fld.orderOf", name)" value="@row.SortOrder"
+                                           @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var n)) { row.SortOrder = n; _dirty = true; } }" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </Box>
+            <Box Title="@L["md.customFields"]" NoPad="true">
+                @if (_custom.Count == 0) {<EmptyState Icon="plus" Title="@L["fld.noCustom"]" Text="@L["fld.noCustomText"]" />}
+                else
+                {
+                    <DataGrid TItem="CustomFieldResponse" Items="_custom" Key="c => c.Id" Caption="@L["md.customFields"]" OnRowClick="EditCustom" RowClass="@(c => c.IsHidden ? "void" : null)">
+                        <Columns>
+                            <GridColumn TItem="CustomFieldResponse" Title="@L["fld.label"]" Value="c => L.Pick(c.LabelAr, c.LabelEn)" />
+                            <GridColumn TItem="CustomFieldResponse" Title="@L["fld.key"]" Value="c => c.FieldKey" Ltr="true" />
+                            <GridColumn TItem="CustomFieldResponse" Title="@L["fld.type"]" Value="@(c => L["fld.t." + c.FieldType])" />
+                            <GridColumn TItem="CustomFieldResponse" Title="@L["ml.status"]">
+                                <Template>
+                                    @if (context.IsRequired) {<Badge Tone="Tone.Info" Text="@L["ui.required"]" />}
+                                    @if (context.IsHidden) {<Badge Tone="Tone.Mute" Text="@L["fld.hidden"]" />}
+                                    @if (context.HasData) {<Badge Tone="Tone.Mute" Icon="db" Text="@L["fld.hasData"]" />}
+                                </Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                }
+            </Box>
+        </div>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(_c.Id is null ? L["fld.newCustom"] : L.F("ml.editTitle", _c.LabelAr ?? ""))" Busy="_busy" Wide="true">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="SaveCustom" id="cf-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                <TextField @bind-Value="_c.LabelAr" Label="@L["acc.nameAr"]" Required="true" MaxLength="100" />
+                <TextField @bind-Value="_c.LabelEn" Label="@L["acc.nameEn"]" MaxLength="100" Ltr="true" />
+                <TextField @bind-Value="_c.FieldKey" Label="@L["fld.key"]" Required="true" MaxLength="50" Ltr="true" ReadOnly="@(_c.Id is not null)" Help="@L["fld.keyHelp"]" />
+                <SelectField TValue="string?" @bind-Value="_c.FieldType" Options="Types" Label="@L["fld.type"]" Required="true" Disabled="@(_c.Id is not null)" />
+                @if (_c.FieldType == CustomFieldTypes.List) {<TextAreaField @bind-Value="_c.Options" Label="@L["fld.options"]" Rows="3" Span="2" Help="@L["fld.optionsHelp"]" />}
+                <TextField @bind-Value="_c.DefaultValue" Label="@L["fld.default"]" MaxLength="200" />
+                <IntField @bind-Value="_c.SortOrder" Label="@L["fld.order"]" Min="0" Max="999" />
+                <TextField @bind-Value="_c.HelpText" Label="@L["fld.help"]" MaxLength="200" Span="2" />
+                <CheckField @bind-Value="_c.IsRequired" Label="@L["ui.required"]" />
+                <CheckField @bind-Value="_c.ShowAsColumn" Label="@L["fld.column"]" />
+                <CheckField @bind-Value="_c.IsHidden" Label="@L["fld.hidden"]" />
+            </div>
+        </EditForm>
+        @if (_c.Id is not null)
+        {
+            <div class="row" style="margin-top:10px">
+                <Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" Disabled="_c.HasData" Title="@(_c.HasData ? L["fld.hasDataHelp"] : null)" OnClick="() => { _editing = false; _deleting = true; }" />
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cf-form" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _c.LabelAr ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["fld.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="DeleteCustom" />
+
+@code {
+    private string _entity = "TRN.Trip";
+    private List<StandardRow> _standard = [];
+    private IReadOnlyList<CustomFieldResponse> _custom = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _deleteError;
+    private bool _busy, _dirty, _editing, _deleting;
+    private CustomModel _c = new();
+    private EditContext _ctx = new(new CustomModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Tabs => [new("TRN.Trip", L["nav.trips"]), new("TRN.Driver", L["nav.drivers"]), new("TRN.Customer", L["nav.customers"])];
+    private IReadOnlyList<Option<string?>> Types => CustomFieldTypes.All.Select(t => new Option<string?>(t, L["fld.t." + t])).ToList();
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private Task SetEntity(string e) { _entity = e; return Load(); }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            var standard = await Api.GetAsync<IReadOnlyList<StandardFieldResponse>>(Api.C($"standard-fields/{_entity}"));
+            _standard = standard.OrderBy(s => s.SortOrder).Select(s => new StandardRow(s)).ToList();
+            _custom = await Api.GetAsync<IReadOnlyList<CustomFieldResponse>>(Api.C($"custom-fields/{_entity}"));
+            _dirty = false;
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task SaveStandard()
+    {
+        _busy = true;
+        try
+        {
+            await Api.PutAsync(Api.C($"standard-fields/{_entity}"), new StandardFieldsRequest(_standard.Select(s =>
+                new StandardFieldChange(s.FieldKey, string.IsNullOrWhiteSpace(s.Label) ? null : s.Label.Trim(), s.IsHidden, s.IsRequired, s.SortOrder)).ToList()));
+            Forms.Invalidate();
+            Toasts.Success(L["set.saved"]);
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Errors is { Count: > 0 } list ? string.Join(" · ", list.Select(x => x.Message)) : e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private void EditCustom(CustomFieldResponse? f)
+    {
+        _c = f is null ? new CustomModel { FieldType = CustomFieldTypes.Text }
+            : new CustomModel { Id = f.Id, FieldKey = f.FieldKey, LabelAr = f.LabelAr, LabelEn = f.LabelEn, FieldType = f.FieldType, Options = string.Join('\n', f.Options),
+                DefaultValue = f.DefaultValue, HelpText = f.HelpText, IsRequired = f.IsRequired, ShowAsColumn = f.ShowAsColumn, SortOrder = f.SortOrder, IsHidden = f.IsHidden,
+                HasData = f.HasData, RowVersion = f.RowVersion };
+        _ctx = new EditContext(_c);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task SaveCustom()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            static string? C(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+            var options = _c.FieldType == CustomFieldTypes.List ? (_c.Options ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() : null;
+            var req = new CustomFieldRequest(C(_c.FieldKey), C(_c.LabelAr), C(_c.LabelEn), _c.FieldType, options, C(_c.DefaultValue), C(_c.HelpText), _c.IsRequired, _c.ShowAsColumn,
+                _c.SortOrder, _c.IsHidden, _c.Id is null ? _c.ClientId : null, _c.RowVersion);
+            if (_c.Id is null) await Api.PostAsync<CustomFieldResponse>(Api.C($"custom-fields/{_entity}"), req);
+            else await Api.PutAsync<CustomFieldResponse>(Api.C($"custom-fields/field/{Uri.EscapeDataString(_c.Id)}"), req);
+            _editing = false;
+            Forms.Invalidate();
+            Toasts.Success(L.F("ml.saved", _c.LabelAr ?? ""));
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteCustom(string reason)
+    {
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"custom-fields/field/{Uri.EscapeDataString(_c.Id!)}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            Forms.Invalidate();
+            Toasts.Success(L.F("ml.deleted", _c.LabelAr ?? ""));
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class StandardRow(StandardFieldResponse s)
+    {
+        public string FieldKey { get; } = s.FieldKey;
+        public string DefaultLabelAr { get; } = s.DefaultLabelAr;
+        public string DefaultLabelEn { get; } = s.DefaultLabelEn;
+        public bool IsCore { get; } = s.IsCore;
+        public bool AlwaysRequired { get; } = s.AlwaysRequired;
+        public string? Label { get; set; } = s.Label;
+        public bool IsHidden { get; set; } = s.IsHidden;
+        public bool IsRequired { get; set; } = s.IsRequired;
+        public int SortOrder { get; set; } = s.SortOrder;
+    }
+
+    private sealed class CustomModel
+    {
+        public string? Id { get; set; }
+        public string? FieldKey { get; set; }
+        public string? LabelAr { get; set; }
+        public string? LabelEn { get; set; }
+        public string? FieldType { get; set; }
+        public string? Options { get; set; }
+        public string? DefaultValue { get; set; }
+        public string? HelpText { get; set; }
+        public bool IsRequired { get; set; }
+        public bool ShowAsColumn { get; set; }
+        public int? SortOrder { get; set; }
+        public bool IsHidden { get; set; }
+        public bool HasData { get; set; }
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

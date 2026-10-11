@@ -1,0 +1,335 @@
+@page "/c/{Company}/settings/users"
+@*
+  SCR-76 users and roles (FR-172…177, BR-001…003, DT-18; core.users.manage): users of the company with role, status, two-step verification,
+  lock and last sign-in — change role, disable / enable, unlock, send a password reset, reset two-step verification, sign out everywhere,
+  remove from the company, archive, erase personal data of an archived user (SEC-19); roles — the five presets (read-only) and custom roles
+  with permissions by group (a user can grant only what they hold); invitations — invite by email with a role, resend, cancel.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.users"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.users"])])">
+    <Actions>
+        <Btn Icon="mail" Text="@L["usr.invite"]" OnClick="() => { _inviteEmail = null; _inviteRole = null; _inviteError = null; _inviting = true; }" />
+        <Btn Primary="true" Icon="plus" Text="@L["usr.newRole"]" OnClick="() => EditRole(null)" />
+    </Actions>
+</PageHeader>
+<TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="SetTab" Label="@L["nav.users"]" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        @switch (_tab)
+        {
+            case "roles":
+                <ListFrame Label="@L["usr.roles"]">
+                    <DataGrid TItem="RoleResponse" Items="_roles" Key="r => r.Id" Caption="@L["usr.roles"]" OnRowClick="EditRole">
+                        <Columns>
+                            <GridColumn TItem="RoleResponse" Title="@L["md.name"]" Value="RoleName" />
+                            <GridColumn TItem="RoleResponse" Title="@L["usr.kind"]" Value="@(r => L[r.IsPreset ? "usr.preset" : "usr.custom"])" />
+                            <GridColumn TItem="RoleResponse" Title="@L["usr.permissions"]" Value="r => Fmt.Count(r.Permissions.Count)" Numeric="true" />
+                            <GridColumn TItem="RoleResponse" Title="@L["usr.users"]" Value="r => Fmt.Count(r.UsersCount)" Numeric="true" />
+                        </Columns>
+                    </DataGrid>
+                </ListFrame>
+                break;
+            case "invitations":
+                @if (_invitations.Count == 0) {<Box Fill="true"><EmptyState Icon="mail" Title="@L["usr.noInvitations"]" /></Box>}
+                else
+                {
+                    <ListFrame Label="@L["usr.invitations"]">
+                        <DataGrid TItem="InvitationResponse" Items="_invitations" Key="i => i.Id" Caption="@L["usr.invitations"]">
+                            <Columns>
+                                <GridColumn TItem="InvitationResponse" Title="@L["acct.email"]" Value="i => i.Email" Ltr="true" />
+                                <GridColumn TItem="InvitationResponse" Title="@L["usr.role"]" Value="@(i => RoleName(i.Role.Name))" />
+                                <GridColumn TItem="InvitationResponse" Title="@L["usr.expires"]" Value="i => Fmt.DateTime(i.ExpiresAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="InvitationResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@InvitationStatus(context.Status)" /></Template></GridColumn>
+                                <GridColumn TItem="InvitationResponse" Title="@L["profile.action"]" HideTitle="true">
+                                    <Template>
+                                        @if (context.Status is "Pending" or "Expired")
+                                        {
+                                            <Btn Small="true" Icon="send" Text="@L["usr.resend"]" OnClick="@(() => Invitation(context, "resend"))" />
+                                            <Btn Small="true" Ghost="true" Icon="x" Text="@L["ui.cancel"]" OnClick="@(() => Invitation(context, "cancel"))" />
+                                        }
+                                    </Template>
+                                </GridColumn>
+                            </Columns>
+                        </DataGrid>
+                    </ListFrame>
+                }
+                break;
+            default:
+                <ListShell Label="@L["usr.users"]" Search="@_q" OnSearch="Search" State="LoadState.Ready" Page="_page" PageSize="50" Total="_users?.TotalCount" OnPage="Go">
+                    <DataGrid TItem="UserListItem" Items="_users!.Items" Key="u => u.Id" Caption="@L["usr.users"]" OnRowClick="OpenUser" RowClass="@(u => u.Status == "Active" ? null : "void")">
+                        <Columns>
+                            <GridColumn TItem="UserListItem" Title="@L["acct.fullName"]" Value="u => u.FullName" />
+                            <GridColumn TItem="UserListItem" Title="@L["acct.email"]" Value="u => u.Email" Ltr="true" />
+                            <GridColumn TItem="UserListItem" Title="@L["usr.role"]" Value="@(u => u.Role is null ? "—" : RoleName(u.Role.Name))" />
+                            <GridColumn TItem="UserListItem" Title="@L["usr.lastSignIn"]" Value="u => Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="UserListItem" Title="@L["ml.status"]">
+                                <Template>
+                                    <StatusTag Status="@(context.Status == "Active" ? "active" : context.Status == "Disabled" ? "disabled" : "archived")" />
+                                    @if (context.IsLocked) {<Badge Tone="Tone.Warn" Icon="lock" Text="@L["usr.locked"]" />}
+                                    @if (!context.TwoFactorEnabled) {<Badge Tone="Tone.Warn" Icon="shield" Text="@L["usr.no2fa"]" />}
+                                </Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                </ListShell>
+                break;
+        }
+    </ChildContent>
+</StateView>
+
+<SidePanel @bind-Open="_userOpen" Title="@(_user?.FullName ?? "")">
+    @if (_user is { } u)
+    {
+        <div class="stack">
+            <KeyValues Columns="1" Items="@([new KeyValue(L["acct.email"], u.Email), new KeyValue(L["usr.lastSignIn"], Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)),
+                new KeyValue(L["usr.2fa"], L[u.TwoFactorEnabled ? "ui.on" : "ui.off"]), new KeyValue(L["usr.emailConfirmed"], L[u.EmailConfirmed ? "ui.yes" : "ui.no"])])" />
+            <SelectField TValue="string?" Value="u.Role?.Id" ValueChanged="ChangeRole" ValueExpression="() => _dummy" Options="RoleOptions" Label="@L["usr.role"]" Disabled="@(u.Status != "Active")" />
+            <div class="stack" style="gap:6px">
+                @if (u.IsLocked) {<Btn Icon="lock" Text="@L["usr.unlock"]" OnClick="@(() => Act("unlock", null))" />}
+                <Btn Icon="mail" Text="@L["usr.passwordReset"]" OnClick="@(() => Act("password-reset", null))" />
+                <Btn Icon="shield" Text="@L["usr.reset2fa"]" OnClick="@(() => Ask("reset-2fa"))" />
+                <Btn Icon="logout" Text="@L["usr.signOut"]" OnClick="@(() => Act("sign-out", null))" />
+                @if (u.Status == "Active") {<Btn Icon="lock" Text="@L["usr.disable"]" OnClick="@(() => Ask("disable"))" />}
+                else if (u.Status == "Disabled") {<Btn Icon="check" Text="@L["usr.enable"]" OnClick="@(() => Act("enable", null))" />}
+                <Btn Icon="x" Text="@L["usr.remove"]" OnClick="@(() => Ask("remove"))" />
+                @if (u.Status != "Archived") {<Btn Danger="true" Icon="archive" Text="@L["ml.archive"]" OnClick="@(() => Ask("archive"))" />}
+                else {<Btn Danger="true" Icon="trash" Text="@L["usr.erase"]" OnClick="@(() => Ask("anonymise"))" />}
+            </div>
+        </div>
+    }
+</SidePanel>
+
+<ConfirmDialog @bind-Open="_asking" Title="@L["usr.act." + (_action ?? "")]" Danger="@(_action is "archive" or "anonymise" or "remove")" AskReason="true" ConfirmText="@L["ui.confirm"]"
+               Message="@L["usr.act." + (_action ?? "") + ".text"]" Busy="_busy" Error="@_actError" OnConfirm="r => Act(_action!, r)" />
+
+<Modal @bind-Open="_roleOpen" Title="@(_role.Id is null ? L["usr.newRole"] : L.F("ml.editTitle", _role.Name ?? ""))" Busy="_busy" Wide="true">
+    <ChildContent>
+        @if (_role.IsPreset) {<Banner Tone="Tone.Lock" Text="@L["usr.presetLocked"]" />}
+        <div class="field">
+            <label for="role-name">@L["md.name"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="role-name" class="input" maxlength="50" @bind="_role.Name" @bind:event="oninput" disabled="@_role.IsPreset" />
+        </div>
+        @foreach (var group in _permissions.GroupBy(p => p.Group))
+        {
+            <fieldset class="stack" style="gap:4px;border:1px solid var(--border);padding:8px">
+                <legend class="lbl">@group.Key</legend>
+                @foreach (var p in group)
+                {
+                    var perm = p;
+                    var held = Shell.Can(perm.Key);
+                    <label style="display:flex;gap:6px;align-items:flex-start">
+                        <input type="checkbox" checked="@_role.Permissions.Contains(perm.Key)" disabled="@(_role.IsPreset || !held)" @onchange="e => TogglePermission(perm.Key, e.Value is true)" />
+                        <span><bdi class="num muted">@perm.PrdName</bdi> @L.Pick(perm.DescriptionAr, perm.DescriptionEn) @if (!held) {<span class="muted">(@L["usr.notHeld"])</span>}</span>
+                    </label>
+                }
+            </fieldset>
+        }
+        @if (_roleError is not null) {<Banner Tone="Tone.Err" Text="@_roleError" />}
+    </ChildContent>
+    <Footer>
+        @if (_role.Id is not null && !_role.IsPreset) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _roleOpen = false; _deletingRole = true; }" />}
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _roleOpen = false" />
+        @if (!_role.IsPreset) {<Btn Primary="true" Text="@L["ui.save"]" Busy="_busy" Disabled="@string.IsNullOrWhiteSpace(_role.Name)" OnClick="SaveRole" />}
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deletingRole" Title="@L.F("ml.deleteTitle", _role.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]" Message="@L["usr.deleteRoleText"]"
+               Busy="_busy" Error="@_roleError" OnConfirm="DeleteRole" />
+
+<Modal @bind-Open="_inviting" Title="@L["usr.invite"]" Busy="_busy" Icon="mail">
+    <ChildContent>
+        <div class="field">
+            <label for="inv-email">@L["acct.email"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="inv-email" class="input" type="email" dir="ltr" maxlength="200" @bind="_inviteEmail" @bind:event="oninput" />
+        </div>
+        <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+        @if (_inviteError is not null) {<Banner Tone="Tone.Err" Text="@_inviteError" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _inviting = false" />
+        <Btn Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" Disabled="@(string.IsNullOrWhiteSpace(_inviteEmail) || _inviteRole is null)" OnClick="Invite" />
+    </Footer>
+</Modal>
+
+@code {
+    private string _tab = "users";
+    private PagedResult<UserListItem>? _users;
+    private IReadOnlyList<RoleResponse> _roles = [];
+    private IReadOnlyList<PermissionItem> _permissions = [];
+    private IReadOnlyList<InvitationResponse> _invitations = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _dummy = null;
+    private string? _reference, _q, _action, _actError, _roleError, _inviteEmail, _inviteRole, _inviteError;
+    private int _page = 1;
+    private UserListItem? _user;
+    private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting;
+    private RoleModel _role = new();
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Tabs => [new("users", L["usr.users"]), new("roles", L["usr.roles"]), new("invitations", L["usr.invitations"])];
+    private IReadOnlyList<Option<string?>> RoleOptions => _roles.Select(r => new Option<string?>(r.Id, RoleName(r))).ToList();
+
+    /// <summary>Preset roles are stored as English codes and shown in the reader's language (DT-15).</summary>
+    private string RoleName(RoleResponse r) => r.IsPreset ? RoleName(r.Name) : r.Name;
+    private string RoleName(string name) => L["role." + name] is var t && !t.StartsWith("role.", StringComparison.Ordinal) ? t : name;
+
+    private static string InvitationStatus(string s) => s switch { "Accepted" => "approved", "Expired" => "expired", "Cancelled" => "cancelled", _ => "invited" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles")); } catch (ApiException) { }
+        await Load();
+    }
+
+    private Task SetTab(string t) { _tab = t; return Load(); }
+    private Task Search(string? q) { _q = q; _page = 1; return Load(); }
+    private Task Go(int p) { _page = p; return Load(); }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        try
+        {
+            switch (_tab)
+            {
+                case "roles":
+                    _roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles"));
+                    if (_permissions.Count == 0) _permissions = await Api.GetAsync<IReadOnlyList<PermissionItem>>(Api.C("roles/permissions"));
+                    break;
+                case "invitations":
+                    _invitations = await Api.GetAsync<IReadOnlyList<InvitationResponse>>(Api.C("invitations"));
+                    break;
+                default:
+                    _users = await Api.GetAsync<PagedResult<UserListItem>>(Api.C($"users?page={_page}" + (_q is null ? "" : "&search=" + Uri.EscapeDataString(_q))));
+                    break;
+            }
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void OpenUser(UserListItem u) { _user = u; _userOpen = true; }
+
+    private void Ask(string action) { _action = action; _actError = null; _asking = true; }
+
+    private async Task ChangeRole(string? roleId)
+    {
+        if (_user is null || roleId is null || roleId == _user.Role?.Id) return;
+        try
+        {
+            await Api.PutAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/role"), new AssignRoleRequest(roleId));
+            Toasts.Success(L.F("usr.roleChanged", _user.FullName));
+            await Refresh();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    /// <summary>A user action (with a reason where the API asks one); erasure goes to the personal-data endpoint (SEC-19).</summary>
+    private async Task Act(string action, string? reason)
+    {
+        if (_user is null) return;
+        _busy = true;
+        _actError = null;
+        try
+        {
+            var path = $"users/{Uri.EscapeDataString(_user.Id)}/{action}";
+            if (reason is null) await Api.PostAsync(Api.C(path), null);
+            else await Api.PostAsync(Api.C(path), new ReasonRequest(reason));
+            _asking = false;
+            Toasts.Success(L.F("usr.done", L["usr.act." + action], _user.FullName));
+            if (action is "remove" or "anonymise") _userOpen = false;
+            await Refresh();
+        }
+        catch (ApiException e) { if (_asking) _actError = e.Problem.Detail; else Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Refresh()
+    {
+        await Load();
+        if (_user is not null) _user = _users?.Items.FirstOrDefault(x => x.Id == _user.Id) ?? _user;
+    }
+
+    private async Task EditRole(RoleResponse? r)
+    {
+        if (_permissions.Count == 0) { try { _permissions = await Api.GetAsync<IReadOnlyList<PermissionItem>>(Api.C("roles/permissions")); } catch (ApiException) { } }
+        _role = r is null ? new RoleModel() : new RoleModel { Id = r.Id, Name = RoleName(r), IsPreset = r.IsPreset, Permissions = r.Permissions.ToHashSet(), RowVersion = r.RowVersion };
+        _roleError = null;
+        _roleOpen = true;
+    }
+
+    private void TogglePermission(string key, bool on) { if (on) _role.Permissions.Add(key); else _role.Permissions.Remove(key); }
+
+    private async Task SaveRole()
+    {
+        _busy = true;
+        _roleError = null;
+        try
+        {
+            var req = new RoleRequest(_role.Name!.Trim(), _role.Permissions.ToList(), _role.RowVersion);
+            if (_role.Id is null) await Api.PostAsync<RoleResponse>(Api.C("roles"), req);
+            else await Api.PutAsync<RoleResponse>(Api.C($"roles/{Uri.EscapeDataString(_role.Id)}"), req);
+            _roleOpen = false;
+            Toasts.Success(L.F("ml.saved", _role.Name ?? ""));
+            _tab = "roles";
+            await Load();
+        }
+        catch (ApiException e) { _roleError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteRole(string reason)
+    {
+        _busy = true;
+        _roleError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"roles/{Uri.EscapeDataString(_role.Id!)}/delete"), new ReasonRequest(reason));
+            _deletingRole = false;
+            Toasts.Success(L.F("ml.deleted", _role.Name ?? ""));
+            await Load();
+        }
+        catch (ApiException e) { _roleError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Invite()
+    {
+        _busy = true;
+        _inviteError = null;
+        try
+        {
+            await Api.PostAsync<InvitationResponse>(Api.C("invitations"), new InviteRequest(_inviteEmail!.Trim(), _inviteRole!));
+            _inviting = false;
+            Toasts.Success(L.F("usr.invited", _inviteEmail));
+            _tab = "invitations";
+            await Load();
+        }
+        catch (ApiException e) { _inviteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Invitation(InvitationResponse i, string action)
+    {
+        try
+        {
+            await Api.PostAsync(Api.C($"invitations/{Uri.EscapeDataString(i.Id)}/{action}"), null);
+            Toasts.Success(L[action == "resend" ? "usr.resent" : "usr.cancelled"]);
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed class RoleModel
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public bool IsPreset { get; set; }
+        public HashSet<string> Permissions { get; set; } = [];
+        public string? RowVersion { get; set; }
+    }
+}

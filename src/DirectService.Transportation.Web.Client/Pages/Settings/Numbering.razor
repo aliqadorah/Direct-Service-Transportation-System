@@ -1,0 +1,105 @@
+@page "/c/{Company}/settings/numbering"
+@*
+  SCR-72 numbering (BR-038, D-16): one sequence per document type with prefix, digits and the next number, and how the next number will
+  look. The API refuses a next number below one already issued (gap-free, no reuse).
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.numbering"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.numbering"])])" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        <p class="muted" style="margin:0">@L["num.help"]</p>
+        <ListFrame Label="@L["nav.numbering"]">
+            <DataGrid TItem="NumberSequenceResponse" Items="_items" Key="s => s.Id" Caption="@L["nav.numbering"]" OnRowClick="Edit">
+                <Columns>
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["num.document"]" Value="@(s => L["num.doc." + s.DocumentType] is var t && t.StartsWith("num.", StringComparison.Ordinal) ? s.DocumentType : t)" />
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["num.prefix"]" Value="s => s.Prefix" Ltr="true" />
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["num.digits"]" Value="s => Fmt.Count(s.Digits)" Numeric="true" />
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["num.next"]" Value="s => s.NextFormatted" Ltr="true" />
+                    <GridColumn TItem="NumberSequenceResponse" Title="@L["ml.edit"]" HideTitle="true"><Template><Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L.F("ml.editTitle", context.Prefix)" OnClick="() => Edit(context)" /></Template></GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@L.F("ml.editTitle", _target?.Prefix ?? "")" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" id="num-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <TextField @bind-Value="_m.Prefix" Label="@L["num.prefix"]" Required="true" MaxLength="10" Ltr="true" />
+            <IntField @bind-Value="_m.Digits" Label="@L["num.digits"]" Required="true" Min="1" Max="10" />
+            <TextField @bind-Value="_m.Next" Label="@L["num.next"]" Required="true" MaxLength="12" Ltr="true" Help="@L.F("num.preview", Preview)" />
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="num-form" />
+    </Footer>
+</Modal>
+
+@code {
+    private IReadOnlyList<NumberSequenceResponse> _items = [];
+    private NumberSequenceResponse? _target;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _editing, _busy;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private string Preview => long.TryParse(_m.Next, out var n) && _m.Digits is int d and > 0 and <= 10
+        ? (_m.Prefix ?? "") + n.ToString(new string('0', d), System.Globalization.CultureInfo.InvariantCulture) : "—";
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _items = await Api.GetAsync<IReadOnlyList<NumberSequenceResponse>>(Api.C("settings/number-sequences"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Edit(NumberSequenceResponse s)
+    {
+        _target = s;
+        _m = new Model { Prefix = s.Prefix, Digits = s.Digits, Next = s.NextNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task Save()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var next = long.TryParse(_m.Next, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : 0;
+            await Api.PutAsync<NumberSequenceResponse>(Api.C($"settings/number-sequences/{Uri.EscapeDataString(_target.Id)}"),
+                new NumberSequenceRequest(_m.Prefix?.Trim() ?? "", _m.Digits ?? 5, next, _target.RowVersion));
+            _editing = false;
+            Toasts.Success(L["set.saved"]);
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Model
+    {
+        public string? Prefix { get; set; }
+        public int? Digits { get; set; }
+        public string? Next { get; set; }
+    }
+}

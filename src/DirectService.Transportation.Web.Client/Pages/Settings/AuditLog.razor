@@ -1,0 +1,115 @@
+@page "/c/{Company}/settings/audit-log"
+@*
+  SCR-77 audit log (FR-189, DT-121; settings.manage or users.manage): every change with time, user, action, record type and reference, reason,
+  field changes old → new and IP address; filters by action, record type, period and text; Excel / CSV / PDF and background export. Driver
+  personal fields are masked for readers without drv.view; erased records show *** (DT-134).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject Downloads Files
+
+<PageHeader Title="@L["nav.audit"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.audit"])])" />
+<ListShell Label="@L["nav.audit"]" Search="@_q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="history" EmptyTitle="@L["aud.none"]" Filtered="Filtered" OnClear="ClearAll" Page="_page" PageSize="50" Total="_result?.TotalCount" OnPage="Go">
+    <Tools><Btn Small="true" Icon="clock" Text="@L["rep.background"]" OnClick="Background" /></Tools>
+    <Filters>
+        <SelectField TValue="string?" @bind-Value="_action" Options="Actions" Empty="@L["tar.all"]" Label="@L["aud.action"]" FieldClass="w200" />
+        <SelectField TValue="string?" @bind-Value="_type" Options="Types" Empty="@L["tar.all"]" Label="@L["aud.type"]" FieldClass="w200" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <ChildContent>
+        <DataGrid TItem="AuditLogEntry" Items="_result!.Items" Key="a => (object)a" Caption="@L["nav.audit"]">
+            <Columns>
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.time"]" Value="a => Fmt.DateTime(a.OccurredAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["mnt.user"]" Value="@(a => a.User ?? L["hist.system"])" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.action"]" Value="a => ActionName(a.Action)" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.type"]" Value="a => a.EntityType" Ltr="true" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.record"]" Value="a => a.Record" Ltr="true" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["ui.reason"]" Value="a => a.Reason" Clip="true" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.changes"]" Wrap="true">
+                    <Template>
+                        @foreach (var c in context.Changes.Take(6)) {<div><Tx Value="@($"{c.Field}: {c.Old ?? "—"} → {c.New ?? "—"}")" /></div>}
+                        @if (context.Changes.Count > 6) {<div class="muted">@L.F("aud.more", context.Changes.Count - 6)</div>}
+                    </Template>
+                </GridColumn>
+                <GridColumn TItem="AuditLogEntry" Title="IP" Value="a => a.IpAddress" Ltr="true" />
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private PagedResult<AuditLogEntry>? _result;
+    private IReadOnlyList<string> _actions = [], _types = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _action, _type;
+    private DateOnly? _from, _to;
+    private int _page = 1;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool Filtered => _q is not null || _action is not null || _type is not null || _from is not null || _to is not null;
+    private IReadOnlyList<Option<string?>> Actions => _actions.Select(a => new Option<string?>(a, ActionName(a))).ToList();
+    private IReadOnlyList<Option<string?>> Types => _types.Select(t => new Option<string?>(t, t)).ToList();
+
+    private string ActionName(string a) => L["hist." + a] is var t && !t.StartsWith("hist.", StringComparison.Ordinal) ? t : a;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var f = await Api.GetAsync<Facets>(Api.C("audit-log/facets"));
+            _actions = f.Actions;
+            _types = f.EntityTypes;
+        }
+        catch (ApiException) { }
+        await Load();
+    }
+
+    private string Query(bool paged)
+    {
+        var p = new List<string>();
+        void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
+        Add("q", _q); Add("action", _action); Add("entityType", _type);
+        Add("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Add("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        if (paged) Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return p.Count == 0 ? "" : "?" + string.Join('&', p);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _result = await Api.GetAsync<PagedResult<AuditLogEntry>>(Api.C("audit-log" + Query(true)));
+            _state = _result.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Search(string? q) { _q = q; _page = 1; return Load(); }
+    private Task Apply() { _page = 1; return Load(); }
+    private Task Go(int p) { _page = p; return Load(); }
+    private Task ClearAll() { _q = _action = _type = null; _from = _to = null; _page = 1; return Load(); }
+    private Task Export(string format) => Files.SaveAsync(Api.C("audit-log/export" + Query(false)), format);
+
+    private async Task Background()
+    {
+        try
+        {
+            await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new
+            {
+                Kind = "audit-log", Audit = new AuditLogQuery(null, _action, _type, _from, _to, _q), From = _from, To = _to, Format = "xlsx",
+            });
+            Toasts.Success(L["rep.backgroundQueued"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed record Facets(IReadOnlyList<string> EntityTypes, IReadOnlyList<string> Actions);
+}

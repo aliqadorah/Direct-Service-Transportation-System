@@ -80,7 +80,7 @@ public static class NavModel
         new("nav.settings", "gear", null,
         [
             new("nav.companySettings", "settings/company", PermissionKeys.SettingsManage),
-            new("nav.mapping", "settings/mapping", PermissionKeys.AcctSetup),
+            new("nav.mapping", "settings/mapping", PermissionKeys.SettingsManage),
             new("nav.numbering", "settings/numbering", PermissionKeys.SettingsManage),
             new("nav.einvoiceSettings", "settings/e-invoicing", PermissionKeys.SettingsManage),
             new("nav.layoutDesigner", "settings/invoice-layout", PermissionKeys.SettingsManage),

@@ -1,0 +1,252 @@
+@page "/c/{Company}/settings/company"
+@*
+  SCR-70 company settings (FR-168…171; core.settings.manage): profile with tax numbers and logo (printed on documents); market — country,
+  currency and decimals, tax rate and whether prices include tax, time zone, phone and IBAN patterns; operations — billing on unloaded
+  weight, driver pay on loaded weight, shortage tolerance, tariff lock, invoice approval, wage accrual. Changing the weight basis while
+  trips exist asks for confirmation (the API names it). Ending the data-migration window is confirmed explicitly.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.companySettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.companySettings"])])" />
+<TabStrip Items="Tabs" @bind-Selected="_tab" Label="@L["nav.companySettings"]" />
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        @switch (_tab)
+        {
+            case "market":
+                <EditForm EditContext="_marketCtx" OnValidSubmit="SaveMarket" class="box pad stack" style="max-width:900px">
+                    <ProblemValidator @ref="_marketProblems" />
+                    <ErrorSummary Extra="_extra" />
+                    <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                        <TextField @bind-Value="_market.CountryCode" Label="@L["set.country"]" Required="true" MaxLength="2" Ltr="true" />
+                        <TextField @bind-Value="_market.CurrencyCode" Label="@L["cb.currency"]" Required="true" MaxLength="3" Ltr="true" />
+                        <IntField @bind-Value="_market.CurrencyDecimals" Label="@L["set.decimals"]" Required="true" Min="0" Max="4" />
+                        <NumberField @bind-Value="_market.TaxRate" Label="@L["ap.taxRate"]" Required="true" Min="0m" Max="100m" Decimals="2" Unit="%" />
+                        <ToggleField @bind-Value="_market.TaxInclusive" Label="@L["set.taxInclusive"]" Help="@L["set.taxInclusiveHelp"]" />
+                        <TextField @bind-Value="_market.TimeZone" Label="@L["set.timeZone"]" Required="true" MaxLength="64" Ltr="true" />
+                        <TextField @bind-Value="_market.PhonePattern" Label="@L["set.phonePattern"]" MaxLength="200" Ltr="true" />
+                        <TextField @bind-Value="_market.IbanPattern" Label="@L["set.ibanPattern"]" MaxLength="200" Ltr="true" />
+                    </div>
+                    <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
+                </EditForm>
+                break;
+            case "operations":
+                <EditForm EditContext="_opsCtx" OnValidSubmit="() => SaveOps(false)" class="box pad stack" style="max-width:900px">
+                    <ProblemValidator @ref="_opsProblems" />
+                    <ErrorSummary Extra="_extra" />
+                    <ToggleField @bind-Value="_ops.BillOnUnloadedWeight" Label="@L["set.billUnloaded"]" Help="@L["set.billUnloadedHelp"]" />
+                    <ToggleField @bind-Value="_ops.PayDriverOnLoadedWeight" Label="@L["set.payLoaded"]" Help="@L["set.payLoadedHelp"]" />
+                    <NumberField @bind-Value="_ops.ShortageTolerancePct" Label="@L["set.tolerance"]" Required="true" Min="0m" Max="100m" Decimals="2" Unit="%" FieldClass="w200" />
+                    <ToggleField @bind-Value="_ops.LockTariffs" Label="@L["set.lockTariffs"]" Help="@L["set.lockTariffsHelp"]" />
+                    <ToggleField @bind-Value="_ops.InvoiceApproval" Label="@L["set.invoiceApproval"]" Help="@L["set.invoiceApprovalHelp"]" />
+                    <ToggleField @bind-Value="_ops.AccrueDriverWage" Label="@L["set.accrue"]" Help="@L["set.accrueHelp"]" />
+                    <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
+                    <hr style="border:0;border-top:1px solid var(--border);width:100%" />
+                    @if (_opsResponse?.MigrationCompletedAt is { } done)
+                    {
+                        <p class="muted" style="margin:0">@L.F("set.migrationDone", Fmt.DateTime(done.ToLocalTime(), Shell.DateFormat))</p>
+                    }
+                    else
+                    {
+                        <p class="muted" style="margin:0">@L["set.migrationOpen"]</p>
+                        <div><Btn Icon="check" Text="@L["set.migrationComplete"]" OnClick="() => _migration = true" /></div>
+                    }
+                </EditForm>
+                break;
+            default:
+                <EditForm EditContext="_profileCtx" OnValidSubmit="SaveProfile" class="box pad stack" style="max-width:900px">
+                    <ProblemValidator @ref="_profileProblems" />
+                    <ErrorSummary Extra="_extra" />
+                    <div class="fg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                        <TextField @bind-Value="_profile.Name" Label="@L["set.nameAr"]" Required="true" MaxLength="200" />
+                        <TextField @bind-Value="_profile.NameEn" Label="@L["set.nameEn"]" MaxLength="200" Ltr="true" />
+                        <TextField @bind-Value="_profile.TaxNumber" Label="@L["md.taxNumber"]" MaxLength="20" Ltr="true" />
+                        <TextField @bind-Value="_profile.CommercialRegNo" Label="@L["md.registrationNo"]" MaxLength="50" Ltr="true" />
+                        <TextField @bind-Value="_profile.Phone" Label="@L["md.phone"]" MaxLength="20" Ltr="true" />
+                        <TextField @bind-Value="_profile.Email" Label="@L["acct.email"]" MaxLength="200" Ltr="true" Type="email" />
+                        <TextAreaField @bind-Value="_profile.Address" Label="@L["md.address"]" MaxLength="500" Rows="2" Span="2" />
+                    </div>
+                    <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
+                </EditForm>
+                <Box Title="@L["set.logo"]">
+                    <div class="row" style="gap:12px;align-items:center;flex-wrap:wrap">
+                        @if (_hasLogo) {<img src="@($"api/v1/companies/{Uri.EscapeDataString(Company)}/logo?v={_logoVersion}")" alt="@L["set.logo"]" style="max-height:64px;max-width:200px;border:1px solid var(--border)" />}
+                        else {<span class="muted">@L["set.noLogo"]</span>}
+                        <div class="field">
+                            <label for="logo-file">@L["set.chooseLogo"]</label>
+                            <InputFile id="logo-file" class="input" style="padding-top:4px" accept=".png,.jpg,.jpeg" OnChange="UploadLogo" />
+                            <span class="help">@L["set.logoHelp"]</span>
+                        </div>
+                    </div>
+                </Box>
+                break;
+        }
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_confirmBasis" Title="@L["set.basisTitle"]" ConfirmText="@L["ui.confirm"]" Message="@_basisMessage" Busy="_busy" OnConfirm="_ => SaveOps(true)" />
+<ConfirmDialog @bind-Open="_migration" Title="@L["set.migrationComplete"]" ConfirmText="@L["ui.confirm"]" Message="@L["set.migrationText"]" Busy="_busy" Error="@_migrationError" OnConfirm="_ => CompleteMigration()" />
+
+@code {
+    private string _tab = "profile";
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _basisMessage, _migrationError;
+    private bool _busy, _hasLogo, _confirmBasis, _migration;
+    private int _logoVersion;
+    private IReadOnlyList<string>? _extra;
+    private ProfileModel _profile = new();
+    private MarketModel _market = new();
+    private OpsModel _ops = new();
+    private OperationSettingsResponse? _opsResponse;
+    private EditContext _profileCtx = new(new ProfileModel()), _marketCtx = new(new MarketModel()), _opsCtx = new(new OpsModel());
+    private ProblemValidator? _profileProblems, _marketProblems, _opsProblems;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Tabs => [new("profile", L["set.profile"]), new("market", L["set.market"]), new("operations", L["set.operations"])];
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            var p = await Api.GetAsync<CompanyProfileResponse>(Api.C("settings/profile"));
+            var m = await Api.GetAsync<MarketSettingsResponse>(Api.C("settings/market"));
+            _opsResponse = await Api.GetAsync<OperationSettingsResponse>(Api.C("settings/operations"));
+            _profile = new ProfileModel { Name = p.Name, NameEn = p.NameEn, TaxNumber = p.TaxNumber, CommercialRegNo = p.CommercialRegNo, Address = p.Address, Phone = p.Phone, Email = p.Email, RowVersion = p.RowVersion };
+            _hasLogo = p.HasLogo;
+            _market = new MarketModel { CountryCode = m.CountryCode, CurrencyCode = m.CurrencyCode, CurrencyDecimals = m.CurrencyDecimals, TaxRate = m.TaxRate, TaxInclusive = m.TaxInclusive,
+                TimeZone = m.TimeZone, PhonePattern = m.PhonePattern, IbanPattern = m.IbanPattern, RowVersion = m.RowVersion };
+            var o = _opsResponse;
+            _ops = new OpsModel { BillOnUnloadedWeight = o.BillOnUnloadedWeight, PayDriverOnLoadedWeight = o.PayDriverOnLoadedWeight, ShortageTolerancePct = o.ShortageTolerancePct,
+                LockTariffs = o.LockTariffs, InvoiceApproval = o.InvoiceApproval, AccrueDriverWage = o.AccrueDriverWage };
+            _profileCtx = new EditContext(_profile);
+            _marketCtx = new EditContext(_market);
+            _opsCtx = new EditContext(_ops);
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private async Task SaveProfile()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PutAsync<CompanyProfileResponse>(Api.C("settings/profile"), new CompanyProfileRequest(_profile.Name?.Trim() ?? "", Clean(_profile.NameEn), Clean(_profile.TaxNumber),
+                Clean(_profile.CommercialRegNo), Clean(_profile.Address), Clean(_profile.Phone), Clean(_profile.Email), _profile.RowVersion));
+            _profile.RowVersion = r.RowVersion;
+            Toasts.Success(L["set.saved"]);
+        }
+        catch (ApiException e) { if (_profileProblems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task SaveMarket()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PutAsync<MarketSettingsResponse>(Api.C("settings/market"), new MarketSettingsRequest(_market.CountryCode?.Trim() ?? "", _market.CurrencyCode?.Trim() ?? "",
+                _market.CurrencyDecimals ?? 3, _market.TaxRate ?? 0, _market.TaxInclusive, _market.TimeZone?.Trim() ?? "", _market.PhonePattern?.Trim() ?? "", _market.IbanPattern?.Trim() ?? "",
+                _market.RowVersion));
+            _market.RowVersion = r.RowVersion;
+            Toasts.Success(L["set.saved"]);
+        }
+        catch (ApiException e) { if (_marketProblems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    /// <summary>Saves; a change of weight basis while trips exist comes back as a confirmation request with its message.</summary>
+    private async Task SaveOps(bool confirmed)
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            _opsResponse = await Api.PutAsync<OperationSettingsResponse>(Api.C("settings/operations"), new OperationSettingsRequest(_ops.BillOnUnloadedWeight, _ops.PayDriverOnLoadedWeight,
+                _ops.ShortageTolerancePct ?? 0, _ops.LockTariffs, _ops.InvoiceApproval, _ops.AccrueDriverWage, confirmed));
+            _confirmBasis = false;
+            Toasts.Success(L["set.saved"]);
+        }
+        catch (ApiException e) when (e.Problem.Code == DirectService.Transportation.Contracts.Errors.ErrorCodes.ConfirmationRequired && !confirmed)
+        {
+            _basisMessage = e.Problem.Detail;
+            _confirmBasis = true;
+        }
+        catch (ApiException e) { _confirmBasis = false; if (_opsProblems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task CompleteMigration()
+    {
+        _busy = true;
+        _migrationError = null;
+        try
+        {
+            await Api.PostAsync(Api.C("settings/migration-complete"), new MigrationCompleteRequest(true));
+            _migration = false;
+            Toasts.Success(L["set.migrationClosed"]);
+            await Load();
+        }
+        catch (ApiException e) { _migrationError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task UploadLogo(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            await using var s = e.File.OpenReadStream(1024 * 1024);
+            await Api.UploadAsync<object>(Api.C("settings/logo"), s, e.File.Name, method: HttpMethod.Put);
+            _hasLogo = true;
+            _logoVersion++;
+            Toasts.Success(L["set.logoSaved"]);
+        }
+        catch (IOException) { Toasts.Error(L["set.logoTooLarge"]); }
+        catch (ApiException x) { Toasts.Error(x.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed class ProfileModel
+    {
+        public string? Name { get; set; }
+        public string? NameEn { get; set; }
+        public string? TaxNumber { get; set; }
+        public string? CommercialRegNo { get; set; }
+        public string? Address { get; set; }
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public string? RowVersion { get; set; }
+    }
+
+    private sealed class MarketModel
+    {
+        public string? CountryCode { get; set; }
+        public string? CurrencyCode { get; set; }
+        public int? CurrencyDecimals { get; set; }
+        public decimal? TaxRate { get; set; }
+        public bool TaxInclusive { get; set; }
+        public string? TimeZone { get; set; }
+        public string? PhonePattern { get; set; }
+        public string? IbanPattern { get; set; }
+        public string? RowVersion { get; set; }
+    }
+
+    private sealed class OpsModel
+    {
+        public bool BillOnUnloadedWeight { get; set; }
+        public bool PayDriverOnLoadedWeight { get; set; }
+        public decimal? ShortageTolerancePct { get; set; }
+        public bool LockTariffs { get; set; }
+        public bool InvoiceApproval { get; set; }
+        public bool AccrueDriverWage { get; set; }
+    }
+}
