@@ -10,12 +10,13 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Receipt"])" OnChange="Load" />
 <PageHeader Title="@L["nav.receipts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"])])">
     <Actions>@if (Shell.Can(PermissionKeys.RcptManage)) {<Btn Primary="true" Icon="plus" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, "receipts/new")" />}</Actions>
 </PageHeader>
 
 <ListShell Label="@L["nav.receipts"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" SearchPlaceholder="@L["rcpt.search"]" OnSearch="Search"
-           Exports="@(["xlsx", "csv"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="cash" EmptyTitle="@L["rcpt.none"]" EmptyText="@L["rcpt.noneText"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
@@ -60,6 +61,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } view) _view = view;
+        if (query["customer"] is { Length: > 0 } customer) _customer = customer;
+        if (query["method"] is { Length: > 0 } method) _method = method;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         await Load();
     }
@@ -79,6 +87,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("customer", _customer), ("method", _method), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<ReceiptPage>(Api.C("receipts" + Query(true)));

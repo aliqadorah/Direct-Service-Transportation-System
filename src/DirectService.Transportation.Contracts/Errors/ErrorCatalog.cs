@@ -77,6 +77,7 @@ public static class ErrorCatalog
         [ErrorCodes.PeriodChecksPending] = ("فحص ما قبل الإغلاق: {0} ترحيل معلّق، {1} مسودة غير معتمدة، {2} حساب رقابة غير مطابق. أكّد للإغلاق.", "Pre-close check: {0} pending posting(s), {1} unapproved draft(s), {2} unreconciled control account(s). Confirm to close."),
         [ErrorCodes.ImportFileType] = ("نوع الملف غير مدعوم. استخدم ملف Excel (.xlsx) أو CSV.", "Unsupported file type. Use an Excel (.xlsx) or CSV file."),
         [ErrorCodes.ImportTooLarge] = ("الملف كبير جداً (الحد {0}).", "The file is too large (limit {0})."),
+        [ErrorCodes.PrintoutTooLarge] = ("القائمة أطول من أن تُطبع ({0} سطر كحد أقصى). ضيّق الفلاتر أو صدّر إلى Excel.", "The list is too long to print (at most {0} rows). Narrow the filters or export to Excel."),
         [ErrorCodes.ImportEmpty] = ("الملف لا يحتوي على صفوف.", "The file has no rows."),
         [ErrorCodes.ImportMissingColumn] = ("العمود «{0}» مطلوب في الملف.", "Column «{0}» is required in the file."),
         [ErrorCodes.ImportHasErrors] = ("في الملف {0} صف مرفوض. صحّحها ثم أعد الاستيراد.", "{0} row(s) of the file are rejected. Correct them and import again."),
@@ -274,6 +275,7 @@ public static class ErrorCodes
     public const string PeriodChecksPending = "period.checksPending";
     public const string ImportFileType = "import.fileType";
     public const string ImportTooLarge = "import.tooLarge";
+    public const string PrintoutTooLarge = "export.printoutTooLarge";
     public const string ImportEmpty = "import.empty";
     public const string ImportMissingColumn = "import.missingColumn";
     public const string ImportHasErrors = "import.hasErrors";

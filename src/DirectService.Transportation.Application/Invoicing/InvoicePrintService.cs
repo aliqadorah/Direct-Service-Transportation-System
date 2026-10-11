@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.Invoicing;
 /// becomes the PDF through <see cref="IPdfRenderer"/>, so preview, PDF and printout are identical. Every print is logged.
 /// </summary>
 public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, InvoiceService invoices, InvoiceLayoutService layouts,
-    DocumentPrinter printer, IQrCodeRenderer qr, AuditTrail audit)
+    DocumentPrinter printer, IQrCodeRenderer qr, AuditTrail audit, IssuedNames names)
 {
     private bool En => ctx.Language == "en";
 
@@ -33,6 +33,7 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var layout = await layouts.GetAsync(type, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters().SingleAsync(c => c.Id == inv.CustomerId, ct).ConfigureAwait(false);
+        (details, customer.Name) = await AsIssuedAsync(inv, details, customer, ct).ConfigureAwait(false);
         var qrText = await db.Set<EInvoiceSubmission>().AsNoTracking().Where(s => s.InvoiceId == inv.Id && s.Status == "Submitted").OrderByDescending(s => s.Id)
             .Select(s => s.QrCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         var html = InvoiceHtml(details, layout, company, customer, qrText);
@@ -49,12 +50,38 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var inv = await db.Set<Invoice>().AsNoTracking().SingleAsync(i => i.Id == cn.InvoiceId, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters().SingleAsync(c => c.Id == cn.CustomerId, ct).ConfigureAwait(false);
+        customer.Name = await names.OfAsync("TRN.Customer", customer.Id, "Name", customer.Name, cn.CreatedAt, ct).ConfigureAwait(false);   // FR-163
         var layout = await layouts.GetAsync(InvoiceCodes.TaxInvoice, ct).ConfigureAwait(false);
         var qrText = await db.Set<EInvoiceSubmission>().AsNoTracking().Where(s => s.CreditNoteId == cn.Id && s.Status == "Submitted").OrderByDescending(s => s.Id)
             .Select(s => s.QrCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         var html = CreditHtml(details, inv, layout, company, customer, qrText);
         audit.Record(CreditNoteService.EntityType, cn.Id, "Print", cn.Status == InvoiceCodes.Void ? "Void" : null);
         return await OutputAsync(html, format, cn.Number, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// FR-163: an approved invoice prints the customer, sites, material and driver names it was issued with (renames after its approval are
+    /// undone from the audit log); a draft prints the current names.
+    /// </summary>
+    private async Task<(InvoiceDetails Details, string CustomerName)> AsIssuedAsync(Invoice inv, InvoiceDetails details, Customer customer, CancellationToken ct)
+    {
+        if (inv.ApprovedAt is not DateTime at) return (details, customer.Name);
+        var customerName = await names.OfAsync("TRN.Customer", customer.Id, "Name", customer.Name, at, ct).ConfigureAwait(false);
+        var trips = await db.Set<InvoiceLine>().AsNoTracking().Where(l => l.InvoiceId == inv.Id && l.TripId != null)
+            .Join(db.Set<Trip>().IgnoreQueryFilters(), l => l.TripId, t => (long?)t.Id, (l, t) => new { l.SortOrder, t.LoadingSiteId, t.UnloadingSiteId, t.MaterialId, t.DriverId })
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (trips.Count == 0) return (details, customerName);
+        var loading = await names.ManyAsync("TRN.LoadingSite", trips.Select(t => t.LoadingSiteId).Distinct().ToList(), "Name", at, ct).ConfigureAwait(false);
+        var unloading = await names.ManyAsync("TRN.UnloadingSite", trips.Select(t => t.UnloadingSiteId).Distinct().ToList(), "Name", at, ct).ConfigureAwait(false);
+        var materials = await names.ManyAsync("TRN.Material", trips.Select(t => t.MaterialId).Distinct().ToList(), "Name", at, ct).ConfigureAwait(false);
+        var drivers = await names.ManyAsync("TRN.Driver", trips.Select(t => t.DriverId).Distinct().ToList(), "FullName", at, ct).ConfigureAwait(false);
+        var bySort = trips.ToDictionary(t => t.SortOrder);
+        var lines = details.Lines.Select(l => bySort.TryGetValue(l.SortOrder, out var t) ? l with
+        {
+            LoadingSite = loading.GetValueOrDefault(t.LoadingSiteId, l.LoadingSite ?? string.Empty), UnloadingSite = unloading.GetValueOrDefault(t.UnloadingSiteId, l.UnloadingSite ?? string.Empty),
+            Material = materials.GetValueOrDefault(t.MaterialId, l.Material ?? string.Empty), Driver = drivers.GetValueOrDefault(t.DriverId, l.Driver ?? string.Empty),
+        } : l).ToList();
+        return (details with { Lines = lines }, customerName);
     }
 
     /// <summary>The designer's live preview (FR-055): the saved layout of a type with sample trips, as HTML.</summary>

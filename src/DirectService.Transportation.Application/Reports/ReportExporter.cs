@@ -39,6 +39,49 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
 
     public string L(string ar, string en) => En ? en : ar;
 
+    /// <summary>Longest list a PDF/HTML printout renders (larger lists go to Excel or a background export).</summary>
+    public const int MaxPrintoutRows = 5000;
+
+    /// <summary>A list export asked as a printout ("pdf" or "html")? Excel and CSV stay with the list's own writer.</summary>
+    public static bool IsPrintout(string? format) => format?.Trim().ToLowerInvariant() is "pdf" or "html";
+
+    /// <summary>
+    /// The printout (PDF / HTML) of a list screen's export (FR-150): the same rows as its Excel file, with the columns that fit an A4 page
+    /// (<paramref name="keep"/>, all when null); value kinds come from the data (amounts, dates, counts).
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="quantities"/>: source columns holding decimals that are not money (weights, rates per ton print as numbers);
+    /// <paramref name="sums"/>: source columns totalled when <paramref name="totals"/> is on (default: the money columns).
+    /// A printout is refused above <see cref="MaxPrintoutRows"/> rows (Excel has no such limit).
+    /// </remarks>
+    public Task<GeneratedFile> ListPrintoutAsync(string title, string fileName, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows, string format,
+        CancellationToken ct, IReadOnlyList<int>? keep = null, bool totals = false, IReadOnlyList<(string Label, string Value)>? filters = null,
+        IReadOnlyList<int>? quantities = null, IReadOnlyList<int>? sums = null)
+    {
+        ArgumentNullException.ThrowIfNull(headers);
+        ArgumentNullException.ThrowIfNull(rows);
+        if (rows.Count > MaxPrintoutRows)
+            throw new AppException(ErrorCodes.PrintoutTooLarge, 422, "format", MaxPrintoutRows.ToString("N0", CultureInfo.InvariantCulture));
+        var columns = keep ?? Enumerable.Range(0, headers.Count).ToList();
+        ReportValue Kind(int i) => rows.Select(r => i < r.Count ? r[i] : null).FirstOrDefault(v => v is not null) switch
+        {
+            decimal when quantities?.Contains(i) == true => ReportValue.Number,
+            decimal => ReportValue.Money,
+            DateOnly or DateTime => ReportValue.Date,
+            int or long => ReportValue.Number,
+            _ => ReportValue.Text,
+        };
+        var kinds = columns.Select(Kind).ToList();
+        var data = rows.Select(r => (IReadOnlyList<object?>)columns.Select(i => i < r.Count ? r[i] : null).ToList()).ToList();
+        // Totals of the amount columns (weights, money) for statements (FR-018).
+        bool Summed(int i, int n) => sums?.Contains(i) ?? kinds[n] == ReportValue.Money;
+        IReadOnlyList<object?>? sum = totals
+            ? columns.Select((i, n) => n == 0 ? L("الإجمالي", "Total") : Summed(i, n) ? data.Sum(r => r[n] is decimal d ? d : 0m) : (object?)null).ToList()
+            : null;
+        var table = new ReportTable(title, filters ?? [], columns.Select((i, n) => new ReportColumn(headers[i], kinds[n])).ToList(), data, sum);
+        return ExportAsync(table, format, fileName, ct);
+    }
+
     public async Task<GeneratedFile> ExportAsync(ReportTable table, string? format, string fileName, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(table);

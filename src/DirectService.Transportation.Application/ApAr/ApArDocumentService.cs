@@ -30,7 +30,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// </summary>
 public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes,
     IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ChartOfAccountsService chart, ApArPartyService parties,
-    EInvoiceService einvoice, ISpreadsheetService sheets)
+    EInvoiceService einvoice, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArDocument";
     public const int MaxLines = 200;
@@ -304,7 +304,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المرجع", "المجموع", "الضريبة", "الإجمالي", "المدفوع", "المرتجع", "المتبقي", "الاستحقاق", "الحالة"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.D.Number, x.D.DocumentDate, x.PartyName, x.D.Reference, x.D.Subtotal, x.D.Tax, x.D.Total, x.D.PaidAmount,
             x.D.ReturnedAmount, x.D.RemainingAmount, x.D.DueDate, ApArRules.PaymentStatus(x.D.Status, x.D.Total, x.D.RemainingAmount)]).ToList();
-        return CashExport.File(k == ApArCodes.SupplierBill ? "supplier-bills" : "receivables", format, headers, data, sheets);
+        return await CashExport.FileAsync(k == ApArCodes.SupplierBill ? "supplier-bills" : "receivables", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<ApArDocumentDetails> GetAsync(string kind, string token, CancellationToken ct)

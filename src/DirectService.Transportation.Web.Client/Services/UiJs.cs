@@ -30,6 +30,9 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask OnOutside(Microsoft.AspNetCore.Components.ElementReference el, object dotNetRef, string id) => Call("onOutside", el, dotNetRef, id);
     public ValueTask OffOutside(string id) => Call("offOutside", id);
     public ValueTask<string?> GetPref(string key) => Get<string?>("getPref", key);
+
+    /// <summary>Seconds since the user last pressed a key, clicked, typed or scrolled (record-lock heartbeat, BR-039).</summary>
+    public ValueTask<int> IdleSeconds() => Get<int>("idleSeconds");
     public ValueTask SetPref(string key, string value) => Call("setPref", key, value);
     public ValueTask ApplyRoot(string density, string? lang) => Call("applyRoot", density, lang);
     public ValueTask<string?> RootLang() => Get<string?>("rootLang");

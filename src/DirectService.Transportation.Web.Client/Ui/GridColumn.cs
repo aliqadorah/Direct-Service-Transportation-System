@@ -11,6 +11,9 @@ public sealed class GridColumn<TItem> : ComponentBase, IDisposable
     [CascadingParameter] private DataGrid<TItem>? Grid { get; set; }
 
     [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>Key of the column in saved column views (FR-183); columns without a key are always shown.</summary>
+    [Parameter] public string? ColumnKey { get; set; }
     [Parameter] public Func<TItem, string?>? Value { get; set; }
     [Parameter] public RenderFragment<TItem>? Template { get; set; }
     /// <summary>Numbers and amounts: aligned to the end, tabular figures, isolated LTR.</summary>

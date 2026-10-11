@@ -12,6 +12,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.EInvoiceSubmission", "TRN.Invoice"])" OnChange="Load" />
 <PageHeader Title="@L["nav.einvoicing"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.einvoicing"])])">
     <Badges>@if (_settings is { } s) {<Badge Tone="@(s.IsEnabled ? Tone.Info : Tone.Mute)" Text="@(s.IsEnabled ? L["ei.env" + s.Environment] : L["ei.off"])" />}</Badges>
     <Actions>
@@ -28,7 +29,7 @@
 }
 
 <ListShell Label="@L["nav.einvoicing"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search"
-           Exports="@(["xlsx", "csv"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="send" EmptyTitle="@L["ei.none"]" EmptyText="@L["ei.noneText"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
@@ -77,9 +78,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } view) _view = view;
         if (query["status"] is { Length: > 0 } st) _view = st;
-        if (query["type"] is { Length: > 0 } t) _type = t;
+        if (query["type"] is { Length: > 0 } type) _type = type;
+        if (query["customer"] is { Length: > 0 } customer) _customer = customer;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         if (Shell.Can(PermissionKeys.SettingsManage))
         {
@@ -114,6 +120,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("status", null), ("type", _type), ("customer", _customer), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<EInvoicePage>(Api.C("einvoice-submissions" + Query(true)));

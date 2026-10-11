@@ -12,6 +12,7 @@
 @inject UiJs Js
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Trip"])" OnChange="Load" />
 <PageHeader Title="@L[_shortage ? "nav.shortage" : "trip.created"]" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips"))])">
     <Actions>
         @if (Shell.Can(PermissionKeys.TripsEdit))
@@ -43,12 +44,15 @@
     <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
     <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
     <ComboField TValue="string?" @bind-Value="_driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+    <ComboField TValue="string?" @bind-Value="_partner" Options="Lookups.Partners" Label="@L["md.partner"]" Placeholder="@L["tar.all"]" FieldClass="w200" />
     <ComboField TValue="string?" @bind-Value="_loading" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />
     <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
     @if (HasFilters) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
     <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <ColumnChooser ViewKey="TRN.Trips" Columns="ColumnChoices" OnChange="c => _columns = c" />
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
     </span>
 </div>
 
@@ -61,7 +65,7 @@
     <ChildContent>
         <ListFrame Label="@L["trip.created"]">
             <ChildContent>
-                <TripGrid Items="_page!.Page.Items" Company="@Company" Totals="_page.Totals" Shortage="_shortage"
+                <TripGrid Items="_page!.Page.Items" Company="@Company" Totals="_page.Totals" Shortage="_shortage" ColumnOrder="_columns"
                           FooterLabel="@L.F("trip.totalOf", Fmt.Count(_page.Totals.Trips))" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort" />
             </ChildContent>
             <Footer><Pager Page="_q.Page" PageSize="_q.PageSize" Total="_page!.Page.TotalCount" OnPage="Go" OnPageSize="Size" /></Footer>
@@ -70,12 +74,17 @@
 </StateView>
 
 @code {
+    private IReadOnlyList<string>? _columns;
+
+    /// <summary>Columns of the trip table for the column view (FR-183), with their titles in the reader's language.</summary>
+    private IReadOnlyList<(string Key, string Title)> ColumnChoices => TripGrid.Columns.Select(c => (c.Key, L[c.Title])).ToList();
+
     private readonly ListQuery _q = new() { Sort = "tripDate", Desc = true };
     private TripPage? _page;
     private LoadState _state = LoadState.Loading;
     private string? _reference;
     private DateOnly? _from, _to;
-    private string? _customer, _driver, _loading;
+    private string? _customer, _driver, _loading, _partner;
     private bool _shortage;
 
     [Parameter, EditorRequired] public string Company { get; set; } = "";
@@ -86,26 +95,38 @@
     {
         _shortage = Shortage;
         // Filters from the address (dashboard drill-downs): every known FR-009 key.
-        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
-        foreach (var key in new[] { "status", "billing", "settled", "fleet", "partnerTrips", "shortage", "breach", "manual", "review", "q" })
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        foreach (var key in FilterKeys)
             if (query[key] is { Length: > 0 } v) _q.Filters[key] = v;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
+        if (query["customer"] is { Length: > 0 } customer) _customer = customer;
+        if (query["driver"] is { Length: > 0 } driver) _driver = driver;
+        if (query["partner"] is { Length: > 0 } partner) _partner = partner;
+        if (query["loadingSite"] is { Length: > 0 } loading) _loading = loading;
         if (_shortage) { _q.Filters["shortage"] = "true"; _q.Sort = "shortagePct"; _q.Desc = true; }
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         await Load();
     }
 
+    /// <summary>The FR-009 filter keys, read from and written to the address (dashboard drill-downs, UX-12).</summary>
+    private static readonly string[] FilterKeys = ["status", "billing", "settled", "fleet", "partnerTrips", "shortage", "breach", "manual", "review"];
+
     private string? F(string key) => _q.Filters.TryGetValue(key, out var v) ? v : null;
 
-    private bool HasFilters => _q.Filters.Keys.Any(k => !(_shortage && k == "shortage")) || _from is not null || _to is not null || _customer is not null || _driver is not null || _loading is not null;
+    private bool HasFilters => _q.Filters.Keys.Any(k => !(_shortage && k == "shortage")) || _from is not null || _to is not null || _customer is not null || _driver is not null || _loading is not null || _partner is not null;
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, [.. FilterKeys.Select(k => (k, _shortage && k == "shortage" ? null : F(k))),
+            ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)), ("customer", _customer), ("driver", _driver), ("partner", _partner), ("loadingSite", _loading)]);
         _q.View = F("status") ?? "active";
         var extra = new Dictionary<string, string?>
         {
             ["from"] = _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
             ["to"] = _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-            ["customer"] = _customer, ["driver"] = _driver, ["loadingSite"] = _loading,
+            ["customer"] = _customer, ["driver"] = _driver, ["partner"] = _partner, ["loadingSite"] = _loading,
         };
         _q.Fixed.Clear();
         foreach (var (k, v) in extra) if (v is not null) _q.Fixed[k] = v;
@@ -141,7 +162,7 @@
         _q.Filters.Clear();
         if (_shortage) _q.Filters["shortage"] = "true";
         _from = _to = null;
-        _customer = _driver = _loading = null;
+        _customer = _driver = _loading = _partner = null;
         _q.Page = 1;
         return Load();
     }

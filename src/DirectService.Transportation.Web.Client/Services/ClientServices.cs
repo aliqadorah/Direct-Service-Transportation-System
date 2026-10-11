@@ -13,6 +13,7 @@ public static class ClientServices
         services.AddScoped<ShellState>();
         services.AddScoped<ToastService>();
         services.AddScoped<UiJs>();
+        services.AddScoped<LiveUpdates>();
         return services;
     }
 }

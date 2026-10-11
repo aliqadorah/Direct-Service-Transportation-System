@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// reason restores the balance (FR-127).
 /// </summary>
 public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArPayment";
     public const string SourceType = "ApArPayment";
@@ -192,7 +192,7 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
             ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Document", "Amount", "Method", "Cash box / bank", "Reference", "Status"]
             : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المستند", "المبلغ", "طريقة الدفع", "الصندوق / البنك", "المرجع", "الحالة"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.Number, x.PaymentDate, x.Party, x.Doc, x.Amount, x.PaymentMethod, x.Account, x.Reference, x.Status]).ToList();
-        return CashExport.File(k == ApArCodes.SupplierBill ? "supplier-payments" : "collections", format, headers, data, sheets);
+        return await CashExport.FileAsync(k == ApArCodes.SupplierBill ? "supplier-payments" : "collections", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<ApArPaymentDetails> GetAsync(string token, CancellationToken ct)

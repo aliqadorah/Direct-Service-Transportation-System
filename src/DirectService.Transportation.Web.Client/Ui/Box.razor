@@ -2,7 +2,7 @@
 <section class="box @(Fill ? "fill" : null) @Class" style="@Style" aria-labelledby="@(Title is null ? null : _id)">
     @if (Title is not null || Actions is not null)
     {
-        <div class="bh"><h2 id="@_id"><Tx Value="@Title" /></h2>@if (Actions is not null) {<span class="a">@Actions</span>}</div>
+        <div class="bh">@if (Title is not null) {<h2 id="@_id"><Tx Value="@Title" /></h2>} else {<span></span>}@if (Actions is not null) {<span class="a">@Actions</span>}</div>
     }
     @if (NoPad) { @ChildContent } else { <div class="pad">@ChildContent</div> }
 </section>

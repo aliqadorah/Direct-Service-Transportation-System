@@ -24,7 +24,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// control account. Receivable returns are e-invoiced as credit notes when their document is (D-15). Void by reversal with a reason.
 /// </summary>
 public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, EInvoiceService einvoice, ISpreadsheetService sheets)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, EInvoiceService einvoice, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArReturn";
     public const string SourceType = "ApArReturn";
@@ -222,7 +222,7 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
             ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Document", "Amount", "Tax", "Total", "Reason", "Status"]
             : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المستند", "المبلغ", "الضريبة", "الإجمالي", "السبب", "الحالة"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.Number, x.ReturnDate, x.Party, x.Doc, x.Amount, x.Tax, x.Total, x.Reason, x.Status]).ToList();
-        return CashExport.File(k == ApArCodes.SupplierBill ? "payable-returns" : "receivable-returns", format, headers, data, sheets);
+        return await CashExport.FileAsync(k == ApArCodes.SupplierBill ? "payable-returns" : "receivable-returns", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<ApArReturnDetails> GetAsync(string token, CancellationToken ct)

@@ -9,6 +9,7 @@
 @using DirectService.Transportation.Contracts.Accounting
 @using Md = DirectService.Transportation.Contracts.MasterData
 @inject Api Api
+@inject NavigationManager Nav
 @inject Loc L
 @inject ShellState Shell
 @inject ToastService Toasts
@@ -31,6 +32,7 @@
             <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["ui.search"]" value="@_q.Q" @onchange="Search" /></div>
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
     </Tools>
 </SavedViews>
 
@@ -78,18 +80,20 @@
     </ChildContent>
 </StateView>
 
+@if (EntityType is { } liveType) {<LiveRefresh EntityTypes="@([liveType])" OnChange="Load" />}
 <Modal @bind-Open="_editing" Title="@(ModelId(_model) is null ? AddText : L.F("ml.editTitle", ModelName(_model) ?? ""))" Busy="_saving" Wide="WideEditor">
     <ChildContent>
         <EditForm Model="_model" OnValidSubmit="Save" id="@_formId" class="stack">
             <ProblemValidator @ref="_problems" />
             <ErrorSummary />
             @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+            @if (_editing && ModelId(_model) is { } editId && EntityType is { } lockType) {<RecordLockGuard EntityType="@lockType" Id="@editId" OnState="h => _lockedBy = h" />}
             @Editor?.Invoke(_model)
         </EditForm>
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" form="@_formId" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="@(_lockedBy is not null)" form="@_formId" />
     </Footer>
 </Modal>
 
@@ -127,7 +131,14 @@
     private string? _reference;
     private TModel _model = new();
     private bool _editing, _saving, _deleting, _panel;
-    private string? _banner, _deleteError;
+    private string? _banner, _deleteError, _lockedBy;
+
+    /// <summary>The record type of the list (record locks BR-039, live refresh FR-185).</summary>
+    private string? EntityType => Path switch
+    {
+        "customers" => "TRN.Customer", "partners" => "TRN.Partner", "materials" => "TRN.Material", "loading-sites" => "TRN.LoadingSite",
+        "unloading-sites" => "TRN.UnloadingSite", "ownership-types" => "TRN.OwnershipType", _ => null,
+    };
     private ProblemValidator? _problems;
     private TItem? _target;
     private Md.ReferencesResponse? _refs;
@@ -167,11 +178,15 @@
     protected override async Task OnInitializedAsync()
     {
         if (!HasStatus) _q.View = "all";
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (HasStatus && query["view"] is { Length: > 0 } saved) _q.View = saved;
         await Load();
     }
 
     private async Task Load()
     {
+        if (Paged) ListUrl.Write(Nav, _q, ("view", HasStatus && _q.View != "active" ? _q.View : null));
         try
         {
             var query = _q.ToQuery(HasStatus ? "status" : null, Paged);
@@ -205,6 +220,7 @@
     {
         _model = new TModel();
         _banner = null;
+        _lockedBy = null;
         _editing = true;
     }
 
@@ -212,6 +228,7 @@
     {
         _model = ToModel(item);
         _banner = null;
+        _lockedBy = null;
         _editing = true;
     }
 

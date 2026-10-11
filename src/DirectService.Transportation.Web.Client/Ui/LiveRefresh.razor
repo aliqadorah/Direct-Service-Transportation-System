@@ -1,0 +1,52 @@
+@*
+  Live screen refresh (FR-185, RT-02): placed on a list or a record view, it reloads the screen shortly after another user (or another tab)
+  changes a record of the given types — or only the record shown, with Id — and once after the live connection came back. Never on an edit
+  form with unsaved input: forms are protected by their record lock instead (BR-039).
+*@
+@implements IDisposable
+@inject LiveUpdates Live
+
+@code {
+    private CancellationTokenSource? _delay;
+
+    /// <summary>Entity types as the server names them, e.g. "TRN.Trip", "TRN.Invoice".</summary>
+    [Parameter, EditorRequired] public string[] EntityTypes { get; set; } = [];
+
+    /// <summary>A record view: only changes of this record (bulk changes of the type count too).</summary>
+    [Parameter] public string? Id { get; set; }
+
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Live.RecordChanged += Changed;
+        Live.Reconnected += Schedule;
+    }
+
+    private void Changed(LiveChange c)
+    {
+        if (!EntityTypes.Contains(c.EntityType, StringComparer.Ordinal)) return;
+        if (Id is not null && c.Id is not null && c.Id != Id) return;
+        Schedule();
+    }
+
+    /// <summary>Several changes in a row (an import, a bulk action) reload the screen once.</summary>
+    private void Schedule()
+    {
+        _delay?.Cancel();
+        _delay = new CancellationTokenSource();
+        var token = _delay.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try { await Task.Delay(600, token); } catch (TaskCanceledException) { return; }
+            await OnChange.InvokeAsync();
+        });
+    }
+
+    public void Dispose()
+    {
+        Live.RecordChanged -= Changed;
+        Live.Reconnected -= Schedule;
+        _delay?.Cancel();
+    }
+}

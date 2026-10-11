@@ -44,6 +44,7 @@
                 </Columns>
             </DataGrid>
         </ListFrame>
+        @if (_history is not null) {<Box Title="@L["ui.history"]"><RecordHistory Items="_history" /></Box>}
     </ChildContent>
 </StateView>
 
@@ -52,6 +53,7 @@
 
 @code {
     private JournalEntryResponse? _e;
+    private IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>? _history;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _error;
     private bool _voiding, _busy;
@@ -68,6 +70,13 @@
             // acct.je.view without acct.acct.view reads the automatic entries only (DT-32).
             var path = Shell.Can(PermissionKeys.AcctView) ? $"accounting/journal-entries/{Uri.EscapeDataString(Id)}" : $"ledger/entries/{Uri.EscapeDataString(Id)}";
             _e = await Api.GetAsync<JournalEntryResponse>(Api.C(path));
+            // Who changed the entry and how (UX-21); only for readers of the full journal (the history route needs acct.view).
+            _history = null;
+            if (Shell.Can(PermissionKeys.AcctView))
+            {
+                try { _history = await Api.GetAsync<IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}/history")); }
+                catch (ApiException) { }
+            }
             _state = LoadState.Ready;
         }
         catch (ApiException x) when (x.Problem.Status == 404) { _state = LoadState.Empty; }

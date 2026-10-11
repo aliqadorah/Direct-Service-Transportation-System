@@ -123,6 +123,38 @@ public sealed class CashTests(ApiFactory f)
     // ------------------------------------------------------------------ advances and settlements (7.4.2, 7.4.3, 8.5)
 
     [Fact]
+    public async Task Settlement_reproduces_the_PRD_8_5_worked_example_TST09()
+    {
+        // PRD 8.5: gross 1,250.000 − advances 400.000 − deductions 35.000 = net 815.000 JOD.
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var c = o.Client;
+        var refs = (await ReadAsync<TripDetails>(await c.GetAsync(U(o, $"/trips/{(await w.Trip("REF", w.Driver, null)).Id}")))).Trip;
+        await (await c.PostAsJsonAsync(U(o, $"/trips/{refs.Id}/void"), new TripVoidRequest("Reference trip only", refs.RowVersion))).EnsureOkAsync();
+        for (var i = 1; i <= 5; i++)   // five trips of 50.000 t at a manual driver rate of 5.000 (masters.manage): 5 × 250.000 = 1,250.000
+        {
+            var trip = (await ReadAsync<TripSaveResult>(await c.PostAsJsonAsync(U(o, "/trips"), new TripRequest($"EX-{i}", Today, null, null, w.Driver.Id, w.Customer.Id,
+                refs.LoadingSite.Id, refs.UnloadingSite.Id, refs.Material.Id, null, 50.000m, 50.000m, null, 5.000m, null, null, null, null, null)))).Trip;
+            Assert.Equal(250.000m, trip.DriverWage);
+        }
+        foreach (var amount in new[] { 300m, 100m })
+            await (await c.PostAsJsonAsync(U(o, "/advances"), new AdvanceRequest(w.Driver.Id, Today, amount, "Cash", w.CashBox, null, null, null, null, null))).EnsureOkAsync();
+
+        var stl = await ReadAsync<SettlementDetails>(await c.PostAsJsonAsync(U(o, "/settlements"), new SettlementRequest(w.Driver.Id, Today, null, null,
+            [new SettlementDeductionRequest("Fine", 20m, "Late delivery"), new SettlementDeductionRequest("Other", 15m, "Tarpaulin")], "Cash", w.CashBox, null, null, null)));
+        Assert.Equal(1250.000m, stl.Settlement.GrossWages);
+        Assert.Equal(400.000m, stl.Settlement.AdvancesTotal);
+        Assert.Equal(35.000m, stl.Settlement.DeductionsTotal);
+        Assert.Equal(815.000m, stl.Settlement.NetPayable);
+        // Entry (8.6, accrual on): Dr driver payable 1,250 = Cr advances 400 + Cr deductions 35 + Cr cash 815.
+        var e = await EntryAsync("Settlement");
+        Assert.Equal(1250.000m, e.TotalDebit);
+        Assert.Contains(e.Lines, l => l.Credit == 815.000m);
+        Assert.Contains(e.Lines, l => l.Credit == 400.000m);
+        Assert.Contains(e.Lines, l => l.Credit == 35.000m);
+    }
+
+    [Fact]
     public async Task Advances_and_settlement_per_8_5_lock_items_post_and_void_FR072_FR082()
     {
         var w = await WorldAsync();

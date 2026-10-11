@@ -42,6 +42,9 @@
 
     private string Display => Current?.Text ?? "";
 
+    /// <summary>Attributes given to the field (an aria-label for a combo without a visible label, e.g. in a table row) go on the input.</summary>
+    private IEnumerable<KeyValuePair<string, object>>? Extras => AdditionalAttributes?.Where(a => a.Key != "class");
+
     private RenderFragment Control => __builder =>
     {
         <div class="combo @(Wide ? "wide" : null) @(_open ? "open" : null)" @ref="_wrap">
@@ -51,7 +54,8 @@
                        aria-activedescendant="@(_open && _active >= 0 ? $"{_list}-{_active}" : null)"
                        aria-invalid="@(Invalid ? "true" : null)" aria-describedby="@DescribedBy" aria-required="@(Required ? "true" : null)"
                        placeholder="@(Placeholder ?? L["ui.choose"])" title="@Display" readonly="@ReadOnly" disabled="@Disabled"
-                       value="@(_editing ? _text : Display)" @oninput="Input" @onfocus="Focus" @onkeydown="Key" @onkeydown:stopPropagation="_open" @onclick="Toggle" />
+                       value="@(_editing ? _text : Display)" @oninput="Input" @onfocus="Focus" @onkeydown="Key" @onkeydown:stopPropagation="_open" @onclick="Toggle"
+                       @attributes="Extras" />
                 <span class="end"><Icon Name="down" /></span>
             </div>
             @if (_open)

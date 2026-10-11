@@ -432,6 +432,8 @@ internal static class ApiSummaries
 
         // Platform (B12)
         ["POST /api/v1/billing/webhook"] = "Payment-gateway webhook: signature-verified payment results (P-04, SEC-10)",
+        ["GET /api/v1/companies/{company}/accounting/accounts/{account}/history"] = "An account's history from the audit log: who changed what, old → new (UX-21)",
+        ["GET /api/v1/companies/{company}/accounting/journal-entries/{entry}/history"] = "A journal entry's history from the audit log (UX-21)",
         ["GET /api/v1/platform/plans"] = "Provider console: plans with the number of tenants on each (P-03)",
         ["POST /api/v1/platform/plans"] = "Provider console: create a plan with price and limits (P-03)",
         ["PUT /api/v1/platform/plans/{plan}"] = "Provider console: edit a plan; issued invoices never change (P-03)",

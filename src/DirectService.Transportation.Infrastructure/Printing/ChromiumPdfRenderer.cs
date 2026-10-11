@@ -96,7 +96,10 @@ public sealed class ChromiumPdfRenderer(IConfiguration config, ILogger<ChromiumP
         {
             Headless = true,
             ExecutablePath = path,
-            Args = ["--no-first-run", "--disable-gpu", "--disable-extensions", "--disable-dev-shm-usage"],
+            // In a container (Printing:NoSandbox, set by the image) Chromium cannot have its own sandbox; it renders only our HTML with scripts off.
+            Args = config.GetValue("Printing:NoSandbox", false)
+                ? ["--no-first-run", "--disable-gpu", "--disable-extensions", "--disable-dev-shm-usage", "--no-sandbox"]
+                : ["--no-first-run", "--disable-gpu", "--disable-extensions", "--disable-dev-shm-usage"],
         }).ConfigureAwait(false);
         return _browser;
     }

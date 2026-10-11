@@ -6,6 +6,7 @@
 @inject TripLookups Lookups
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Settlement"])" OnChange="Load" />
 <PageHeader Title="@L["drv.settlementsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.settlementsList"])])" />
 <ListShell Label="@L["drv.settlementsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search"
            State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="file" EmptyTitle="@L["drv.noSettlements"]" Filtered="Filtered" OnClear="ClearAll"
@@ -48,7 +49,16 @@
     private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("active", L["st.posted"]), new("void", L["st.void"])];
     private bool Filtered => _q.Q is not null || _driver is not null || _from is not null || _to is not null;
 
-    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnInitializedAsync()
+    {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } view) _view = view;
+        if (query["driver"] is { Length: > 0 } driver) _driver = driver;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
+        return Load();
+    }
 
     private string Query(bool paged)
     {
@@ -63,6 +73,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("driver", _driver), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<SettlementPage>(Api.C("settlements" + Query(true)));

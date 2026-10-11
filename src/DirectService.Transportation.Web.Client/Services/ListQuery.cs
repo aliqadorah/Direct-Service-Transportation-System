@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Components;
 
 namespace DirectService.Transportation.Web.Client.Services;
 
@@ -44,4 +45,55 @@ public sealed class ListQuery
         Desc = s.Desc;
         Page = 1;
     }
+}
+
+/// <summary>
+/// Filtered lists keep their state in the address (UX-12): a filtered list can be bookmarked, shared and restored with Back.
+/// <see cref="Write"/> replaces the current history entry (no new entry per filter change); <see cref="Read"/> restores on load.
+/// </summary>
+public static class ListUrl
+{
+    private const string Day = "yyyy-MM-dd";
+
+    /// <summary>The address's query values (lists read them on first load).</summary>
+    public static System.Collections.Specialized.NameValueCollection Read(NavigationManager nav) =>
+        System.Web.HttpUtility.ParseQueryString(new Uri(nav.Uri).Query);
+
+    /// <summary>Restores search, sort and page from the address.</summary>
+    public static void ReadInto(this ListQuery q, System.Collections.Specialized.NameValueCollection query)
+    {
+        if (query["q"] is { Length: > 0 } text) q.Q = text;
+        if (query["sort"] is { Length: > 1 } sort) { q.Desc = sort[0] == '-'; q.Sort = q.Desc ? sort[1..] : sort; }
+        if (int.TryParse(query["page"], NumberStyles.None, CultureInfo.InvariantCulture, out var page) && page > 1) q.Page = page;
+    }
+
+    public static DateOnly? Date(string? value) =>
+        DateOnly.TryParseExact(value, Day, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
+    public static string? Date(DateOnly? value) => value?.ToString(Day, CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Writes search, sort, page and the screen's own values into the address (null or empty removes a key; keys not named are kept).
+    /// Does nothing when the address already says so.
+    /// </summary>
+    public static void Write(NavigationManager nav, ListQuery q, params (string Key, string? Value)[] values)
+    {
+        var p = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["q"] = q.Q,
+            ["sort"] = q.SortParam,
+            ["page"] = q.Page > 1 ? q.Page.ToString(CultureInfo.InvariantCulture) : null,
+        };
+        foreach (var (k, v) in values) p[k] = string.IsNullOrEmpty(v) ? null : v;
+        var uri = nav.GetUriWithQueryParameters(p);
+        if (string.Equals(uri, nav.Uri, StringComparison.Ordinal)) return;
+        LastWritten = uri;
+        nav.NavigateTo(uri, replace: true);
+    }
+
+    /// <summary>
+    /// The address a list last wrote for itself: the layout keeps the page on that navigation, while any other move to the same path with a
+    /// different query (a menu link, a drill-down) starts the page afresh so the new filters apply.
+    /// </summary>
+    public static string? LastWritten { get; private set; }
 }

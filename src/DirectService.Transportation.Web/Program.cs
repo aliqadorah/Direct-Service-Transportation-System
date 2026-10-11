@@ -59,9 +59,17 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy(RateLimits.Auth, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = authLimit, Window = TimeSpan.FromMinutes(1) }));
-    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http => RateLimitPartition.GetTokenBucketLimiter(
-        http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new TokenBucketRateLimiterOptions { TokenLimit = apiLimit, TokensPerPeriod = apiLimit, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true }));
+    var tenantLimit = config.GetValue("RateLimits:ApiPerMinutePerTenant", 3000);
+    // Per user (or address) and, chained, per tenant (API-07): one tenant cannot use up the platform's capacity for the others.
+    o.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+        PartitionedRateLimiter.Create<HttpContext, string>(http => RateLimitPartition.GetTokenBucketLimiter(
+            http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new TokenBucketRateLimiterOptions { TokenLimit = apiLimit, TokensPerPeriod = apiLimit, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true })),
+        PartitionedRateLimiter.Create<HttpContext, string>(http => http.Items[typeof(DirectService.Transportation.Application.Identity.SessionPrincipal)]
+                is DirectService.Transportation.Application.Identity.SessionPrincipal { TenantId: long tenant }
+            ? RateLimitPartition.GetTokenBucketLimiter("t:" + tenant.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                _ => new TokenBucketRateLimiterOptions { TokenLimit = tenantLimit, TokensPerPeriod = tenantLimit, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true })
+            : RateLimitPartition.GetNoLimiter("no-tenant")));
     o.OnRejected = async (ctx, ct) =>
     {
         var lang = ctx.HttpContext.RequestServices.GetService<IRequestContext>()?.Language ?? "ar";
@@ -81,6 +89,23 @@ if (config.GetValue("Jobs:Enabled", true))
 var app = builder.Build();
 
 // ---------------------------------------------------------------- pipeline (order = security model, step 2 §9)
+// Behind a TLS-terminating proxy or load balancer (container hosting, NFR-22): the scheme and client address come from the proxy's
+// X-Forwarded-* headers, so HTTPS redirection, secure cookies and the per-address rate limits work. Off by default; the proxies to
+// trust must be listed (Hosting:KnownProxies addresses and/or Hosting:KnownNetworks CIDR ranges): trusting any sender would let a
+// client forge its address past the sign-in rate limit and into the audit log, so the host refuses to start without them.
+if (config.GetValue("Hosting:BehindProxy", false))
+{
+    var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto };
+    var proxies = config.GetSection("Hosting:KnownProxies").Get<string[]>() ?? [];
+    var networks = config.GetSection("Hosting:KnownNetworks").Get<string[]>() ?? [];
+    if (proxies.Length == 0 && networks.Length == 0)
+        throw new InvalidOperationException("Hosting:BehindProxy is on, but neither Hosting:KnownProxies nor Hosting:KnownNetworks is configured.");
+    forwarded.KnownIPNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+    foreach (var p in proxies) forwarded.KnownProxies.Add(System.Net.IPAddress.Parse(p));
+    foreach (var n in networks) forwarded.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(n));
+    app.UseForwardedHeaders(forwarded);
+}
 app.UseExceptionHandler();
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseHttpsRedirection();

@@ -1,0 +1,68 @@
+# Direct Service Transportation — build and test on every push and pull request (NFR-19, TST-01, TST-02, TST-06, TST-12…14).
+# Not run yet: the repository has never been pushed (owner decision Q-10). SQL Server runs as a service container; the tests use
+# SQL authentication through DST_TEST_DB / DST_API_TEST_DB instead of the Windows authentication of the development PC.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD || 'Ci-Only-Passw0rd!' }}
+          MSSQL_COLLATION: Arabic_100_CI_AI_SC_UTF8
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+    env:
+      DOTNET_NOLOGO: "true"
+      SQL_PASSWORD: ${{ secrets.CI_SQL_SA_PASSWORD || 'Ci-Only-Passw0rd!' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # NuGet audit runs on restore and fails the build on known vulnerable packages (warnings are errors) — SEC-15 dependency scanning.
+      - name: Restore
+        run: dotnet restore DirectService.Transportation.slnx
+
+      - name: Build
+        run: dotnet build DirectService.Transportation.slnx --no-restore -c Release
+
+      - name: Unit and component tests (Domain, Application, UI) with coverage
+        run: |
+          for p in Domain Application UI; do
+            dotnet test --project tests/DirectService.Transportation.$p.Tests -c Release --no-build \
+              --coverage --coverage-output-format cobertura --coverage-output $p.cobertura.xml
+          done
+
+      - name: Database and API tests (integration, isolation, security) with coverage
+        env:
+          DST_TEST_DB: Server=localhost,1433;Database=DirectServiceMaster_Tests;User Id=sa;Password=${{ env.SQL_PASSWORD }};TrustServerCertificate=true;Encrypt=true
+          DST_API_TEST_DB: Server=localhost,1433;Database=DirectServiceMaster_ApiTests;User Id=sa;Password=${{ env.SQL_PASSWORD }};TrustServerCertificate=true;Encrypt=true
+        run: |
+          for p in Infrastructure Api; do
+            dotnet test --project tests/DirectService.Transportation.$p.Tests -c Release --no-build \
+              --coverage --coverage-output-format cobertura --coverage-output $p.cobertura.xml
+          done
+
+      - name: Coverage files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: "**/TestResults/*.cobertura.xml"
+
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@2.62.1 lint docs/api/openapi-v1.json

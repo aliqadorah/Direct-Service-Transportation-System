@@ -66,9 +66,10 @@
                 }
                 @if (!_form.Hidden("notes")) {<div style="margin-top:10px"><TextAreaField @bind-Value="_m.Notes" Label="@F("notes", L["md.notes"])" MaxLength="1000" /></div>}
             </section>
+            @if (Id is not null) {<RecordLockGuard EntityType="TRN.Driver" Id="@Id" OnState="h => _lockedBy = h" />}
             <div class="formbar">
                 <Btn Text="@L["ui.cancel"]" Href="@(Id is null ? NavModel.Href(Company, "masters/drivers") : NavModel.Href(Company, $"masters/drivers/{Id}"))" />
-                <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" />
+                <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="@(_lockedBy is not null)" />
             </div>
         </EditForm>
     </ChildContent>
@@ -79,6 +80,7 @@
     private LoadState _state = LoadState.Loading;
     private string? _reference;
     private bool _saving;
+    private string? _lockedBy;
     private ProblemValidator? _problems;
     private ErrorSummary? _summary;
     private IReadOnlyList<string>? _extra;

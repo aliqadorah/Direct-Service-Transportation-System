@@ -7,10 +7,11 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.PartnerPayment"])" OnChange="Load" />
 <PageHeader Title="@L["prt.paymentsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts")), new Crumb(L["prt.paymentsList"])])">
     <Actions>@if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="plus" Text="@L["prt.newPayment"]" Href="@NavModel.Href(Company, "partner-accounts/payments/new")" />}</Actions>
 </PageHeader>
-<ListShell Label="@L["prt.paymentsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv"])" OnExport="Export"
+<ListShell Label="@L["prt.paymentsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export"
            State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="cash" EmptyTitle="@L["prt.noPayments"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
@@ -54,6 +55,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } view) _view = view;
+        if (query["partner"] is { Length: > 0 } partner) _partner = partner;
+        if (query["method"] is { Length: > 0 } method) _method = method;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         await Load();
     }
@@ -72,6 +80,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("partner", _partner), ("method", _method), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<PartnerPaymentPage>(Api.C("partner-payments" + Query(true)));

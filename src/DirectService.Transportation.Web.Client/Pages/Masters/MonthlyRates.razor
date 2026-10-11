@@ -11,7 +11,8 @@
 
 <PageHeader Title="@L["nav.monthlyRates"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.monthlyRates"])])">
     <Actions>
-        <Btn Icon="export" Text="Excel" OnClick="Export" Disabled="_month is null" />
+        <Btn Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" Disabled="_month is null" />
+        <Btn Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" Disabled="_month is null" />
         @if (CanManage) {<Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="@(!Dirty)" OnClick="AskSave" />}
     </Actions>
 </PageHeader>
@@ -161,11 +162,11 @@
         finally { _saving = false; }
     }
 
-    private async Task Export()
+    private async Task Export(string format)
     {
         try
         {
-            var file = await Api.FileAsync(Api.C($"monthly-rates/{_selected}/export?format=xlsx"));
+            var file = await Api.FileAsync(Api.C($"monthly-rates/{_selected}/export?format={format}"));
             await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }

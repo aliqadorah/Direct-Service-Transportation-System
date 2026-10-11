@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
   <!-- Brand fonts bundled locally (PRD UX-07, open issue B6): one copy in assets/fonts, served from wwwroot/fonts. -->

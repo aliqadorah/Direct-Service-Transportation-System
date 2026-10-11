@@ -1,6 +1,7 @@
 @* The list block of the board: a box filling the page height with a scrolling table and a fixed footer (pager / totals). *@
 <section class="box fill gridwrap" aria-label="@Label" style="display:flex">
-    <div class="fill">@ChildContent</div>
+    @* Focusable so keyboard users can scroll a table whose rows are not links (WCAG 2.1.1, axe scrollable-region-focusable). *@
+    <div class="fill" tabindex="0">@ChildContent</div>
     @Footer
 </section>
 

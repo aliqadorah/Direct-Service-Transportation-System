@@ -9,6 +9,7 @@
 @inject NavigationManager Nav
 @inject FormConfig Forms
 
+<LiveRefresh EntityTypes="@(["TRN.Driver"])" OnChange="Load" />
 <PageHeader Title="@L["nav.drivers"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.drivers"])])">
     <Actions>
         @if (Shell.Can(PermissionKeys.MastersManage))
@@ -25,6 +26,7 @@
             <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["md.driverSearch"]" value="@_q.Q" @onchange="Search" /></div>
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
     </Tools>
 </SavedViews>
 
@@ -81,6 +83,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } saved) _view = saved;
         try { _form = await Forms.GetAsync(FormConfig.Driver); } catch (ApiException) { }
         await Load();
     }
@@ -89,6 +94,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "active" ? null : _view));
         _q.View = _view switch { "archived" => "archived", _ => "active" };
         _q.Filters.Clear();
         if (_view == "alerts") _q.Filters["expiry"] = "alerts";

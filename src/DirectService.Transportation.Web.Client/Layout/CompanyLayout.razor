@@ -9,6 +9,8 @@
 @inject ShellState Shell
 @inject NavigationManager Nav
 @inject Loc L
+@inject LiveUpdates Live
+@inject ToastService Toasts
 
 @if (_state == LoadState.Loading)
 {
@@ -28,6 +30,10 @@ else
             {
                 <NotFoundView />
             }
+            else if (!NavModel.RouteAllowed(Shell.Permissions, Nav.ToBaseRelativePath(Nav.Uri)))
+            {
+                <NoAccessView />
+            }
             else
             {
                 @* A new page instance per path: routes that share a component (new / edit, payables / receivables) never carry state over. *@
@@ -46,7 +52,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _lastUri = Nav.Uri;
         Nav.LocationChanged += Moved;
+        Live.Notification += Notified;
         await Load();
     }
 
@@ -57,6 +65,7 @@ else
             await Session.EnsureLoadedAsync();
             _company = CompanyOfUrl() ?? Shell.Company?.Id ?? Session.HomeCompany;
             _state = _company is not null && await Session.EnterCompanyAsync(_company) ? LoadState.Ready : LoadState.Empty;
+            if (_state == LoadState.Ready) _ = Live.EnterCompanyAsync(_company!);   // live updates of this company (FR-185)
         }
         catch (ApiException e)
         {
@@ -65,10 +74,22 @@ else
         }
     }
 
-    private string PageKey => Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath;
+    private int _visit;
+    private string? _lastUri;
+
+    /// <summary>Pages are kept across query changes they make themselves (list filters, UX-12) and recreated for any other move.</summary>
+    private string PageKey => Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath + "#" + _visit;
 
     private void Moved(object? sender, LocationChangedEventArgs e)
     {
+        var before = _lastUri;
+        _lastUri = e.Location;
+        if (before is not null && e.Location != ListUrl.LastWritten && e.Location != before
+            && Nav.ToAbsoluteUri(before).AbsolutePath == Nav.ToAbsoluteUri(e.Location).AbsolutePath)
+        {
+            _visit++;   // same list, new filters from a link: start the page again
+            _ = InvokeAsync(StateHasChanged);
+        }
         var company = CompanyOfUrl();
         if (company is null || company == _company) return;
         _ = InvokeAsync(async () => { await Load(); StateHasChanged(); });
@@ -85,5 +106,17 @@ else
 
     private void Profile() => Nav.NavigateTo(NavModel.Href(Shell.Company?.Id ?? "", "profile"));
 
-    public void Dispose() => Nav.LocationChanged -= Moved;
+    /// <summary>A notification for this user arrived (FR-190): the bell counts it at once and a toast says so.</summary>
+    private void Notified(System.Text.Json.JsonElement n) => _ = InvokeAsync(() =>
+    {
+        Shell.SetNotifications(Shell.UnreadNotifications + 1);
+        Toasts.Success(L["notif.arrived"]);
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= Moved;
+        Live.Notification -= Notified;
+    }
 }

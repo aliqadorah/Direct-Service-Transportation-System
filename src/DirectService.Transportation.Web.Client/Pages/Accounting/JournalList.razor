@@ -12,6 +12,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["ACC.JournalEntry"])" OnChange="Load" />
 @if (!AutomaticOnly)
 {
 <PageHeader Title="@L["nav.journal"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"])])">

@@ -117,6 +117,22 @@ public static class NavModel
             .Where(g => g.Route is not null || g.Items.Count > 0)
             .ToList();
 
+    /// <summary>
+    /// Whether the screen at a company address is open to these permissions (UX-13): the menu entry with the longest matching route decides
+    /// ("trips/new" before "trips"); addresses without an entry are open (the API still checks every request).
+    /// </summary>
+    public static bool RouteAllowed(IReadOnlyCollection<string> granted, string relativeUrl)
+    {
+        ArgumentNullException.ThrowIfNull(relativeUrl);
+        var path = relativeUrl.Split('?', '#')[0].Trim('/');
+        if (!path.StartsWith("c/", StringComparison.Ordinal)) return true;
+        var rest = path.Split('/', 3) is { Length: 3 } parts ? parts[2] : string.Empty;
+        var entry = Company.SelectMany(g => g.Items)
+            .Where(i => !i.Route.StartsWith('/') && (rest == i.Route || rest.StartsWith(i.Route + "/", StringComparison.Ordinal)))
+            .OrderByDescending(i => i.Route.Length).FirstOrDefault();
+        return entry is null || Allowed(granted, entry.AnyOf);
+    }
+
     /// <summary>The full path of a route for a company token.</summary>
     public static string Href(string company, string route) => route.StartsWith('/') ? route : route.Length == 0 ? $"/c/{company}" : $"/c/{company}/{route}";
 }

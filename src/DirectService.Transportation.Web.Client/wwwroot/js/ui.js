@@ -4,6 +4,11 @@
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const traps = new Map();
 
+/** The user's last activity (keys, pointer, typing, scrolling): record locks are kept only while the user works (BR-039, 90 s). */
+let lastActivity = Date.now();
+for (const ev of ["keydown", "pointerdown", "input", "wheel"]) document.addEventListener(ev, () => { lastActivity = Date.now(); }, { capture: true, passive: true });
+export function idleSeconds() { return Math.floor((Date.now() - lastActivity) / 1000); }
+
 /** Keeps Tab / Shift+Tab inside a dialog, focuses its first field, and restores focus to the opener when released (WCAG 2.4.3). */
 export function trapFocus(el, id) {
   if (!el) return;

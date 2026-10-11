@@ -65,6 +65,21 @@
                 }
             </Box>
         </div>
+        @* FR-184: the form as it will look with the changes on screen (not yet saved): order, labels, required marks; hidden fields left out. *@
+        <Box Title="@L["fld.preview"]" Style="flex:none">
+            <p class="help" style="margin:0 0 8px">@L[_dirty ? "fld.previewUnsaved" : "fld.previewSaved"]</p>
+            <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))" aria-label="@L["fld.preview"]" role="group">
+                @foreach (var f in _standard.Where(f => !f.IsHidden).OrderBy(f => f.SortOrder))
+                {
+                    var label = string.IsNullOrWhiteSpace(f.Label) ? L.Pick(f.DefaultLabelAr, f.DefaultLabelEn) : f.Label;
+                    <div class="field"><span class="lbl">@label @if (f.IsRequired || f.AlwaysRequired) {<span class="req" aria-hidden="true">*</span>}</span><span class="input" aria-hidden="true" style="display:block;background:var(--surface-sunk)"></span></div>
+                }
+                @foreach (var c in _custom.Where(c => !c.IsHidden).OrderBy(c => c.SortOrder))
+                {
+                    <div class="field"><span class="lbl">@L.Pick(c.LabelAr, c.LabelEn ?? c.LabelAr) @if (c.IsRequired) {<span class="req" aria-hidden="true">*</span>}</span><span class="input" aria-hidden="true" style="display:block;background:var(--surface-sunk)"></span></div>
+                }
+            </div>
+        </Box>
     </ChildContent>
 </StateView>
 

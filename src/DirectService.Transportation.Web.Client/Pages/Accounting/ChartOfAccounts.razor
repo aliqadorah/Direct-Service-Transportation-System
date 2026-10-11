@@ -77,6 +77,7 @@
                     <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack">
                         <ProblemValidator @ref="_problems" />
                         <ErrorSummary Extra="_extra" />
+                        @if (_model.Id is not null) {<RecordLockGuard @key="_model.Id" EntityType="ACC.Account" Id="@_model.Id" OnState="h => _lockedBy = h" />}
                         <TextField @bind-Value="_model.Code" Label="@L["acc.code"]" Required="true" Ltr="true" MaxLength="20" ReadOnly="!CanSetup" />
                         <TextField @bind-Value="_model.NameAr" Label="@L["acc.nameAr"]" Required="true" MaxLength="200" ReadOnly="!CanSetup" />
                         <TextField @bind-Value="_model.NameEn" Label="@L["acc.nameEn"]" MaxLength="200" Ltr="true" ReadOnly="!CanSetup" />
@@ -90,7 +91,7 @@
                         }
                         @if (_model.Id is not null) {<p class="help" style="margin:0">@L.F("acc.openingsHere", Fmt.Money(_model.OpeningDebit), Fmt.Money(_model.OpeningCredit))</p>}
                         <div class="row" style="gap:6px;flex-wrap:wrap">
-                            @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" />}
+                            @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" Disabled="@(_lockedBy is not null)" />}
                             <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
                             @if (CanSetup && _model.Id is not null)
                             {
@@ -99,6 +100,7 @@
                             }
                         </div>
                     </EditForm>
+                    @if (_history is { Count: > 0 }) {<h3 class="lbl" style="margin:10px 0 4px">@L["ui.history"]</h3><RecordHistory Items="_history" />}
                 </Box>
             }
             else {<div></div>}
@@ -114,6 +116,7 @@
     private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
     private LoadState _state = LoadState.Loading;
     private string? _reference, _q, _deleteError;
+    private string? _lockedBy;
     private bool _showArchived, _editing, _busy, _deleting;
     private AccountModel _model = new();
     private EditContext _ctx = new(new AccountModel());
@@ -190,12 +193,28 @@
 
     private void Open(AccountResponse a) => Edit(a);
 
+    private IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>? _history;
+
     private void Edit(AccountResponse? a)
     {
+        _history = null;
+        if (a is not null) _ = LoadHistory(a.Id);
         _model = a is null ? new AccountModel { IsPostable = true } : AccountModel.From(a);
         _ctx = new EditContext(_model);
         _extra = null;
+        _lockedBy = null;
         _editing = true;
+    }
+
+    /// <summary>The account's changes (UX-21), shown under its editor.</summary>
+    private async Task LoadHistory(string id)
+    {
+        try
+        {
+            var h = await Api.GetAsync<IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>>(Api.C($"accounting/accounts/{Uri.EscapeDataString(id)}/history"));
+            if (_model.Id == id) { _history = h; StateHasChanged(); }
+        }
+        catch (ApiException) { }
     }
 
     private async Task Template()

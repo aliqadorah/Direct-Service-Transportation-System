@@ -32,7 +32,7 @@ public interface IEInvoiceSignal
 /// </summary>
 public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
     EInvoiceSettingsService settings, EInvoiceDocumentBuilder builder, ISpreadsheetService sheets, IEInvoiceSignal signal, IOptions<EInvoicingOptions> options,
-    TimeProvider clock, Collaboration.NotificationService notifications)
+    TimeProvider clock, Collaboration.NotificationService notifications, Reports.ReportExporter exporter)
 {
     public const string EntityType = "TRN.EInvoiceSubmission";
     private const string ValidationPrefix = "validation:";
@@ -408,7 +408,7 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
             totals.OrderBy(t => t.Status, StringComparer.Ordinal).Select(t => new EInvoiceStatusTotal(t.Status, t.Count, t.Total)).ToList());
     }
 
-    /// <summary>The e-invoicing report as Excel or CSV (FR-065).</summary>
+    /// <summary>The e-invoicing report as Excel, CSV or a printout (FR-065, FR-150).</summary>
     public async Task<GeneratedFile> ExportAsync(EInvoiceListQuery q, string? format, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
@@ -420,6 +420,8 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
         var data = rows.Select(r => (IReadOnlyList<object?>)[
             r.S.DocumentType, r.Number, r.Date, r.CustomerName, r.Total, r.S.Status, r.S.Icv, r.S.SystemNumber, r.S.UniqueId?.ToString(), r.S.SubmittedAt,
             r.S.Attempts, Problems(r.S.LastError) is { Count: > 0 } p ? string.Join(" | ", p.Select(x => x.Message)) : Display(r.S.LastError)]).ToList();
+        if (Reports.ReportExporter.IsPrintout(format))   // FR-150
+            return await exporter.ListPrintoutAsync(En ? "E-invoicing" : "الفوترة الإلكترونية", "e-invoicing", headers, data, format!, ct, [0, 1, 2, 3, 4, 5, 7, 9, 11]).ConfigureAwait(false);
         return string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
             ? new GeneratedFile("e-invoicing.csv", "text/csv", sheets.WriteCsv(headers, data))
             : new GeneratedFile("e-invoicing.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sheets.WriteXlsx("e-invoicing", headers, data));

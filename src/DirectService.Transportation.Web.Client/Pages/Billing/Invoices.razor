@@ -11,6 +11,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Invoice"])" OnChange="Load" />
 <PageHeader Title="@L["nav.invoices"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"])])">
     <Actions>
         @if (Shell.Can(PermissionKeys.InvIssue))
@@ -97,12 +98,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } v) _view = v;
         if (query["overdue"] == "true") _view = "overdue";
         if (query["status"] == "draft") _view = "draft";
         if (query["einvoice"] is { Length: > 0 } e) _einvoice = e;
         if (query["customer"] is { Length: > 0 } c) _customer = c;
         if (query["paid"] is { Length: > 0 } p) _paid = p;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         await Load();
     }
@@ -123,6 +128,9 @@
 
     private async Task Load()
     {
+        // The drill-down keys (overdue, status) become the view once read.
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("overdue", null), ("status", null), ("einvoice", _einvoice),
+            ("customer", _customer), ("paid", _paid), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<InvoicePage>(Api.C("invoices" + Query(true)));

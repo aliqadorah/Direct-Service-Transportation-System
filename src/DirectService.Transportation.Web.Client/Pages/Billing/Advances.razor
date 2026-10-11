@@ -7,10 +7,11 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Advance"])" OnChange="Load" />
 <PageHeader Title="@L["drv.advancesList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.advancesList"])])">
     <Actions>@if (Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Primary="true" Icon="plus" Text="@L["drv.newAdvance"]" Href="@NavModel.Href(Company, "driver-accounts/advances/new")" />}</Actions>
 </PageHeader>
-<ListShell Label="@L["drv.advancesList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv"])" OnExport="Export"
+<ListShell Label="@L["drv.advancesList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export"
            State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="cash" EmptyTitle="@L["drv.noAdvances"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
@@ -52,7 +53,17 @@
     private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("open", L["st.open"]), new("settled", L["st.settled"]), new("void", L["st.void"])];
     private bool Filtered => _q.Q is not null || _driver is not null || _method is not null || _from is not null || _to is not null;
 
-    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnInitializedAsync()
+    {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } view) _view = view;
+        if (query["driver"] is { Length: > 0 } driver) _driver = driver;
+        if (query["method"] is { Length: > 0 } method) _method = method;
+        _from = ListUrl.Date(query["from"]);
+        _to = ListUrl.Date(query["to"]);
+        return Load();
+    }
 
     private string Query(bool paged)
     {
@@ -69,6 +80,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "all" ? null : _view), ("driver", _driver), ("method", _method), ("from", ListUrl.Date(_from)), ("to", ListUrl.Date(_to)));
         try
         {
             _page = await Api.GetAsync<AdvancePage>(Api.C("advances" + Query(true)));

@@ -40,6 +40,25 @@ public sealed class BillingPageTests : PageTestBase
         Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/invoices?overdue=true");
         var cut = Render<Invoices>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.Contains("overdue=true", StringComparison.Ordinal)));
+        // UX-12: the drill-down key becomes the saved view in the address.
+        var uri = Services.GetRequiredService<NavigationManager>().Uri;
+        Assert.Contains("view=overdue", uri, StringComparison.Ordinal);
+        Assert.DoesNotContain("overdue=true", uri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Invoice_list_restores_its_filters_from_the_address_UX12()
+    {
+        Respond("invoices", new InvoicePage(new PagedResult<InvoiceResponse>([Invoice()], 2, 50, 51), new InvoiceListTotals(51, 0, 0, 0, 0)));
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo($"/c/{Company}/invoices?view=draft&customer=cu1&q=INV&page=2&from=2026-10-01");
+        var cut = Render<Invoices>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.StartsWith("invoices?", StringComparison.Ordinal)
+            && r.Path.Contains("status=draft", StringComparison.Ordinal) && r.Path.Contains("customer=cu1", StringComparison.Ordinal)
+            && r.Path.Contains("q=INV", StringComparison.Ordinal) && r.Path.Contains("page=2", StringComparison.Ordinal)
+            && r.Path.Contains("from=2026-10-01", StringComparison.Ordinal)));
+        Assert.Contains("view=draft", nav.Uri, StringComparison.Ordinal);
+        Assert.Contains("customer=cu1", nav.Uri, StringComparison.Ordinal);
     }
 
     [Fact]

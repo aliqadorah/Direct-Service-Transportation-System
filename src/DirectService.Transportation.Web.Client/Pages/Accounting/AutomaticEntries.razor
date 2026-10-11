@@ -11,6 +11,7 @@
 @inject UiJs Js
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["ACC.JournalEntry", "ACC.PendingPosting"])" OnChange="Load" />
 <PageHeader Title="@L["nav.automatic"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.automatic"])])" />
 <TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="SetTab" Label="@L["nav.automatic"]" />
 @switch (_tab)

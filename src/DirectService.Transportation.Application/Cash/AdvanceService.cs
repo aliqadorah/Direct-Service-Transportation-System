@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// old → new; void with reason (reversal, number kept), refused once settled (BR-032).
 /// </summary>
 public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "TRN.Advance";
     public const string SourceType = "Advance";
@@ -223,7 +223,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
             : ["الرقم", "التاريخ", "السائق", "المبلغ", "طريقة الدفع", "الصندوق / البنك", "المرجع", "التسوية", "الحالة", "ملاحظات"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.A.Number, x.A.AdvanceDate, x.DriverName, x.A.Amount, x.A.PaymentMethod, x.BoxName ?? x.BankName, x.A.Reference,
             x.SettlementNumber, x.A.Status, x.A.Notes]).ToList();
-        return CashExport.File("advances", format, headers, data, sheets);
+        return await CashExport.FileAsync("advances", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<AdvanceDetails> GetAsync(string token, CancellationToken ct)

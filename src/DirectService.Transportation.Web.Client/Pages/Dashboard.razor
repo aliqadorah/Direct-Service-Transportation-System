@@ -6,6 +6,7 @@
 @inject Loc L
 @inject ShellState Shell
 
+<LiveRefresh EntityTypes="@(["TRN.Trip", "TRN.Invoice", "TRN.Receipt", "ACC.PendingPosting", "TRN.EInvoiceSubmission"])" OnChange="Load" />
 <PageHeader Title="@L["nav.dashboard"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
     <Actions>
         <Btn Text="@L["dash.today"]" Primary="@(_period == "today")" Pressed="@(_period == "today" ? "true" : "false")" OnClick="@(() => Period("today"))" />

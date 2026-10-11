@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.MasterData;
 /// rejected row blocks the import; a committed import is one transaction logged in cfg.ImportBatches.
 /// </summary>
 public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields,
+    MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields, Reports.ReportExporter exporter,
     DriverService drivers, CustomerService customers, PartnerService partners, MaterialService materials,
     LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes)
 {
@@ -154,12 +154,20 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
 
     // ============================================================ export
 
+    private string ListTitle(string kind) => (ctx.Language == "en", kind) switch
+    {
+        (true, "drivers") => "Drivers", (false, "drivers") => "السائقون", (true, "customers") => "Customers", (false, "customers") => "العملاء",
+        (true, "partners") => "Partners", (false, "partners") => "الشركاء", (true, "materials") => "Materials", (false, "materials") => "المواد",
+        (true, "loading-sites") => "Loading sites", (false, "loading-sites") => "مواقع التحميل", (true, "unloading-sites") => "Unloading sites",
+        (false, "unloading-sites") => "مواقع التنزيل", _ => kind,
+    };
+
     public async Task<GeneratedFile> ExportAsync(string kind, MasterListQuery q, string? format, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
         var csv = (format?.Trim().ToLowerInvariant()) switch
         {
-            null or "" or "xlsx" => false,
+            null or "" or "xlsx" or "pdf" or "html" => false,
             "csv" => true,
             _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
         };
@@ -220,6 +228,8 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
             var keep = shown.Select(x => x.i).ToList();
             rows = rows.Select(r => (IReadOnlyList<object?>)[.. keep.Select(i => r[i]), .. r.Skip(all.Length)]).ToList();
         }
+        if (Reports.ReportExporter.IsPrintout(format))   // FR-150 printout of the master list
+            return await exporter.ListPrintoutAsync(ListTitle(kind), kind, headers, rows, format!, ct).ConfigureAwait(false);
         var name = kind + (csv ? ".csv" : ".xlsx");
         return csv
             ? new GeneratedFile(name, "text/csv", sheets.WriteCsv(headers, rows))

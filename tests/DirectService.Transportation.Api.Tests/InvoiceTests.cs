@@ -246,6 +246,26 @@ public sealed class InvoiceTests(ApiFactory f)
         Assert.Contains(await ReadAsync<List<HistoryEntry>>(await o.Client.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/history"))), h => h.Action == "Print");
     }
 
+    [Fact]
+    public async Task Issued_documents_keep_the_names_they_were_issued_with_FR163()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var inv = await ReadAsync<InvoiceDetails>(await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Take(1), approve: true)));
+        var customer = (await ReadAsync<CustomerProfile>(await o.Client.GetAsync(U(o, $"/customers/{w.Customer.Id}")))).Customer;
+        await (await o.Client.PutAsJsonAsync(U(o, $"/customers/{w.Customer.Id}"), new CustomerRequest("APC Mining", customer.TaxNumber, null, customer.Phone, null, null, null,
+            null, customer.PaymentTermsDays, null, null, null, null, customer.RowVersion))).EnsureOkAsync();
+
+        // The approved invoice reprints with the name it was issued with; the customer list shows the new name (rename by id).
+        var html = await (await o.Client.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/print?format=html"))).Content.ReadAsStringAsync();
+        Assert.Contains("Arab Potash", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("APC Mining", html, StringComparison.Ordinal);
+        Assert.Equal("APC Mining", (await ReadAsync<CustomerProfile>(await o.Client.GetAsync(U(o, $"/customers/{w.Customer.Id}")))).Customer.Name);
+        // A document issued after the rename carries the new name.
+        var next = await ReadAsync<InvoiceDetails>(await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Skip(1).Take(1), approve: true)));
+        Assert.Contains("APC Mining", await (await o.Client.GetAsync(U(o, $"/invoices/{next.Invoice.Id}/print?format=html"))).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     // ------------------------------------------------------------------ layouts and printing (FR-054 … FR-058)
 
     [Fact]

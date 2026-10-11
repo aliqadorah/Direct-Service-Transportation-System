@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<CreditNoteService>();
         services.AddScoped<InvoiceLayoutService>();
         services.AddScoped<InvoicePrintService>();
+        services.AddScoped<Common.IssuedNames>();
         services.AddScoped<InvoicePostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<InvoicePostingHandler>());
         services.AddScoped<CreditNotePostingHandler>();

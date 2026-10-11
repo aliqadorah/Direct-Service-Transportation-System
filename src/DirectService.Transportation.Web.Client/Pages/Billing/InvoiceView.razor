@@ -11,6 +11,7 @@
 @inject ToastService Toasts
 @inject NavigationManager Nav
 
+<LiveRefresh EntityTypes="@(["TRN.Invoice", "TRN.Receipt", "TRN.CreditNote", "TRN.EInvoiceSubmission"])" OnChange="Load" />
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>

@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// customer; void with reason (reversal, invoice balance restored, number kept); list with filters, totals and export.
 /// </summary>
 public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "TRN.Receipt";
     public const string SourceType = "Receipt";
@@ -220,7 +220,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
             : ["الرقم", "التاريخ", "العميل", "الفاتورة", "المبلغ", "طريقة الدفع", "الصندوق / البنك", "المرجع", "المرفقات", "الحالة", "ملاحظات"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.R.Number, x.R.ReceiptDate, x.CustomerName, x.InvoiceNumber ?? (cash.En ? "On account" : "على الحساب"), x.R.Amount,
             x.R.PaymentMethod, x.BoxName ?? x.BankName, x.R.Reference, x.R.AttachmentsCount, x.R.Status, x.R.Notes]).ToList();
-        return CashExport.File("receipts", format, headers, data, sheets);
+        return await CashExport.FileAsync("receipts", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<ReceiptDetails> GetAsync(string token, CancellationToken ct)
@@ -275,11 +275,33 @@ internal static class CashPosting
     }
 }
 
-/// <summary>Excel or CSV export of a cash list.</summary>
+/// <summary>Excel or CSV export of a cash or AP/AR list, or its printout (PDF / HTML, FR-150).</summary>
 internal static class CashExport
 {
+    /// <summary>Excel or CSV only (callers with their own printout).</summary>
     public static GeneratedFile File(string name, string? format, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows, ISpreadsheetService sheets) =>
         string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
             ? new GeneratedFile(name + ".csv", "text/csv", sheets.WriteCsv(headers, rows))
             : new GeneratedFile(name + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sheets.WriteXlsx(name, headers, rows));
+
+    public static async Task<GeneratedFile> FileAsync(string name, string? format, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows, ISpreadsheetService sheets,
+        Reports.ReportExporter exporter, CancellationToken ct)
+    {
+        if (Reports.ReportExporter.IsPrintout(format)) return await exporter.ListPrintoutAsync(Title(name, exporter.En), name, headers, rows, format!, ct).ConfigureAwait(false);
+        return File(name, format, headers, rows, sheets);
+    }
+
+    private static string Title(string name, bool en) => name switch
+    {
+        "receipts" => en ? "Receipts" : "سندات القبض",
+        "advances" => en ? "Driver advances" : "سلف السائقين",
+        "partner-payments" => en ? "Partner payments" : "دفعات الشركاء",
+        "supplier-bills" => en ? "Supplier bills" : "فواتير الموردين",
+        "receivables" => en ? "Receivable documents" : "مستندات الذمم المدينة",
+        "supplier-payments" => en ? "Supplier payments" : "دفعات الموردين",
+        "collections" => en ? "Collections" : "التحصيلات",
+        "payable-returns" => en ? "Payable returns" : "مرتجعات الموردين",
+        "receivable-returns" => en ? "Receivable returns" : "مرتجعات العملاء",
+        _ => name,
+    };
 }

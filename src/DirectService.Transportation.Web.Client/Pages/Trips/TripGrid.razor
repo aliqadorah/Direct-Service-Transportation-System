@@ -5,28 +5,28 @@
 @inject ShellState Shell
 @inject NavigationManager Nav
 <DataGrid TItem="TripResponse" Items="Items" Key="t => t.Id" Caption="@L["nav.trips"]" LiveKeys="LiveKeys" SortKey="@SortKey" SortDesc="SortDesc" OnSort="OnSort"
-          ShowFilters="ShowFilters" Filters="Filters" OnFilter="OnFilter" Selectable="Selectable" Selected="Selected" SelectedChanged="SelectedChanged"
+          ColumnOrder="ColumnOrder" ShowFilters="ShowFilters" Filters="Filters" OnFilter="OnFilter" Selectable="Selectable" Selected="Selected" SelectedChanged="SelectedChanged"
           OnRowClick="Open" RowClass="@(t => t.Status == "Void" ? "void" : null)" FooterLabel="@FooterLabel">
     <Columns>
-        <GridColumn TItem="TripResponse" Title="@L["trip.receiptNo"]" Value="t => t.ReceiptNo" Ltr="true" SortKey="receiptNo" FilterKey="@(ShowFilters ? "q" : null)" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.date"]" Value="t => Fmt.Date(t.TripDate, Shell.DateFormat)" Ltr="true" SortKey="tripDate" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.driver"]" Value="t => t.Driver.Name" SortKey="driver" Clip="true" />
-        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["md.plate"]" Value="t => t.TruckPlate" Ltr="true" />}
-        <GridColumn TItem="TripResponse" Title="@L["trip.customer"]" Value="t => t.Customer.Name" SortKey="customer" Clip="true" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.loading"]" Value="t => t.LoadingSite.Name" Clip="true" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.unloading"]" Value="t => t.UnloadingSite.Name" Clip="true" />
-        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.material"]" Value="t => t.Material.Name" />}
-        <GridColumn TItem="TripResponse" Title="@L["trip.loadedT"]" Value="t => Fmt.Qty(t.LoadedWeight)" Numeric="true" Footer="@Totals?.LoadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.unloadedT"]" Value="t => Fmt.Qty(t.UnloadedWeight)" Numeric="true" Footer="@Totals?.UnloadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.receiptNo"]" ColumnKey="receiptNo" Value="t => t.ReceiptNo" Ltr="true" SortKey="receiptNo" FilterKey="@(ShowFilters ? "q" : null)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.date"]" ColumnKey="date" Value="t => Fmt.Date(t.TripDate, Shell.DateFormat)" Ltr="true" SortKey="tripDate" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.driver"]" ColumnKey="driver" Value="t => t.Driver.Name" SortKey="driver" Clip="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["md.plate"]" ColumnKey="plate" Value="t => t.TruckPlate" Ltr="true" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.customer"]" ColumnKey="customer" Value="t => t.Customer.Name" SortKey="customer" Clip="true" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.loading"]" ColumnKey="loading" Value="t => t.LoadingSite.Name" Clip="true" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.unloading"]" ColumnKey="unloading" Value="t => t.UnloadingSite.Name" Clip="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.material"]" ColumnKey="material" Value="t => t.Material.Name" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.loadedT"]" ColumnKey="loadedT" Value="t => Fmt.Qty(t.LoadedWeight)" Numeric="true" Footer="@Totals?.LoadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.unloadedT"]" ColumnKey="unloadedT" Value="t => Fmt.Qty(t.UnloadedWeight)" Numeric="true" Footer="@Totals?.UnloadedWeight.ToString("#,##0.000", System.Globalization.CultureInfo.InvariantCulture)" />
         @if (Shortage)
         {
-            <GridColumn TItem="TripResponse" Title="@L["trip.shortageT"]" Value="t => Fmt.Qty(t.ShortageWeight)" Numeric="true" />
-            <GridColumn TItem="TripResponse" Title="@L["trip.shortagePct"]" Value="t => Fmt.Percent(t.ShortagePct)" Numeric="true" SortKey="shortagePct" />
+            <GridColumn TItem="TripResponse" Title="@L["trip.shortageT"]" ColumnKey="shortageT" Value="t => Fmt.Qty(t.ShortageWeight)" Numeric="true" />
+            <GridColumn TItem="TripResponse" Title="@L["trip.shortagePct"]" ColumnKey="shortagePct" Value="t => Fmt.Percent(t.ShortagePct)" Numeric="true" SortKey="shortagePct" />
         }
-        <GridColumn TItem="TripResponse" Title="@L["trip.price"]" Value="t => Fmt.Money(t.CustomerPrice)" Numeric="true" />
-        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.rate"]" Value="t => Fmt.Money(t.PartnerRate ?? t.DriverRate)" Numeric="true" />}
-        <GridColumn TItem="TripResponse" Title="@L["trip.revenue"]" Value="t => Fmt.Money(t.Revenue)" Numeric="true" SortKey="revenue" Footer="@Money(Totals?.Revenue)" />
-        <GridColumn TItem="TripResponse" Title="@L["trip.wageCost"]" Value="t => Fmt.Money(t.DriverWage + t.PartnerCost)" Numeric="true" Footer="@Money(Totals is null ? null : Totals.DriverWage + Totals.PartnerCost)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.price"]" ColumnKey="price" Value="t => Fmt.Money(t.CustomerPrice)" Numeric="true" />
+        @if (!Compact) {<GridColumn TItem="TripResponse" Title="@L["trip.rate"]" ColumnKey="rate" Value="t => Fmt.Money(t.PartnerRate ?? t.DriverRate)" Numeric="true" />}
+        <GridColumn TItem="TripResponse" Title="@L["trip.revenue"]" ColumnKey="revenue" Value="t => Fmt.Money(t.Revenue)" Numeric="true" SortKey="revenue" Footer="@Money(Totals?.Revenue)" />
+        <GridColumn TItem="TripResponse" Title="@L["trip.wageCost"]" ColumnKey="wageCost" Value="t => Fmt.Money(t.DriverWage + t.PartnerCost)" Numeric="true" Footer="@Money(Totals is null ? null : Totals.DriverWage + Totals.PartnerCost)" />
         <GridColumn TItem="TripResponse" Title="@L["ml.status"]"><Template><TripTags Trip="context" /></Template></GridColumn>
     </Columns>
 </DataGrid>
@@ -36,6 +36,15 @@
     [Parameter, EditorRequired] public string Company { get; set; } = "";
     [Parameter] public IReadOnlySet<object>? LiveKeys { get; set; }
     [Parameter] public bool Compact { get; set; }
+
+    /// <summary>The saved column view (FR-183): keys in order; null = all columns.</summary>
+    [Parameter] public IReadOnlyList<string>? ColumnOrder { get; set; }
+
+    /// <summary>The trip-table columns a view can show, in the default order (key, text key).</summary>
+    public static readonly IReadOnlyList<(string Key, string Title)> Columns =
+    [
+        ("receiptNo", "trip.receiptNo"), ("date", "trip.date"), ("driver", "trip.driver"), ("plate", "md.plate"), ("customer", "trip.customer"), ("loading", "trip.loading"), ("unloading", "trip.unloading"), ("material", "trip.material"), ("loadedT", "trip.loadedT"), ("unloadedT", "trip.unloadedT"), ("shortageT", "trip.shortageT"), ("shortagePct", "trip.shortagePct"), ("price", "trip.price"), ("rate", "trip.rate"), ("revenue", "trip.revenue"), ("wageCost", "trip.wageCost"),
+    ];
     [Parameter] public bool Shortage { get; set; }
     [Parameter] public TripTotals? Totals { get; set; }
     [Parameter] public string? FooterLabel { get; set; }

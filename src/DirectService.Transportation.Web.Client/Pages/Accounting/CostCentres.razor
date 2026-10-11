@@ -56,6 +56,7 @@
 
 <Modal @bind-Open="_editing" Title="@(_m.Id is null ? L["cc.new"] : L.F("ml.editTitle", _m.Name ?? ""))" Busy="_busy">
     <ChildContent>
+        @if (_m.Id is not null) {<RecordLockGuard EntityType="ACC.CostCentre" Id="@_m.Id" OnState="h => _lockedBy = h" />}
         <EditForm EditContext="_ctx" OnValidSubmit="Save" id="cc-form" class="stack">
             <ProblemValidator @ref="_problems" />
             <ErrorSummary Extra="_extra" />
@@ -72,7 +73,7 @@
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cc-form" />}
+        @if (CanSetup) {<Btn Type="submit" Disabled="@(_lockedBy is not null)" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cc-form" />}
     </Footer>
 </Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _m.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
@@ -84,6 +85,7 @@
     private LoadState _state = LoadState.Loading;
     private string? _reference, _deleteError;
     private DateOnly? _from, _to;
+    private string? _lockedBy;
     private bool _editing, _busy, _deleting;
     private Model _m = new();
     private EditContext _ctx = new(new Model());
@@ -136,6 +138,7 @@
         _m = c is null ? new Model() : new Model { Id = c.Id, Code = c.Code, Name = c.Name, Status = c.Status, RowVersion = c.RowVersion };
         _ctx = new EditContext(_m);
         _extra = null;
+        _lockedBy = null;
         _editing = true;
     }
 

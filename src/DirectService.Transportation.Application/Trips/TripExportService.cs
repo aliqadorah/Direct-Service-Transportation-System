@@ -9,16 +9,17 @@ namespace DirectService.Transportation.Application.Trips;
 
 /// <summary>
 /// Excel / CSV export of the filtered trip list (FR-009, FR-017, FR-018 data): the company's field labels, the visible custom
-/// fields, frozen prices, amounts, flags and status. PDF comes with the print engine (B6, DT-45).
+/// fields, frozen prices, amounts, flags and status; or the printout (PDF / HTML, FR-150).
 /// </summary>
-public sealed class TripExportService(TripService trips, ISpreadsheetService sheets, IRequestContext ctx, StandardFieldService fields, CustomFieldService customFields)
+public sealed class TripExportService(TripService trips, ISpreadsheetService sheets, IRequestContext ctx, StandardFieldService fields, CustomFieldService customFields,
+    Reports.ReportExporter exporter)
 {
     public async Task<GeneratedFile> ExportAsync(TripListQuery q, string? format, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
         var csv = (format?.Trim().ToLowerInvariant()) switch
         {
-            null or "" or "xlsx" => false,
+            null or "" or "xlsx" or "pdf" or "html" => false,
             "csv" => true,
             _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
         };
@@ -50,6 +51,10 @@ public sealed class TripExportService(TripService trips, ISpreadsheetService she
                 t.NeedsReview, t.Status, t.Billing, t.IsSettled, t.Notes,
             }, .. defs.Select(d => values.TryGetValue(d.FieldKey, out var v) ? Cell(v) : null)]);
         }
+        if (Reports.ReportExporter.IsPrintout(format))   // FR-150: the printout keeps the columns that fit A4 (receipt, date, parties, route, weights, amounts, status)
+            return await exporter.ListPrintoutAsync(X("الرحلات", "Trips"), "trips", headers, rows, format!, ct, [0, 1, 4, 6, 7, 8, 9, 12, 13, 15, 21, 22, 29],
+                totals: true, filters: q.From is null && q.To is null ? null : [(X("الفترة", "Period"), $"{q.From:yyyy-MM-dd} – {q.To:yyyy-MM-dd}")],
+                quantities: [12, 13, 14, 25], sums: [12, 13, 21, 22]).ConfigureAwait(false);   // weights print as numbers; the unit price is not totalled   // also the trip statement of a driver, customer or partner (FR-018)
         return csv
             ? new GeneratedFile("trips.csv", "text/csv", sheets.WriteCsv(headers, rows))
             : new GeneratedFile("trips.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sheets.WriteXlsx("trips", headers, rows));

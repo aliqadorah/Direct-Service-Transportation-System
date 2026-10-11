@@ -4,6 +4,7 @@
 *@
 @inject Loc L
 <header class="top">
+    <button type="button" class="btn ghost menu-toggle" aria-label="@L["shell.menu"]" aria-expanded="@(MenuOpen ? "true" : "false")" @onclick="OnMenu"><Icon Name="grid" /></button>
     @if (Provider)
     {
         <Badge Tone="Tone.Mute" Icon="shield" Text="@L["shell.production"]" />
@@ -50,6 +51,9 @@
     [Parameter] public string Density { get; set; } = "compact";
     [Parameter] public EventCallback<string> OnCompany { get; set; }
     [Parameter] public EventCallback OnCommandBar { get; set; }
+    /// <summary>Phones (UX-14): the menu button opens the side menu as a drawer.</summary>
+    [Parameter] public EventCallback OnMenu { get; set; }
+    [Parameter] public bool MenuOpen { get; set; }
     [Parameter] public EventCallback OnNotifications { get; set; }
     [Parameter] public EventCallback OnProfile { get; set; }
     [Parameter] public EventCallback<string> OnDensity { get; set; }

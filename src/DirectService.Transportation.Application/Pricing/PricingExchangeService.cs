@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Pricing;
 /// one transaction with a history row per line and a cfg.ImportBatches row.
 /// </summary>
 public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    TariffService tariffs, MonthlyRateService rates, RateHistoryLog history)
+    TariffService tariffs, MonthlyRateService rates, RateHistoryLog history, Reports.ReportExporter exporter)
 {
     private sealed record Column(string Key, string Ar, string En, params string[] Aliases);
 
@@ -55,6 +55,8 @@ public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService
             PartyTypeText(r.T.PartyType), r.PartyName ?? AllText, r.MaterialName ?? AllText, r.LoadingName ?? AllText, r.UnloadingName ?? AllText,
             r.T.Price, r.T.ValidFrom, r.T.ValidTo, r.T.Notes, r.T.Status,
         ]).ToList();
+        if (Reports.ReportExporter.IsPrintout(format))
+            return await exporter.ListPrintoutAsync(En ? "Tariffs" : "التعرفات", "tariffs", headers, rows, format!, ct).ConfigureAwait(false);
         return File("tariffs", csv, headers, rows);
     }
 
@@ -66,12 +68,14 @@ public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService
             ? new List<string> { "Loading site", "Area", "Own-fleet rate", "External-fleet rate", "Trips" }
             : ["موقع التحميل", "المنطقة", "سعر الأسطول الخاص", "سعر الأسطول الخارجي", "الرحلات"];
         var rows = m.Sites.Select(s => (IReadOnlyList<object?>)[s.LoadingSite.Name, s.Area, s.OwnFleetRate, s.ExternalFleetRate, s.TripCount]).ToList();
+        if (Reports.ReportExporter.IsPrintout(format))   // FR-028 print
+            return await exporter.ListPrintoutAsync((En ? "Monthly site rates " : "أسعار المواقع الشهرية ") + m.Month, "monthly-rates-" + m.Month, headers, rows, format!, ct).ConfigureAwait(false);
         return File("monthly-rates-" + m.Month, csv, headers, rows);
     }
 
     private static bool Csv(string? format) => (format?.Trim().ToLowerInvariant()) switch
     {
-        null or "" or "xlsx" => false,
+        null or "" or "xlsx" or "pdf" or "html" => false,
         "csv" => true,
         _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
     };

@@ -199,4 +199,19 @@ public sealed class SecurityTests(ApiFactory f)
         await (await client.PostAsJsonAsync("/api/v1/auth/invitations/accept", new InvitationAcceptRequest(token, presetRole + " User", ApiHelpers.Password))).EnsureOkAsync();
         return await f.SignInFirstTimeAsync(client, email, ApiHelpers.Password);
     }
+
+    [Fact]
+    public async Task Sign_in_attempts_are_rate_limited_per_address_SEC14()
+    {
+        // A host with a low limit (3 per minute and address); the shared test host has the limits raised for speed.
+        await using var limited = f.WithWebHostBuilder(b => b.UseSetting("RateLimits:AuthPerMinutePerIp", "3"));
+        var client = limited.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 5; i++)
+            statuses.Add((await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest("nobody@example.test", "wrong-password"))).StatusCode);
+        Assert.Contains(HttpStatusCode.TooManyRequests, statuses);
+        Assert.DoesNotContain(HttpStatusCode.TooManyRequests, statuses.Take(3));
+        var refused = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest("nobody@example.test", "wrong-password"));
+        Assert.Equal("rateLimited", await refused.ProblemCodeAsync());   // problem details in the user's language (API-06)
+    }
 }

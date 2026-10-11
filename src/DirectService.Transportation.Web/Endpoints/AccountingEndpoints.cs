@@ -40,6 +40,11 @@ internal static class AccountingEndpoints
             .RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{account}", async (string account, ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(account, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
+        g.MapGet("/{account}/history", async (string account, Application.MasterData.MasterDataSupport support, CancellationToken ct) =>
+        {
+            var a = await support.FindAsync<Domain.Acc.Account>(account, ct).ConfigureAwait(false);
+            return TypedResults.Ok(await support.HistoryAsync("ACC.Account", a.Id, ct).ConfigureAwait(false));
+        }).RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (AccountRequest r, ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.CreateAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPut("/{account}", async (string account, AccountRequest r, ChartOfAccountsService svc, CancellationToken ct) =>
@@ -161,6 +166,11 @@ internal static class AccountingEndpoints
             File(await svc.ExportListAsync(q, format, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}", async (string entry, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(entry, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
+        g.MapGet("/{entry}/history", async (string entry, Application.MasterData.MasterDataSupport support, CancellationToken ct) =>
+        {
+            var e = await support.FindAsync<Domain.Acc.JournalEntry>(entry, ct).ConfigureAwait(false);
+            return TypedResults.Ok(await support.HistoryAsync(JournalService.EntityType, e.Id, ct).ConfigureAwait(false));
+        }).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}/voucher", async (string entry, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.VoucherAsync(entry, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (ManualEntryRequest r, JournalService svc, CancellationToken ct) =>

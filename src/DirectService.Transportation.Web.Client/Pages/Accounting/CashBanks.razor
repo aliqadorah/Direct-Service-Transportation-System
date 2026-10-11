@@ -97,6 +97,7 @@
 
 <Modal @bind-Open="_editing" Title="@EditorTitle" Busy="_busy">
     <ChildContent>
+        @if (_m.Id is not null) {<RecordLockGuard EntityType="@(_m.IsBank ? "ACC.BankAccount" : "ACC.CashBox")" Id="@_m.Id" OnState="h => _lockedBy = h" />}
         <EditForm EditContext="_ctx" OnValidSubmit="Save" id="cb-form" class="stack">
             <ProblemValidator @ref="_problems" />
             <ErrorSummary Extra="_extra" />
@@ -120,7 +121,7 @@
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cb-form" />
+        <Btn Type="submit" Disabled="@(_lockedBy is not null)" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="cb-form" />
     </Footer>
 </Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _m.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
@@ -134,6 +135,7 @@
     private LoadState _state = LoadState.Loading;
     private string? _reference, _selected, _selectedKind, _selectedName, _deleteError;
     private DateOnly? _from, _to;
+    private string? _lockedBy;
     private bool _editing, _busy, _deleting;
     private int _statementVersion, _statementPage = 1;
     private EditorModel _m = new();
@@ -219,6 +221,7 @@
     {
         _ctx = new EditContext(_m);
         _extra = null;
+        _lockedBy = null;
         _editing = true;
     }
 

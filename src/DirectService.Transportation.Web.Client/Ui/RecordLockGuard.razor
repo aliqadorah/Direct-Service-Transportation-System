@@ -1,20 +1,26 @@
 @*
-  Record lock of an edit form (BR-039, FR-186, ADR-11): takes the lock when the form opens, sends a heartbeat every 30 s and releases it
-  when the form closes (the server also releases locks idle for 90 s). When another user holds it, the bar says who and the page turns
-  read-only (the server refuses their saves as well).
+  Record lock of an edit form (BR-039, FR-186, ADR-11): takes the lock when the form opens and releases it when the form closes. The
+  heartbeat (every 30 s) is sent only while the user is active, so the server releases the lock after 90 seconds without activity; when
+  the user works again, the lock is taken back if nobody else took it meanwhile. When another user holds it, the bar says who and the page
+  turns read-only (the server refuses their saves as well) — and becomes editable by itself as soon as that user leaves (live lock
+  changes, FR-185).
 *@
 @implements IAsyncDisposable
 @using DirectService.Transportation.Contracts.Platform
 @inject Api Api
 @inject Loc L
+@inject UiJs Js
+@inject LiveUpdates Live
 @if (_message is not null) {<Banner Tone="Tone.Lock" Icon="lock" Live="true" Text="@_message" />}
 
 @code {
+    private const int ActiveWithinSeconds = 60;   // a beat every 30 s keeps the lock; 60 s without activity lets the server's 90 s expire it
     private string? _lockId;
     private string? _holder;
     private string? _message;
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
+    private bool _disposed;
 
     /// <summary>Entity type as the server names it, e.g. "TRN.Trip".</summary>
     [Parameter, EditorRequired] public string EntityType { get; set; } = "";
@@ -24,20 +30,48 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Live.LockChanged += LockChanged;
+        await AcquireAsync();
+        Beat();
+    }
+
+    /// <summary>Takes the lock, or learns who holds it; tells the form either way.</summary>
+    private async Task AcquireAsync()
+    {
+        string? holder = null;
         try
         {
             var l = await Api.PostAsync<LockResponse>(Api.C("locks"), new AcquireLockRequest(EntityType, Id));
-            if (l.HeldByMe) { _lockId = l.Id; Beat(); }
-            else { _holder = l.HolderName; _message = L.F("ui.lockedBy", l.HolderName); }
+            if (l.HeldByMe && _disposed)
+            {
+                // The form closed while the lock was being taken: give it back at once instead of holding it until it expires.
+                await ReleaseAsync(l.Id);
+                return;
+            }
+            if (l.HeldByMe) { _lockId = l.Id; _message = null; }
+            else { holder = l.HolderName; _message = L.F("ui.lockedBy", l.HolderName); }
         }
         catch (ApiException e) when (e.Problem.Status is 409 or 423)
         {
             // The server names the holder in its message ("{name} is editing this record").
-            _holder = e.Problem.Detail ?? "?";
+            holder = e.Problem.Detail ?? "?";
             _message = e.Problem.Detail;
         }
-        catch (ApiException) { }
-        await OnState.InvokeAsync(_holder);
+        catch (ApiException) { return; }
+        catch (HttpRequestException) { return; }   // offline for a moment: the next beat tries again
+        if (_disposed) return;
+        if (holder != _holder || holder is null)
+        {
+            _holder = holder;
+            await OnState.InvokeAsync(_holder);
+        }
+    }
+
+    /// <summary>The holder left (live lock change): try to take the record over.</summary>
+    private void LockChanged(LockChange c)
+    {
+        if (_disposed || _holder is null || c.EntityType != EntityType || c.Id != Id || c.Holder is not null) return;
+        _ = InvokeAsync(async () => { await AcquireAsync(); StateHasChanged(); });
     }
 
     private void Beat()
@@ -45,26 +79,50 @@
         _cts = new CancellationTokenSource();
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         var token = _cts.Token;
-        _ = Task.Run(async () =>
+        _ = InvokeAsync(async () =>
         {
             try
             {
-                while (await _timer.WaitForNextTickAsync(token).ConfigureAwait(false))
-                    await Api.PutAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId!)}/heartbeat"), null, token).ConfigureAwait(false);
+                while (await _timer.WaitForNextTickAsync(token))
+                {
+                    // One failed beat (network blip, script error) must not end the loop: the lock would then expire under the user.
+                    try { await BeatOnceAsync(token); }
+                    catch (Exception e) when (e is not OperationCanceledException) { }
+                }
             }
             catch (OperationCanceledException) { }
-            catch (ApiException) { }
-        }, token);
+        });
+    }
+
+    private async Task BeatOnceAsync(CancellationToken token)
+    {
+        if (await Js.IdleSeconds() >= ActiveWithinSeconds) return;   // inactive: no beat, the server lets the lock go (BR-039)
+        if (_lockId is null) { await AcquireAsync(); StateHasChanged(); return; }   // read-only view: try again (also without live updates)
+        try { await Api.PutAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId)}/heartbeat"), null, token); }
+        catch (ApiException)
+        {
+            // The lock expired while the user was away: take it back, unless someone else has it now.
+            _lockId = null;
+            await AcquireAsync();
+            if (_lockId is null && _message is null) _message = L["ui.lockReleased"];
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReleaseAsync(string lockId)
+    {
+        try { await Api.DeleteAsync(Api.C($"locks/{Uri.EscapeDataString(lockId)}")); }
+        catch (ApiException) { }
+        catch (HttpRequestException) { }   // the server's expiry releases it
     }
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+        Live.LockChanged -= LockChanged;
         _cts?.Cancel();
         _timer?.Dispose();
         _cts?.Dispose();
-        if (_lockId is not null)
-        {
-            try { await Api.DeleteAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId)}")); } catch (ApiException) { }
-        }
+        if (_lockId is not null) await ReleaseAsync(_lockId);
     }
 }

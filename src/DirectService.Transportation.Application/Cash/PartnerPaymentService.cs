@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// payments cannot together exceed it); void with reason (drv.settle): reversal, number kept.
 /// </summary>
 public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
 {
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";
@@ -178,7 +178,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
             : ["الرقم", "التاريخ", "الشريك", "المبلغ", "طريقة الدفع", "الصندوق / البنك", "المرجع", "الحالة", "ملاحظات"];
         var data = rows.Select(x => (IReadOnlyList<object?>)[x.P.Number, x.P.PaymentDate, x.PartnerName, x.P.Amount, x.P.PaymentMethod, x.BoxName ?? x.BankName, x.P.Reference,
             x.P.Status, x.P.Notes]).ToList();
-        return CashExport.File("partner-payments", format, headers, data, sheets);
+        return await CashExport.FileAsync("partner-payments", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
     public async Task<PartnerPaymentDetails> GetAsync(string token, CancellationToken ct)

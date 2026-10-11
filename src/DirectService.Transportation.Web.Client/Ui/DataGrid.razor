@@ -4,7 +4,9 @@
   void rows muted, rows changed by another user highlighted briefly (UX-20). Paging is a separate <Pager>.
 *@
 @typeparam TItem
+@implements IDisposable
 @inject Loc L
+@inject LiveUpdates Live
 <CascadingValue Value="this" IsFixed="true">@Columns</CascadingValue>
 <table class="grid @Class" aria-rowcount="@(TotalCount ?? Items.Count)">
     @if (Caption is not null) {<caption class="sr-only">@Caption</caption>}
@@ -99,6 +101,31 @@
 </table>
 
 @code {
+    // Rows changed by another user glow for a few seconds (UX-20, FR-185): redraw when a shown row changes, and once more when the glow ends.
+    private CancellationTokenSource? _glow;
+
+    protected override void OnInitialized() => Live.RecordChanged += Changed;
+
+    private void Changed(LiveChange c)
+    {
+        if (c.Id is null || !Items.Any(i => Equals(Key(i), c.Id))) return;
+        _glow?.Cancel();
+        _glow = new CancellationTokenSource();
+        var token = _glow.Token;
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            try { await Task.Delay(4100, token); } catch (TaskCanceledException) { return; }
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Live.RecordChanged -= Changed;
+        _glow?.Cancel();
+    }
+
     private readonly List<GridColumn<TItem>> _columns = [];
     private HashSet<object> _selected = [];
 
@@ -130,7 +157,27 @@
 
     [Parameter] public EventCallback<TItem> OnRowClick { get; set; }
 
-    private List<GridColumn<TItem>> Visible => _columns.Where(c => c.Visible).ToList();
+    /// <summary>A saved column view (FR-183): the keyed columns listed, in this order; keyed columns not listed are hidden; unkeyed ones stay.</summary>
+    [Parameter] public IReadOnlyList<string>? ColumnOrder { get; set; }
+
+    private List<GridColumn<TItem>> Visible
+    {
+        get
+        {
+            var shown = _columns.Where(c => c.Visible).ToList();
+            if (ColumnOrder is not { Count: > 0 } order) return shown;
+            // Chosen columns in the chosen order, filling the keyed slots; columns without a key (actions) keep their place.
+            var keyed = new Queue<GridColumn<TItem>>(order.Select(k => shown.FirstOrDefault(c => c.ColumnKey == k)).Where(c => c is not null).Select(c => c!));
+            var result = new List<GridColumn<TItem>>();
+            foreach (var c in shown)
+            {
+                if (c.ColumnKey is null) result.Add(c);
+                else if (keyed.Count > 0) result.Add(keyed.Dequeue());
+            }
+            result.AddRange(keyed);
+            return result;
+        }
+    }
 
     private int ColSpan => Visible.Count + (Selectable ? 1 : 0);
 
@@ -172,7 +219,7 @@
     {
         clickable ? "click" : null,
         _selected.Contains(key) ? "sel" : null,
-        LiveKeys?.Contains(key) == true ? "live" : null,
+        LiveKeys?.Contains(key) == true || Live.IsRecent(key) ? "live" : null,
         RowClass?.Invoke(row),
     }.Where(x => x is not null));
 

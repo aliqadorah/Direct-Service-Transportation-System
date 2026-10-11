@@ -47,7 +47,7 @@
         break;
     case "payments":
         <ListShell Label="@L[Payables ? "ap.payments" : "ap.collections"]" State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="cash"
-                   EmptyTitle="@L[Payables ? "ap.noPayments" : "ap.noCollections"]" Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/payments/export?kind={Kind}&status=all"), f))"
+                   EmptyTitle="@L[Payables ? "ap.noPayments" : "ap.noCollections"]" Exports="@(["xlsx", "csv", "pdf"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/payments/export?kind={Kind}&status=all"), f))"
                    Page="_page" PageSize="50" Total="_payments?.Page.TotalCount" OnPage="Go">
             <DataGrid TItem="ApArPaymentResponse" Items="_payments!.Page.Items" Key="p => p.Id" Caption="@L[Payables ? "ap.payments" : "ap.collections"]" RowClass="@(p => p.Status == "Void" ? "void" : null)"
                       OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-payments/{p.Id}")))" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_payments.Totals.Included))">
@@ -65,7 +65,7 @@
         break;
     case "returns":
         <ListShell Label="@L["ap.returns"]" State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="refresh" EmptyTitle="@L["ap.noReturns"]"
-                   Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/returns/export?kind={Kind}&status=all"), f))"
+                   Exports="@(["xlsx", "csv", "pdf"])" OnExport="@(f => Files.SaveAsync(Api.C($"apar/returns/export?kind={Kind}&status=all"), f))"
                    Page="_page" PageSize="50" Total="_returns?.Page.TotalCount" OnPage="Go">
             <DataGrid TItem="ApArReturnResponse" Items="_returns!.Page.Items" Key="r => r.Id" Caption="@L["ap.returns"]" RowClass="@(r => r.Status == "Void" ? "void" : null)"
                       OnRowClick="@(r => Nav.NavigateTo(NavModel.Href(Company, $"accounting/apar-returns/{r.Id}")))">
@@ -113,7 +113,7 @@
         break;
     default:
         <ListShell Label="@L[Payables ? "ap.bills" : "ap.receivables"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q" SearchPlaceholder="@L["ap.search"]" OnSearch="Search"
-                   Exports="@(["xlsx", "csv"])" OnExport="@(f => Files.SaveAsync(Api.C(DocPath + "/export" + DocQuery(false)), f))" State="_state" Reference="@_reference" OnRetry="Load"
+                   Exports="@(["xlsx", "csv", "pdf"])" OnExport="@(f => Files.SaveAsync(Api.C(DocPath + "/export" + DocQuery(false)), f))" State="_state" Reference="@_reference" OnRetry="Load"
                    EmptyIcon="file" EmptyTitle="@L[Payables ? "ap.noBills" : "ap.noReceivables"]" EmptyText="@L[Payables ? "ap.noBillsText" : "ap.noReceivablesText"]"
                    Filtered="@(_q is not null || _from is not null || _to is not null)" OnClear="ClearAll" Page="_page" PageSize="50" Total="_docs?.Page.TotalCount" OnPage="Go">
             <Filters>

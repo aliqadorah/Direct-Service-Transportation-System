@@ -4,11 +4,13 @@
 @using DirectService.Transportation.Contracts.Pricing
 @using DirectService.Transportation.Contracts.Accounting
 @inject Api Api
+@inject NavigationManager Nav
 @inject Loc L
 @inject ShellState Shell
 @inject ToastService Toasts
 @inject UiJs Js
 
+<LiveRefresh EntityTypes="@(["TRN.Tariff"])" OnChange="Load" />
 <PageHeader Title="@L["nav.tariffs"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.tariffs"])])">
     <Actions>
         @if (CanManage)
@@ -24,6 +26,7 @@
         <div class="adorn" style="width:220px"><span class="start"><Icon Name="search" /></span>
             <input class="input" type="search" style="height:26px" aria-label="@L["ui.search"]" placeholder="@L["ui.search"]" value="@_q.Q" @onchange="Search" /></div>
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
     </Tools>
 </SavedViews>
 
@@ -59,6 +62,7 @@
 
 <Modal @bind-Open="_editing" Title="@(_m.Id is null ? L["tar.new"] : L["tar.line"])" Busy="_saving" Wide="true">
     <ChildContent>
+        @if (_m.Id is not null) {<RecordLockGuard EntityType="TRN.Tariff" Id="@_m.Id" OnState="h => _lockedBy = h" />}
         <EditForm Model="_m" OnValidSubmit="Save" id="tariff-form" class="stack">
             <ProblemValidator @ref="_problems" />
             <ErrorSummary />
@@ -95,7 +99,7 @@
             <Btn Icon="@(_m.Archived ? "refresh" : "archive")" Text="@L[_m.Archived ? "ml.restore" : "ml.archive"]" OnClick="ToggleStatus" />
         }
         <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
-        @if (CanManage) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_saving" form="tariff-form" />}
+        @if (CanManage) {<Btn Type="submit" Disabled="@(_lockedBy is not null)" Primary="true" Text="@L["ui.save"]" Busy="_saving" form="tariff-form" />}
     </Footer>
 </Modal>
 
@@ -108,6 +112,7 @@
     private int _total;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _banner;
+    private string? _lockedBy;
     private bool _editing, _saving;
     private TariffModel _m = new();
     private ProblemValidator? _problems;
@@ -124,6 +129,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var query = ListUrl.Read(Nav);
+        _q.ReadInto(query);
+        if (query["view"] is { Length: > 0 } saved) _view = saved;
         await Load();
         try
         {
@@ -139,6 +147,7 @@
 
     private async Task Load()
     {
+        ListUrl.Write(Nav, _q, ("view", _view == "customers" ? null : _view));
         _q.Filters.Clear();
         _q.View = _view == "archived" ? "archived" : "active";
         if (_view == "customers") _q.Filters["partyType"] = "Customer";
@@ -159,12 +168,14 @@
     private Task Go(int p) { _q.Page = p; return Load(); }
     private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
 
-    private void New() { _m = new TariffModel { PartyType = _view == "partners" ? "Partner" : "Customer" }; _banner = null; _editing = true; }
+    private void New() { _m = new TariffModel { PartyType = _view == "partners" ? "Partner" : "Customer" }; _banner = null; _lockedBy = null;
+        _editing = true; }
 
     private async Task Open(TariffResponse t)
     {
         _m = TariffModel.From(t);
         _banner = null;
+        _lockedBy = null;
         _editing = true;
         _history = null;
         try { _history = (await Api.GetAsync<TariffDetails>(Api.C($"tariffs/{Uri.EscapeDataString(t.Id)}"))).History; } catch (ApiException) { _history = []; }

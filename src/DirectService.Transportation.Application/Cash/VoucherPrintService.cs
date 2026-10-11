@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// documents carry a VOID stamp; every print after the first is marked "Copy"; every print is logged.
 /// </summary>
 public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, DocumentPrinter printer, AuditTrail audit,
-    ReceiptService receipts, AdvanceService advances, SettlementService settlements, PartnerPaymentService payments, AccountStatementService statements)
+    ReceiptService receipts, AdvanceService advances, SettlementService settlements, PartnerPaymentService payments, AccountStatementService statements, IssuedNames names)
 {
     private string L(string ar, string en) => printer.L(ar, en);
 
@@ -63,7 +63,8 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var d = (await receipts.DetailsAsync(receipt.Id, ct).ConfigureAwait(false));
         var r = d.Receipt;
         var mark = await MarkAsync(ReceiptService.EntityType, receipt.Id, null, ct).ConfigureAwait(false);
-        var body = Voucher(await CompanyAsync(ct).ConfigureAwait(false), L("سند قبض", "Receipt voucher"), r.Number, r.ReceiptDate, L("استلمنا من", "Received from"), r.Customer.Name,
+        var body = Voucher(await CompanyAsync(ct).ConfigureAwait(false), L("سند قبض", "Receipt voucher"), r.Number, r.ReceiptDate, L("استلمنا من", "Received from"),
+            await names.OfAsync("TRN.Customer", receipt.CustomerId, "Name", r.Customer.Name, receipt.CreatedAt, ct).ConfigureAwait(false),   // FR-163
             r.Amount, d.AmountInWords, Method(r.PaymentMethod), r.Account, r.Reference,
             [
                 Field(L("عن", "For"), r.Invoice is null ? E(L("دفعة على الحساب", "On account")) : $"{L("الفاتورة", "Invoice")} {N(r.Invoice.Number)}"),
@@ -83,7 +84,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var a = d.Advance;
         var mark = await MarkAsync(AdvanceService.EntityType, advance.Id, null, ct).ConfigureAwait(false);
         var body = Voucher(await CompanyAsync(ct).ConfigureAwait(false), L("سند صرف — سلفة سائق", "Payment voucher — driver advance"), a.Number, a.AdvanceDate,
-            L("صرفنا إلى", "Paid to"), a.Driver.Name, a.Amount, d.AmountInWords, Method(a.PaymentMethod), a.Account, a.Reference,
+            L("صرفنا إلى", "Paid to"), await names.OfAsync("TRN.Driver", advance.DriverId, "FullName", a.Driver.Name, advance.CreatedAt, ct).ConfigureAwait(false), a.Amount, d.AmountInWords, Method(a.PaymentMethod), a.Account, a.Reference,
             [a.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(a.Notes))], [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]);
         return await printer.OutputAsync(printer.Shell(a.Number, body, a.Status == CashCodes.Void ? "VOID" : null, mark), format, a.Number, ct).ConfigureAwait(false);
     }
@@ -95,7 +96,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var p = d.Payment;
         var mark = await MarkAsync(PartnerPaymentService.EntityType, payment.Id, null, ct).ConfigureAwait(false);
         var body = Voucher(await CompanyAsync(ct).ConfigureAwait(false), L("سند صرف — دفعة شريك", "Payment voucher — partner payment"), p.Number, p.PaymentDate,
-            L("صرفنا إلى", "Paid to"), p.Partner.Name, p.Amount, d.AmountInWords, Method(p.PaymentMethod), p.Account, p.Reference,
+            L("صرفنا إلى", "Paid to"), await names.OfAsync("TRN.Partner", payment.PartnerId, "Name", p.Partner.Name, payment.CreatedAt, ct).ConfigureAwait(false), p.Amount, d.AmountInWords, Method(p.PaymentMethod), p.Account, p.Reference,
             [p.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(p.Notes))], [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]);
         return await printer.OutputAsync(printer.Shell(p.Number, body, p.Status == CashCodes.Void ? "VOID" : null, mark), format, p.Number, ct).ConfigureAwait(false);
     }
@@ -108,6 +109,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var d = await settlements.DetailsAsync(stl.Id, ct).ConfigureAwait(false);
         var s = d.Settlement;
         var plate = await db.Set<Driver>().IgnoreQueryFilters().Where(x => x.Id == stl.DriverId).Select(x => x.PlateNumber).SingleAsync(ct).ConfigureAwait(false);
+        var driverName = await names.OfAsync("TRN.Driver", stl.DriverId, "FullName", s.Driver.Name, stl.CreatedAt, ct).ConfigureAwait(false);   // FR-163
         var company = await CompanyAsync(ct).ConfigureAwait(false);
         var mark = await MarkAsync(SettlementService.EntityType, stl.Id, null, ct).ConfigureAwait(false);
         var trips = string.Concat(d.Trips.Select(t =>
@@ -117,7 +119,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var deductionRows = string.Concat(d.Deductions.Select(x => $"<tr><td>{E(DeductionLabel(x.Type))}</td><td>{E(x.Note)}</td><td class=\"n\">{N(M(x.Amount))}</td></tr>"));
         var statement = printer.Header(company)
             + $"<h1>{L("كشف تسوية سائق", "Driver settlement statement")}</h1><div class=\"meta\">{L("رقم", "No.")} {N(s.Number)} · {L("التاريخ", "Date")} {N(D(s.SettlementDate))}</div>"
-            + $"<div class=\"fields\">{Field(L("السائق", "Driver"), E(s.Driver.Name))}{Field(L("رقم اللوحة", "Plate"), N(plate))}</div>"
+            + $"<div class=\"fields\">{Field(L("السائق", "Driver"), E(driverName))}{Field(L("رقم اللوحة", "Plate"), N(plate))}</div>"
             + $"<h2>{L("الرحلات", "Trips")}</h2><table><tr><th>{L("السند", "Receipt")}</th><th>{L("التاريخ", "Date")}</th><th>{L("المسار", "Route")}</th><th>{L("المادة", "Material")}</th>"
             + $"<th>{L("الكمية", "Qty")}</th><th>{L("الأجرة", "Rate")}</th><th>{L("الأجر", "Wage")}</th></tr>{trips}</table>"
             + (d.Advances.Count == 0 ? string.Empty : $"<h2>{L("السلف", "Advances")}</h2><table><tr><th>{L("الرقم", "No.")}</th><th>{L("التاريخ", "Date")}</th><th>{L("المبلغ", "Amount")}</th></tr>{advanceRows}</table>")
@@ -126,7 +128,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
             + $"<div><span>{L("الخصومات", "Deductions")}</span>{N(M(s.DeductionsTotal))}</div><div class=\"grand\"><span>{L("الصافي", "Net payable")}</span>{N(M(s.NetPayable))}</div></div>"
             + $"<div class=\"words\">{E(d.AmountInWords)}</div>" + Signatures([L("المحاسب", "Accountant"), L("المدير المالي", "Finance manager"), L("السائق", "Driver")]);
         var voucher = s.NetPayable == 0 ? string.Empty : "<div class=\"annex\">" + Voucher(company, L("سند صرف — صافي تسوية", "Payment voucher — settlement net"), s.Number, s.SettlementDate, L("صرفنا إلى", "Paid to"),
-            s.Driver.Name, s.NetPayable, d.AmountInWords, Method(s.PaymentMethod), s.Account, s.Reference, [], [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]) + "</div>";
+            driverName, s.NetPayable, d.AmountInWords, Method(s.PaymentMethod), s.Account, s.Reference, [], [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]) + "</div>";
         return await printer.OutputAsync(printer.Shell(s.Number, statement + voucher, s.Status == CashCodes.Void ? "VOID" : null, mark), format, s.Number, ct).ConfigureAwait(false);
     }
 

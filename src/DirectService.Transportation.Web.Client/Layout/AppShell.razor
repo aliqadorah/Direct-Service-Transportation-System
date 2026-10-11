@@ -6,13 +6,14 @@
 @inject Loc L
 @inject UiJs Js
 @inject ShellState Shell
+@inject NavigationManager Nav
 <a class="skip-link" href="#content">@L["shell.skip"]</a>
-<div class="shell @(Provider ? "provider" : null)" @key="L.Language">
+<div class="shell @(Provider ? "provider" : null) @(_menuOpen ? "menu-open" : null)" @key="L.Language">
     <SideNav Groups="Groups" Company="@(Shell.Company?.Id ?? "")" Foot="@Shell.PlanText" Provider="Provider" />
     <div class="main">
         <TopBar Provider="Provider" Companies="@(Shell.Me?.Companies ?? [])" CurrentCompany="@Shell.Company?.Id" UserName="@Shell.Me?.FullName"
                 Unread="Shell.UnreadNotifications" Density="@Shell.Density" OnCompany="OnCompany" OnCommandBar="OpenCommandBar" OnNotifications="OnNotifications"
-                OnProfile="OnProfile" OnDensity="SetDensity" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
+                OnProfile="OnProfile" OnMenu="() => _menuOpen = !_menuOpen" MenuOpen="_menuOpen" OnDensity="SetDensity" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
         <main class="content @(Fixed ? "fixed" : null)" id="content" tabindex="-1">
             @Banners
             @ChildContent
@@ -24,6 +25,7 @@
 
 @code {
     private bool _commandBar;
+    private bool _menuOpen;   // phones: the menu opens as a drawer (UX-14)
     private DotNetObjectReference<AppShell>? _ref;
 
     [Parameter] public bool Provider { get; set; }
@@ -49,6 +51,14 @@
     {
         Shell.Changed += Refresh;
         L.Changed += LanguageChanged;
+        Nav.LocationChanged += Navigated;
+    }
+
+    private void Navigated(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (!_menuOpen) return;
+        _menuOpen = false;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     /// <summary>The direction and language of the whole document follow the interface language at once.</summary>
@@ -91,6 +101,7 @@
     {
         Shell.Changed -= Refresh;
         L.Changed -= LanguageChanged;
+        Nav.LocationChanged -= Navigated;
         await Js.UnregisterShortcuts();
         _ref?.Dispose();
     }
