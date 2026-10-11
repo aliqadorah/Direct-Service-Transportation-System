@@ -15,6 +15,9 @@ public sealed record AccountResponse(
     bool IsPostable, bool HasChildren, decimal OpeningDebit, decimal OpeningCredit, bool IsControlAccount, string? ControlPartyType,
     string Status, string RowVersion);
 
+/// <summary>An active postable account for pick lists, with its type and whether lines on it need a party (control account).</summary>
+public sealed record AccountOption(AccountRef Account, string AccountType, bool IsControlAccount, string? ControlPartyType);
+
 public sealed record AccountRequest(
     string? Code, string? NameAr, string? NameEn, string? AccountType, string? ParentId, bool IsPostable,
     bool IsControlAccount, string? ControlPartyType, string? RowVersion);
@@ -75,6 +78,9 @@ public sealed record CostCentreRequest(string? Code, string? Name, string? RowVe
 public sealed record CashBoxResponse(string Id, string Name, AccountRef Account, string Status, string RowVersion);
 
 public sealed record CashBoxRequest(string? Name, string? AccountId, string? RowVersion);
+
+/// <summary>Active cash boxes and bank accounts (pick lists of cash documents).</summary>
+public sealed record MoneyAccountOptions(IReadOnlyList<MasterData.MasterOption> CashBoxes, IReadOnlyList<MasterData.MasterOption> BankAccounts, DateOnly Today);
 
 public sealed record BankAccountResponse(
     string Id, string Name, string BankName, string? AccountNumber, string? Iban, string CurrencyCode, AccountRef Account, string Status,

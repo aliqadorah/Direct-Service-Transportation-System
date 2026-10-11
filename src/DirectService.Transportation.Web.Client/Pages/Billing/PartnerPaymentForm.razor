@@ -1,0 +1,99 @@
+@page "/c/{Company}/partner-accounts/{PartnerId}/pay"
+@page "/c/{Company}/partner-accounts/payments/new"
+@*
+  SCR-28 partner payment (FR-085, FR-086): partner (with its balance due shown), date, amount — refused above the balance due —, method,
+  cash box or bank account, reference, notes; "Save & print" opens the payment voucher.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject MoneyAccounts Accounts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["prt.newPayment"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
+    <Actions>
+        <Btn Icon="print" Text="@L["cash.savePrint"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />
+    </Actions>
+</PageHeader>
+<PostingBanner OnStatus="r => _postingReady = r" />
+<EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="box pad stack" style="max-width:820px">
+    <ProblemValidator @ref="_problems" />
+    <ErrorSummary @ref="_summary" Extra="_extra" />
+    @if (_account is { } a) {<Banner Tone="Tone.Info" Text="@L.F("prt.balanceDue", a.Partner.Name, Fmt.Money(a.BalanceDue))" />}
+    <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <ComboField TValue="string?" @bind-Value="_m.PartnerId" Options="Lookups.Partners" Label="@L["md.partner"]" Required="true" Span="2" OnSelected="_ => LoadAccount()" />
+        <DateField @bind-Value="_m.PaymentDate" Label="@L["trip.date"]" Required="true" />
+        <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" />
+        <PaymentFields Model="_m" />
+        <TextField @bind-Value="_m.Notes" Label="@L["md.notes"]" MaxLength="500" Span="2" />
+    </div>
+</EditForm>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private PartnerAccountResponse? _account;
+    private bool _saving, _postingReady = true;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? PartnerId { get; set; }
+
+    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.DrvSettle);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new EditContext(_m);
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        try { await Accounts.EnsureAsync(); } catch (ApiException) { }
+        _m.PaymentDate = Accounts.Today ?? DateOnly.FromDateTime(DateTime.Today);
+        if (PartnerId is not null) { _m.PartnerId = PartnerId; await LoadAccount(); }
+    }
+
+    private async Task LoadAccount()
+    {
+        _account = null;
+        if (_m.PartnerId is null) return;
+        try { _account = await Api.GetAsync<PartnerAccountResponse>(Api.C($"partners/{Uri.EscapeDataString(_m.PartnerId)}/account")); }
+        catch (ApiException) { }
+    }
+
+    private async Task Save(bool print)
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PostAsync<PartnerPaymentDetails>(Api.C("partner-payments"), new PartnerPaymentRequest(_m.PartnerId, _m.PaymentDate, _m.Amount, _m.PaymentMethod,
+                _m.CashBox(), _m.Bank(), _m.Ref(), string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId));
+            var p = r.Payment;
+            Toasts.Success(L.F("prt.saved", p.Number, Fmt.Money(p.Amount)), L["ui.print"], NavModel.Href(Company, $"print/partner-payment/{p.Id}"));
+            Nav.NavigateTo(NavModel.Href(Company, print ? $"print/partner-payment/{p.Id}" : $"partner-accounts/payments/{p.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model : IPaymentModel
+    {
+        public string? PartnerId { get; set; }
+        public DateOnly? PaymentDate { get; set; }
+        public decimal? Amount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? CashBoxId { get; set; }
+        public string? BankAccountId { get; set; }
+        public string? Reference { get; set; }
+        public string? Notes { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

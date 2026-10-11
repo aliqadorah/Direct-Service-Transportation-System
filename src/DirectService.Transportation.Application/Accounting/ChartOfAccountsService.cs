@@ -30,6 +30,14 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
             .ToList();
     }
 
+    /// <summary>
+    /// Active postable accounts for the pick lists of journal lines, AP/AR lines, cash boxes, banks and account mapping (FR-106, FR-123):
+    /// code, names, type, control flag and party type, so forms can ask for a party on control accounts.
+    /// </summary>
+    public async Task<IReadOnlyList<AccountOption>> OptionsAsync(CancellationToken ct) =>
+        (await db.Set<Account>().AsNoTracking().Where(a => a.IsPostable && a.Status == AccountingCodes.Active).OrderBy(a => a.Code).ToListAsync(ct).ConfigureAwait(false))
+            .Select(a => new AccountOption(Ref(a), a.AccountType, a.IsControlAccount, a.ControlPartyType)).ToList();
+
     public async Task<AccountResponse> GetAsync(string token, CancellationToken ct)
     {
         var a = await FindAsync(token, tracked: false, ct).ConfigureAwait(false);

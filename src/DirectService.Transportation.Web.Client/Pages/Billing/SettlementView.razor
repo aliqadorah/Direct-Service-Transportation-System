@@ -1,0 +1,93 @@
+@page "/c/{Company}/driver-accounts/settlements/{Id}"
+@*
+  SCR-27 settlement view (FR-080…082): driver, date, gross wages, advances, deductions and net, the settled trips and advances, method and
+  account; print the settlement with its payment voucher; void with a reason (reversal, items released) — drv.settle.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var s = _d!.Settlement; }
+        <CashDocView Title="@s.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(s.Driver.Name, NavModel.Href(Company, $"driver-accounts/{s.Driver.Id}"))])"
+                     IsVoid="@(s.Status == "Void")" VoidReason="@s.VoidReason" PostingPending="s.PostingPending" Details="Details(s)" Amount="s.NetPayable" AmountLabel="@L["drv.net"]"
+                     AmountInWords="@_d.AmountInWords" Entry="s.JournalEntry" History="_d.History" PrintHref="@NavModel.Href(Company, $"print/settlement/{Id}")"
+                     CanVoid="@Shell.Can(PermissionKeys.DrvSettle)" VoidText="@L["drv.settlementVoidText"]" OnVoid="Void">
+            <Box Title="@L["drv.settledTrips"]" NoPad="true"><SettlementTripsGrid Trips="_d.Trips" Company="@Company" /></Box>
+            @if (_d.Advances.Count > 0)
+            {
+                <Box Title="@L["drv.settledAdvances"]" NoPad="true">
+                    <DataGrid TItem="SettlementAdvanceItem" Items="_d.Advances" Key="a => a.Id" Caption="@L["drv.settledAdvances"]" OnRowClick="@(a => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/advances/{a.Id}")))">
+                        <Columns>
+                            <GridColumn TItem="SettlementAdvanceItem" Title="@L["doc.number"]" Value="a => a.Number" Ltr="true" />
+                            <GridColumn TItem="SettlementAdvanceItem" Title="@L["trip.date"]" Value="a => Fmt.Date(a.AdvanceDate, Shell.DateFormat)" Ltr="true" />
+                            <GridColumn TItem="SettlementAdvanceItem" Title="@L["inv.amount"]" Value="a => Fmt.Money(a.Amount)" Numeric="true" />
+                        </Columns>
+                    </DataGrid>
+                </Box>
+            }
+            @if (_d.Deductions.Count > 0)
+            {
+                <Box Title="@L["drv.deductions"]" NoPad="true">
+                    <DataGrid TItem="SettlementDeductionResponse" Items="_d.Deductions" Key="x => x.Id" Caption="@L["drv.deductions"]">
+                        <Columns>
+                            <GridColumn TItem="SettlementDeductionResponse" Title="@L["drv.type"]" Value="@(x => L["drv.ded" + x.Type])" />
+                            <GridColumn TItem="SettlementDeductionResponse" Title="@L["inv.amount"]" Value="x => Fmt.Money(x.Amount)" Numeric="true" />
+                            <GridColumn TItem="SettlementDeductionResponse" Title="@L["drv.note"]" Value="x => x.Note" Wrap="true" />
+                        </Columns>
+                    </DataGrid>
+                </Box>
+            }
+        </CashDocView>
+    </ChildContent>
+</StateView>
+
+@code {
+    private SettlementDetails? _d;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<SettlementDetails>(Api.C($"settlements/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Details(SettlementResponse s) =>
+    [
+        new(L["trip.driver"], null, @<a href="@NavModel.Href(Company, $"driver-accounts/{s.Driver.Id}")">@s.Driver.Name</a>),
+        new(L["trip.date"], Fmt.Date(s.SettlementDate, Shell.DateFormat)),
+        new(L["drv.gross"], Fmt.Money(s.GrossWages)),
+        new(L["md.openAdvances"], Fmt.Money(s.AdvancesTotal)),
+        new(L["drv.deductions"], Fmt.Money(s.DeductionsTotal)),
+        new(L["cash.method"], L["pay." + s.PaymentMethod]),
+        new(L["cash.account"], s.Account.Name),
+        new(L["cash.reference"], s.Reference),
+    ];
+
+    private async Task<string?> Void(string reason)
+    {
+        try
+        {
+            await Api.PostAsync<SettlementDetails>(Api.C($"settlements/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Settlement.RowVersion));
+            Toasts.Success(L.F("cash.voided", _d.Settlement.Number));
+            await Load();
+            return null;
+        }
+        catch (ApiException e) { return e.Problem.Detail ?? L["ui.loadFailed"]; }
+    }
+}

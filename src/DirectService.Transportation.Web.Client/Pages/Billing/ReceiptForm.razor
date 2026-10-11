@@ -1,0 +1,148 @@
+@page "/c/{Company}/receipts/new"
+@*
+  SCR-26 receipt form (FR-067…070): customer, date, one of the customer's open invoices or none (on account), amount (not above the
+  invoice's remaining balance — checked by the API), method, cash box or bank account, reference for transfer / CliQ, attachments count,
+  notes. "Save & print" opens the voucher with the amount in words (FR-070). Opened from an invoice with its customer and invoice filled in.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject MoneyAccounts Accounts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.newReceipt"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"], NavModel.Href(Company, "receipts"))])">
+    <Actions>
+        <Btn Icon="print" Text="@L["cash.savePrint"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />
+    </Actions>
+</PageHeader>
+<PostingBanner OnStatus="r => _postingReady = r" />
+<EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+    <div class="stack">
+        <ProblemValidator @ref="_problems" />
+        <ErrorSummary @ref="_summary" Extra="_extra" />
+        <section class="box pad">
+            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <ComboField TValue="string?" @bind-Value="_m.CustomerId" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="true" Span="2" OnSelected="_ => CustomerChanged()" />
+                <DateField @bind-Value="_m.ReceiptDate" Label="@L["trip.date"]" Required="true" />
+                <SelectField TValue="string?" @bind-Value="_m.InvoiceId" Options="InvoiceOptions" Empty="@L["rcpt.onAccount"]" Label="@L["cn.invoice"]" Span="2"
+                             Help="@L["rcpt.invoiceHelp"]" @bind-Value:after="InvoiceChanged" />
+                <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" />
+                <PaymentFields Model="_m" />
+                <IntField @bind-Value="_m.AttachmentsCount" Label="@L["rcpt.attachments"]" Min="0" Max="99" />
+                <TextField @bind-Value="_m.Notes" Label="@L["md.notes"]" MaxLength="500" Span="2" />
+            </div>
+        </section>
+    </div>
+    <Box Title="@L["rcpt.after"]">
+        @if (SelectedInvoice is { } inv)
+        {
+            <div class="ln"><span>@L["rcpt.remainingNow"]</span><Money Value="inv.RemainingAmount" /></div>
+            <div class="ln tot"><span>@L["rcpt.afterReceipt"]</span><Money Value="inv.RemainingAmount - (_m.Amount ?? 0)" /></div>
+            <p class="help" style="margin:6px 0 0">@L[inv.RemainingAmount - (_m.Amount ?? 0) == 0 ? "rcpt.willClose" : "rcpt.partly"]</p>
+        }
+        else
+        {
+            <p class="muted" style="margin:0">@L["rcpt.onAccountHelp"]</p>
+        }
+    </Box>
+</EditForm>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private IReadOnlyList<InvoiceResponse> _invoices = [];
+    private bool _saving, _postingReady = true;
+    private int _invoicesVersion;
+    private decimal? _autoAmount;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.RcptManage);
+    private InvoiceResponse? SelectedInvoice => _invoices.FirstOrDefault(i => i.Id == _m.InvoiceId);
+    private IReadOnlyList<Option<string?>> InvoiceOptions =>
+        _invoices.Select(i => new Option<string?>(i.Id, $"{i.Number} · {L["inv.remaining"]} {Fmt.Money(i.RemainingAmount)}")).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new EditContext(_m);
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        try { await Accounts.EnsureAsync(); } catch (ApiException) { }
+        _m.ReceiptDate = Accounts.Today ?? DateOnly.FromDateTime(DateTime.Today);
+        if (query["customer"] is { Length: > 0 } c)
+        {
+            _m.CustomerId = c;
+            await LoadInvoices();
+            if (query["invoice"] is { Length: > 0 } i && _invoices.Any(x => x.Id == i)) { _m.InvoiceId = i; InvoiceChanged(); }
+        }
+    }
+
+    private async Task CustomerChanged()
+    {
+        _m.InvoiceId = null;
+        await LoadInvoices();
+    }
+
+    /// <summary>The customer's approved invoices with a remaining balance (FR-067).</summary>
+    private async Task LoadInvoices()
+    {
+        _invoices = [];
+        var version = ++_invoicesVersion;
+        if (_m.CustomerId is null) return;
+        try
+        {
+            var page = await Api.GetAsync<InvoicePage>(Api.C($"invoices?customer={Uri.EscapeDataString(_m.CustomerId)}&status=approved&sort=dueDate&pageSize=200"));
+            if (version != _invoicesVersion) return;   // another customer was chosen meanwhile
+            _invoices = page.Page.Items.Where(i => i.RemainingAmount > 0).ToList();
+        }
+        catch (ApiException) { }
+    }
+
+    private void InvoiceChanged()
+    {
+        // The amount follows the chosen invoice's remaining balance until the user types another amount.
+        if (_m.Amount is null || _m.Amount == _autoAmount) _m.Amount = _autoAmount = SelectedInvoice?.RemainingAmount;
+    }
+
+    private async Task Save(bool print)
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PostAsync<ReceiptDetails>(Api.C("receipts"), new ReceiptRequest(_m.CustomerId, _m.ReceiptDate, _m.InvoiceId, _m.Amount, _m.PaymentMethod,
+                _m.CashBox(), _m.Bank(), _m.Ref(), _m.AttachmentsCount ?? 0, string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId));
+            var rc = r.Receipt;
+            Toasts.Success(L.F("rcpt.saved", rc.Number, Fmt.Money(rc.Amount)), L["ui.print"], NavModel.Href(Company, $"print/receipt/{rc.Id}"));
+            Nav.NavigateTo(NavModel.Href(Company, print ? $"print/receipt/{rc.Id}" : $"receipts/{rc.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model : IPaymentModel
+    {
+        public string? CustomerId { get; set; }
+        public DateOnly? ReceiptDate { get; set; }
+        public string? InvoiceId { get; set; }
+        public decimal? Amount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? CashBoxId { get; set; }
+        public string? BankAccountId { get; set; }
+        public string? Reference { get; set; }
+        public int? AttachmentsCount { get; set; }
+        public string? Notes { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

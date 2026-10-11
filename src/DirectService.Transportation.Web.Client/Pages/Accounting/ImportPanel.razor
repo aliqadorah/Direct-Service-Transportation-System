@@ -1,0 +1,98 @@
+@*
+  Strict import of the accounting screens (chart FR-109, journal FR-114; ADR-13): choose an Excel/CSV file, preview every row with its
+  problems, import only when no row is rejected. The page names the preview and import paths and where to go afterwards.
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+@inject NavigationManager Nav
+@inject ShellState Shell
+
+<Box Title="@L["imp.file"]">
+    <div class="row" style="align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="min-width:320px">
+            <label for="acc-imp-file">@L["imp.choose"]</label>
+            <InputFile id="acc-imp-file" class="input" style="padding-top:4px" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
+            <span class="help">@Help</span>
+        </div>
+        <Btn Icon="refresh" Text="@L["imp.preview"]" Disabled="_file is null" Busy="_busy" OnClick="Preview" />
+        <Btn Primary="true" Icon="import" Text="@L["imp.import"]" Disabled="@(_preview is null || _preview.RejectedRows > 0)" Busy="_busy" OnClick="Import" />
+    </div>
+</Box>
+@if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+@if (_preview is not null)
+{
+    <Figures Items="@([new Figure(L["imp.total"], Fmt.Count(_preview.TotalRows)), new Figure(L["imp.valid"], Fmt.Count(_preview.ValidRows)), new Figure(L["imp.rejected"], Fmt.Count(_preview.RejectedRows))])" />
+    @if (_preview.RejectedRows > 0) {<Banner Tone="Tone.Warn" Text="@L.F("acc.importRejected", _preview.RejectedRows)" />}
+    else {<Banner Tone="Tone.Ok" Text="@L.F("imp.ready", _preview.ValidRows)" />}
+    <ListFrame Label="@L["imp.rows"]">
+        <DataGrid TItem="ImportRowResult" Items="Rows" Key="r => r.Row" Caption="@L["imp.rows"]" RowClass="@(r => r.Problems.Count > 0 ? "sel" : null)">
+            <Columns>
+                <GridColumn TItem="ImportRowResult" Title="@L["imp.row"]" Value="r => Fmt.Count(r.Row)" Numeric="true" Width="70px" />
+                <GridColumn TItem="ImportRowResult" Title="@L["imp.key"]" Value="r => r.Key" Ltr="true" />
+                <GridColumn TItem="ImportRowResult" Title="@L["imp.problems"]" Wrap="true">
+                    <Template>@if (context.Problems.Count == 0) {<StatusTag Status="approved" />} else {<ul style="margin:0;padding-inline-start:16px;color:var(--err)">@foreach (var p in context.Problems) {<li><Tx Value="@p" /></li>}</ul>}</Template>
+                </GridColumn>
+            </Columns>
+        </DataGrid>
+    </ListFrame>
+}
+
+@code {
+    private IBrowserFile? _file;
+    private byte[]? _bytes;
+    private ImportPreview? _preview;
+    private string? _error;
+    private bool _busy;
+
+    /// <summary>Company-relative path of the preview (e.g. <c>accounting/accounts/import/preview</c>).</summary>
+    [Parameter, EditorRequired] public string PreviewPath { get; set; } = "";
+    [Parameter, EditorRequired] public string ImportPath { get; set; } = "";
+    /// <summary>Screen to open after a successful import (relative to the company).</summary>
+    [Parameter, EditorRequired] public string Done { get; set; } = "";
+    [Parameter] public string? Help { get; set; }
+    [Parameter] public EventCallback OnImported { get; set; }
+
+    private IReadOnlyList<ImportRowResult> Rows => _preview!.Rows.OrderBy(r => r.Problems.Count == 0).ThenBy(r => r.Row).ToList();
+
+    private async Task Picked(InputFileChangeEventArgs e)
+    {
+        _preview = null;
+        _error = null;
+        _file = e.File;
+        try
+        {
+            await using var s = e.File.OpenReadStream(10 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            _bytes = ms.ToArray();
+            await Preview();
+        }
+        catch (IOException) { _error = L["imp.tooLarge"]; _file = null; }
+    }
+
+    private async Task Preview()
+    {
+        if (_file is null || _bytes is null) return;
+        _busy = true;
+        _error = null;
+        try { _preview = await Api.UploadAsync<ImportPreview>(Api.C(PreviewPath), new MemoryStream(_bytes), _file.Name); }
+        catch (ApiException e) { _error = e.Problem.Detail; _preview = null; }
+        finally { _busy = false; }
+    }
+
+    private async Task Import()
+    {
+        if (_file is null || _bytes is null) return;
+        _busy = true;
+        try
+        {
+            var r = await Api.UploadAsync<ImportResult>(Api.C(ImportPath), new MemoryStream(_bytes), _file.Name);
+            Toasts.Success(L.F("imp.done", r.ImportedRows));
+            await OnImported.InvokeAsync();
+            if (Shell.Company is { } c) Nav.NavigateTo(NavModel.Href(c.Id, Done));
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

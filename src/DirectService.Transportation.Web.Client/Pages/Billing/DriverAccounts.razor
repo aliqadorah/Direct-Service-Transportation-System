@@ -1,0 +1,55 @@
+@page "/c/{Company}/driver-accounts"
+@*
+  SCR-27 driver accounts — entry list (FR-076): open wages, open advances and net due per driver as of a date (RPT-19); a row opens the
+  driver's account. Any driver (also one with nothing open) can be opened by name or plate.
+*@
+@using DirectService.Transportation.Contracts.Reports
+@inject Api Api
+@inject Loc L
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.driverAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"])])">
+    <Actions><Btn Icon="file" Text="@L["drv.advancesList"]" Href="@NavModel.Href(Company, "driver-accounts/advances")" /><Btn Icon="file" Text="@L["drv.settlementsList"]" Href="@NavModel.Href(Company, "driver-accounts/settlements")" /></Actions>
+</PageHeader>
+<div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+    <ComboField TValue="string?" @bind-Value="_driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["drv.openAccount"]" Placeholder="@L["md.driverSearch"]" FieldClass="w260"
+                OnSelected="@(o => { if (o?.Value is { } id) Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/{id}")); })" />
+    <DateField @bind-Value="_asOf" Label="@L["rep.asOf"]" FieldClass="w160" @bind-Value:after="Load" />
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="export" Text="PDF" OnClick="@(() => Export("pdf"))" />
+    </span>
+</div>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="check" Title="@L["drv.noneOpen"]" Text="@L["drv.noneOpenText"]" /></Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.driverAccounts"]"><ChildContent><ReportGrid Result="_result!" ShowFilters="false" /></ChildContent></ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private ReportResult? _result;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _driver;
+    private DateOnly? _asOf;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private string Query => _asOf is { } d ? "?asOf=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "";
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _result = await Api.GetAsync<ReportResult>(Api.C("reports/standard/driver-balances" + Query));
+            _state = _result.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("reports/standard/driver-balances/export" + Query), format);
+}

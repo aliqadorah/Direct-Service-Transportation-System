@@ -1,0 +1,374 @@
+@page "/c/{Company}/invoices/new"
+@page "/c/{Company}/invoices/manual"
+@page "/c/{Company}/invoices/{Id}/edit"
+@*
+  SCR-21 trip invoice (US-07, FR-038, FR-040…044, BR-023): customer → only its active unbilled trips, period / site / material filters,
+  select all, live totals from the server (lines − discount + fees → tax → total), layout, notes. SCR-22 manual invoice (US-08, FR-039):
+  description × quantity × unit price lines (each > 0). Also edits a draft (FR-042). With invoice approval on (FR-041) "Save as draft"
+  keeps it unnumbered and "Save & approve" numbers and posts it; otherwise Save approves. Refusals (closed period, a trip taken meanwhile,
+  discount above the subtotal, mapping incomplete) come back from the API and are listed in the error summary.
+*@
+@implements IDisposable
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <PageHeader Title="@Title" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
+            <Badges>@if (_draft is not null) {<StatusTag Status="draft" />}</Badges>
+            <Actions>
+                @if (_calc?.ApprovalRequired == true)
+                {
+                    <Btn Text="@L["inv.saveDraft"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />
+                    <Btn Primary="true" Text="@L["inv.saveApprove"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
+                }
+                else
+                {
+                    <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
+                }
+            </Actions>
+        </PageHeader>
+        <PostingBanner OnStatus="r => _postingReady = r" />
+        @if (_draft is not null) {<RecordLockGuard EntityType="TRN.Invoice" Id="@_draft.Invoice.Id" OnState="h => _lockedBy = h" />}
+        <EditForm EditContext="_ctx" OnValidSubmit="() => Save(_calc?.ApprovalRequired != true)" id="invoice-form" class="stack fill" style="min-height:0">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <section class="box pad" style="flex:none">
+                <div class="fg" style="grid-template-columns:repeat(6,minmax(0,1fr))">
+                    <ComboField TValue="string?" @bind-Value="_m.CustomerId" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="true" Span="2"
+                                ReadOnly="_draft is not null && _manual is false" OnSelected="_ => CustomerChanged()" />
+                    <DateField @bind-Value="_m.InvoiceDate" Label="@L["inv.date"]" Required="true" @bind-Value:after="Recalculate" />
+                    <DateField @bind-Value="_m.DueDate" Label="@L["inv.due"]" Help="@DueHelp" />
+                    @if (_manual)
+                    {
+                        <SelectField TValue="string?" @bind-Value="_m.LayoutType" Options="Layouts" Label="@L["inv.layout"]" Span="2" />
+                    }
+                    else
+                    {
+                        <DateField @bind-Value="_from" Label="@L["trip.from"]" @bind-Value:after="LoadTrips" />
+                        <DateField @bind-Value="_to" Label="@L["trip.to"]" @bind-Value:after="LoadTrips" />
+                        <ComboField TValue="string?" @bind-Value="_loading" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" OnSelected="_ => LoadTrips()" />
+                        <ComboField TValue="string?" @bind-Value="_unloading" Options="Lookups.UnloadingSites" Label="@L["trip.unloading"]" Placeholder="@L["tar.all"]" OnSelected="_ => LoadTrips()" />
+                        <ComboField TValue="string?" @bind-Value="_material" Options="Lookups.Materials" Label="@L["trip.material"]" Placeholder="@L["tar.all"]" OnSelected="_ => LoadTrips()" />
+                    }
+                </div>
+            </section>
+            <div class="cols fill" style="grid-template-columns:1fr 290px;align-items:stretch;min-height:0">
+                @if (_manual)
+                {
+                    <Box Title="@L["inv.items"]" NoPad="true" Style="display:flex;flex-direction:column;overflow:hidden">
+                        <Actions><Btn Small="true" Icon="plus" Text="@L["inv.addLine"]" OnClick="AddLine" /></Actions>
+                        <ChildContent>
+                            @if (_m.Lines.Count == 0)
+                            {
+                                <EmptyState Icon="file" Title="@L["inv.addLineTitle"]" Text="@L["inv.addLineText"]">
+                                    <Actions><Btn Primary="true" Icon="plus" Text="@L["inv.addLine"]" OnClick="AddLine" /></Actions>
+                                </EmptyState>
+                            }
+                            else
+                            {
+                                <div class="tbl-wrap fill">
+                                    <table class="tbl">
+                                        <caption class="sr-only">@L["inv.items"]</caption>
+                                        <thead><tr><th scope="col">@L["inv.description"]</th><th scope="col" class="n">@L["inv.qty"]</th><th scope="col" class="n">@L["inv.unitPrice"]</th><th scope="col" class="n">@L["inv.amount"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th></tr></thead>
+                                        <tbody>
+                                            @for (var i = 0; i < _m.Lines.Count; i++)
+                                            {
+                                                var line = _m.Lines[i];
+                                                var n = i + 1;
+                                                <tr @key="line">
+                                                    <td style="min-width:240px"><TextField @bind-Value="line.Description" MaxLength="300" aria-label="@L.F("inv.lineDescription", n)" Error="@LineError(i, "description")" /></td>
+                                                    <td class="n" style="width:120px"><NumberField @bind-Value="line.Quantity" Min="0.001m" aria-label="@L.F("inv.lineQty", n)" Error="@LineError(i, "quantity")" @bind-Value:after="Recalculate" /></td>
+                                                    <td class="n" style="width:140px"><NumberField @bind-Value="line.UnitPrice" Decimals="4" Min="0.0001m" aria-label="@L.F("inv.linePrice", n)" Error="@LineError(i, "unitPrice")" @bind-Value:after="Recalculate" /></td>
+                                                    <td class="n"><bdi class="num">@Fmt.Money(LineAmount(line))</bdi></td>
+                                                    <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" OnClick="() => RemoveLine(line)" /></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            <div class="pad"><TextAreaField @bind-Value="_m.Notes" Label="@L["inv.notesPrinted"]" MaxLength="1000" Rows="2" /></div>
+                        </ChildContent>
+                    </Box>
+                }
+                else
+                {
+                    <Box NoPad="true" Style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
+                        <ChildContent>
+                            <div class="bh">
+                                <span>@L["inv.unbilledTrips"]</span> <Badge Tone="Tone.Primary" Text="@Fmt.Count(_rows.Count)" />
+                                <span class="a">
+                                    <Btn Small="true" Text="@L["ui.selectAll"]" Disabled="_rows.Count == 0" OnClick="SelectAll" />
+                                    @if (_selected.Count > 0) {<Btn Small="true" Ghost="true" Text="@L["ui.clear"]" OnClick="ClearSelection" />}
+                                </span>
+                            </div>
+                            @if (_m.CustomerId is null)
+                            {
+                                <EmptyState Icon="users" Title="@L["inv.pickCustomer"]" Text="@L["inv.pickCustomerText"]" />
+                            }
+                            else if (_tripsLoading)
+                            {
+                                <Skeleton Kind="SkeletonKind.List" />
+                            }
+                            else if (_rows.Count == 0)
+                            {
+                                <EmptyState Icon="truck" Title="@L["inv.noUnbilled"]" Text="@L["inv.noUnbilledText"]">
+                                    <Actions><Btn Text="@L["nav.manualInvoice"]" Href="@NavModel.Href(Company, "invoices/manual")" /></Actions>
+                                </EmptyState>
+                            }
+                            else
+                            {
+                                <div class="fill" style="min-height:0;overflow:auto">
+                                    <DataGrid TItem="PickRow" Items="_rows" Key="r => r.Id" Caption="@L["inv.unbilledTrips"]" Selectable="true" Selected="_selected" SelectedChanged="Picked">
+                                        <Columns>
+                                            <GridColumn TItem="PickRow" Title="@L["trip.receiptNo"]" Value="r => r.ReceiptNo" Ltr="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.date"]" Value="r => Fmt.Date(r.Date, Shell.DateFormat)" Ltr="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.driver"]" Value="r => r.Driver" Clip="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["md.plate"]" Value="r => r.Plate" Ltr="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.loading"]" Value="r => r.Loading" Clip="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.unloading"]" Value="r => r.Unloading" Clip="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.material"]" Value="r => r.Material" />
+                                            <GridColumn TItem="PickRow" Title="@L["inv.billedQty"]" Value="r => Fmt.Qty(r.Qty)" Numeric="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.price"]" Value="r => Fmt.Money(r.Price)" Numeric="true" />
+                                            <GridColumn TItem="PickRow" Title="@L["trip.revenue"]" Value="r => Fmt.Money(r.Revenue)" Numeric="true" />
+                                        </Columns>
+                                    </DataGrid>
+                                </div>
+                            }
+                        </ChildContent>
+                    </Box>
+                }
+                <div class="box pad stack" style="align-self:start;gap:6px">
+                    <h2 class="lbl" style="font-size:14px;margin:0">@L["inv.totals"]</h2>
+                    @if (!_manual) {<div class="ln"><span>@L["inv.selectedTrips"]</span><bdi class="num">@Fmt.Count(_selected.Count)</bdi></div>}
+                    <div class="ln"><span>@L["inv.subtotal"]</span><Money Value="_calc?.Subtotal" Decimals="Decimals" /></div>
+                    <NumberField @bind-Value="_m.Discount" Label="@L["inv.discount"]" Min="0m" Decimals="Decimals" @bind-Value:after="Recalculate"
+                                 Error="@(_m.Discount > _calc?.Subtotal ? L["inv.discountAbove"] : null)" />
+                    <NumberField @bind-Value="_m.ExtraFees" Label="@L["inv.fees"]" Min="0m" Decimals="Decimals" @bind-Value:after="Recalculate" />
+                    @if (_m.ExtraFees > 0) {<TextField @bind-Value="_m.ExtraFeesDescription" Label="@L["inv.feesDescription"]" Required="true" MaxLength="200" />}
+                    <div class="ln"><span>@L["inv.base"]</span><Money Value="_calc?.BaseAmount" Decimals="Decimals" /></div>
+                    <div class="ln"><span>@L.F("inv.taxAt", Fmt.Percent(_calc?.TaxRate))</span><Money Value="_calc?.Tax" Decimals="Decimals" /></div>
+                    <div class="ln tot big"><span>@L["inv.total"]</span><Money Value="_calc?.Total" Decimals="Decimals" /></div>
+                    @if (_calc?.TaxInclusive == true) {<p class="help" style="margin:0">@L["inv.taxInclusive"]</p>}
+                    @if (!_manual)
+                    {
+                        <SelectField TValue="string?" @bind-Value="_m.LayoutType" Options="Layouts" Label="@L["inv.layout"]" />
+                        <TextAreaField @bind-Value="_m.Notes" Label="@L["inv.notesPrinted"]" MaxLength="1000" Rows="2" />
+                    }
+                    <p class="help" style="margin:0">@L[_calc?.ApprovalRequired == true ? "inv.approvalOn" : "inv.approvalOff"]</p>
+                </div>
+            </div>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private InvoiceDetails? _draft;
+    private InvoiceCalculationResponse? _calc;
+    private List<PickRow> _rows = [];
+    private IReadOnlySet<object> _selected = new HashSet<object>();
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy, _loading, _unloading, _material;
+    private DateOnly? _from, _to;
+    private bool _manual, _saving, _tripsLoading, _postingReady = true, _dueTouched;
+    private int _tripsVersion;
+    private DateOnly? _lastAutoDue;
+    private IReadOnlyList<string>? _extra;
+    private Dictionary<string, string> _lineErrors = new(StringComparer.Ordinal);
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private CancellationTokenSource? _calcCts;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? Id { get; set; }
+
+    private string Title => _draft is not null ? L.F("inv.editDraft", _draft.Invoice.Customer.Name) : L[_manual ? "nav.manualInvoice" : "nav.newTripInvoice"];
+    private int Decimals => _calc?.Decimals ?? 3;
+    private bool CanSave => _postingReady && _lockedBy is null && !_saving && Shell.Can(PermissionKeys.InvIssue);
+    private string? DueHelp => _calc?.PaymentTermsDays is int d ? L.F("inv.termsDays", d) : null;
+
+    private IReadOnlyList<Option<string?>> Layouts => [new(InvoiceCodes.Claim, L["inv.layoutClaim"]), new(InvoiceCodes.TaxInvoice, L["inv.layoutTax"])];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _manual = Id is null && Nav.Uri.Contains("/invoices/manual", StringComparison.Ordinal);
+        _ctx = new EditContext(_m);
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            if (Id is not null)
+            {
+                _draft = await Api.GetAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}"));
+                var inv = _draft.Invoice;
+                if (inv.Status != InvoiceCodes.Draft) { Nav.NavigateTo(NavModel.Href(Company, $"invoices/{inv.Id}"), replace: true); return; }
+                _manual = inv.InvoiceType == InvoiceCodes.Manual;
+                _m.CustomerId = inv.Customer.Id;
+                _m.InvoiceDate = inv.InvoiceDate;
+                _m.DueDate = inv.DueDate;
+                _dueTouched = true;
+                _m.Discount = inv.Discount;
+                _m.ExtraFees = inv.ExtraFees;
+                _m.ExtraFeesDescription = inv.ExtraFeesDescription;
+                _m.LayoutType = inv.LayoutType;
+                _m.Notes = inv.Notes;
+                _m.RowVersion = inv.RowVersion;
+                if (_manual) _m.Lines = _draft.Lines.Select(l => new LineModel { Description = l.Description, Quantity = l.Quantity, UnitPrice = l.UnitPrice }).ToList();
+                else _selected = _draft.Lines.Where(l => l.Trip is not null).Select(l => (object)l.Trip!.Id).ToHashSet();
+            }
+            else
+            {
+                _m.LayoutType = _manual ? InvoiceCodes.TaxInvoice : InvoiceCodes.Claim;
+                if (_manual) _m.Lines.Add(new LineModel());
+                if (!_manual && System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["customer"] is { Length: > 0 } c) _m.CustomerId = c;
+            }
+            _state = LoadState.Ready;
+            await Recalculate();
+            _m.InvoiceDate ??= _calc?.Today;
+            await LoadTrips();
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task CustomerChanged()
+    {
+        if (_draft is null) { _selected = new HashSet<object>(); }
+        if (!_dueTouched) _m.DueDate = null;
+        await LoadTrips();
+    }
+
+    /// <summary>The customer's unbilled trips (with a draft's own trips first, still selectable).</summary>
+    private async Task LoadTrips()
+    {
+        var version = ++_tripsVersion;
+        if (_manual || _m.CustomerId is null) { _rows = []; await Recalculate(); return; }
+        _tripsLoading = true;
+        try
+        {
+            string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            var qs = $"customer={U(_m.CustomerId)}&from={D(_from)}&to={D(_to)}&loadingSite={U(_loading)}&unloadingSite={U(_unloading)}&material={U(_material)}";
+            var r = await Api.GetAsync<UnbilledTripsResponse>(Api.C("invoices/unbilled-trips?" + qs));
+            if (version != _tripsVersion) return;   // the customer or a filter changed meanwhile
+            var rows = new List<PickRow>();
+            if (_draft is not null && _draft.Invoice.Customer.Id == _m.CustomerId)
+                rows.AddRange(_draft.Lines.Where(l => l.Trip is not null).Select(l => new PickRow(l.Trip!.Id, l.Trip.Name, l.LoadingDate, l.Driver, l.TruckPlate, l.LoadingSite,
+                    l.UnloadingSite, l.Material, l.Quantity, l.UnitPrice, l.Amount)));
+            rows.AddRange(r.Trips.Where(t => rows.All(x => x.Id != t.Id)).Select(t => new PickRow(t.Id, t.ReceiptNo, t.TripDate, t.Driver.Name, t.TruckPlate,
+                t.LoadingSite.Name, t.UnloadingSite.Name, t.Material.Name, t.BillingQty, t.CustomerPrice, t.Revenue)));
+            _rows = rows;
+            // A selection hidden by the filters is kept only for trips still listed.
+            _selected = _selected.Where(k => _rows.Any(x => (object)x.Id == k || x.Id.Equals(k))).ToHashSet();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); _rows = []; }
+        finally { if (version == _tripsVersion) _tripsLoading = false; }
+        await Recalculate();
+    }
+
+    private static string U(string? s) => Uri.EscapeDataString(s ?? "");
+
+    private Task Picked(IReadOnlySet<object> s) { _selected = s; return Recalculate(); }
+    private Task SelectAll() { _selected = _rows.Select(r => (object)r.Id).ToHashSet(); return Recalculate(); }
+    private Task ClearSelection() { _selected = new HashSet<object>(); return Recalculate(); }
+
+    private void AddLine() => _m.Lines.Add(new LineModel());
+
+    private Task RemoveLine(LineModel l) { _m.Lines.Remove(l); return Recalculate(); }
+
+    private decimal? LineAmount(LineModel l) => l.Quantity is decimal q && l.UnitPrice is decimal p ? Math.Round(q * p, Decimals, MidpointRounding.AwayFromZero) : null;
+
+    private string? LineError(int i, string field) => _lineErrors.GetValueOrDefault($"lines[{i}].{field}");
+
+    /// <summary>Totals from the server (the latest request wins); also brings the due date from the customer's terms and the approval setting.</summary>
+    private async Task Recalculate()
+    {
+        _calcCts?.Cancel();
+        _calcCts?.Dispose();
+        _calcCts = new CancellationTokenSource();
+        var token = _calcCts.Token;
+        try
+        {
+            _calc = await Api.PostAsync<InvoiceCalculationResponse>(Api.C("invoices/calculate"), new InvoiceCalculationRequest(
+                _manual ? InvoiceCodes.Manual : InvoiceCodes.Trip, _m.CustomerId, _m.InvoiceDate, _manual ? null : _selected.Select(k => k.ToString()!).ToList(),
+                _manual ? _m.Lines.Select(l => new ManualLineRequest(l.Description, l.Quantity, l.UnitPrice)).ToList() : null, _m.Discount, _m.ExtraFees), token);
+            // The due date follows the customer's terms until the user changes it.
+            if (_m.DueDate is null || _m.DueDate == _lastAutoDue) { _m.DueDate = _calc.DueDate; _lastAutoDue = _calc.DueDate; }
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiException) { }
+    }
+
+    private async Task Save(bool approve)
+    {
+        if (!CanSave) return;
+        _extra = null;
+        _lineErrors.Clear();
+        if (!_ctx.Validate()) { if (_summary is not null) await _summary.FocusAsync(); return; }
+        _saving = true;
+        try
+        {
+            var req = new InvoiceRequest(_m.CustomerId, _manual ? InvoiceCodes.Manual : InvoiceCodes.Trip, _m.InvoiceDate, _m.DueDate,
+                _manual ? null : _selected.Select(k => k.ToString()!).ToList(),
+                _manual ? _m.Lines.Select(l => new ManualLineRequest(l.Description?.Trim(), l.Quantity, l.UnitPrice)).ToList() : null,
+                _m.Discount, _m.ExtraFees, _m.ExtraFees > 0 ? _m.ExtraFeesDescription?.Trim() : null, _m.LayoutType,
+                string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), approve, _draft is null ? _m.ClientId : null, _m.RowVersion);
+            var r = _draft is null
+                ? await Api.PostAsync<InvoiceDetails>(Api.C("invoices"), req)
+                : await Api.PutAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(_draft.Invoice.Id)}"), req);
+            var inv = r.Invoice;
+            Toasts.Success(inv.Status == InvoiceCodes.Draft ? L["inv.draftSaved"] : L.F("inv.approved", inv.Number ?? "", Fmt.Money(inv.Total, Decimals)),
+                L["inv.open"], NavModel.Href(Company, $"invoices/{inv.Id}"));
+            Nav.NavigateTo(NavModel.Href(Company, $"invoices/{inv.Id}"));
+        }
+        catch (ApiException e)
+        {
+            foreach (var x in e.Problem.Errors ?? []) if (x.Field?.StartsWith("lines[", StringComparison.Ordinal) == true) _lineErrors[x.Field] = x.Message ?? "";
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    public void Dispose()
+    {
+        _calcCts?.Cancel();
+        _calcCts?.Dispose();
+    }
+
+    private sealed record PickRow(string Id, string ReceiptNo, DateOnly? Date, string? Driver, string? Plate, string? Loading, string? Unloading, string? Material,
+        decimal Qty, decimal Price, decimal Revenue);
+
+    private sealed class Model
+    {
+        public string? CustomerId { get; set; }
+        public DateOnly? InvoiceDate { get; set; }
+        public DateOnly? DueDate { get; set; }
+        public decimal? Discount { get; set; }
+        public decimal? ExtraFees { get; set; }
+        public string? ExtraFeesDescription { get; set; }
+        public string? LayoutType { get; set; }
+        public string? Notes { get; set; }
+        public List<LineModel> Lines { get; set; } = [];
+        public string? RowVersion { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+
+    private sealed class LineModel
+    {
+        public string? Description { get; set; }
+        public decimal? Quantity { get; set; }
+        public decimal? UnitPrice { get; set; }
+    }
+}

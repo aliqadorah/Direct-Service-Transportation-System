@@ -1,0 +1,81 @@
+@page "/c/{Company}/driver-accounts/settlements"
+@* Settlements register (FR-080, RPT-21): views All / Active / Void, driver and period filters, number search, total of active net payments. *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject TripLookups Lookups
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["drv.settlementsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.settlementsList"])])" />
+<ListShell Label="@L["drv.settlementsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search"
+           State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="file" EmptyTitle="@L["drv.noSettlements"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <ComboField TValue="string?" @bind-Value="_driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <ChildContent>
+        <DataGrid TItem="SettlementResponse" Items="_page!.Page.Items" Key="s => s.Id" Caption="@L["drv.settlementsList"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  OnRowClick="@(s => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}")))" RowClass="@(s => s.Status == "Void" ? "void" : null)"
+                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+            <Columns>
+                <GridColumn TItem="SettlementResponse" Title="@L["doc.number"]" Value="s => s.Number" Ltr="true" SortKey="number" />
+                <GridColumn TItem="SettlementResponse" Title="@L["trip.date"]" Value="s => Fmt.Date(s.SettlementDate, Shell.DateFormat)" Ltr="true" SortKey="settlementDate" />
+                <GridColumn TItem="SettlementResponse" Title="@L["trip.driver"]" Value="s => s.Driver.Name" Clip="true" SortKey="driver" />
+                <GridColumn TItem="SettlementResponse" Title="@L["drv.gross"]" Value="s => Fmt.Money(s.GrossWages)" Numeric="true" />
+                <GridColumn TItem="SettlementResponse" Title="@L["md.openAdvances"]" Value="s => Fmt.Money(s.AdvancesTotal)" Numeric="true" />
+                <GridColumn TItem="SettlementResponse" Title="@L["drv.deductions"]" Value="s => Fmt.Money(s.DeductionsTotal)" Numeric="true" />
+                <GridColumn TItem="SettlementResponse" Title="@L["drv.net"]" Value="s => Fmt.Money(s.NetPayable)" Numeric="true" SortKey="net" Footer="@Fmt.Money(_page.Totals.Amount)" />
+                <GridColumn TItem="SettlementResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "settlementDate", Desc = true };
+    private SettlementPage? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _driver;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("active", L["st.posted"]), new("void", L["st.void"])];
+    private bool Filtered => _q.Q is not null || _driver is not null || _from is not null || _to is not null;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        Set("status", _view);
+        Set("driver", _driver);
+        Set("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<SettlementPage>(Api.C("settlements" + Query(true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+    private Task ClearAll() { _q.Q = _driver = null; _from = _to = null; _q.Page = 1; return Load(); }
+}

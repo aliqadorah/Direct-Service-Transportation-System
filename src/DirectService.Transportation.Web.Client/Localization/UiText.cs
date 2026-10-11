@@ -5,9 +5,21 @@ namespace DirectService.Transportation.Web.Client.Localization;
 /// status tags, <c>shell.</c> top bar and menus. Screen text is added per screen in step 8. Business error messages come from the API
 /// in the user's language and are not repeated here.
 /// </summary>
-public static class UiText
+public static partial class UiText
 {
-    public static readonly IReadOnlyDictionary<string, (string Ar, string En)> All = new Dictionary<string, (string Ar, string En)>(StringComparer.Ordinal)
+    /// <summary>Every key of every module; a key defined twice fails at start-up (and in the UI tests).</summary>
+    public static readonly IReadOnlyDictionary<string, (string Ar, string En)> All = Merge(Core(), Billing(), Accounting(), Reports(), Settings(), Platform());
+
+    private static Dictionary<string, (string Ar, string En)> Merge(params Dictionary<string, (string Ar, string En)>[] parts)
+    {
+        var all = new Dictionary<string, (string Ar, string En)>(StringComparer.Ordinal);
+        foreach (var part in parts)
+            foreach (var (k, v) in part)
+                if (!all.TryAdd(k, v)) throw new InvalidOperationException("UI text key defined twice: " + k);
+        return all;
+    }
+
+    private static Dictionary<string, (string Ar, string En)> Core() => new(StringComparer.Ordinal)
     {
         // ---- component chrome
         ["ui.loading"] = ("جارٍ التحميل…", "Loading…"),

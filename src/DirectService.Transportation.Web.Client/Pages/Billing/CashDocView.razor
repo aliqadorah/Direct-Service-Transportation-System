@@ -1,0 +1,76 @@
+@*
+  View of a cash document (receipt, advance, settlement, partner payment; FR-069, FR-073, FR-080, FR-086, FR-090): number and status,
+  details, extra sections, amount in words, journal entry, history; print the voucher ("Copy" on reprints) and void with a required reason
+  (reversal entry). Pages load the document and pass what to show.
+*@
+@inject Loc L
+@inject ShellState Shell
+
+<PageHeader Title="@Title" Crumbs="Crumbs">
+    <Badges><StatusTag Status="@(PostingPending && !IsVoid ? "pending" : BillingStatus.Document(IsVoid ? "Void" : "Active"))" /></Badges>
+    <Actions>
+        @Actions
+        <Btn Icon="print" Text="@L["cash.printVoucher"]" Href="@PrintHref" />
+        @if (!IsVoid && CanVoid) {<Btn Danger="true" Icon="x" Text="@L["inv.void"]" OnClick="() => _voiding = true" />}
+    </Actions>
+</PageHeader>
+@if (IsVoid) {<Banner Tone="Tone.Err" Text="@L.F("cash.voidBanner", VoidReason ?? "")" />}
+@if (PostingPending && !IsVoid) {<Banner Tone="Tone.Warn" Text="@L["doc.postingPending"]" />}
+@Above
+<div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
+    <div class="stack" style="min-width:0">
+        <Box><KeyValues Columns="3" Items="Details" /></Box>
+        @ChildContent
+    </div>
+    <div class="stack">
+        <Box Title="@L["inv.amount"]">
+            <div class="ln tot big"><span>@AmountLabel</span><Money Value="Amount" /></div>
+            <p class="muted" style="margin:8px 0 0"><Tx Value="@L.F("doc.inWords", AmountInWords)" /></p>
+        </Box>
+        @if (Entry is { } je)
+        {
+            <Box Title="@L["doc.entry"]">
+                @if (Shell.Can(PermissionKeys.AcctView) || Shell.Can(PermissionKeys.JeView)) {<a href="@NavModel.Href(Shell.Company?.Id ?? "", $"accounting/journal/{je.Id}")"><bdi>@je.Number</bdi></a>}
+                else {<bdi>@je.Number</bdi>}
+            </Box>
+        }
+        <Box Title="@L["ui.history"]"><RecordHistory Items="History" /></Box>
+    </div>
+</div>
+
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("cash.voidTitle", Title)" Danger="true" AskReason="true" ConfirmText="@L["inv.void"]"
+               Message="@VoidText" Busy="_busy" Error="@_error" OnConfirm="Void" />
+
+@code {
+    private bool _voiding, _busy;
+    private string? _error;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public IReadOnlyList<Crumb>? Crumbs { get; set; }
+    [Parameter] public bool IsVoid { get; set; }
+    [Parameter] public string? VoidReason { get; set; }
+    [Parameter] public bool PostingPending { get; set; }
+    [Parameter] public IReadOnlyList<KeyValue> Details { get; set; } = [];
+    [Parameter] public decimal Amount { get; set; }
+    [Parameter] public string? AmountLabel { get; set; }
+    [Parameter] public string AmountInWords { get; set; } = "";
+    [Parameter] public Contracts.Trips.DocRef? Entry { get; set; }
+    [Parameter] public IReadOnlyList<Contracts.MasterData.HistoryEntry> History { get; set; } = [];
+    [Parameter] public string PrintHref { get; set; } = "";
+    [Parameter] public bool CanVoid { get; set; }
+    [Parameter] public string? VoidText { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Above { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Voids the document with the reason; returns the refusal message, or null when it worked.</summary>
+    [Parameter] public Func<string, Task<string?>>? OnVoid { get; set; }
+
+    private async Task Void(string reason)
+    {
+        if (OnVoid is null) return;
+        _busy = true;
+        _error = await OnVoid(reason);
+        _busy = false;
+        if (_error is null) _voiding = false;
+    }
+}

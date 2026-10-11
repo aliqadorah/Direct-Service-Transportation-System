@@ -346,4 +346,62 @@ public sealed class InvoiceTests(ApiFactory f)
         var steal = await other.Client.PostAsJsonAsync(U(other, "/invoices"), new InvoiceRequest(otherCustomer.Id, "Trip", Today, null, [w.Trips[2].Id], null, 0, 0, null, null, null, false, null, null));
         Assert.Equal(HttpStatusCode.BadRequest, steal.StatusCode);
     }
+
+    // ------------------------------------------------------------------ screen support (step 8, DT-146 … DT-149)
+
+    [Fact]
+    public async Task Screens_get_live_totals_list_exports_receipts_of_an_invoice_money_accounts_and_an_unlogged_preview()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var c = o.Client;
+        // Live totals with the PRD example: 720 − 20 + 5 = 705, tax 112.800, total 817.800; due date from the customer's 30-day terms (DT-148).
+        var calc = await ReadAsync<InvoiceCalculationResponse>(await c.PostAsJsonAsync(U(o, "/invoices/calculate"),
+            new InvoiceCalculationRequest("Trip", w.Customer.Id, Today, w.Trips.Take(4).Select(t => t.Id).ToList(), null, 20m, 5m)));
+        Assert.Equal((720.000m, 705.000m, 112.800m, 817.800m), (calc.Subtotal, calc.BaseAmount, calc.Tax, calc.Total));
+        Assert.Equal(Today.AddDays(30), calc.DueDate);
+        Assert.True(calc.ApprovalRequired);
+        var manual = await ReadAsync<InvoiceCalculationResponse>(await c.PostAsJsonAsync(U(o, "/invoices/calculate"),
+            new InvoiceCalculationRequest("Manual", null, Today, null, [new ManualLineRequest("Transport", 2m, 350m), new ManualLineRequest("Night loading", 1m, 170m)], null, null)));
+        Assert.Equal(1009.200m, manual.Total);
+
+        var inv = await ReadAsync<InvoiceDetails>(await c.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Take(4), approve: true)));
+        // Credit-note preview with the PRD example (one trip of 180.000 → 204.450); nothing is saved.
+        var preview = await ReadAsync<CreditNoteCalculation>(await c.PostAsJsonAsync(U(o, "/credit-notes/calculate"),
+            new CreditNoteRequest(inv.Invoice.Id, Today, "Returned", [new CreditLineRequest(inv.Lines[0].Id, null)], null)));
+        Assert.Equal((176.250m, 28.200m, 204.450m), (preview.BaseAmount, preview.Tax, preview.Total));
+        Assert.Empty((await c.GetFromJsonAsync<Contracts.Common.PagedResult<CreditNoteResponse>>(U(o, "/credit-notes")))!.Items);
+
+        // List exports (FR-047, FR-165).
+        var csv = await c.GetAsync(U(o, "/invoices/export?format=csv"));
+        await csv.EnsureOkAsync();
+        Assert.Contains("INV-00001", await csv.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        await (await c.GetAsync(U(o, "/credit-notes/export"))).EnsureOkAsync();
+
+        // Cash boxes and banks for cash documents (DT-147), and the receipts of one invoice (FR-048).
+        var money = await ReadAsync<MoneyAccountOptions>(await c.GetAsync(U(o, "/accounting/money-accounts/options")));
+        Assert.NotEmpty(money.CashBoxes);
+        await (await c.PostAsJsonAsync(U(o, "/receipts"), new Contracts.Cash.ReceiptRequest(w.Customer.Id, Today, inv.Invoice.Id, 100m, "Cash", money.CashBoxes[0].Id, null, null, 0, null, null))).EnsureOkAsync();
+        await (await c.PostAsJsonAsync(U(o, "/receipts"), new Contracts.Cash.ReceiptRequest(w.Customer.Id, Today, null, 50m, "Cash", money.CashBoxes[0].Id, null, null, 0, null, null))).EnsureOkAsync();
+        var onInvoice = await ReadAsync<Contracts.Cash.ReceiptPage>(await c.GetAsync(U(o, $"/receipts?invoice={inv.Invoice.Id}")));
+        Assert.Equal(100m, Assert.Single(onInvoice.Page.Items).Amount);
+
+        // The on-screen preview is not a print (FR-058); the printout is, and a voucher's second print is a Copy (FR-090).
+        async Task<int> Prints() => (await ReadAsync<List<HistoryEntry>>(await c.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/history")))).Count(h => h.Action == "Print");
+        var before = await Prints();
+        await (await c.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/print?format=html&preview=true"))).EnsureOkAsync();
+        Assert.Equal(before, await Prints());
+        await (await c.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/print?format=html"))).EnsureOkAsync();
+        Assert.Equal(before + 1, await Prints());
+        // A PDF is always a logged print, even when asked as a preview (review H1).
+        await (await c.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}/print?format=pdf&preview=true"))).EnsureOkAsync();
+        Assert.Equal(before + 2, await Prints());
+        var receipt = onInvoice.Page.Items[0].Id;
+        var first = await (await c.GetAsync(U(o, $"/receipts/{receipt}/print?format=html&preview=true"))).Content.ReadAsStringAsync();
+        var printed = await (await c.GetAsync(U(o, $"/receipts/{receipt}/print?format=html"))).Content.ReadAsStringAsync();
+        var again = await (await c.GetAsync(U(o, $"/receipts/{receipt}/print?format=html&preview=true"))).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("class=\"copy\"", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"copy\"", printed, StringComparison.Ordinal);
+        Assert.Contains("class=\"copy\"", again, StringComparison.Ordinal);   // a reprint would be a copy, and the preview shows it
+    }
 }

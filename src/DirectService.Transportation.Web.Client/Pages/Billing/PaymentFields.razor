@@ -1,0 +1,34 @@
+@* Payment method, cash box or bank account (by method) and reference of a cash document (7.4): cash → cash box; transfer / CliQ → bank account with a reference. *@
+@inject Loc L
+@inject MoneyAccounts Accounts
+<SelectField TValue="string?" @bind-Value="Model.PaymentMethod" Options="MoneyAccounts.Methods(L)" Label="@L["cash.method"]" Required="true" @bind-Value:after="MethodChanged" />
+@if (Model.PaymentMethod == CashCodes.Cash)
+{
+    <SelectField TValue="string?" @bind-Value="Model.CashBoxId" Options="Accounts.CashBoxes" Empty="@L["ui.choose"]" Label="@L["cash.cashBox"]" Required="true" />
+}
+else
+{
+    <SelectField TValue="string?" @bind-Value="Model.BankAccountId" Options="Accounts.BankAccounts" Empty="@L["ui.choose"]" Label="@L["cash.bankAccount"]" Required="true" />
+}
+<TextField @bind-Value="Model.Reference" Label="@L["cash.reference"]" Required="@(Model.PaymentMethod != CashCodes.Cash)" MaxLength="100" Ltr="true"
+           Help="@(Model.PaymentMethod != CashCodes.Cash ? L["cash.referenceHelp"] : null)" />
+
+@code {
+    [Parameter, EditorRequired] public IPaymentModel Model { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Accounts.EnsureAsync(); } catch (ApiException) { }
+        Model.PaymentMethod ??= CashCodes.Cash;
+        DefaultAccount();
+    }
+
+    private void MethodChanged() => DefaultAccount();
+
+    /// <summary>A single cash box or bank account is chosen for the user.</summary>
+    private void DefaultAccount()
+    {
+        if (Model.PaymentMethod == CashCodes.Cash) { if (Model.CashBoxId is null && Accounts.CashBoxes.Count == 1) Model.CashBoxId = Accounts.CashBoxes[0].Value; }
+        else if (Model.BankAccountId is null && Accounts.BankAccounts.Count == 1) Model.BankAccountId = Accounts.BankAccounts[0].Value;
+    }
+}

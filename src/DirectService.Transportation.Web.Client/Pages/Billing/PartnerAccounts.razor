@@ -1,0 +1,56 @@
+@page "/c/{Company}/partner-accounts"
+@* SCR-28 partner accounts — entry list (FR-084): cost of partner trips, payments and balance due per partner as of a date (RPT-20); a row opens the account. *@
+@using DirectService.Transportation.Contracts.Reports
+@inject Api Api
+@inject Loc L
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.partnerAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"])])">
+    <Actions><Btn Icon="file" Text="@L["prt.paymentsList"]" Href="@NavModel.Href(Company, "partner-accounts/payments")" /></Actions>
+</PageHeader>
+<div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+    <ComboField TValue="string?" @bind-Value="_partner" Options="Lookups.Partners" Label="@L["prt.openAccount"]" FieldClass="w260"
+                OnSelected="@(o => { if (o?.Value is { } id) Nav.NavigateTo(NavModel.Href(Company, $"partner-accounts/{id}")); })" />
+    <DateField @bind-Value="_asOf" Label="@L["rep.asOf"]" FieldClass="w160" @bind-Value:after="Load" />
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="export" Text="PDF" OnClick="@(() => Export("pdf"))" />
+    </span>
+</div>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="truck" Title="@L["prt.none"]" Text="@L["prt.noneText"]" /></Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.partnerAccounts"]"><ChildContent><ReportGrid Result="_result!" ShowFilters="false" /></ChildContent></ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    private ReportResult? _result;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _partner;
+    private DateOnly? _asOf;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private string Query => _asOf is { } d ? "?asOf=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _result = await Api.GetAsync<ReportResult>(Api.C("reports/standard/partner-balances" + Query));
+            _state = _result.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("reports/standard/partner-balances/export" + Query), format);
+}

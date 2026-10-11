@@ -1,0 +1,168 @@
+@page "/c/{Company}/e-invoicing"
+@*
+  SCR-25 e-invoicing status (FR-060…065): counts and totals per status for the filtered period, views All / Rejected / Queued, document
+  type, customer and period filters, number search, the reason or the problems to fix, attempts and last attempt; submit the selected
+  documents (inv.issue), the status report as Excel/CSV (FR-065). The environment (Test / Production) is shown when settings are readable.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.einvoicing"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.einvoicing"])])">
+    <Badges>@if (_settings is { } s) {<Badge Tone="@(s.IsEnabled ? Tone.Info : Tone.Mute)" Text="@(s.IsEnabled ? L["ei.env" + s.Environment] : L["ei.off"])" />}</Badges>
+    <Actions>
+        @if (Shell.Can(PermissionKeys.InvIssue)) {<Btn Icon="send" Text="@L.F("ei.submitSelected", _selected.Count)" Disabled="_selected.Count == 0" Busy="_busy" OnClick="SubmitSelected" />}
+    </Actions>
+</PageHeader>
+@if (_settings is { IsEnabled: false } && Shell.Can(PermissionKeys.SettingsManage))
+{
+    <Banner Tone="Tone.Info" Text="@L["ei.offText"]"><Actions><a href="@NavModel.Href(Company, "settings/e-invoicing")">@L["nav.einvoiceSettings"]</a></Actions></Banner>
+}
+@if (_page is { } p)
+{
+    <Figures Items="Figures(p)" />
+}
+
+<ListShell Label="@L["nav.einvoicing"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search"
+           Exports="@(["xlsx", "csv"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="send" EmptyTitle="@L["ei.none"]" EmptyText="@L["ei.noneText"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <SelectField TValue="string?" @bind-Value="_type" Options="Types" Empty="@L["tar.all"]" Label="@L["ei.docType"]" FieldClass="w160" />
+        <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <EmptyActions>@if (Shell.Can(PermissionKeys.SettingsManage)) {<Btn Primary="true" Text="@L["nav.einvoiceSettings"]" Href="@NavModel.Href(Company, "settings/e-invoicing")" />}</EmptyActions>
+    <ChildContent>
+        <DataGrid TItem="EInvoiceSubmissionResponse" Items="_page!.Page.Items" Key="s => s.Id" Caption="@L["nav.einvoicing"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  Selectable="@Shell.Can(PermissionKeys.InvIssue)" Selected="_selected" SelectedChanged="s => _selected = s" OnRowClick="Open">
+            <Columns>
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ei.document"]" Value="s => s.Document.Number" Ltr="true" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ei.docType"]" Value="@(s => L[s.DocumentType == EInvoiceCodes.CreditNote ? "ei.creditNote" : "ei.invoice"])" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["trip.customer"]" Value="s => s.Customer.Name" Clip="true" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["trip.date"]" Value="s => Fmt.Date(s.DocumentDate, Shell.DateFormat)" Ltr="true" SortKey="date" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["inv.total"]" Value="s => Fmt.Money(s.Total)" Numeric="true" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.EInvoice(context.Status)" /></Template></GridColumn>
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ei.attempts"]" Value="s => Fmt.Count(s.Attempts)" Numeric="true" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ei.lastAttempt"]" Value="s => Fmt.DateTime((s.UpdatedAt ?? s.CreatedAt).ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="EInvoiceSubmissionResponse" Title="@L["ei.reason"]" Value="Reason" Wrap="true" />
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "date", Desc = true };
+    private EInvoicePage? _page;
+    private EInvoiceSettingsResponse? _settings;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _customer, _type;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+    private IReadOnlySet<object> _selected = new HashSet<object>();
+    private bool _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("Rejected", L["st.rejected"]), new("Queued", L["st.queued"]), new("Submitted", L["st.submitted"])];
+    private IReadOnlyList<Option<string?>> Types => [new(EInvoiceCodes.Invoice, L["ei.invoice"]), new(EInvoiceCodes.CreditNote, L["ei.creditNote"])];
+    private bool Filtered => _q.Q is not null || _customer is not null || _type is not null || _from is not null || _to is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        if (query["status"] is { Length: > 0 } st) _view = st;
+        if (query["type"] is { Length: > 0 } t) _type = t;
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        if (Shell.Can(PermissionKeys.SettingsManage))
+        {
+            try { _settings = await Api.GetAsync<EInvoiceSettingsResponse>(Api.C("settings/e-invoicing")); } catch (ApiException) { }
+        }
+        await Load();
+    }
+
+    private string Reason(EInvoiceSubmissionResponse s) =>
+        s.Problems.Count > 0 ? string.Join(" · ", s.Problems.Select(p => p.Message))
+        : s.WaitingForInvoice ? L["ei.waitingInvoice"]
+        : s.LastError ?? (s.SystemNumber is null ? "" : $"{L["ei.systemNumber"]} {s.SystemNumber}");
+
+    private IReadOnlyList<Figure> Figures(EInvoicePage p)
+    {
+        Figure F(string status, string key) => p.Totals.FirstOrDefault(t => t.Status == status) is { } t
+            ? new Figure(L[key], Fmt.Count(t.Count), Fmt.Money(t.Total)) : new Figure(L[key], "0");
+        return [F(EInvoiceCodes.Submitted, "st.submitted"), F(EInvoiceCodes.Queued, "st.queued"), F(EInvoiceCodes.Rejected, "st.rejected"), F(EInvoiceCodes.NotRequired, "st.notRequired")];
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        Set("status", _view == "all" ? null : _view);
+        Set("documentType", _type);
+        Set("customer", _customer);
+        Set("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<EInvoicePage>(Api.C("einvoice-submissions" + Query(true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+            _selected = new HashSet<object>();
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private Task ClearAll()
+    {
+        _q.Q = _customer = _type = null;
+        _from = _to = null;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("einvoice-submissions/export" + Query(false)), format);
+
+    private void Open(EInvoiceSubmissionResponse s) =>
+        Nav.NavigateTo(NavModel.Href(Company, s.DocumentType == EInvoiceCodes.CreditNote ? $"credit-notes/{s.Document.Id}" : $"invoices/{s.Document.Id}"));
+
+    /// <summary>Submits the selected documents one by one (FR-062, FR-063) and reports how many were accepted.</summary>
+    private async Task SubmitSelected()
+    {
+        _busy = true;
+        int accepted = 0, failed = 0;
+        try
+        {
+            foreach (var id in _selected.Select(k => k.ToString()!).ToList())
+            {
+            try
+            {
+                var r = await Api.PostAsync<EInvoiceSubmissionDetails>(Api.C($"einvoice-submissions/{Uri.EscapeDataString(id)}/submit"), null);
+                if (r.Submission.Status == EInvoiceCodes.Submitted) accepted++; else failed++;
+            }
+            catch (ApiException) { failed++; }
+            }
+        }
+        finally { _busy = false; }
+        if (failed == 0) Toasts.Success(L.F("ei.submitted", accepted));
+        else Toasts.Error(L.F("ei.submitPartly", accepted, failed));
+        await Load();
+    }
+}

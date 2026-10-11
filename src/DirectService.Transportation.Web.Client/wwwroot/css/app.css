@@ -348,6 +348,8 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 }
 @media print {
   .side, .top, .toasts { display: none; }
+  /* The unlogged on-screen preview is never what the browser prints (FR-058): printing goes through the Print button. */
+  .print-preview { visibility: hidden; }
   .shell { display: block; height: auto; }
 }
 .w100 { width: 100%; }

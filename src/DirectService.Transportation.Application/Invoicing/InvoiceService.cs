@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
+using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
@@ -136,6 +137,37 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             db.Set<Invoice>().Remove(inv);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Live totals of the invoice form (UX-17; the rules stay on the server, NFR-14): the same line amounts, discount, fees and tax as a save,
+    /// the due date from the customer's terms and the approval setting. Nothing is saved; unknown trips are left out.
+    /// </summary>
+    public async Task<InvoiceCalculationResponse> CalculateAsync(InvoiceCalculationRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var company = await CompanyAsync(ct).ConfigureAwait(false);
+        decimal linesTotal;
+        if (string.Equals(r.InvoiceType, InvoiceCodes.Manual, StringComparison.OrdinalIgnoreCase))
+        {
+            linesTotal = (r.Lines ?? []).Take(500).Where(l => l.Quantity is > 0 && l.UnitPrice is > 0)
+                .Sum(l => InvoiceCalculator.LineAmount(l.Quantity!.Value, l.UnitPrice!.Value, company.Decimals));
+        }
+        else
+        {
+            var ids = (r.TripIds ?? []).Take(5000).Select(t => support.Decode<Trip>(t)).OfType<Guid>().Distinct().ToList();
+            linesTotal = ids.Count == 0 ? 0m : await db.Set<Trip>().AsNoTracking().Where(t => ids.Contains(t.PublicId) && t.Status == TripService.Active)
+                .SumAsync(t => t.Revenue, ct).ConfigureAwait(false);
+        }
+        var discount = Math.Max(0m, r.Discount ?? 0m);
+        var fees = Math.Max(0m, r.ExtraFees ?? 0m);
+        var totals = InvoiceCalculator.Invoice(linesTotal, Math.Min(discount, linesTotal), fees, company.TaxRate, company.TaxInclusive, company.Decimals);
+        int? terms = null;
+        if (support.Decode<Customer>(r.CustomerId) is Guid c)
+            terms = await db.Set<Customer>().AsNoTracking().Where(x => x.PublicId == c).Select(x => (int?)x.PaymentTermsDays).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+        var due = terms is int days && r.InvoiceDate is DateOnly d ? d.AddDays(days) : (DateOnly?)null;
+        return new InvoiceCalculationResponse(totals.Subtotal, totals.Discount, totals.ExtraFees, totals.BaseAmount, company.TaxRate, totals.Tax, totals.Total,
+            company.TaxInclusive, company.Decimals, company.Today, due, terms, await ApprovalOnAsync(ct).ConfigureAwait(false));
     }
 
     private async Task<bool> ApprovalOnAsync(CancellationToken ct) =>
@@ -416,6 +448,41 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     {
         ArgumentNullException.ThrowIfNull(q);
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
+        var query = Filter(q, today);
+        var totals = await query.GroupBy(_ => 1).Select(g => new InvoiceListTotals(g.Count(), g.Sum(i => i.Total), g.Sum(i => i.PaidAmount), g.Sum(i => i.ReturnedAmount), g.Sum(i => i.RemainingAmount)))
+            .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new InvoiceListTotals(0, 0, 0, 0, 0);
+        var paging = new PageRequest(q.Page, q.PageSize);
+        var sorted = MasterDataSupport.Sort(query, q.Sort, SortFields, "-invoiceDate").ThenByDescending(i => i.Id);
+        var rows = await Rows(sorted.Skip(paging.Skip).Take(paging.SafePageSize)).ToListAsync(ct).ConfigureAwait(false);
+        return new InvoicePage(new PagedResult<InvoiceResponse>(rows.Select(r => ToResponse(r, today)).ToList(), paging.SafePage, paging.SafePageSize, totals.Invoices), totals);
+    }
+
+    /// <summary>The filtered invoice list as a report table for Excel/CSV/PDF export (FR-047, FR-165), with the totals row.</summary>
+    public async Task<ReportTable> ExportTableAsync(InvoiceListQuery q, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(q);
+        var today = await support.TodayAsync(ct).ConfigureAwait(false);
+        var query = Filter(q, today);
+        var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-invoiceDate").ThenByDescending(i => i.Id).Take(SheetData.MaxRows)).ToListAsync(ct).ConfigureAwait(false);
+        var data = rows.Select(r => ToResponse(r, today)).Select(i => (IReadOnlyList<object?>)[i.Number ?? (En ? "Draft" : "مسودة"), i.InvoiceDate, i.Customer.Name,
+            i.LineCount, i.Total, i.PaidAmount + i.ReturnedAmount, i.RemainingAmount, i.DueDate, i.PaymentState, i.EInvoiceStatus]).ToList();
+        var active = rows.Where(r => r.I.Status != InvoiceCodes.Void && r.I.Status != InvoiceCodes.Draft).ToList();
+        IReadOnlyList<object?> totals = [En ? "Total" : "المجموع", null, null, null, active.Sum(r => r.I.Total), active.Sum(r => r.I.PaidAmount + r.I.ReturnedAmount),
+            active.Sum(r => r.I.RemainingAmount), null, null, null];
+        ReportColumn[] columns = En
+            ? [new("Number"), new("Date", ReportValue.Date), new("Customer"), new("Lines", ReportValue.Number), new("Total", ReportValue.Money), new("Paid and returned", ReportValue.Money),
+               new("Remaining", ReportValue.Money), new("Due", ReportValue.Date), new("Status"), new("E-invoicing")]
+            : [new("الرقم"), new("التاريخ", ReportValue.Date), new("العميل"), new("البنود", ReportValue.Number), new("الإجمالي", ReportValue.Money), new("المدفوع والمرتجع", ReportValue.Money),
+               new("المتبقي", ReportValue.Money), new("الاستحقاق", ReportValue.Date), new("الحالة"), new("الفوترة الإلكترونية")];
+        var filters = new List<(string, string)>();
+        if (q.From is DateOnly f) filters.Add((En ? "From" : "من", f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+        if (q.To is DateOnly t) filters.Add((En ? "To" : "إلى", t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+        if (!string.IsNullOrWhiteSpace(q.Status)) filters.Add((En ? "Status" : "الحالة", q.Status));
+        return new ReportTable(En ? "Invoices" : "الفواتير", filters, columns, data, totals);
+    }
+
+    private IQueryable<Invoice> Filter(InvoiceListQuery q, DateOnly today)
+    {
         var query = db.Set<Invoice>().AsNoTracking();
         query = (q.Status?.Trim().ToLowerInvariant()) switch
         {
@@ -447,12 +514,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
                 : query.Where(i => db.Set<EInvoiceSubmission>().Where(s => s.InvoiceId == i.Id).OrderByDescending(s => s.Id).Select(s => s.Status).FirstOrDefault() == e);
         }
         if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(i => i.Number != null && i.Number.Contains(text));
-        var totals = await query.GroupBy(_ => 1).Select(g => new InvoiceListTotals(g.Count(), g.Sum(i => i.Total), g.Sum(i => i.PaidAmount), g.Sum(i => i.ReturnedAmount), g.Sum(i => i.RemainingAmount)))
-            .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new InvoiceListTotals(0, 0, 0, 0, 0);
-        var paging = new PageRequest(q.Page, q.PageSize);
-        var sorted = MasterDataSupport.Sort(query, q.Sort, SortFields, "-invoiceDate").ThenByDescending(i => i.Id);
-        var rows = await Rows(sorted.Skip(paging.Skip).Take(paging.SafePageSize)).ToListAsync(ct).ConfigureAwait(false);
-        return new InvoicePage(new PagedResult<InvoiceResponse>(rows.Select(r => ToResponse(r, today)).ToList(), paging.SafePage, paging.SafePageSize, totals.Invoices), totals);
+        return query;
     }
 
     public async Task<InvoiceDetails> GetAsync(string token, CancellationToken ct)

@@ -52,7 +52,7 @@ public static class Statuses
     {
         ["unbilled"] = (Tone.Info, "clock"), ["invoiced"] = (Tone.Ok, "check"), ["settled"] = (Tone.Mute, "check"), ["void"] = (Tone.Err, "x"),
         ["short"] = (Tone.Warn, "scale"), ["breach"] = (Tone.Err, "alert"), ["manual"] = (Tone.Warn, "edit"), ["review"] = (Tone.Warn, "alert"),
-        ["draft"] = (Tone.Mute, "edit"), ["unpaid"] = (Tone.Info, "clock"), ["partial"] = (Tone.Warn, "clock"), ["closed"] = (Tone.Ok, "check"),
+        ["draft"] = (Tone.Mute, "edit"), ["unpaid"] = (Tone.Info, "clock"), ["partial"] = (Tone.Warn, "clock"), ["partReturned"] = (Tone.Warn, "refresh"), ["closed"] = (Tone.Ok, "check"),
         ["posted"] = (Tone.Ok, "check"), ["pending"] = (Tone.Warn, "clock"), ["reversed"] = (Tone.Mute, "refresh"),
         ["active"] = (Tone.Ok, "check"), ["archived"] = (Tone.Mute, "archive"), ["open"] = (Tone.Ok, "check"), ["closedPeriod"] = (Tone.Mute, "lock"),
         ["queued"] = (Tone.Info, "clock"), ["submitted"] = (Tone.Ok, "check"), ["rejected"] = (Tone.Err, "x"), ["notRequired"] = (Tone.Mute, null),

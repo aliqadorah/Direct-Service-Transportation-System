@@ -1,0 +1,131 @@
+@page "/c/{Company}/credit-notes/{Id}"
+@*
+  Credit note view (FR-049…053, FR-064): invoice, reason, returned trips or lines, proportional totals, amount in words, e-invoice status,
+  journal entry and history; print (FR-053) and void with a reason (FR-052: reversal, trips invoiced again; refused once accepted by the
+  national system, DT-89).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var cn = _d!.CreditNote; var isVoid = cn.Status == "Void"; }
+        <PageHeader Title="@cn.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"], NavModel.Href(Company, "credit-notes"))])">
+            <Badges>
+                <StatusTag Status="@BillingStatus.Document(cn.Status)" />
+                @if (!isVoid) {<StatusTag Status="@BillingStatus.EInvoice(cn.EInvoiceStatus)" />}
+            </Badges>
+            <Actions>
+                <Btn Icon="print" Text="@L["ui.print"]" Href="@NavModel.Href(Company, $"print/credit-note/{Id}")" />
+                @if (!isVoid && Shell.Can(PermissionKeys.InvVoid))
+                {
+                    <Btn Danger="true" Icon="x" Text="@L["inv.void"]" Disabled="@(cn.EInvoiceStatus == EInvoiceCodes.Submitted)"
+                         Title="@(cn.EInvoiceStatus == EInvoiceCodes.Submitted ? L["cn.acceptedNoVoid"] : null)" OnClick="() => _voiding = true" />
+                }
+            </Actions>
+        </PageHeader>
+        @if (isVoid) {<Banner Tone="Tone.Err" Text="@L.F("cn.voidBanner", cn.VoidReason ?? "")" />}
+        @if (_submission is { Status: EInvoiceCodes.Rejected } s) {<Banner Tone="Tone.Err" Text="@L.F("inv.rejectedBanner", s.LastError ?? string.Join(" · ", s.Problems.Select(p => p.Message)))" />}
+        else if (_submission is { WaitingForInvoice: true }) {<Banner Tone="Tone.Info" Text="@L["cn.waitsForInvoice"]" />}
+        @if (cn.PostingPending) {<Banner Tone="Tone.Warn" Text="@L["doc.postingPending"]" />}
+        <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
+            <div class="stack" style="min-width:0">
+                <Box>
+                    <KeyValues Columns="3" Items="Details(cn)" />
+                </Box>
+                <Box Title="@L["cn.returnedLines"]" NoPad="true">
+                    <DataGrid TItem="CreditNoteLineResponse" Items="_d.Lines" Key="l => l.Id" Caption="@L["cn.returnedLines"]" FooterLabel="@L["ui.total"]">
+                        <Columns>
+                            <GridColumn TItem="CreditNoteLineResponse" Title="@L["inv.description"]" Value="l => l.Trip?.Name ?? l.Description" />
+                            <GridColumn TItem="CreditNoteLineResponse" Title="@L["inv.qty"]" Value="l => Fmt.Qty(l.Quantity)" Numeric="true" />
+                            <GridColumn TItem="CreditNoteLineResponse" Title="@L["inv.amount"]" Value="l => Fmt.Money(l.Amount)" Numeric="true" Footer="@Fmt.Money(_d.Lines.Sum(l => l.Amount))" />
+                        </Columns>
+                    </DataGrid>
+                </Box>
+                <Box Title="@L["ui.history"]"><RecordHistory Items="_d.History" /></Box>
+            </div>
+            <div class="stack">
+                <Box Title="@L["inv.totals"]">
+                    <div class="ln"><span>@L["cn.returnedSubtotal"]</span><Money Value="cn.Subtotal" /></div>
+                    @if (cn.DiscountShare != 0) {<div class="ln"><span>@L["cn.discountShare"]</span><Money Value="-cn.DiscountShare" /></div>}
+                    @if (cn.FeesShare != 0) {<div class="ln"><span>@L["cn.feesShare"]</span><Money Value="cn.FeesShare" /></div>}
+                    <div class="ln"><span>@L["inv.base"]</span><Money Value="cn.BaseAmount" /></div>
+                    <div class="ln"><span>@L["inv.tax"]</span><Money Value="cn.Tax" /></div>
+                    <div class="ln tot big"><span>@L["inv.total"]</span><Money Value="cn.Total" /></div>
+                    <p class="muted" style="margin:8px 0 0"><Tx Value="@L.F("doc.inWords", _d.AmountInWords)" /></p>
+                </Box>
+                @if (_submission is { } sub)
+                {
+                    <Box Title="@L["inv.einvoice"]">
+                        <KeyValues Columns="1" Items="EDetails(sub)" />
+                    </Box>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("cn.voidTitle", _d?.CreditNote.Number ?? "")" Danger="true" AskReason="true" ConfirmText="@L["inv.void"]"
+               Message="@L["cn.voidText"]" Busy="_busy" Error="@_error" OnConfirm="Void" />
+
+@code {
+    private CreditNoteDetails? _d;
+    private EInvoiceSubmissionResponse? _submission;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private bool _voiding, _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private IReadOnlyList<KeyValue> Details(CreditNoteResponse cn) =>
+    [
+        new(L["cn.invoice"], null, @<a href="@NavModel.Href(Company, $"invoices/{cn.Invoice.Id}")"><bdi>@cn.Invoice.Number</bdi></a>),
+        new(L["trip.customer"], cn.Customer.Name),
+        new(L["cn.date"], Fmt.Date(cn.CreditDate, Shell.DateFormat)),
+        new(L["ui.reason"], cn.Reason),
+        new(L["doc.entry"], cn.JournalEntry?.Number ?? "—"),
+    ];
+
+    private IReadOnlyList<KeyValue> EDetails(EInvoiceSubmissionResponse s) =>
+    [
+        new(L["ml.status"], null, @<StatusTag Status="@BillingStatus.EInvoice(s.Status)" />),
+        new("ICV", s.Icv?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        new(L["ei.systemNumber"], s.SystemNumber),
+        new(L["ei.attempts"], Fmt.Count(s.Attempts)),
+    ];
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<CreditNoteDetails>(Api.C($"credit-notes/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; return; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; return; }
+        try { _submission = (await Api.GetAsync<EInvoiceSubmissionDetails>(Api.C($"credit-notes/{Uri.EscapeDataString(Id)}/e-invoice"))).Submission; }
+        catch (ApiException) { _submission = null; }
+    }
+
+    private async Task Void(string reason)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync<CreditNoteDetails>(Api.C($"credit-notes/{Uri.EscapeDataString(Id)}/void"), new CreditNoteVoidRequest(reason, _d!.CreditNote.RowVersion));
+            _voiding = false;
+            Toasts.Success(L.F("cn.voided", _d.CreditNote.Number));
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

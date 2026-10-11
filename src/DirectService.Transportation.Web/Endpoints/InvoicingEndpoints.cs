@@ -1,4 +1,5 @@
 using DirectService.Transportation.Application.Invoicing;
+using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Security;
@@ -18,6 +19,10 @@ internal static class InvoicingEndpoints
         var g = company.MapGroup("/invoices").WithTags("Invoices");
         g.MapGet("/", async ([AsParameters] InvoiceListQuery q, InvoiceService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(q, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvView);
+        g.MapPost("/calculate", async (InvoiceCalculationRequest r, InvoiceService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.CalculateAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
+        g.MapGet("/export", async ([AsParameters] InvoiceListQuery q, string? format, InvoiceService svc, ReportExporter exporter, CancellationToken ct) =>
+            File(await exporter.ExportAsync(await svc.ExportTableAsync(q, ct).ConfigureAwait(false), format, "invoices", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvView);
         g.MapGet("/unbilled-trips", async ([AsParameters] UnbilledTripsQuery q, InvoiceService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.UnbilledAsync(q, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
         g.MapGet("/{invoice}", async (string invoice, InvoiceService svc, CancellationToken ct) =>
@@ -43,6 +48,10 @@ internal static class InvoicingEndpoints
         var c = company.MapGroup("/credit-notes").WithTags("Credit notes");
         c.MapGet("/", async ([AsParameters] CreditNoteListQuery q, CreditNoteService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(q, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvView);
+        c.MapPost("/calculate", async (CreditNoteRequest r, CreditNoteService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.CalculateAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvIssue);
+        c.MapGet("/export", async ([AsParameters] CreditNoteListQuery q, string? format, CreditNoteService svc, ReportExporter exporter, CancellationToken ct) =>
+            File(await exporter.ExportAsync(await svc.ExportTableAsync(q, ct).ConfigureAwait(false), format, "credit-notes", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvView);
         c.MapGet("/{creditNote}", async (string creditNote, CreditNoteService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(creditNote, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.InvView);
         c.MapGet("/{creditNote}/print", async (string creditNote, string? format, InvoicePrintService svc, CreditNoteService credits, CancellationToken ct) =>

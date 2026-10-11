@@ -1,0 +1,34 @@
+@* Open trips of a driver for the account view and the settlement (FR-076, FR-077): receipt, date, route, material, wage quantity × rate = wage, shortage flag; optionally selectable. *@
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+<DataGrid TItem="SettlementTripItem" Items="Trips" Key="t => t.Id" Caption="@L["md.openTrips"]" FooterLabel="@L["ui.total"]" Selectable="Selectable" Selected="Selected"
+          SelectedChanged="SelectedChanged" OnRowClick="RowClick">
+    <Columns>
+        <GridColumn TItem="SettlementTripItem" Title="@L["trip.receiptNo"]" Value="t => t.ReceiptNo" Ltr="true" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["trip.date"]" Value="t => Fmt.Date(t.TripDate, Shell.DateFormat)" Ltr="true" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["drv.route"]" Value="t => t.Route" Clip="true" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["trip.material"]" Value="t => t.Material" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["drv.wageQty"]" Value="t => Fmt.Qty(t.WageQty)" Numeric="true" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["trip.rate"]" Value="t => Fmt.Money(t.DriverRate, 4)" Numeric="true" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["trip.driverWage"]" Value="t => Fmt.Money(t.DriverWage)" Numeric="true" Footer="@Fmt.Money(FooterTotal)" />
+        <GridColumn TItem="SettlementTripItem" Title="@L["ml.status"]"><Template>@if (context.IsShortageFlagged) {<StatusTag Status="short" />}</Template></GridColumn>
+    </Columns>
+</DataGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SettlementTripItem> Trips { get; set; } = [];
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public bool Selectable { get; set; }
+    [Parameter] public IReadOnlySet<object>? Selected { get; set; }
+    [Parameter] public EventCallback<IReadOnlySet<object>> SelectedChanged { get; set; }
+    /// <summary>Rows open the trip; off in the settlement form so a click never leaves unsaved work.</summary>
+    [Parameter] public bool OpenTrips { get; set; } = true;
+
+    private EventCallback<SettlementTripItem> RowClick => OpenTrips ? EventCallback.Factory.Create<SettlementTripItem>(this, Open) : default;
+
+    /// <summary>Sum of the selected trips when selectable, otherwise of all.</summary>
+    private decimal FooterTotal => Selectable && Selected is not null ? Trips.Where(t => Selected.Contains(t.Id)).Sum(t => t.DriverWage) : Trips.Sum(t => t.DriverWage);
+
+    private void Open(SettlementTripItem t) => Nav.NavigateTo(NavModel.Href(Company, $"trips/{t.Id}"));
+}

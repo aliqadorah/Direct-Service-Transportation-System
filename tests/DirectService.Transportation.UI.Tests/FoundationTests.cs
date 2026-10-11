@@ -27,11 +27,13 @@ public sealed class FoundationTests
     [Fact]
     public void Text_used_by_the_components_exists()
     {
-        // Keys referenced in the component sources (L["…"], L.F("…")) must be in the catalogue.
+        // Every key referenced in the screens and components (L["…"], L.F("…")) must be in the catalogue; keys built at run time
+        // (a prefix followed by "+ value") are left out.
         var root = FindRepoRoot();
         var sources = Directory.EnumerateFiles(Path.Combine(root, "src", "DirectService.Transportation.Web.Client"), "*.*", SearchOption.AllDirectories)
             .Where(p => (p.EndsWith(".razor", StringComparison.Ordinal) || p.EndsWith(".cs", StringComparison.Ordinal)) && !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
-        var used = sources.SelectMany(p => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(p), "L(?:\\.F\\(|\\[)\"((?:ui|shell|nav|st)\\.[A-Za-z]+)\"").Select(m => m.Groups[1].Value)).Distinct();
+        var used = sources.SelectMany(p => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(p), "L(?:\\.F\\(|\\[)\"([a-z]+\\.[A-Za-z0-9_.-]*[A-Za-z0-9])\"(?!\\s*\\+)").Select(m => m.Groups[1].Value)).Distinct().ToList();
+        Assert.NotEmpty(used);
         Assert.All(used, k => Assert.True(UiText.All.ContainsKey(k), k));
     }
 

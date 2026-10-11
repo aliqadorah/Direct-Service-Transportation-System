@@ -1,0 +1,63 @@
+@page "/c/{Company}/receipts/{Id}"
+@* SCR-26 receipt view (FR-067…070): customer, invoice or on account, method, cash box / bank, reference, amount in words; print, void (rcpt.manage). *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var r = _d!.Receipt; }
+        <CashDocView Title="@r.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"], NavModel.Href(Company, "receipts"))])"
+                     IsVoid="@(r.Status == "Void")" VoidReason="@r.VoidReason" PostingPending="r.PostingPending" Details="Details(r)" Amount="r.Amount" AmountLabel="@L["inv.amount"]"
+                     AmountInWords="@_d.AmountInWords" Entry="r.JournalEntry" History="_d.History" PrintHref="@NavModel.Href(Company, $"print/receipt/{Id}")"
+                     CanVoid="@Shell.Can(PermissionKeys.RcptManage)" VoidText="@L["rcpt.voidText"]" OnVoid="Void" />
+    </ChildContent>
+</StateView>
+
+@code {
+    private ReceiptDetails? _d;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<ReceiptDetails>(Api.C($"receipts/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Details(ReceiptResponse r) =>
+    [
+        new(L["trip.customer"], r.Customer.Name),
+        new(L["trip.date"], Fmt.Date(r.ReceiptDate, Shell.DateFormat)),
+        r.Invoice is { } inv ? new(L["cn.invoice"], null, @<a href="@NavModel.Href(Company, $"invoices/{inv.Id}")"><bdi>@inv.Number</bdi></a>) : new(L["cn.invoice"], L["rcpt.onAccount"]),
+        new(L["cash.method"], L["pay." + r.PaymentMethod]),
+        new(L["cash.account"], r.Account.Name),
+        new(L["cash.reference"], r.Reference),
+        new(L["rcpt.attachments"], Fmt.Count(r.AttachmentsCount)),
+        new(L["md.notes"], r.Notes),
+    ];
+
+    private async Task<string?> Void(string reason)
+    {
+        try
+        {
+            await Api.PostAsync<ReceiptDetails>(Api.C($"receipts/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Receipt.RowVersion));
+            Toasts.Success(L.F("cash.voided", _d.Receipt.Number));
+            await Load();
+            return null;
+        }
+        catch (ApiException e) { return e.Problem.Detail ?? L["ui.loadFailed"]; }
+    }
+}

@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
 
         // Invoicing and credit notes (B6)
+        services.AddScoped<PrintMode>();
         services.AddScoped<AuditTrail>();
         services.AddScoped<DocumentPrinter>();
         services.AddScoped<InvoiceService>();

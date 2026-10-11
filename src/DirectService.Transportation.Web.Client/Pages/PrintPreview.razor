@@ -1,0 +1,110 @@
+@page "/c/{Company}/print/{Kind}/{Id}"
+@*
+  SCR-09 print preview (UX-22, UX-23, FR-054, FR-057, FR-058, FR-090): the document exactly as it prints (A4, company header, DRAFT / VOID
+  stamps, "Copy" on reprints of vouchers) in a sandboxed frame without scripts; the layout choice for invoices (claim statement / tax
+  invoice); PDF download and Print. The preview itself is not logged as a print; Print and PDF are (FR-058).
+*@
+@using System.Text
+@inject Api Api
+@inject Loc L
+@inject UiJs Js
+@inject Downloads Files
+@inject ToastService Toasts
+
+<PageHeader Title="@L.F("print.title", L["print.kind." + Kind])" Crumbs="@([new Crumb(L[Doc.Crumb], NavModel.Href(Company, Doc.Back))])">
+    <Actions>
+        @if (Kind == "invoice")
+        {
+            <SelectField TValue="string?" Value="_layout" ValueChanged="LayoutChanged" ValueExpression="() => _layout" Options="Layouts" Empty="@L["print.savedLayout"]"
+                         aria-label="@L["inv.layout"]" FieldClass="w200" />
+        }
+        <Btn Icon="export" Text="PDF" Busy="_busy" Disabled="_html is null" OnClick="Pdf" />
+        <Btn Primary="true" Icon="print" Text="@L["ui.print"]" Shortcut="Ctrl P" Busy="_busy" Disabled="_html is null" OnClick="Print" />
+    </Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <div class="box fill" style="display:flex;justify-content:center;background:var(--surface-sunk);padding:12px;min-height:0">
+            <iframe @ref="_frame" class="print-preview" srcdoc="@_html" title="@L["print.frame"]" sandbox="allow-same-origin allow-modals"
+                    style="width:min(100%,820px);height:100%;min-height:600px;border:1px solid var(--border);background:#fff"></iframe>
+        </div>
+    </ChildContent>
+</StateView>
+
+@code {
+    private ElementReference _frame;
+    private string? _html, _layout, _reference;
+    private LoadState _state = LoadState.Loading;
+    private bool _busy;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Kind { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    /// <summary>The documents that print: API path, and the screen to go back to.</summary>
+    private (string Api, string Back, string Crumb) Doc => Kind switch
+    {
+        "invoice" => ($"invoices/{E(Id)}/print", $"invoices/{Id}", "nav.invoices"),
+        "credit-note" => ($"credit-notes/{E(Id)}/print", $"credit-notes/{Id}", "nav.creditNotes"),
+        "receipt" => ($"receipts/{E(Id)}/print", $"receipts/{Id}", "nav.receipts"),
+        "advance" => ($"advances/{E(Id)}/print", $"driver-accounts/advances/{Id}", "nav.driverAccounts"),
+        "settlement" => ($"settlements/{E(Id)}/print", $"driver-accounts/settlements/{Id}", "nav.driverAccounts"),
+        "partner-payment" => ($"partner-payments/{E(Id)}/print", $"partner-accounts/payments/{Id}", "nav.partnerAccounts"),
+        "bill" => ($"apar/bills/{E(Id)}/print", $"accounting/payables/{Id}", "nav.payables"),
+        "receivable" => ($"apar/receivables/{E(Id)}/print", $"accounting/receivables/{Id}", "nav.receivables"),
+        "apar-payment" => ($"apar/payments/{E(Id)}/print", $"accounting/apar-payments/{Id}", "nav.accounting"),
+        "apar-return" => ($"apar/returns/{E(Id)}/print", $"accounting/apar-returns/{Id}", "nav.accounting"),
+        _ => ("", "", "nav.dashboard"),
+    };
+
+    private IReadOnlyList<Option<string?>> Layouts =>
+        [new(Contracts.Invoicing.InvoiceCodes.Claim, L["inv.layoutClaim"]), new(Contracts.Invoicing.InvoiceCodes.TaxInvoice, L["inv.layoutTax"])];
+
+    private static string E(string s) => Uri.EscapeDataString(s);
+
+    private string Path(string format, bool preview) =>
+        Api.C(Doc.Api + "?format=" + format + (preview ? "&preview=true" : "") + (_layout is null ? "" : "&layout=" + E(_layout)));
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        if (Doc.Api.Length == 0) { _state = LoadState.Empty; return; }
+        try
+        {
+            var file = await Api.FileAsync(Path("html", preview: true));
+            _html = Encoding.UTF8.GetString(file.Bytes);
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task LayoutChanged(string? layout)
+    {
+        _layout = layout;
+        await Load();
+    }
+
+    /// <summary>Prints the logged copy of the document (marked "Copy" when printed before).</summary>
+    private async Task Print()
+    {
+        _busy = true;
+        try
+        {
+            var file = await Api.FileAsync(Path("html", preview: false));
+            _html = Encoding.UTF8.GetString(file.Bytes);
+            await Js.PrintHtml(_frame, _html);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Pdf()
+    {
+        _busy = true;
+        try { await Files.SaveAsync(Path("pdf", preview: false)); }
+        finally { _busy = false; }
+    }
+}

@@ -1,0 +1,87 @@
+namespace DirectService.Transportation.Web.Client.Localization;
+
+/// <summary>Text of the accounting screens (SCR-30 … SCR-45).</summary>
+public static partial class UiText
+{
+    private static Dictionary<string, (string Ar, string En)> Accounting() => new(StringComparer.Ordinal)
+    {
+        // ---- account types and parties
+        ["acc.t.Asset"] = ("أصل", "Asset"),
+        ["acc.t.Liability"] = ("التزام", "Liability"),
+        ["acc.t.Equity"] = ("حقوق ملكية", "Equity"),
+        ["acc.t.Revenue"] = ("إيراد", "Revenue"),
+        ["acc.t.Expense"] = ("مصروف", "Expense"),
+        ["party.Customer"] = ("عملاء", "Customers"),
+        ["party.Supplier"] = ("موردون", "Suppliers"),
+        ["party.Driver"] = ("سائقون", "Drivers"),
+        ["party.Partner"] = ("شركاء", "Partners"),
+        ["party.ApArParty"] = ("طرف محاسبي", "Accounting party"),
+        ["acc.controlOf"] = ("حساب رقابة:", "Control account:"),
+
+        // ---- chart of accounts (SCR-30)
+        ["acc.newAccount"] = ("حساب جديد", "New account"),
+        ["acc.editAccount"] = ("تعديل الحساب {0}", "Edit account {0}"),
+        ["acc.openings"] = ("الأرصدة الافتتاحية", "Opening balances"),
+        ["acc.searchChart"] = ("الرمز أو الاسم", "Code or name"),
+        ["acc.showInactive"] = ("إظهار الحسابات الموقوفة", "Show inactive accounts"),
+        ["acc.expandAll"] = ("توسيع الكل", "Expand all"),
+        ["acc.collapseAll"] = ("طي الكل", "Collapse all"),
+        ["acc.expand"] = ("توسيع {0}", "Expand {0}"),
+        ["acc.collapse"] = ("طي {0}", "Collapse {0}"),
+        ["acc.chartEmpty"] = ("دليل الحسابات فارغ", "The chart of accounts is empty"),
+        ["acc.chartEmptyText"] = ("ابدأ من نموذج دليل النقل الجاهز (مع صندوق ومفاتيح الترحيل)، أو استورد دليلك من Excel.", "Start from the ready transport chart (with a cash box and posting keys), or import your chart from Excel."),
+        ["acc.useTemplate"] = ("استخدام نموذج النقل", "Use the transport template"),
+        ["acc.importExcel"] = ("استيراد من Excel", "Import from Excel"),
+        ["acc.templateApplied"] = ("أُنشئ الدليل: {0} حساباً و{1} صندوق و{2} مفتاح ترحيل.", "Chart created: {0} accounts, {1} cash box and {2} posting keys."),
+        ["acc.code"] = ("رمز الحساب", "Code"),
+        ["acc.type"] = ("النوع", "Type"),
+        ["acc.kind"] = ("المستوى", "Kind"),
+        ["acc.postable"] = ("حساب ترحيل", "Postable"),
+        ["acc.group"] = ("حساب تجميعي", "Group"),
+        ["acc.control"] = ("حساب رقابة", "Control"),
+        ["acc.openDebit"] = ("افتتاحي مدين", "Opening debit"),
+        ["acc.openCredit"] = ("افتتاحي دائن", "Opening credit"),
+        ["acc.nameAr"] = ("الاسم بالعربية", "Arabic name"),
+        ["acc.nameEn"] = ("الاسم بالإنجليزية", "English name"),
+        ["acc.typeHelp"] = ("لا يتغير بعد وجود قيود على الحساب", "Cannot change once the account has entries"),
+        ["acc.parent"] = ("الحساب الأب", "Parent account"),
+        ["acc.topLevel"] = ("مستوى أول", "Top level"),
+        ["acc.isPostable"] = ("يُرحّل عليه (حساب فرعي)", "Postable (leaf account)"),
+        ["acc.postableHelp"] = ("الحسابات التي لها فروع لا يُرحّل عليها", "Accounts with children cannot be posted to"),
+        ["acc.isControl"] = ("حساب رقابة (يتطلب طرفاً على كل قيد)", "Control account (every line needs a party)"),
+        ["acc.partyType"] = ("نوع الطرف", "Party type"),
+        ["acc.openingsHere"] = ("الرصيد الافتتاحي: مدين {0} / دائن {1} — يُعدّل من شاشة الأرصدة الافتتاحية.", "Opening balance: debit {0} / credit {1} — edited on the opening balances screen."),
+        ["acc.deactivate"] = ("إيقاف", "Deactivate"),
+        ["acc.activate"] = ("تفعيل", "Activate"),
+        ["acc.deactivated"] = ("تم إيقاف الحساب {0}.", "Account {0} deactivated."),
+        ["acc.activated"] = ("تم تفعيل الحساب {0}.", "Account {0} activated."),
+        ["acc.saved"] = ("تم حفظ الحساب {0}.", "Account {0} saved."),
+        ["acc.deleteText"] = ("يُحذف الحساب حذفاً منطقياً مع السبب. غير ممكن إذا عليه قيود أو له فروع أو أرصدة أو روابط.", "The account is deleted (soft) with the reason. Not possible with entries, children, balances or links."),
+
+        // ---- imports (SCR-33)
+        ["acc.chartImport"] = ("استيراد دليل الحسابات", "Chart of accounts import"),
+        ["acc.chartImportHelp"] = ("تُضاف الحسابات الجديدة فقط؛ الرموز الموجودة ترفضها المعاينة. أعمدة الرصيد الافتتاحي المدين والدائن منفصلة.", "Only new accounts are added; existing codes are rejected in the preview. Opening debit and credit are separate columns."),
+        ["acc.chartImportColumns"] = ("الأعمدة: الرمز، الاسم بالعربية، الاسم بالإنجليزية، النوع، رمز الأب، يُرحّل عليه، حساب رقابة، نوع الطرف، افتتاحي مدين، افتتاحي دائن.", "Columns: code, Arabic name, English name, type, parent code, postable, control, party type, opening debit, opening credit."),
+        ["acc.journalImportHelp"] = ("تُرفض في المعاينة القيود غير المتوازنة، والحسابات غير المعروفة أو التجميعية، والفترات المغلقة، والأسطر بلا طرف على حسابات الرقابة.", "The preview rejects unbalanced entries, unknown or group accounts, closed periods and lines without a party on control accounts."),
+        ["acc.journalImportColumns"] = ("الأعمدة: رقم القيد في الملف، التاريخ، البيان، رمز الحساب، مدين، دائن، مركز التكلفة، نوع الطرف، الطرف، ملاحظة.", "Columns: entry key, date, description, account code, debit, credit, cost centre, party type, party, note."),
+        ["acc.importRejected"] = ("رفضت المعاينة {0} صفاً. صحّحها ثم أعد الاستيراد.", "The preview rejected {0} rows. Correct them and import again."),
+
+        // ---- opening balances
+        ["acc.postOpening"] = ("ترحيل القيد الافتتاحي", "Post the opening entry"),
+        ["acc.postOpeningText"] = ("يُرحّل قيد افتتاحي بالأرصدة المحفوظة في التاريخ المختار.", "An opening entry is posted with the saved balances on the chosen date."),
+        ["acc.repostOpeningText"] = ("يُعكس القيد الافتتاحي السابق ويُرحّل قيد جديد بالأرصدة المحفوظة.", "The previous opening entry is reversed and a new one is posted with the saved balances."),
+        ["acc.openingDate"] = ("تاريخ القيد الافتتاحي", "Opening entry date"),
+        ["acc.openingsNoChart"] = ("أنشئ دليل الحسابات أولاً لإدخال الأرصدة الافتتاحية.", "Create the chart of accounts first to enter opening balances."),
+        ["acc.openingDiffSetup"] = ("الأرصدة غير متوازنة بفرق {0}: أثناء الإعداد يُرحّل الفرق إلى حساب فرق الأرصدة الافتتاحية حتى يُصفّى.", "The balances differ by {0}: during setup the difference goes to the opening-difference account until it is cleared."),
+        ["acc.openingDiffClosed"] = ("الأرصدة غير متوازنة بفرق {0}: بعد انتهاء الإعداد لا يُرحّل قيد افتتاحي غير متوازن.", "The balances differ by {0}: after setup an unbalanced opening entry cannot be posted."),
+        ["acc.totalDebit"] = ("إجمالي المدين", "Total debit"),
+        ["acc.totalCredit"] = ("إجمالي الدائن", "Total credit"),
+        ["acc.difference"] = ("الفرق", "Difference"),
+        ["acc.openingEntry"] = ("القيد الافتتاحي", "Opening entry"),
+        ["acc.notPosted"] = ("لم يُرحّل بعد", "Not posted yet"),
+        ["acc.debitOf"] = ("مدين {0}", "Debit of {0}"),
+        ["acc.creditOf"] = ("دائن {0}", "Credit of {0}"),
+        ["acc.openingsSaved"] = ("تم حفظ الأرصدة الافتتاحية. رحّل القيد الافتتاحي لتظهر في الدفاتر.", "Opening balances saved. Post the opening entry to bring them into the books."),
+        ["acc.openingPosted"] = ("تم ترحيل القيد الافتتاحي {0}.", "Opening entry {0} posted."),
+    };
+}

@@ -1,0 +1,298 @@
+@page "/c/{Company}/accounting/chart"
+@*
+  SCR-30 chart of accounts (FR-107…110): the tree (expand / collapse, search by code or name), type, postable leaf or group, control account
+  and its party type, opening debit / credit, status. acct.setup adds, edits, moves (new parent), deactivates / activates and deletes (with a
+  reason, only when unused); type and control flag are locked once entries exist (DT-34, refused by the API). Empty chart: apply the
+  approved transport template (D-10) or import from Excel. Export to Excel; opening balances on their own screen.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject Downloads Files
+@inject AccountingLookups Lookups
+
+<PageHeader Title="@L["nav.chart"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"])])">
+    <Actions>
+        @if (CanSetup) {<Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "accounting/chart/import")" />}
+        <Btn Icon="export" Text="@L["ui.export"]" OnClick="@(() => Files.SaveAsync(Api.C("accounting/accounts/export")))" />
+        <Btn Icon="book" Text="@L["acc.openings"]" Href="@NavModel.Href(Company, "accounting/opening-balances")" />
+        @if (CanSetup) {<Btn Primary="true" Icon="plus" Text="@L["acc.newAccount"]" OnClick="() => Edit(null)" />}
+    </Actions>
+</PageHeader>
+<div class="row" style="gap:8px;flex:none;align-items:center">
+    <div class="adorn" style="width:260px"><span class="start"><Icon Name="search" /></span>
+        <input class="input" type="search" style="height:26px" aria-label="@L["acc.searchChart"]" placeholder="@L["acc.searchChart"]" value="@_q" @oninput="e => _q = e.Value?.ToString()" /></div>
+    <CheckField @bind-Value="_showArchived" Label="@L["acc.showInactive"]" />
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Ghost="true" Text="@L["acc.expandAll"]" OnClick="() => _collapsed.Clear()" />
+        <Btn Small="true" Ghost="true" Text="@L["acc.collapseAll"]" OnClick="CollapseAll" />
+    </span>
+</div>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="book" Title="@L["acc.chartEmpty"]" Text="@L["acc.chartEmptyText"]">
+            <Actions>
+                @if (CanSetup)
+                {
+                    <Btn Primary="true" Text="@L["acc.useTemplate"]" Busy="_busy" OnClick="Template" />
+                    <Btn Icon="import" Text="@L["acc.importExcel"]" Href="@NavModel.Href(Company, "accounting/chart/import")" />
+                }
+            </Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <div class="cols fill" style="grid-template-columns:1fr @(_editing ? "360px" : "0px");min-height:0">
+            <ListFrame Label="@L["nav.chart"]">
+                <DataGrid TItem="AccountResponse" Items="Visible" Key="a => a.Id" Caption="@L["nav.chart"]" OnRowClick="Open" RowClass="@(a => a.Status == "Active" ? (a.Id == _model.Id ? "sel" : null) : "void")">
+                    <Columns>
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.code"]">
+                            <Template>
+                                <span style="display:inline-flex;align-items:center;gap:4px;padding-inline-start:@((context.Level - 1) * 16)px">
+                                    @if (context.HasChildren && string.IsNullOrEmpty(_q))
+                                    {
+                                        var a = context;
+                                        <button type="button" class="btn ghost sm" style="padding:0 2px" aria-expanded="@(!_collapsed.Contains(a.Id) ? "true" : "false")"
+                                                aria-label="@L.F(_collapsed.Contains(a.Id) ? "acc.expand" : "acc.collapse", a.Code)" @onclick="() => Toggle(a.Id)" @onclick:stopPropagation="true">
+                                            <Icon Name="@(_collapsed.Contains(a.Id) ? "left" : "down")" Flip="@L.En" />
+                                        </button>
+                                    }
+                                    <bdi class="num" style="@(context.IsPostable ? null : "font-weight:600")">@context.Code</bdi>
+                                </span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn TItem="AccountResponse" Title="@L["md.name"]" Value="a => L.Pick(a.NameAr, a.NameEn)" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.type"]" Value="@(a => L["acc.t." + a.AccountType])" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.kind"]" Value="@(a => L[a.IsPostable ? "acc.postable" : "acc.group"])" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.control"]" Value="@(a => a.IsControlAccount ? L["party." + a.ControlPartyType] : null)" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.openDebit"]" Value="@(a => a.OpeningDebit == 0 ? null : Fmt.Money(a.OpeningDebit))" Numeric="true" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.openCredit"]" Value="@(a => a.OpeningCredit == 0 ? null : Fmt.Money(a.OpeningCredit))" Numeric="true" />
+                        <GridColumn TItem="AccountResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
+                    </Columns>
+                </DataGrid>
+            </ListFrame>
+            @if (_editing)
+            {
+                <Box Title="@(_model.Id is null ? L["acc.newAccount"] : L.F("acc.editAccount", _model.Code ?? ""))" Style="align-self:start">
+                    <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack">
+                        <ProblemValidator @ref="_problems" />
+                        <ErrorSummary Extra="_extra" />
+                        <TextField @bind-Value="_model.Code" Label="@L["acc.code"]" Required="true" Ltr="true" MaxLength="20" ReadOnly="!CanSetup" />
+                        <TextField @bind-Value="_model.NameAr" Label="@L["acc.nameAr"]" Required="true" MaxLength="200" ReadOnly="!CanSetup" />
+                        <TextField @bind-Value="_model.NameEn" Label="@L["acc.nameEn"]" MaxLength="200" Ltr="true" ReadOnly="!CanSetup" />
+                        <SelectField TValue="string?" @bind-Value="_model.AccountType" Options="Types" Label="@L["acc.type"]" Required="true" Disabled="!CanSetup" Help="@L["acc.typeHelp"]" />
+                        <ComboField TValue="string?" @bind-Value="_model.ParentId" Options="ParentOptions" Label="@L["acc.parent"]" Placeholder="@L["acc.topLevel"]" ReadOnly="!CanSetup" />
+                        <CheckField @bind-Value="_model.IsPostable" Label="@L["acc.isPostable"]" Disabled="!CanSetup" Help="@L["acc.postableHelp"]" />
+                        <CheckField @bind-Value="_model.IsControlAccount" Label="@L["acc.isControl"]" Disabled="!CanSetup" />
+                        @if (_model.IsControlAccount)
+                        {
+                            <SelectField TValue="string?" @bind-Value="_model.ControlPartyType" Options="PartyTypes" Label="@L["acc.partyType"]" Required="true" Disabled="!CanSetup" />
+                        }
+                        @if (_model.Id is not null) {<p class="help" style="margin:0">@L.F("acc.openingsHere", Fmt.Money(_model.OpeningDebit), Fmt.Money(_model.OpeningCredit))</p>}
+                        <div class="row" style="gap:6px;flex-wrap:wrap">
+                            @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" />}
+                            <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+                            @if (CanSetup && _model.Id is not null)
+                            {
+                                <Btn Icon="@(_model.Status == "Active" ? "archive" : "refresh")" Text="@L[_model.Status == "Active" ? "acc.deactivate" : "acc.activate"]" Busy="_busy" OnClick="ToggleStatus" />
+                                <Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => _deleting = true" />
+                            }
+                        </div>
+                    </EditForm>
+                </Box>
+            }
+            else {<div></div>}
+        </div>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _model.Code ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["acc.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="Delete" />
+
+@code {
+    private IReadOnlyList<AccountResponse> _all = [];
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _deleteError;
+    private bool _showArchived, _editing, _busy, _deleting;
+    private AccountModel _model = new();
+    private EditContext _ctx = new(new AccountModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanSetup => Shell.Can(PermissionKeys.AcctSetup);
+
+    private IReadOnlyList<Option<string?>> Types => new[] { "Asset", "Liability", "Equity", "Revenue", "Expense" }.Select(t => new Option<string?>(t, L["acc.t." + t])).ToList();
+    private IReadOnlyList<Option<string?>> PartyTypes => new[] { "Customer", "Supplier", "Driver", "Partner" }.Select(t => new Option<string?>(t, L["party." + t])).ToList();
+
+    /// <summary>Parents: any account except the edited one and its descendants (a group must not be posted to, FR-108).</summary>
+    private IReadOnlyList<Option<string?>> ParentOptions
+    {
+        get
+        {
+            var excluded = _model.Id is null ? new HashSet<string>() : Descendants(_model.Id);
+            return _all.Where(a => !excluded.Contains(a.Id)).Select(a => new Option<string?>(a.Id, $"{a.Code} · {L.Pick(a.NameAr, a.NameEn)}")).ToList();
+        }
+    }
+
+    private HashSet<string> Descendants(string id)
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal) { id };
+        bool added;
+        do
+        {
+            added = false;
+            foreach (var a in _all) if (a.ParentId is { } p && set.Contains(p) && set.Add(a.Id)) added = true;
+        } while (added);
+        return set;
+    }
+
+    /// <summary>The rows shown: search matches (flat), or the tree without the children of collapsed accounts.</summary>
+    private IReadOnlyList<AccountResponse> Visible
+    {
+        get
+        {
+            var rows = _all.Where(a => _showArchived || a.Status == "Active");
+            if (!string.IsNullOrWhiteSpace(_q))
+                return rows.Where(a => a.Code.Contains(_q.Trim(), StringComparison.OrdinalIgnoreCase) || Fold.Contains(a.NameAr, _q) || (a.NameEn is not null && Fold.Contains(a.NameEn, _q))).ToList();
+            var byId = _all.ToDictionary(a => a.Id);
+            bool Hidden(AccountResponse a)
+            {
+                for (var p = a.ParentId; p is not null && byId.TryGetValue(p, out var parent); p = parent.ParentId)
+                    if (_collapsed.Contains(p)) return true;
+                return false;
+            }
+            return rows.Where(a => !Hidden(a)).ToList();
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _all = await Api.GetAsync<IReadOnlyList<AccountResponse>>(Api.C("accounting/accounts"));
+            _state = _all.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Toggle(string id) { if (!_collapsed.Add(id)) _collapsed.Remove(id); }
+
+    private void CollapseAll()
+    {
+        foreach (var a in _all.Where(a => a.HasChildren && a.Level > 1)) _collapsed.Add(a.Id);
+    }
+
+    private void Open(AccountResponse a) => Edit(a);
+
+    private void Edit(AccountResponse? a)
+    {
+        _model = a is null ? new AccountModel { IsPostable = true } : AccountModel.From(a);
+        _ctx = new EditContext(_model);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task Template()
+    {
+        _busy = true;
+        try
+        {
+            var r = await Api.PostAsync<ChartTemplateResult>(Api.C("accounting/accounts/template"), new { });
+            Toasts.Success(L.F("acc.templateApplied", r.Accounts, r.CashBoxes, r.PostingKeys));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var req = new AccountRequest(_model.Code?.Trim(), _model.NameAr?.Trim(), string.IsNullOrWhiteSpace(_model.NameEn) ? null : _model.NameEn.Trim(), _model.AccountType,
+                _model.ParentId, _model.IsPostable, _model.IsControlAccount, _model.IsControlAccount ? _model.ControlPartyType : null, _model.RowVersion);
+            AccountResponse saved;
+            if (_model.Id is null) saved = await Api.PostAsync<AccountResponse>(Api.C("accounting/accounts"), req);
+            else
+            {
+                saved = await Api.PutAsync<AccountResponse>(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}"), req);
+                // Moving under another parent is its own action (FR-108).
+                if (saved.ParentId != _model.ParentId)
+                    saved = await Api.PostAsync<AccountResponse>(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}/move"), new MoveAccountRequest(_model.ParentId, saved.RowVersion));
+            }
+            Toasts.Success(L.F("acc.saved", saved.Code));
+            Lookups.Invalidate();
+            await Load();
+            Edit(_all.FirstOrDefault(a => a.Id == saved.Id));
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task ToggleStatus()
+    {
+        if (_model.Id is null) return;
+        _busy = true;
+        try
+        {
+            var active = _model.Status == "Active";
+            var a = await Api.PostAsync<AccountResponse>(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}/{(active ? "deactivate" : "activate")}"), new StatusChangeRequest(_model.RowVersion));
+            Toasts.Success(L.F(active ? "acc.deactivated" : "acc.activated", a.Code));
+            Lookups.Invalidate();
+            await Load();
+            Edit(_all.FirstOrDefault(x => x.Id == a.Id));
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete(string reason)
+    {
+        if (_model.Id is null) return;
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/accounts/{Uri.EscapeDataString(_model.Id)}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            _editing = false;
+            Toasts.Success(L.F("ml.deleted", _model.Code ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class AccountModel
+    {
+        public string? Id { get; set; }
+        public string? Code { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public string? AccountType { get; set; }
+        public string? ParentId { get; set; }
+        public bool IsPostable { get; set; }
+        public bool IsControlAccount { get; set; }
+        public string? ControlPartyType { get; set; }
+        public decimal OpeningDebit { get; set; }
+        public decimal OpeningCredit { get; set; }
+        public string Status { get; set; } = "Active";
+        public string? RowVersion { get; set; }
+
+        public static AccountModel From(AccountResponse a) => new()
+        {
+            Id = a.Id, Code = a.Code, NameAr = a.NameAr, NameEn = a.NameEn, AccountType = a.AccountType, ParentId = a.ParentId, IsPostable = a.IsPostable,
+            IsControlAccount = a.IsControlAccount, ControlPartyType = a.ControlPartyType, OpeningDebit = a.OpeningDebit, OpeningCredit = a.OpeningCredit,
+            Status = a.Status, RowVersion = a.RowVersion,
+        };
+    }
+}

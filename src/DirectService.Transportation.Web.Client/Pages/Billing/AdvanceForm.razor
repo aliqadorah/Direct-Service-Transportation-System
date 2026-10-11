@@ -1,0 +1,144 @@
+@page "/c/{Company}/driver-accounts/{DriverId}/advance"
+@page "/c/{Company}/driver-accounts/advances/new"
+@page "/c/{Company}/driver-accounts/advances/{Id}/edit"
+@*
+  SCR-27 advance form (FR-072, FR-073): driver, date, amount, method, cash box or bank account, reference, reason / notes. Posts Dr driver
+  advances, Cr cash or bank. An unsettled advance can be edited (reverse + re-post); "Save & print" opens the payment voucher.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject MoneyAccounts Accounts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <PageHeader Title="@(_existing is null ? L["drv.newAdvance"] : L.F("drv.editAdvance", _existing.Number))"
+                    Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts"))])">
+            <Actions>
+                <Btn Icon="print" Text="@L["drv.savePrintVoucher"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
+                <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />
+            </Actions>
+        </PageHeader>
+        <PostingBanner OnStatus="r => _postingReady = r" />
+        @if (_existing is not null) {<RecordLockGuard EntityType="TRN.Advance" Id="@_existing.Id" OnState="h => _lockedBy = h" />}
+        <EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="box pad stack" style="max-width:820px">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <ComboField TValue="string?" @bind-Value="_m.DriverId" SearchAsync="Lookups.SearchDriversAsync" Selected="_driverOption" Label="@L["trip.driver"]" Required="true" Span="2"
+                            ReadOnly="@(_existing is not null)" />
+                <DateField @bind-Value="_m.AdvanceDate" Label="@L["trip.date"]" Required="true" />
+                <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" />
+                <PaymentFields Model="_m" />
+                <TextField @bind-Value="_m.Notes" Label="@L["drv.advanceNotes"]" MaxLength="500" Span="3" />
+            </div>
+            <p class="help" style="margin:0">@L["drv.advanceHelp"]</p>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private AdvanceResponse? _existing;
+    private Option<string?>? _driverOption;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy;
+    private bool _saving, _postingReady = true;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string? DriverId { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    private bool CanSave => _postingReady && !_saving && _lockedBy is null && Shell.Can(PermissionKeys.DrvAdvance);
+
+    protected override Task OnParametersSetAsync()
+    {
+        _ctx = new EditContext(_m);
+        return Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            if (Id is not null)
+            {
+                var d = await Api.GetAsync<AdvanceDetails>(Api.C($"advances/{Uri.EscapeDataString(Id)}"));
+                _existing = d.Advance;
+                if (_existing.Status == "Void" || _existing.Settlement is not null) { Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/advances/{Id}"), replace: true); return; }
+                _m.DriverId = _existing.Driver.Id;
+                _driverOption = new Option<string?>(_existing.Driver.Id, _existing.Driver.Name);
+                _m.AdvanceDate = _existing.AdvanceDate;
+                _m.Amount = _existing.Amount;
+                _m.PaymentMethod = _existing.PaymentMethod;
+                if (_existing.Account.Kind == CashCodes.CashBox) _m.CashBoxId = _existing.Account.Id; else _m.BankAccountId = _existing.Account.Id;
+                _m.Reference = _existing.Reference;
+                _m.Notes = _existing.Notes;
+            }
+            else
+            {
+                try { await Accounts.EnsureAsync(); } catch (ApiException) { }
+                _m.AdvanceDate = Accounts.Today ?? DateOnly.FromDateTime(DateTime.Today);
+                if (DriverId is not null)
+                {
+                    // The driver's name comes from the account (drv.view); without it the driver is chosen in the form.
+                    try
+                    {
+                        var a = await Api.GetAsync<DriverAccountResponse>(Api.C($"drivers/{Uri.EscapeDataString(DriverId)}/account"));
+                        _m.DriverId = a.Driver.Id;
+                        _driverOption = new Option<string?>(a.Driver.Id, a.Driver.Name, a.TruckPlate);
+                    }
+                    catch (ApiException e) when (e.Problem.Status == 403) { }
+                }
+            }
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private async Task Save(bool print)
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var req = new AdvanceRequest(_m.DriverId, _m.AdvanceDate, _m.Amount, _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(),
+                string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _existing is null ? _m.ClientId : null, _existing?.RowVersion);
+            var r = _existing is null
+                ? await Api.PostAsync<AdvanceDetails>(Api.C("advances"), req)
+                : await Api.PutAsync<AdvanceDetails>(Api.C($"advances/{Uri.EscapeDataString(_existing.Id)}"), req);
+            var adv = r.Advance;
+            Toasts.Success(L.F("drv.advanceSaved", adv.Number, Fmt.Money(adv.Amount)), L["ui.print"], NavModel.Href(Company, $"print/advance/{adv.Id}"));
+            Nav.NavigateTo(NavModel.Href(Company, print ? $"print/advance/{adv.Id}" : $"driver-accounts/advances/{adv.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model : IPaymentModel
+    {
+        public string? DriverId { get; set; }
+        public DateOnly? AdvanceDate { get; set; }
+        public decimal? Amount { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? CashBoxId { get; set; }
+        public string? BankAccountId { get; set; }
+        public string? Reference { get; set; }
+        public string? Notes { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

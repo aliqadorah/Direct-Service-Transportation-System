@@ -1,0 +1,152 @@
+@page "/c/{Company}/invoices"
+@*
+  SCR-20 invoice list (FR-047): views All / Drafts / Unpaid / Overdue / E-invoice rejected, filters (customer, period, paid/unpaid,
+  e-invoice status), number search, sortable columns, totals of every matching invoice, Excel/CSV/PDF export; FR-094 banner when mapping
+  is incomplete. Dashboard links arrive with their filters in the address (overdue=true, einvoice=Rejected …).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.invoices"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"])])">
+    <Actions>
+        @if (Shell.Can(PermissionKeys.InvIssue))
+        {
+            <Btn Icon="file" Text="@L["nav.manualInvoice"]" Href="@NavModel.Href(Company, "invoices/manual")" Disabled="!_postingReady" />
+            <Btn Primary="true" Icon="plus" Text="@L["nav.newTripInvoice"]" Href="@NavModel.Href(Company, "invoices/new")" Disabled="!_postingReady" />
+        }
+    </Actions>
+</PageHeader>
+<PostingBanner OnStatus="r => _postingReady = r" />
+
+<ListShell Label="@L["nav.invoices"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" SearchPlaceholder="@L["inv.searchNumber"]" OnSearch="Search"
+           Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="file" EmptyTitle="@L["inv.none"]" EmptyText="@L["inv.noneText"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <SelectField TValue="string?" @bind-Value="_paid" Options="PaidOptions" Empty="@L["tar.all"]" Label="@L["inv.payment"]" FieldClass="w160" />
+        <SelectField TValue="string?" @bind-Value="_einvoice" Options="EInvoiceOptions" Empty="@L["tar.all"]" Label="@L["inv.einvoice"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <EmptyActions>
+        @if (Shell.Can(PermissionKeys.InvIssue))
+        {
+            <Btn Primary="true" Text="@L["nav.newTripInvoice"]" Href="@NavModel.Href(Company, "invoices/new")" />
+            <Btn Text="@L["nav.manualInvoice"]" Href="@NavModel.Href(Company, "invoices/manual")" />
+        }
+    </EmptyActions>
+    <ChildContent>
+        <DataGrid TItem="InvoiceResponse" Items="_page!.Page.Items" Key="i => i.Id" Caption="@L["nav.invoices"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  OnRowClick="Open" RowClass="@(i => i.Status == "Void" ? "void" : null)" FooterLabel="@L.F("inv.totalOf", Fmt.Count(_page.Totals.Invoices))">
+            <Columns>
+                <GridColumn TItem="InvoiceResponse" Title="@L["doc.number"]" Value="@(i => i.Number ?? L["st.draft"])" Ltr="true" SortKey="number" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["trip.date"]" Value="i => Fmt.Date(i.InvoiceDate, Shell.DateFormat)" Ltr="true" SortKey="invoiceDate" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["trip.customer"]" Value="i => i.Customer.Name" SortKey="customer" Clip="true" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.lines"]" Value="i => Fmt.Count(i.LineCount)" Numeric="true" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" SortKey="total" Footer="@Fmt.Money(_page.Totals.Total)" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.paidReturned"]" Value="@(i => i.Status == "Draft" ? null : Fmt.Money(i.PaidAmount + i.ReturnedAmount))" Numeric="true"
+                            Footer="@Fmt.Money(_page.Totals.Paid + _page.Totals.Returned)" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.remaining"]" Value="@(i => i.Status == "Draft" ? null : Fmt.Money(i.RemainingAmount))" Numeric="true" SortKey="remaining"
+                            Footer="@Fmt.Money(_page.Totals.Remaining)" />
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.due"]" SortKey="dueDate" Numeric="true">
+                    <Template>
+                        @if (context.Status != "Draft")
+                        {
+                            <bdi class="num">@Fmt.Date(context.DueDate, Shell.DateFormat)</bdi>
+                            @if (context.IsOverdue) {<text> </text><Badge Tone="Tone.Err" Icon="clock" Text="@L["inv.overdue"]" />}
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn TItem="InvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Invoice(context.PaymentState)" /></Template></GridColumn>
+                <GridColumn TItem="InvoiceResponse" Title="@L["inv.einvoice"]"><Template><StatusTag Status="@BillingStatus.EInvoice(context.EInvoiceStatus)" /></Template></GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "invoiceDate", Desc = true };
+    private InvoicePage? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _customer, _paid, _einvoice;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+    private bool _postingReady = true;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views =>
+    [
+        new("all", L["inv.viewAll"]), new("draft", L["inv.viewDrafts"]), new("unpaid", L["inv.viewUnpaid"]), new("overdue", L["inv.viewOverdue"]),
+        new("rejected", L["inv.viewRejected"]),
+    ];
+
+    private IReadOnlyList<Option<string?>> PaidOptions => [new("unpaid", L["st.unpaid"]), new("partial", L["st.partial"]), new("paid", L["st.closed"])];
+
+    private IReadOnlyList<Option<string?>> EInvoiceOptions =>
+        [new("NotRequired", L["st.notRequired"]), new("Queued", L["st.queued"]), new("Submitted", L["st.submitted"]), new("Rejected", L["st.rejected"])];
+
+    private bool Filtered => _q.Q is not null || _customer is not null || _from is not null || _to is not null || _paid is not null || _einvoice is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        if (query["overdue"] == "true") _view = "overdue";
+        if (query["status"] == "draft") _view = "draft";
+        if (query["einvoice"] is { Length: > 0 } e) _einvoice = e;
+        if (query["customer"] is { Length: > 0 } c) _customer = c;
+        if (query["paid"] is { Length: > 0 } p) _paid = p;
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        Set("status", _view switch { "draft" => "draft", "unpaid" => "approved", _ => null });
+        Set("overdue", _view == "overdue" ? "true" : null);
+        Set("eInvoice", _view == "rejected" ? "Rejected" : _einvoice);
+        Set("customer", _customer);
+        Set("paid", _paid);
+        Set("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<InvoicePage>(Api.C("invoices" + Query(true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private Task ClearAll()
+    {
+        _q.Q = _customer = _paid = _einvoice = null;
+        _from = _to = null;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("invoices/export" + Query(false)), format);
+
+    private void Open(InvoiceResponse i) => Nav.NavigateTo(NavModel.Href(Company, $"invoices/{i.Id}"));
+}

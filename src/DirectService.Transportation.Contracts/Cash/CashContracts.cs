@@ -44,7 +44,7 @@ public sealed record ReceiptDetails(ReceiptResponse Receipt, string AmountInWord
 /// <summary>Receipts list filters (FR-071): customer, period, method, cash box / bank, applied (invoice) or on account, status, number search.</summary>
 public sealed record ReceiptListQuery(
     string? Customer, DateOnly? From, DateOnly? To, string? Method, string? CashBox, string? BankAccount, string? Applied, string? Status, string? Q, string? Sort,
-    int Page = 1, int PageSize = 50);
+    int Page = 1, int PageSize = 50, string? Invoice = null);
 
 public sealed record ReceiptPage(PagedResult<ReceiptResponse> Page, CashListTotals Totals);
 

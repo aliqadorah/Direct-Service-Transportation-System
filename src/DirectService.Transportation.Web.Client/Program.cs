@@ -12,5 +12,8 @@ builder.Services.AddScoped<Api>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<FormConfig>();
 builder.Services.AddScoped<TripLookups>();
+builder.Services.AddScoped<Downloads>();
+builder.Services.AddScoped<MoneyAccounts>();
+builder.Services.AddScoped<AccountingLookups>();
 
 await builder.Build().RunAsync().ConfigureAwait(false);

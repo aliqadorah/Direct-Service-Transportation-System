@@ -1,0 +1,41 @@
+@* Lines of an invoice: trips with their annex fields (receipt opens the trip), or manual lines; returned quantities shown when credited. *@
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+<DataGrid TItem="InvoiceLineResponse" Items="Lines" Key="l => l.Id" Caption="@L[Manual ? "inv.items" : "nav.trips"]" OnRowClick="Open"
+          RowClass="@(l => l.ReturnedQuantity >= l.Quantity ? "void" : null)" FooterLabel="@L["ui.total"]">
+    <Columns>
+        @if (Manual)
+        {
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.description"]" Value="l => l.Description" Wrap="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.qty"]" Value="l => Fmt.Qty(l.Quantity)" Numeric="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.unitPrice"]" Value="l => Fmt.Money(l.UnitPrice, 4)" Numeric="true" />
+        }
+        else
+        {
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.receiptNo"]" Value="l => l.Trip?.Name" Ltr="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.loadingDate"]" Value="l => Fmt.Date(l.LoadingDate, Shell.DateFormat)" Ltr="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.driver"]" Value="l => l.Driver" Clip="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["md.plate"]" Value="l => l.TruckPlate" Ltr="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.loading"]" Value="l => l.LoadingSite" Clip="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.unloading"]" Value="l => l.UnloadingSite" Clip="true" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.material"]" Value="l => l.Material" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.billedQty"]" Value="l => Fmt.Qty(l.Quantity)" Numeric="true" Footer="@Fmt.Qty(Lines.Sum(l => l.Quantity))" />
+            <GridColumn TItem="InvoiceLineResponse" Title="@L["trip.price"]" Value="l => Fmt.Money(l.UnitPrice, 4)" Numeric="true" />
+        }
+        <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.amount"]" Value="l => Fmt.Money(l.Amount)" Numeric="true" Footer="@Fmt.Money(Lines.Sum(l => l.Amount))" />
+        <GridColumn TItem="InvoiceLineResponse" Title="@L["inv.returned"]">
+            <Template>@if (context.ReturnedQuantity > 0) {<Badge Tone="Tone.Mute" Icon="refresh" Text="@(Manual ? Fmt.Qty(context.ReturnedQuantity) : L["inv.returnedTrip"])" />}</Template>
+        </GridColumn>
+    </Columns>
+</DataGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<InvoiceLineResponse> Lines { get; set; } = [];
+    [Parameter] public bool Manual { get; set; }
+
+    private void Open(InvoiceLineResponse l)
+    {
+        if (l.Trip is not null && Shell.Company is { } c) Nav.NavigateTo(NavModel.Href(c.Id, $"trips/{l.Trip.Id}"));
+    }
+}

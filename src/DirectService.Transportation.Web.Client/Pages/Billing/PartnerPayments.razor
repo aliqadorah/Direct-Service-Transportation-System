@@ -1,0 +1,91 @@
+@page "/c/{Company}/partner-accounts/payments"
+@* Partner payments register (FR-087, RPT-21): views All / Active / Void, partner, period and method filters, number search, total of active payments, Excel/CSV. *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["prt.paymentsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts")), new Crumb(L["prt.paymentsList"])])">
+    <Actions>@if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="plus" Text="@L["prt.newPayment"]" Href="@NavModel.Href(Company, "partner-accounts/payments/new")" />}</Actions>
+</PageHeader>
+<ListShell Label="@L["prt.paymentsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv"])" OnExport="Export"
+           State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="cash" EmptyTitle="@L["prt.noPayments"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <ComboField TValue="string?" @bind-Value="_partner" Options="Lookups.Partners" Label="@L["md.partner"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <SelectField TValue="string?" @bind-Value="_method" Options="MoneyAccounts.Methods(L)" Empty="@L["tar.all"]" Label="@L["cash.method"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <ChildContent>
+        <DataGrid TItem="PartnerPaymentResponse" Items="_page!.Page.Items" Key="p => p.Id" Caption="@L["prt.paymentsList"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"partner-accounts/payments/{p.Id}")))" RowClass="@(p => p.Status == "Void" ? "void" : null)"
+                  FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+            <Columns>
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" SortKey="number" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" SortKey="paymentDate" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["md.partner"]" Value="p => p.Partner.Name" Clip="true" SortKey="partner" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.method"]" Value="@(p => L["pay." + p.PaymentMethod])" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.account"]" Value="p => p.Account.Name" Clip="true" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.reference"]" Value="p => p.Reference" Ltr="true" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["inv.amount"]" Value="p => Fmt.Money(p.Amount)" Numeric="true" SortKey="amount" Footer="@Fmt.Money(_page.Totals.Amount)" />
+                <GridColumn TItem="PartnerPaymentResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "paymentDate", Desc = true };
+    private PartnerPaymentPage? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _partner, _method;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("active", L["st.posted"]), new("void", L["st.void"])];
+    private bool Filtered => _q.Q is not null || _partner is not null || _method is not null || _from is not null || _to is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        Set("status", _view);
+        Set("partner", _partner);
+        Set("method", _method);
+        Set("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<PartnerPaymentPage>(Api.C("partner-payments" + Query(true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+    private Task ClearAll() { _q.Q = _partner = _method = null; _from = _to = null; _q.Page = 1; return Load(); }
+    private Task Export(string format) => Files.SaveAsync(Api.C("partner-payments/export" + Query(false)), format);
+}

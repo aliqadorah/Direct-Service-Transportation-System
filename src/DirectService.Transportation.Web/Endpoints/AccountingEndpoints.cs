@@ -21,6 +21,8 @@ internal static class AccountingEndpoints
         MapOpenings(acc.MapGroup("/opening-balances").WithTags("Opening balances"));
         MapPostingKeys(acc);
         MapCostCentres(acc.MapGroup("/cost-centres").WithTags("Cost centres"));
+        acc.MapGet("/money-accounts/options", async (CashBankService svc, CancellationToken ct) => TypedResults.Ok(await svc.MoneyOptionsAsync(ct).ConfigureAwait(false)))
+            .WithTags("Cash boxes").RequireAnyPermission(PermissionKeys.RcptManage, PermissionKeys.DrvAdvance, PermissionKeys.DrvSettle, PermissionKeys.AcctApar, PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.ReportsView);
         MapCashBoxes(acc.MapGroup("/cash-boxes").WithTags("Cash boxes"));
         MapBankAccounts(acc.MapGroup("/bank-accounts").WithTags("Bank accounts"));
         MapPeriods(acc.MapGroup("/periods").WithTags("Periods"));
@@ -32,6 +34,8 @@ internal static class AccountingEndpoints
     {
         g.MapGet("/", async (string? status, ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(status, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
+        g.MapGet("/options", async (ChartOfAccountsService svc, CancellationToken ct) => TypedResults.Ok(await svc.OptionsAsync(ct).ConfigureAwait(false)))
+            .RequireAnyPermission(PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.AcctApar, PermissionKeys.AcctSetup, PermissionKeys.SettingsManage, PermissionKeys.ReportsView);
         g.MapGet("/export", async (ChartImportService svc, CancellationToken ct) => File(await svc.ExportAsync(ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{account}", async (string account, ChartOfAccountsService svc, CancellationToken ct) =>
@@ -86,6 +90,8 @@ internal static class AccountingEndpoints
 
     private static void MapCostCentres(RouteGroupBuilder g)
     {
+        g.MapGet("/options", async (CashBankService svc, CancellationToken ct) => TypedResults.Ok(await svc.CostCentreOptionsAsync(ct).ConfigureAwait(false)))
+            .RequireAnyPermission(PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.AcctApar);
         g.MapGet("/", async (CashBankService svc, CancellationToken ct) => TypedResults.Ok(await svc.CostCentresAsync(ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (CostCentreRequest r, CashBankService svc, CancellationToken ct) =>

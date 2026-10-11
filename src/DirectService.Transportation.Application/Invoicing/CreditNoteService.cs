@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
+using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
@@ -53,49 +54,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         {
             await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
             await periods.EnsureOpenAsync(cn.CreditDate, c).ConfigureAwait(false);
-            var invLines = await db.Set<InvoiceLine>().Where(l => l.InvoiceId == inv.Id).ToListAsync(c).ConfigureAwait(false);
-            var returnedQty = await db.Set<CreditNoteLine>().Where(x => x.InvoiceLine.InvoiceId == inv.Id && x.CreditNote.Status == InvoiceCodes.Posted)
-                .GroupBy(x => x.InvoiceLineId).Select(g => new { g.Key, Qty = g.Sum(x => x.Quantity), Amount = g.Sum(x => x.Amount) })
-                .ToDictionaryAsync(x => x.Key, x => (x.Qty, x.Amount), c).ConfigureAwait(false);
-
-            // ---- returned lines: trip lines whole, manual lines up to the quantity not yet returned (FR-049).
-            var picked = new List<(InvoiceLine Line, decimal Qty, decimal Amount)>();
-            var seen = new HashSet<long>();
-            var items = r.Lines!;
-            for (var i = 0; i < items.Count; i++)
-            {
-                var field = $"lines[{i}].invoiceLineId";
-                var pid = support.Decode<InvoiceLine>(items[i].InvoiceLineId) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
-                var line = invLines.FirstOrDefault(l => l.PublicId == pid) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
-                if (!seen.Add(line.Id)) throw Fail.Field(field, ErrorCodes.ImportDuplicate, field);
-                var (doneQty, doneAmount) = returnedQty.GetValueOrDefault(line.Id);
-                var openQty = line.Quantity - doneQty;
-                if (openQty <= 0) throw Fail.RuleOn(field, ErrorCodes.CreditLineReturned);
-                decimal qty;
-                if (line.TripId is not null) qty = openQty;
-                else
-                {
-                    qty = items[i].Quantity ?? openQty;
-                    if (qty <= 0 || decimal.Round(qty, 3) != qty || qty > openQty) throw Fail.Field($"lines[{i}].quantity", ErrorCodes.ValidationRange, "quantity");
-                }
-                // The last open part of a line takes exactly what is left of its amount (no rounding residue on the line).
-                var amount = qty == openQty ? line.Amount - doneAmount : InvoiceCalculator.LineAmount(qty, line.UnitPrice, company.Decimals);
-                picked.Add((line, qty, amount));
-            }
-
-            var everything = invLines.All(l => l.Quantity - returnedQty.GetValueOrDefault(l.Id).Qty - picked.Where(p => p.Line.Id == l.Id).Sum(p => p.Qty) <= 0);
-            var before = await db.Set<CreditNote>().Where(x => x.InvoiceId == inv.Id && x.Status == InvoiceCodes.Posted)
-                .GroupBy(_ => 1).Select(g => new ReturnedSoFar(g.Sum(x => x.Subtotal), g.Sum(x => x.DiscountShare), g.Sum(x => x.FeesShare), g.Sum(x => x.Tax), g.Sum(x => x.Total)))
-                .SingleOrDefaultAsync(c).ConfigureAwait(false) ?? ReturnedSoFar.None;
-            var invoiceTotals = new InvoiceTotals(inv.Subtotal, inv.Discount, inv.ExtraFees, inv.BaseAmount, inv.Tax, inv.Total);
-            // The invoice's own tax mode (review M1): an inclusive invoice stores a net subtotal below the sum of its line amounts.
-            var linesSum = invLines.Sum(l => l.Amount);
-            var inclusive = inv.Subtotal != linesSum;
-            var t = InvoiceCalculator.Credit(picked.Sum(p => p.Amount), linesSum, invoiceTotals, inv.TaxRate, inclusive, everything, before, company.Decimals);
-            t = InvoiceCalculator.CapToRemaining(t, inv.RemainingAmount, 0.010m);
-            // BR-026: never above the remaining balance.
-            if (t.Total > inv.RemainingAmount) throw Fail.Rule(ErrorCodes.CreditExceedsRemaining, Money.Format(t.Total), Money.Format(inv.RemainingAmount));
-            if (t.Total <= 0) throw Fail.Rule(ErrorCodes.InvoiceTotalZero);
+            var (picked, t) = await PlanAsync(inv, r.Lines!, company.Decimals, c).ConfigureAwait(false);
 
             cn.Number = await numbering.NextAsync(Configuration.DocumentTypes.CreditNote, c).ConfigureAwait(false);
             cn.Subtotal = t.Subtotal;
@@ -132,6 +91,72 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             raced = r2.Existing;
         }
         return raced is not null ? (await DetailsAsync(raced.Id, ct).ConfigureAwait(false), false) : (await DetailsAsync(cn.Id, ct).ConfigureAwait(false), true);
+    }
+
+    /// <summary>
+    /// Totals a credit note would have (screen preview, nothing saved): the same returned-line rules, proportional shares and
+    /// remaining-balance check as <see cref="CreateAsync"/> (BR-025 … BR-027).
+    /// </summary>
+    public async Task<CreditNoteCalculation> CalculateAsync(CreditNoteRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        new Validator().Check(!string.IsNullOrWhiteSpace(r.InvoiceId), "invoiceId", ErrorCodes.ValidationRequired)
+            .Check((r.Lines ?? []).Count > 0, "lines", ErrorCodes.ValidationRequired).ThrowIfInvalid();
+        var inv = await support.FindAsync<Invoice>(r.InvoiceId, ct).ConfigureAwait(false);
+        if (inv.Status is not (InvoiceCodes.Approved or InvoiceCodes.Closed)) throw Fail.Rule(ErrorCodes.CreditInvoiceNotApproved, inv.Number);
+        var company = await invoices.CompanyAsync(ct).ConfigureAwait(false);
+        var (_, t) = await PlanAsync(inv, r.Lines!, company.Decimals, ct).ConfigureAwait(false);
+        db.ChangeTracker.Clear();
+        return new CreditNoteCalculation(t.Subtotal, t.DiscountShare, t.FeesShare, t.BaseAmount, t.Tax, t.Total, inv.RemainingAmount, inv.TaxRate, company.Decimals);
+    }
+
+    /// <summary>The returned lines and the credit note's totals, checked against the remaining balance (FR-049, BR-025 … BR-027).</summary>
+    private async Task<(List<(InvoiceLine Line, decimal Qty, decimal Amount)> Picked, CreditTotals Totals)> PlanAsync(Invoice inv, IReadOnlyList<CreditLineRequest> items,
+        int decimals, CancellationToken c)
+    {
+        var invLines = await db.Set<InvoiceLine>().Where(l => l.InvoiceId == inv.Id).ToListAsync(c).ConfigureAwait(false);
+        var returnedQty = await db.Set<CreditNoteLine>().Where(x => x.InvoiceLine.InvoiceId == inv.Id && x.CreditNote.Status == InvoiceCodes.Posted)
+            .GroupBy(x => x.InvoiceLineId).Select(g => new { g.Key, Qty = g.Sum(x => x.Quantity), Amount = g.Sum(x => x.Amount) })
+            .ToDictionaryAsync(x => x.Key, x => (x.Qty, x.Amount), c).ConfigureAwait(false);
+
+        // ---- returned lines: trip lines whole, manual lines up to the quantity not yet returned (FR-049).
+        var picked = new List<(InvoiceLine Line, decimal Qty, decimal Amount)>();
+        var seen = new HashSet<long>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var field = $"lines[{i}].invoiceLineId";
+            var pid = support.Decode<InvoiceLine>(items[i].InvoiceLineId) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+            var line = invLines.FirstOrDefault(l => l.PublicId == pid) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+            if (!seen.Add(line.Id)) throw Fail.Field(field, ErrorCodes.ImportDuplicate, field);
+            var (doneQty, doneAmount) = returnedQty.GetValueOrDefault(line.Id);
+            var openQty = line.Quantity - doneQty;
+            if (openQty <= 0) throw Fail.RuleOn(field, ErrorCodes.CreditLineReturned);
+            decimal qty;
+            if (line.TripId is not null) qty = openQty;
+            else
+            {
+                qty = items[i].Quantity ?? openQty;
+                if (qty <= 0 || decimal.Round(qty, 3) != qty || qty > openQty) throw Fail.Field($"lines[{i}].quantity", ErrorCodes.ValidationRange, "quantity");
+            }
+            // The last open part of a line takes exactly what is left of its amount (no rounding residue on the line).
+            var amount = qty == openQty ? line.Amount - doneAmount : InvoiceCalculator.LineAmount(qty, line.UnitPrice, decimals);
+            picked.Add((line, qty, amount));
+        }
+
+        var everything = invLines.All(l => l.Quantity - returnedQty.GetValueOrDefault(l.Id).Qty - picked.Where(p => p.Line.Id == l.Id).Sum(p => p.Qty) <= 0);
+        var before = await db.Set<CreditNote>().Where(x => x.InvoiceId == inv.Id && x.Status == InvoiceCodes.Posted)
+            .GroupBy(_ => 1).Select(g => new ReturnedSoFar(g.Sum(x => x.Subtotal), g.Sum(x => x.DiscountShare), g.Sum(x => x.FeesShare), g.Sum(x => x.Tax), g.Sum(x => x.Total)))
+            .SingleOrDefaultAsync(c).ConfigureAwait(false) ?? ReturnedSoFar.None;
+        var invoiceTotals = new InvoiceTotals(inv.Subtotal, inv.Discount, inv.ExtraFees, inv.BaseAmount, inv.Tax, inv.Total);
+        // The invoice's own tax mode (review M1): an inclusive invoice stores a net subtotal below the sum of its line amounts.
+        var linesSum = invLines.Sum(l => l.Amount);
+        var inclusive = inv.Subtotal != linesSum;
+        var t = InvoiceCalculator.Credit(picked.Sum(p => p.Amount), linesSum, invoiceTotals, inv.TaxRate, inclusive, everything, before, decimals);
+        t = InvoiceCalculator.CapToRemaining(t, inv.RemainingAmount, 0.010m);
+        // BR-026: never above the remaining balance.
+        if (t.Total > inv.RemainingAmount) throw Fail.Rule(ErrorCodes.CreditExceedsRemaining, Money.Format(t.Total), Money.Format(inv.RemainingAmount));
+        if (t.Total <= 0) throw Fail.Rule(ErrorCodes.InvoiceTotalZero);
+        return (picked, t);
     }
 
     /// <summary>Void (FR-052): reversal, trips invoiced again; blocked if a returned trip was invoiced again or the period is closed.</summary>
@@ -226,6 +251,29 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
     public async Task<PagedResult<CreditNoteResponse>> ListAsync(CreditNoteListQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
+        var query = Filter(q);
+        var paging = new PageRequest(q.Page, q.PageSize);
+        var total = await query.CountAsync(ct).ConfigureAwait(false);
+        var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-creditDate").ThenByDescending(c => c.Id).Skip(paging.Skip).Take(paging.SafePageSize))
+            .ToListAsync(ct).ConfigureAwait(false);
+        return new PagedResult<CreditNoteResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, total);
+    }
+
+    /// <summary>The filtered credit-note list as a report table for Excel/CSV/PDF export (FR-165), with the total of posted notes.</summary>
+    public async Task<ReportTable> ExportTableAsync(CreditNoteListQuery q, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(q);
+        var rows = await Rows(MasterDataSupport.Sort(Filter(q), q.Sort, SortFields, "-creditDate").ThenByDescending(c => c.Id).Take(SheetData.MaxRows)).ToListAsync(ct).ConfigureAwait(false);
+        var data = rows.Select(ToResponse).Select(c => (IReadOnlyList<object?>)[c.Number, c.CreditDate, c.Invoice.Number, c.Customer.Name, c.Reason, c.Total, c.Status, c.EInvoiceStatus]).ToList();
+        IReadOnlyList<object?> totals = [En ? "Total" : "المجموع", null, null, null, null, rows.Where(r => r.C.Status == InvoiceCodes.Posted).Sum(r => r.C.Total), null, null];
+        ReportColumn[] columns = En
+            ? [new("Number"), new("Date", ReportValue.Date), new("Invoice"), new("Customer"), new("Reason"), new("Total", ReportValue.Money), new("Status"), new("E-invoicing")]
+            : [new("الرقم"), new("التاريخ", ReportValue.Date), new("الفاتورة"), new("العميل"), new("السبب"), new("الإجمالي", ReportValue.Money), new("الحالة"), new("الفوترة الإلكترونية")];
+        return new ReportTable(En ? "Credit notes" : "الإشعارات الدائنة", [], columns, data, totals);
+    }
+
+    private IQueryable<CreditNote> Filter(CreditNoteListQuery q)
+    {
         var query = db.Set<CreditNote>().AsNoTracking();
         query = (q.Status?.Trim().ToLowerInvariant()) switch
         {
@@ -247,11 +295,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         if (q.From is DateOnly from) query = query.Where(c => c.CreditDate >= from);
         if (q.To is DateOnly to) query = query.Where(c => c.CreditDate <= to);
         if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(c => c.Number.Contains(text) || (c.Invoice.Number != null && c.Invoice.Number.Contains(text)));
-        var paging = new PageRequest(q.Page, q.PageSize);
-        var total = await query.CountAsync(ct).ConfigureAwait(false);
-        var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-creditDate").ThenByDescending(c => c.Id).Skip(paging.Skip).Take(paging.SafePageSize))
-            .ToListAsync(ct).ConfigureAwait(false);
-        return new PagedResult<CreditNoteResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, total);
+        return query;
     }
 
     public async Task<CreditNoteDetails> GetAsync(string token, CancellationToken ct)

@@ -1,0 +1,27 @@
+@page "/c/{Company}/accounting/chart/import"
+@page "/c/{Company}/accounting/journal/import"
+@*
+  SCR-33 journal import (FR-114) and the chart import (FR-109): strict preview (unbalanced entries, unknown or non-postable accounts, closed
+  periods, missing parties on control accounts; duplicate codes, unknown parents, invalid types) then import.
+*@
+@inject Loc L
+@inject NavigationManager Nav
+@inject AccountingLookups Lookups
+
+<PageHeader Title="@L[Journal ? "nav.journalImport" : "acc.chartImport"]"
+            Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L[Journal ? "nav.journal" : "nav.chart"], NavModel.Href(Company, Journal ? "accounting/journal" : "accounting/chart"))])" />
+<p class="muted" style="margin:0">@L[Journal ? "acc.journalImportHelp" : "acc.chartImportHelp"]</p>
+@if (Journal)
+{
+    <ImportPanel PreviewPath="accounting/journal-entries/import/preview" ImportPath="accounting/journal-entries/import" Done="accounting/journal" Help="@L["acc.journalImportColumns"]" />
+}
+else
+{
+    <ImportPanel PreviewPath="accounting/accounts/import/preview" ImportPath="accounting/accounts/import" Done="accounting/chart" Help="@L["acc.chartImportColumns"]" OnImported="Lookups.Invalidate" />
+}
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool Journal => Nav.Uri.Contains("/accounting/journal/import", StringComparison.Ordinal);
+}

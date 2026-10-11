@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
@@ -17,9 +18,15 @@ namespace DirectService.Transportation.Application.Accounting;
 /// its own postable asset account ("one account per cash box / bank account", 7.5.1). Archived records stay in
 /// history but cannot be chosen on new documents; delete (soft) only while unreferenced (BR-040).
 /// </summary>
-public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, ChartOfAccountsService accounts, IRequestContext ctx)
+public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, ChartOfAccountsService accounts, IRequestContext ctx,
+    MasterData.MasterDataSupport support)
 {
     // ============================================================ cost centres
+
+    /// <summary>Active cost centres for the pick lists of journal and AP/AR lines (FR-131).</summary>
+    public async Task<IReadOnlyList<MasterOption>> CostCentreOptionsAsync(CancellationToken ct) =>
+        (await db.Set<CostCentre>().AsNoTracking().Where(c => c.Status == AccountingCodes.Active).OrderBy(c => c.Code).Select(c => new { c.PublicId, c.Code, c.Name })
+            .ToListAsync(ct).ConfigureAwait(false)).Select(c => new MasterOption(tokens.Encode<CostCentre>(c.PublicId), c.Code + " · " + c.Name)).ToList();
 
     public async Task<IReadOnlyList<CostCentreResponse>> CostCentresAsync(CancellationToken ct) =>
         (await db.Set<CostCentre>().AsNoTracking().OrderBy(c => c.Code).ToListAsync(ct).ConfigureAwait(false)).Select(ToResponse).ToList();
@@ -86,6 +93,18 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         new(tokens.Encode<CostCentre>(c.PublicId), c.Code, c.Name, c.Status, Convert.ToBase64String(c.RowVersion));
 
     // ============================================================ cash boxes
+
+    /// <summary>Active cash boxes and bank accounts for the cash documents' pick lists (receipts, advances, settlements, payments).</summary>
+    public async Task<MoneyAccountOptions> MoneyOptionsAsync(CancellationToken ct)
+    {
+        var boxes = await db.Set<CashBox>().AsNoTracking().Where(c => c.Status == AccountingCodes.Active).OrderBy(c => c.Name)
+            .Select(c => new { c.PublicId, c.Name }).ToListAsync(ct).ConfigureAwait(false);
+        var banks = await db.Set<BankAccount>().AsNoTracking().Where(b => b.Status == AccountingCodes.Active).OrderBy(b => b.Name)
+            .Select(b => new { b.PublicId, b.Name, b.BankName }).ToListAsync(ct).ConfigureAwait(false);
+        return new MoneyAccountOptions(boxes.Select(c => new MasterOption(tokens.Encode<CashBox>(c.PublicId), c.Name)).ToList(),
+            banks.Select(b => new MasterOption(tokens.Encode<BankAccount>(b.PublicId), b.Name == b.BankName ? b.Name : b.BankName + " · " + b.Name)).ToList(),
+            await support.TodayAsync(ct).ConfigureAwait(false));
+    }
 
     public async Task<IReadOnlyList<CashBoxResponse>> CashBoxesAsync(CancellationToken ct) =>
         (await db.Set<CashBox>().AsNoTracking().Include(c => c.Account).OrderBy(c => c.Name).ToListAsync(ct).ConfigureAwait(false))

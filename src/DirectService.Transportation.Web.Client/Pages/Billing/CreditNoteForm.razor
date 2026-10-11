@@ -1,0 +1,266 @@
+@page "/c/{Company}/credit-notes/new"
+@*
+  SCR-24 credit note from an approved invoice (FR-049…051, BR-025…027): pick the invoice, the date and a required reason, tick the returned
+  trips (whole) or manual lines (with the quantity), and see the proportional discount, fees, tax and total computed by the server; never
+  above the invoice's remaining balance. The returned trips become unbilled again. E-invoicing waits for the invoice's acceptance (FR-064).
+*@
+@implements IDisposable
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@(_inv is null ? L["cn.new"] : L.F("cn.fromNumber", _inv.Invoice.Number ?? ""))"
+            Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"], NavModel.Href(Company, "credit-notes"))])">
+    <Actions>
+        @if (_inv is not null) {<Btn Primary="true" Text="@L["cn.approve"]" Busy="_saving" Disabled="!CanSave" OnClick="Save" />}
+    </Actions>
+</PageHeader>
+<PostingBanner OnStatus="r => _postingReady = r" />
+
+<EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+    <ProblemValidator @ref="_problems" />
+    <ErrorSummary @ref="_summary" Extra="_extra" />
+    @if (_preview is null && _previewError is not null) {<Banner Tone="Tone.Err" Text="@_previewError" />}
+    @if (_inv?.Invoice.EInvoiceStatus is EInvoiceCodes.Queued or EInvoiceCodes.Rejected) {<Banner Tone="Tone.Warn" Text="@L["cn.waitsForInvoice"]" />}
+    <section class="box pad" style="flex:none">
+        <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+            <ComboField TValue="string?" @bind-Value="_m.InvoiceId" SearchAsync="SearchInvoices" Selected="_invoiceOption" Label="@L["cn.invoice"]" Required="true" Span="2"
+                        OnSelected="InvoicePicked" Help="@(_inv is null ? null : L.F("cn.remainingHelp", Fmt.Money(_inv.Invoice.RemainingAmount)))" />
+            <DateField @bind-Value="_m.CreditDate" Label="@L["cn.date"]" Required="true" />
+            <div></div>
+            <TextField @bind-Value="_m.Reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Span="4" />
+        </div>
+    </section>
+    @if (_inv is null)
+    {
+        <Box Fill="true"><EmptyState Icon="file" Title="@L["cn.pickInvoice"]" Text="@L["cn.pickInvoiceText"]" /></Box>
+    }
+    else
+    {
+        <div class="cols fill" style="grid-template-columns:1fr 310px;align-items:stretch;min-height:0">
+            <Box NoPad="true" Style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
+                <div class="bh"><span>@L[_manual ? "cn.pickLines" : "cn.pickTrips"]</span><span class="a">@if (_open.Count > 0) {<Btn Small="true" Text="@L["ui.selectAll"]" OnClick="SelectAll" />}</span></div>
+                @if (_open.Count == 0)
+                {
+                    <EmptyState Icon="check" Title="@L["cn.nothingOpen"]" />
+                }
+                else
+                {
+                    <div class="tbl-wrap fill">
+                        <table class="tbl">
+                            <caption class="sr-only">@L[_manual ? "cn.pickLines" : "cn.pickTrips"]</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="chk"><span class="sr-only">@L["ui.selectRow"]</span></th>
+                                    @if (_manual)
+                                    {
+                                        <th scope="col">@L["inv.description"]</th><th scope="col" class="n">@L["cn.openQty"]</th><th scope="col" class="n">@L["cn.returnQty"]</th><th scope="col" class="n">@L["inv.unitPrice"]</th>
+                                    }
+                                    else
+                                    {
+                                        <th scope="col">@L["trip.receiptNo"]</th><th scope="col">@L["trip.loadingDate"]</th><th scope="col">@L["trip.driver"]</th><th scope="col">@L["trip.loading"]</th><th scope="col" class="n">@L["inv.billedQty"]</th><th scope="col" class="n">@L["trip.price"]</th>
+                                    }
+                                    <th scope="col" class="n">@L["inv.amount"]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in _open)
+                                {
+                                    var l = line;
+                                    var label = l.Trip?.Name ?? l.Description ?? "";
+                                    <tr @key="l.Id" class="@(_pick.ContainsKey(l.Id) ? "sel" : null)">
+                                        <td class="chk"><input type="checkbox" checked="@_pick.ContainsKey(l.Id)" aria-label="@L.F("cn.returnLine", label)" @onchange="e => Toggle(l, e.Value is true)" /></td>
+                                        @if (_manual)
+                                        {
+                                            <td>@l.Description</td>
+                                            <td class="n"><bdi class="num">@Fmt.Qty(l.Quantity - l.ReturnedQuantity)</bdi></td>
+                                            <td class="n" style="width:130px">
+                                                @if (_pick.TryGetValue(l.Id, out var q))
+                                                {
+                                                    <input class="input num" style="height:26px;width:110px" inputmode="decimal" aria-label="@L.F("cn.returnQtyOf", label)" value="@Fmt.Qty(q)"
+                                                           @onchange="e => SetQty(l, e.Value?.ToString())" />
+                                                }
+                                            </td>
+                                            <td class="n"><bdi class="num">@Fmt.Money(l.UnitPrice, 4)</bdi></td>
+                                        }
+                                        else
+                                        {
+                                            <td><bdi>@l.Trip?.Name</bdi></td><td><bdi class="num">@Fmt.Date(l.LoadingDate, Shell.DateFormat)</bdi></td><td>@l.Driver</td><td>@l.LoadingSite</td>
+                                            <td class="n"><bdi class="num">@Fmt.Qty(l.Quantity)</bdi></td><td class="n"><bdi class="num">@Fmt.Money(l.UnitPrice, 4)</bdi></td>
+                                        }
+                                        <td class="n"><bdi class="num">@Fmt.Money(l.Amount)</bdi></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </Box>
+            <Box Title="@L["cn.returnedShare"]" Style="align-self:start">
+                @if (_preview is { } p)
+                {
+                    <div class="ln"><span>@L["cn.shareOfInvoice"]</span><bdi class="num">@Fmt.Percent(_inv.Invoice.Subtotal == 0 ? 0 : p.Subtotal / _inv.Invoice.Subtotal * 100, 1)</bdi></div>
+                    <div class="ln"><span>@L["cn.returnedSubtotal"]</span><Money Value="p.Subtotal" Decimals="p.Decimals" /></div>
+                    @if (p.DiscountShare != 0) {<div class="ln"><span>@L["cn.discountShare"]</span><Money Value="-p.DiscountShare" Decimals="p.Decimals" /></div>}
+                    @if (p.FeesShare != 0) {<div class="ln"><span>@L["cn.feesShare"]</span><Money Value="p.FeesShare" Decimals="p.Decimals" /></div>}
+                    <div class="ln"><span>@L["inv.base"]</span><Money Value="p.BaseAmount" Decimals="p.Decimals" /></div>
+                    <div class="ln"><span>@L.F("inv.taxAt", Fmt.Percent(p.TaxRate))</span><Money Value="p.Tax" Decimals="p.Decimals" /></div>
+                    <div class="ln tot big"><span>@L["inv.total"]</span><Money Value="p.Total" Decimals="p.Decimals" /></div>
+                    <p class="help" style="margin:6px 0 0">@L.F("cn.limitHelp", Fmt.Money(p.Remaining, p.Decimals))</p>
+                }
+                else
+                {
+                    <p class="muted" style="margin:0">@(_previewError ?? L["cn.pickToSee"])</p>
+                }
+            </Box>
+        </div>
+    }
+</EditForm>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private InvoiceDetails? _inv;
+    private Option<string?>? _invoiceOption;
+    private List<InvoiceLineResponse> _open = [];
+    private readonly Dictionary<string, decimal> _pick = new(StringComparer.Ordinal);
+    private CreditNoteCalculation? _preview;
+    private string? _previewError;
+    private bool _manual, _saving, _postingReady = true;
+    private int _invoiceVersion;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+    private CancellationTokenSource? _cts;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanSave => _postingReady && !_saving && _pick.Count > 0 && Shell.Can(PermissionKeys.InvIssue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new EditContext(_m);
+        // Today in the company's time zone (the credit date is checked against it).
+        try
+        {
+            _m.CreditDate = (await Api.PostAsync<InvoiceCalculationResponse>(Api.C("invoices/calculate"),
+                new InvoiceCalculationRequest(InvoiceCodes.Manual, null, null, null, [], null, null))).Today;
+        }
+        catch (ApiException) { _m.CreditDate = DateOnly.FromDateTime(DateTime.Today); }
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["invoice"] is { Length: > 0 } id)
+        {
+            _m.InvoiceId = id;
+            await LoadInvoice();
+        }
+    }
+
+    private async Task<IReadOnlyList<Option<string?>>> SearchInvoices(string text, CancellationToken ct)
+    {
+        var page = await Api.GetAsync<InvoicePage>(Api.C("invoices?status=active&pageSize=20&q=" + Uri.EscapeDataString(text ?? "")), ct);
+        return page.Page.Items.Where(i => i.RemainingAmount > 0)
+            .Select(i => new Option<string?>(i.Id, i.Number ?? "", $"{i.Customer.Name} · {L["inv.remaining"]} {Fmt.Money(i.RemainingAmount)}")).ToList();
+    }
+
+    private async Task InvoicePicked(Option<string?>? o)
+    {
+        _invoiceOption = o;
+        await LoadInvoice();
+    }
+
+    private async Task LoadInvoice()
+    {
+        _inv = null;
+        _open = [];
+        _pick.Clear();
+        _preview = null;
+        _previewError = null;
+        var version = ++_invoiceVersion;
+        if (_m.InvoiceId is null) return;
+        try
+        {
+            var inv = await Api.GetAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(_m.InvoiceId)}"));
+            if (version != _invoiceVersion) return;   // another invoice was chosen meanwhile
+            _inv = inv;
+            _invoiceOption = new Option<string?>(_inv.Invoice.Id, _inv.Invoice.Number ?? "", _inv.Invoice.Customer.Name);
+            _manual = _inv.Invoice.InvoiceType == InvoiceCodes.Manual;
+            _open = _inv.Lines.Where(l => l.Quantity - l.ReturnedQuantity > 0).ToList();
+            if (_inv.Invoice.Status is not (InvoiceCodes.Approved or InvoiceCodes.Closed)) _previewError = L["cn.invoiceNotApproved"];
+        }
+        catch (ApiException e) { _previewError = e.Problem.Detail; }
+    }
+
+    private Task Toggle(InvoiceLineResponse l, bool on)
+    {
+        if (on) _pick[l.Id] = l.Quantity - l.ReturnedQuantity; else _pick.Remove(l.Id);
+        return Preview();
+    }
+
+    private Task SelectAll()
+    {
+        foreach (var l in _open) _pick[l.Id] = l.Quantity - l.ReturnedQuantity;
+        return Preview();
+    }
+
+    private Task SetQty(InvoiceLineResponse l, string? text)
+    {
+        // A zero, negative or unreadable quantity unticks the line, so the box never shows a value other than the one used.
+        if (Fmt.TryParseDecimal(text, out var q) && q > 0) _pick[l.Id] = Math.Min(q, l.Quantity - l.ReturnedQuantity);
+        else _pick.Remove(l.Id);
+        return Preview();
+    }
+
+    private IReadOnlyList<CreditLineRequest> Lines() =>
+        _open.Where(l => _pick.ContainsKey(l.Id)).Select(l => new CreditLineRequest(l.Id, l.Trip is null ? _pick[l.Id] : null)).ToList();
+
+    /// <summary>The server's proportional totals for the ticked lines (BR-025…027); a refusal (e.g. above the remaining balance) is shown instead.</summary>
+    private async Task Preview()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+        if (_pick.Count == 0 || _inv is null) { _preview = null; _previewError = null; return; }
+        try
+        {
+            _preview = await Api.PostAsync<CreditNoteCalculation>(Api.C("credit-notes/calculate"), new CreditNoteRequest(_inv.Invoice.Id, _m.CreditDate, _m.Reason, Lines(), null), token);
+            _previewError = null;
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiException e) { _preview = null; _previewError = e.Problem.Detail; }
+    }
+
+    private async Task Save()
+    {
+        if (!CanSave || _inv is null) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PostAsync<CreditNoteDetails>(Api.C("credit-notes"), new CreditNoteRequest(_inv.Invoice.Id, _m.CreditDate, _m.Reason?.Trim(), Lines(), _m.ClientId));
+            Toasts.Success(L.F("cn.saved", r.CreditNote.Number, Fmt.Money(r.CreditNote.Total)));
+            Nav.NavigateTo(NavModel.Href(Company, $"credit-notes/{r.CreditNote.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private sealed class Model
+    {
+        public string? InvoiceId { get; set; }
+        public DateOnly? CreditDate { get; set; }
+        public string? Reason { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+}

@@ -1,0 +1,166 @@
+@page "/c/{Company}/accounting/opening-balances"
+@*
+  Opening balances (FR-110): debit or credit per postable account, totals and the difference; save, then post the opening entry on a date
+  (a new posting reverses the previous one). During setup an unbalanced opening goes to the opening-difference account and the banner stays
+  until that account is cleared; after setup an unbalanced opening is refused. acct.setup edits; acct.view reads.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["acc.openings"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"], NavModel.Href(Company, "accounting/chart"))])">
+    <Actions>
+        @if (CanEdit)
+        {
+            <Btn Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="Save" />
+            <Btn Primary="true" Icon="check" Text="@L["acc.postOpening"]" Busy="_busy" Disabled="_dirty" OnClick="() => _posting = true" />
+        }
+    </Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="book" Title="@L["acc.chartEmpty"]" Text="@L["acc.openingsNoChart"]"><Actions><Btn Primary="true" Text="@L["nav.chart"]" Href="@NavModel.Href(Company, "accounting/chart")" /></Actions></EmptyState></Empty>
+    <ChildContent>
+        @{ var d = _data!; }
+        @if (Difference != 0)
+        {
+            <Banner Tone="@(d.SetupOpen ? Tone.Warn : Tone.Err)" Text="@L.F(d.SetupOpen ? "acc.openingDiffSetup" : "acc.openingDiffClosed", Fmt.Money(Difference))" />
+        }
+        @if (d.DifferenceAccountBalance != 0) {<Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(d.DifferenceAccountBalance))" />}
+        <Figures Items="@([new Figure(L["acc.totalDebit"], Fmt.Money(TotalDebit)), new Figure(L["acc.totalCredit"], Fmt.Money(TotalCredit)), new Figure(L["acc.difference"], Fmt.Money(Difference)),
+            new Figure(L["acc.openingEntry"], d.PostedEntry?.Number ?? "—", d.PostedEntry is null ? L["acc.notPosted"] : Fmt.Date(d.PostedEntry.EntryDate, Shell.DateFormat))])" />
+        <div class="row" style="gap:8px;flex:none"><div class="adorn" style="width:260px"><span class="start"><Icon Name="search" /></span>
+            <input class="input" type="search" style="height:26px" aria-label="@L["acc.searchChart"]" placeholder="@L["acc.searchChart"]" value="@_q" @oninput="e => _q = e.Value?.ToString()" /></div></div>
+        <ListFrame Label="@L["acc.openings"]">
+            <div class="tbl-wrap">
+                <table class="grid">
+                    <caption class="sr-only">@L["acc.openings"]</caption>
+                    <thead><tr><th scope="col">@L["acc.code"]</th><th scope="col">@L["md.name"]</th><th scope="col">@L["acc.type"]</th><th scope="col" class="n">@L["acc.openDebit"]</th><th scope="col" class="n">@L["acc.openCredit"]</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in Rows)
+                        {
+                            var r = row;
+                            <tr @key="r.Id">
+                                <td><bdi class="num">@r.Code</bdi></td>
+                                <td>@r.Name</td>
+                                <td>@L["acc.t." + r.Type]</td>
+                                <td class="n" style="width:160px">
+                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.debitOf", r.Code)" value="@Show(r.Debit)" @onchange="e => Set(r, e.Value?.ToString(), true)" />}
+                                    else {<bdi class="num">@Show(r.Debit)</bdi>}
+                                </td>
+                                <td class="n" style="width:160px">
+                                    @if (CanEdit) {<input class="input num" style="height:26px;width:140px" inputmode="decimal" aria-label="@L.F("acc.creditOf", r.Code)" value="@Show(r.Credit)" @onchange="e => Set(r, e.Value?.ToString(), false)" />}
+                                    else {<bdi class="num">@Show(r.Credit)</bdi>}
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><td colspan="3">@L["ui.total"]</td><td class="n"><bdi class="num">@Fmt.Money(TotalDebit)</bdi></td><td class="n"><bdi class="num">@Fmt.Money(TotalCredit)</bdi></td></tr></tfoot>
+                </table>
+            </div>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_posting" Title="@L["acc.postOpening"]" Busy="_busy">
+    <ChildContent>
+        <p style="margin:0">@L[_data?.PostedEntry is null ? "acc.postOpeningText" : "acc.repostOpeningText"]</p>
+        <DateField @bind-Value="_date" Label="@L["acc.openingDate"]" Required="true" />
+        @if (_postError is not null) {<Banner Tone="Tone.Err" Text="@_postError" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _posting = false" />
+        <Btn Primary="true" Text="@L["acc.postOpening"]" Busy="_busy" Disabled="_date is null" OnClick="Post" />
+    </Footer>
+</Modal>
+
+@code {
+    private OpeningBalancesResponse? _data;
+    private List<Row> _rows = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _postError;
+    private bool _busy, _dirty, _posting;
+    private DateOnly? _date;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanEdit => Shell.Can(PermissionKeys.AcctSetup);
+    private decimal TotalDebit => _rows.Sum(r => r.Debit);
+    private decimal TotalCredit => _rows.Sum(r => r.Credit);
+    private decimal Difference => TotalDebit - TotalCredit;
+
+    private IEnumerable<Row> Rows => string.IsNullOrWhiteSpace(_q) ? _rows
+        : _rows.Where(r => r.Code.Contains(_q.Trim(), StringComparison.OrdinalIgnoreCase) || Fold.Contains(r.Name, _q));
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _data = await Api.GetAsync<OpeningBalancesResponse>(Api.C("accounting/opening-balances"));
+            Fill(_data);
+            _state = _data.Accounts.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Fill(OpeningBalancesResponse d)
+    {
+        _data = d;
+        _rows = d.Accounts.Select(a => new Row(a.Account.Id, a.Account.Code, L.Pick(a.Account.NameAr, a.Account.NameEn), a.AccountType) { Debit = a.Debit, Credit = a.Credit,
+            SavedDebit = a.Debit, SavedCredit = a.Credit }).ToList();
+        _date ??= d.PostedEntry?.EntryDate;
+        _dirty = false;
+    }
+
+    private static string Show(decimal v) => v == 0 ? "" : Fmt.Money(v);
+
+    /// <summary>A typed debit clears the credit of the same account and the other way round (one side per account).</summary>
+    private void Set(Row r, string? text, bool debit)
+    {
+        var value = string.IsNullOrWhiteSpace(text) ? 0m : Fmt.TryParseDecimal(text, out var v) && v >= 0 ? v : (debit ? r.Debit : r.Credit);
+        if (debit) { r.Debit = value; if (value > 0) r.Credit = 0; }
+        else { r.Credit = value; if (value > 0) r.Debit = 0; }
+        _dirty = _rows.Any(x => x.Debit != x.SavedDebit || x.Credit != x.SavedCredit);
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        try
+        {
+            var changed = _rows.Where(r => r.Debit != r.SavedDebit || r.Credit != r.SavedCredit).Select(r => new OpeningBalanceLine(r.Id, r.Debit, r.Credit)).ToList();
+            Fill(await Api.PutAsync<OpeningBalancesResponse>(Api.C("accounting/opening-balances"), new OpeningBalancesRequest(changed)));
+            Toasts.Success(L["acc.openingsSaved"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Post()
+    {
+        _busy = true;
+        _postError = null;
+        try
+        {
+            Fill(await Api.PostAsync<OpeningBalancesResponse>(Api.C("accounting/opening-balances/post"), new PostOpeningRequest(_date)));
+            _posting = false;
+            Toasts.Success(L.F("acc.openingPosted", _data!.PostedEntry?.Number ?? ""));
+        }
+        catch (ApiException e) { _postError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Row(string id, string code, string name, string type)
+    {
+        public string Id { get; } = id;
+        public string Code { get; } = code;
+        public string Name { get; } = name;
+        public string Type { get; } = type;
+        public decimal Debit { get; set; }
+        public decimal Credit { get; set; }
+        public decimal SavedDebit { get; set; }
+        public decimal SavedCredit { get; set; }
+    }
+}

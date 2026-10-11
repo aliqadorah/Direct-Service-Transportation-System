@@ -35,7 +35,7 @@ public static class NavModel
             new("nav.manualInvoice", "invoices/manual", PermissionKeys.InvIssue),
             new("nav.creditNotes", "credit-notes", PermissionKeys.InvView),
             new("nav.einvoicing", "e-invoicing", PermissionKeys.InvView),
-            new("nav.receipts", "receipts", PermissionKeys.RcptManage),
+            new("nav.receipts", "receipts", PermissionKeys.RcptManage, PermissionKeys.InvView),
             new("nav.driverAccounts", "driver-accounts", PermissionKeys.DrvView),
             new("nav.partnerAccounts", "partner-accounts", PermissionKeys.DrvView),
         ]),

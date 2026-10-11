@@ -1,0 +1,97 @@
+@*
+  The body of a server-paged list screen (FR-165, board direction A + C): saved views above the list with search and export, an optional
+  filter bar, the five states (loading skeleton, empty or filtered-empty with its next action, load error with retry and reference),
+  the table and the pager. Pages keep their own query and API call; this component only lays them out the same way everywhere.
+*@
+@inject Loc L
+
+@if (Views is { Count: > 0 })
+{
+    <SavedViews Items="Views" Selected="@View" SelectedChanged="ViewChanged" Label="@Label">
+        <Tools>@ToolsContent()</Tools>
+    </SavedViews>
+}
+else if (SearchVisible || Exports.Length > 0 || Tools is not null)
+{
+    <div class="row" style="gap:8px;flex:none;justify-content:flex-end">@ToolsContent()</div>
+}
+@if (Filters is not null)
+{
+    <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">@Filters</div>
+}
+@Above
+<StateView State="State" ErrorReference="@Reference" OnRetry="OnRetry">
+    <Empty>
+        <EmptyState Icon="@EmptyIcon" Title="@(Filtered ? L["ui.noMatches"] : EmptyTitle)" Text="@(Filtered ? L["list.noMatchText"] : EmptyText)">
+            <Actions>
+                @if (Filtered && OnClear.HasDelegate) {<Btn Primary="true" Text="@L["ui.clear"]" OnClick="OnClear" />}
+                else {@EmptyActions}
+            </Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@Label">
+            <ChildContent>@ChildContent</ChildContent>
+            <Footer>@if (Total is int t) {<Pager Page="Page" PageSize="PageSize" Total="t" OnPage="OnPage" OnPageSize="OnPageSize" />}</Footer>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public IReadOnlyList<TabItem>? Views { get; set; }
+    [Parameter] public string? View { get; set; }
+    [Parameter] public EventCallback<string> ViewChanged { get; set; }
+
+    /// <summary>Search box text; the box shows when <see cref="OnSearch"/> is set.</summary>
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public string? SearchPlaceholder { get; set; }
+    [Parameter] public EventCallback<string?> OnSearch { get; set; }
+
+    /// <summary>Export formats offered (xlsx, csv, pdf); each calls <see cref="OnExport"/> with its format.</summary>
+    [Parameter] public string[] Exports { get; set; } = [];
+    [Parameter] public EventCallback<string> OnExport { get; set; }
+    [Parameter] public RenderFragment? Tools { get; set; }
+
+    [Parameter] public RenderFragment? Filters { get; set; }
+    [Parameter] public RenderFragment? Above { get; set; }
+
+    [Parameter] public LoadState State { get; set; }
+    [Parameter] public string? Reference { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    [Parameter] public string EmptyIcon { get; set; } = "file";
+    [Parameter] public string EmptyTitle { get; set; } = "";
+    [Parameter] public string? EmptyText { get; set; }
+    [Parameter] public RenderFragment? EmptyActions { get; set; }
+    /// <summary>True when filters or search hide rows: the empty state offers to clear them.</summary>
+    [Parameter] public bool Filtered { get; set; }
+    [Parameter] public EventCallback OnClear { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 50;
+    /// <summary>Rows matching the filters; no pager when null (unpaged lists).</summary>
+    [Parameter] public int? Total { get; set; }
+    [Parameter] public EventCallback<int> OnPage { get; set; }
+    [Parameter] public EventCallback<int> OnPageSize { get; set; }
+
+    private bool SearchVisible => OnSearch.HasDelegate;
+
+    private RenderFragment ToolsContent() => @<text>
+        @if (SearchVisible)
+        {
+            <div class="adorn" style="width:220px"><span class="start"><Icon Name="search" /></span>
+                <input class="input" type="search" style="height:26px" aria-label="@(SearchPlaceholder ?? L["ui.search"])" placeholder="@(SearchPlaceholder ?? L["ui.search"])"
+                       value="@Search" @onchange="e => OnSearch.InvokeAsync(string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString()!.Trim())" /></div>
+        }
+        @Tools
+        @foreach (var f in Exports)
+        {
+            var format = f;
+            <Btn Small="true" Icon="export" Text="@Name(format)" AriaLabel="@L.F("list.exportAs", Name(format))" OnClick="() => OnExport.InvokeAsync(format)" />
+        }
+    </text>;
+
+    private static string Name(string format) => format switch { "xlsx" => "Excel", "csv" => "CSV", "pdf" => "PDF", _ => format.ToUpperInvariant() };
+}

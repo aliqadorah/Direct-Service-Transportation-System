@@ -9,7 +9,7 @@
 else
 {
     <button type="@Type" class="@Css" disabled="@(Disabled || Busy)" aria-busy="@(Busy ? "true" : null)" aria-label="@AriaLabel" aria-pressed="@Pressed" aria-expanded="@Expanded"
-            aria-haspopup="@HasPopup" title="@Title" @onclick="Click" @attributes="Attributes">@Inner</button>
+            aria-haspopup="@HasPopup" title="@Title" data-shortcut="@Shortcut" @onclick="Click" @attributes="Attributes">@Inner</button>
 }
 
 @code {

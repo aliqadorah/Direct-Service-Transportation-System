@@ -1,0 +1,106 @@
+@page "/c/{Company}/driver-accounts/{Id}"
+@*
+  SCR-27 driver account (FR-076, FR-083): unsettled wages, open advances, net due and the last settlement; tabs for the open trips, open
+  advances, settlements and the statement of a period with its running balance (export Excel / PDF). Actions: new advance (drv.advance),
+  new settlement (drv.settle), statement.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var a = _a!; var last = a.Settlements.Where(s => s.Status != "Void").OrderByDescending(s => s.SettlementDate).FirstOrDefault(); }
+        <PageHeader Title="@a.Driver.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts"))])">
+            <Badges>@if (a.TruckPlate is not null) {<Badge Tone="Tone.Mute" Text="@a.TruckPlate" />}</Badges>
+            <Actions>
+                <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />
+                @if (Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Icon="cash" Text="@L["drv.advance"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}/advance")" />}
+                @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Text="@L["drv.settle"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}/settle")" Disabled="@(a.OpenTrips.Count == 0 && a.OpenAdvances.Count == 0)" />}
+            </Actions>
+        </PageHeader>
+        <Figures Items="@([
+            new Figure(L["md.unsettledWages"], Fmt.Money(a.Gross), L.F("drv.tripsCount", Fmt.Count(a.OpenTrips.Count))),
+            new Figure(L["md.openAdvances"], Fmt.Money(a.AdvancesTotal), L.F("drv.advancesCount", Fmt.Count(a.OpenAdvances.Count))),
+            new Figure(L["md.netDue"], Fmt.Money(a.NetDue)),
+            new Figure(L["drv.lastSettlement"], last?.Number ?? "—", last is null ? null : Fmt.Date(last.SettlementDate, Shell.DateFormat)),
+        ])" />
+        <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@a.Driver.Name" />
+        <Box NoPad="true" Class="fill">
+            @switch (_tab)
+            {
+                case "advances":
+                    @if (a.OpenAdvances.Count == 0) {<EmptyState Icon="cash" Title="@L["drv.noOpenAdvances"]" />}
+                    else
+                    {
+                        <DataGrid TItem="SettlementAdvanceItem" Items="a.OpenAdvances" Key="x => x.Id" Caption="@L["md.openAdvances"]" FooterLabel="@L["ui.total"]"
+                                  OnRowClick="@(x => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/advances/{x.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["doc.number"]" Value="x => x.Number" Ltr="true" />
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["trip.date"]" Value="x => Fmt.Date(x.AdvanceDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["inv.amount"]" Value="x => Fmt.Money(x.Amount)" Numeric="true" Footer="@Fmt.Money(a.AdvancesTotal)" />
+                            </Columns>
+                        </DataGrid>
+                    }
+                    break;
+                case "settlements":
+                    @if (a.Settlements.Count == 0) {<EmptyState Icon="file" Title="@L["drv.noSettlements"]" />}
+                    else
+                    {
+                        <DataGrid TItem="SettlementResponse" Items="a.Settlements" Key="x => x.Id" Caption="@L["drv.settlements"]" RowClass="@(x => x.Status == "Void" ? "void" : null)"
+                                  OnRowClick="@(x => Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/settlements/{x.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="SettlementResponse" Title="@L["doc.number"]" Value="x => x.Number" Ltr="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["trip.date"]" Value="x => Fmt.Date(x.SettlementDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["drv.gross"]" Value="x => Fmt.Money(x.GrossWages)" Numeric="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["md.openAdvances"]" Value="x => Fmt.Money(x.AdvancesTotal)" Numeric="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["drv.deductions"]" Value="x => Fmt.Money(x.DeductionsTotal)" Numeric="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["drv.net"]" Value="x => Fmt.Money(x.NetPayable)" Numeric="true" />
+                                <GridColumn TItem="SettlementResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                            </Columns>
+                        </DataGrid>
+                    }
+                    break;
+                case "statement":
+                    <StatementPanel Path="@($"drivers/{Uri.EscapeDataString(Id)}/statement")" />
+                    break;
+                default:
+                    @if (a.OpenTrips.Count == 0) {<EmptyState Icon="check" Title="@L["drv.noOpenTrips"]" Text="@L.F("drv.noOpenTripsText", a.Driver.Name)" />}
+                    else {<SettlementTripsGrid Trips="a.OpenTrips" Company="@Company" />}
+                    break;
+            }
+        </Box>
+    </ChildContent>
+</StateView>
+
+@code {
+    private DriverAccountResponse? _a;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private string _tab = "trips";
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("trips", L["md.openTrips"], _a?.OpenTrips.Count), new("advances", L["md.openAdvances"], _a?.OpenAdvances.Count),
+        new("settlements", L["drv.settlements"], _a?.Settlements.Count), new("statement", L["md.statement"]),
+    ];
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _a = await Api.GetAsync<DriverAccountResponse>(Api.C($"drivers/{Uri.EscapeDataString(Id)}/account"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+}

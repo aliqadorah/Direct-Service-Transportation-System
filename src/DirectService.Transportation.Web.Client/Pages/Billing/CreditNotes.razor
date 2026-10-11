@@ -1,0 +1,113 @@
+@page "/c/{Company}/credit-notes"
+@*
+  SCR-24 credit notes list (FR-049…053): views All / This month / Void, customer and period filters, number search (credit note or
+  invoice), sortable columns, Excel/CSV/PDF export; "From an invoice…" starts a credit note (inv.issue). Credit notes waiting for the
+  national system are listed on the e-invoicing screen.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.creditNotes"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"])])">
+    <Actions>
+        <Btn Icon="send" Text="@L["cn.waiting"]" Href="@NavModel.Href(Company, "e-invoicing?type=CreditNote&status=Queued")" />
+        @if (Shell.Can(PermissionKeys.InvIssue)) {<Btn Primary="true" Icon="plus" Text="@L["cn.fromInvoice"]" Href="@NavModel.Href(Company, "credit-notes/new")" />}
+    </Actions>
+</PageHeader>
+
+<ListShell Label="@L["nav.creditNotes"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" SearchPlaceholder="@L["cn.search"]" OnSearch="Search"
+           Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="file" EmptyTitle="@L["cn.none"]" EmptyText="@L["cn.noneText"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <EmptyActions>
+        @if (Shell.Can(PermissionKeys.InvIssue)) {<Btn Primary="true" Text="@L["cn.pickInvoice"]" Href="@NavModel.Href(Company, "credit-notes/new")" />}
+    </EmptyActions>
+    <ChildContent>
+        <DataGrid TItem="CreditNoteResponse" Items="_page!.Items" Key="c => c.Id" Caption="@L["nav.creditNotes"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  OnRowClick="Open" RowClass="@(c => c.Status == "Void" ? "void" : null)">
+            <Columns>
+                <GridColumn TItem="CreditNoteResponse" Title="@L["doc.number"]" Value="c => c.Number" Ltr="true" SortKey="number" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["trip.date"]" Value="c => Fmt.Date(c.CreditDate, Shell.DateFormat)" Ltr="true" SortKey="creditDate" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["cn.invoice"]" Value="c => c.Invoice.Number" Ltr="true" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["trip.customer"]" Value="c => c.Customer.Name" SortKey="customer" Clip="true" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["ui.reason"]" Value="c => c.Reason" Clip="true" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["inv.total"]" Value="c => Fmt.Money(c.Total)" Numeric="true" SortKey="total" />
+                <GridColumn TItem="CreditNoteResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                <GridColumn TItem="CreditNoteResponse" Title="@L["inv.einvoice"]"><Template><StatusTag Status="@BillingStatus.EInvoice(context.EInvoiceStatus)" /></Template></GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "creditDate", Desc = true };
+    private PagedResult<CreditNoteResponse>? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _customer;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("month", L["cn.thisMonth"]), new("void", L["st.void"])];
+
+    private bool Filtered => _q.Q is not null || _customer is not null || _from is not null || _to is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        Set("status", _view == "void" ? "void" : null);
+        Set("customer", _customer);
+        Set("from", (_view == "month" && (_from is null || _from < monthStart) ? monthStart : _from)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<PagedResult<CreditNoteResponse>>(Api.C("credit-notes" + Query(true)));
+            _state = _page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private Task ClearAll()
+    {
+        _q.Q = _customer = null;
+        _from = _to = null;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("credit-notes/export" + Query(false)), format);
+
+    private void Open(CreditNoteResponse c) => Nav.NavigateTo(NavModel.Href(Company, $"credit-notes/{c.Id}"));
+}

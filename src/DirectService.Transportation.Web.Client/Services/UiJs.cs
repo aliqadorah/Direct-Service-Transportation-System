@@ -39,6 +39,7 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask FocusFirst(Microsoft.AspNetCore.Components.ElementReference el) => Call("focusFirst", el);
     public ValueTask ShowPicker(Microsoft.AspNetCore.Components.ElementReference el) => Call("showPicker", el);
     public ValueTask SaveFile(string name, string contentType, byte[] bytes) => Call("saveFile", name, contentType, bytes);
+    public ValueTask PrintHtml(Microsoft.AspNetCore.Components.ElementReference el, string html) => Call("printHtml", el, html);
     public ValueTask ScrollIntoView(Microsoft.AspNetCore.Components.ElementReference el) => Call("scrollIntoView", el);
 
     public async ValueTask DisposeAsync()

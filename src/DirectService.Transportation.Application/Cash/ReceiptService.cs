@@ -190,6 +190,11 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
             "account" => query.Where(r => r.InvoiceId == null),
             _ => throw Fail.Field("applied", ErrorCodes.ValidationFormat, "applied"),
         };
+        if (!string.IsNullOrWhiteSpace(q.Invoice))
+        {
+            var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, "invoice");
+            query = query.Where(r => r.Invoice != null && r.Invoice.PublicId == g);
+        }
         if (MasterDataSupport.SearchText(q.Q) is { } text)
             query = query.Where(r => r.Number.Contains(text) || (r.Reference != null && r.Reference.Contains(text)) || (r.Invoice != null && r.Invoice.Number!.Contains(text)));
         return query;

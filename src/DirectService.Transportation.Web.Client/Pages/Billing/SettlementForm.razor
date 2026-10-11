@@ -1,0 +1,193 @@
+@page "/c/{Company}/driver-accounts/{DriverId}/settle"
+@*
+  SCR-27 settlement (FR-077…080, BR-031, BR-032, 8.5): the driver's open own-fleet trips and open advances up to the date, all pre-selected
+  (untick to leave for later); deduction lines (shortage, fine, other) with suggestions from shortage trips (FR-078, DT-96); net = wages −
+  advances − deductions, never below zero; method and cash box / bank for the net. Confirming posts the entry and locks the items until the
+  settlement is voided.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var p = _p!; }
+        <PageHeader Title="@L.F("drv.newSettlementFor", p.Driver.Name)"
+                    Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(p.Driver.Name, NavModel.Href(Company, $"driver-accounts/{DriverId}"))])">
+            <Actions><Btn Primary="true" Text="@L["drv.confirmSettlement"]" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
+        </PageHeader>
+        <PostingBanner OnStatus="r => _postingReady = r" />
+        @if (Net < 0) {<Banner Tone="Tone.Err" Text="@L.F("drv.netNegative", Fmt.Money(Net))" />}
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
+            <div class="stack" style="min-width:0;min-height:0">
+                <ProblemValidator @ref="_problems" />
+                <ErrorSummary @ref="_summary" Extra="_extra" />
+                <Box NoPad="true">
+                    <div class="bh"><span>@L.F("drv.openTripsTo", Fmt.Date(p.Date, Shell.DateFormat))</span><span class="a"><bdi class="num">@L.F("drv.selectedCount", Fmt.Count(_trips.Count))</bdi></span></div>
+                    @if (p.Trips.Count == 0) {<EmptyState Icon="check" Title="@L["drv.noOpenTrips"]" />}
+                    else {<SettlementTripsGrid Trips="p.Trips" Company="@Company" Selectable="true" Selected="_trips" SelectedChanged="PickTrips" OpenTrips="false" />}
+                </Box>
+                <Box Title="@L["md.openAdvances"]" NoPad="true">
+                    @if (p.Advances.Count == 0) {<p class="muted pad" style="margin:0">@L["drv.noOpenAdvances"]</p>}
+                    else
+                    {
+                        <DataGrid TItem="SettlementAdvanceItem" Items="p.Advances" Key="a => a.Id" Caption="@L["md.openAdvances"]" Selectable="true" Selected="_advances" SelectedChanged="PickAdvances">
+                            <Columns>
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["doc.number"]" Value="a => a.Number" Ltr="true" />
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["trip.date"]" Value="a => Fmt.Date(a.AdvanceDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="SettlementAdvanceItem" Title="@L["inv.amount"]" Value="a => Fmt.Money(a.Amount)" Numeric="true" />
+                            </Columns>
+                        </DataGrid>
+                    }
+                </Box>
+                <Box Title="@L["drv.deductions"]">
+                    <Actions>
+                        @if (Suggestions.Count > 0) {<Btn Small="true" Icon="scale" Text="@L["drv.suggest"]" OnClick="Suggest" />}
+                        <Btn Small="true" Icon="plus" Text="@L["drv.addDeduction"]" OnClick="() => _m.Deductions.Add(new DeductionModel { Type = CashCodes.Other })" />
+                    </Actions>
+                    <ChildContent>
+                        @if (_m.Deductions.Count == 0) {<p class="muted" style="margin:0">@L["drv.noDeductions"]</p>}
+                        @for (var i = 0; i < _m.Deductions.Count; i++)
+                        {
+                            var d = _m.Deductions[i];
+                            var n = i + 1;
+                            <div @key="d" class="fg" style="grid-template-columns:160px 160px 1fr auto;align-items:end">
+                                <SelectField TValue="string?" @bind-Value="d.Type" Options="Types" Label="@L.F("drv.deductionType", n)" />
+                                <NumberField @bind-Value="d.Amount" Label="@L["inv.amount"]" Min="0.001m" />
+                                <TextField @bind-Value="d.Note" Label="@L["drv.note"]" MaxLength="200" />
+                                <Btn Ghost="true" Icon="trash" AriaLabel="@L.F("drv.removeDeduction", n)" OnClick="() => _m.Deductions.Remove(d)" />
+                            </div>
+                        }
+                    </ChildContent>
+                </Box>
+            </div>
+            <Box Title="@L["drv.netDue"]">
+                <div class="ln"><span>@L["drv.gross"]</span><Money Value="Gross" /></div>
+                <div class="ln"><span>@L["md.openAdvances"]</span><Money Value="-AdvancesTotal" /></div>
+                <div class="ln"><span>@L["drv.deductions"]</span><Money Value="-DeductionsTotal" /></div>
+                <div class="ln tot big" style="@(Net < 0 ? "color:var(--err)" : null)"><span>@L["drv.net"]</span><Money Value="Net" /></div>
+                <DateField @bind-Value="_m.SettlementDate" Label="@L["drv.settlementDate"]" Required="true" @bind-Value:after="Load" Help="@L["drv.dateHelp"]" />
+                <PaymentFields Model="_m" />
+                <p class="help" style="margin:6px 0 0">@L["drv.netHelp"]</p>
+            </Box>
+        </EditForm>
+    </ChildContent>
+</StateView>
+
+@code {
+    private readonly Model _m = new();
+    private EditContext _ctx = default!;
+    private SettlementPreview? _p;
+    private IReadOnlySet<object> _trips = new HashSet<object>(), _advances = new HashSet<object>();
+    private readonly HashSet<object> _untickedTrips = [], _untickedAdvances = [];
+
+    private void PickTrips(IReadOnlySet<object> s)
+    {
+        foreach (var t in _p!.Trips) { if (s.Contains(t.Id)) _untickedTrips.Remove(t.Id); else _untickedTrips.Add(t.Id); }
+        _trips = s;
+    }
+
+    private void PickAdvances(IReadOnlySet<object> s)
+    {
+        foreach (var a in _p!.Advances) { if (s.Contains(a.Id)) _untickedAdvances.Remove(a.Id); else _untickedAdvances.Add(a.Id); }
+        _advances = s;
+    }
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private bool _saving, _postingReady = true;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string DriverId { get; set; } = "";
+
+    private IReadOnlyList<Option<string?>> Types => [new(CashCodes.Shortage, L["drv.dedShortage"]), new(CashCodes.Fine, L["drv.dedFine"]), new(CashCodes.Other, L["drv.dedOther"])];
+
+    // Display totals of the selection (8.5); the API recomputes and enforces net ≥ 0 (BR-032).
+    private decimal Gross => _p?.Trips.Where(t => _trips.Contains(t.Id)).Sum(t => t.DriverWage) ?? 0;
+    private decimal AdvancesTotal => _p?.Advances.Where(a => _advances.Contains(a.Id)).Sum(a => a.Amount) ?? 0;
+    private decimal DeductionsTotal => _m.Deductions.Sum(d => d.Amount ?? 0);
+    private decimal Net => Gross - AdvancesTotal - DeductionsTotal;
+    private bool CanSave => _postingReady && !_saving && Net >= 0 && (_trips.Count > 0 || _advances.Count > 0) && Shell.Can(PermissionKeys.DrvSettle);
+
+    private IReadOnlyList<SuggestedDeduction> Suggestions => _p?.Suggestions.Where(s => _trips.Contains(s.TripId)).ToList() ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new EditContext(_m);
+        await Load();
+    }
+
+    /// <summary>Open items up to the settlement date, all selected (FR-077).</summary>
+    private async Task Load()
+    {
+        try
+        {
+            var date = _m.SettlementDate is { } d ? "&date=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "";
+            _p = await Api.GetAsync<SettlementPreview>(Api.C($"settlements/preview?driver={Uri.EscapeDataString(DriverId)}{date}"));
+            _m.SettlementDate ??= _p.Date;
+            // Everything open is selected except what the user unticked before changing the date (FR-077).
+            _trips = _p.Trips.Select(t => (object)t.Id).Where(id => !_untickedTrips.Contains(id)).ToHashSet();
+            _advances = _p.Advances.Select(a => (object)a.Id).Where(id => !_untickedAdvances.Contains(id)).ToHashSet();
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    /// <summary>Adds one shortage deduction per selected flagged trip not yet listed (FR-078, DT-96); amounts stay editable.</summary>
+    private void Suggest()
+    {
+        foreach (var s in Suggestions)
+        {
+            var note = L.F("drv.shortageNote", s.ReceiptNo, Fmt.Qty(s.ExcessWeight));
+            if (_m.Deductions.Any(d => d.Note == note)) continue;
+            _m.Deductions.Add(new DeductionModel { Type = CashCodes.Shortage, Amount = s.Amount, Note = note });
+        }
+    }
+
+    private async Task Save()
+    {
+        if (!CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PostAsync<SettlementDetails>(Api.C("settlements"), new SettlementRequest(DriverId, _m.SettlementDate,
+                _trips.Select(k => k.ToString()!).ToList(), _advances.Select(k => k.ToString()!).ToList(),
+                _m.Deductions.Where(d => d.Amount is > 0).Select(d => new SettlementDeductionRequest(d.Type, d.Amount, string.IsNullOrWhiteSpace(d.Note) ? null : d.Note.Trim())).ToList(),
+                _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(), _m.ClientId));
+            var s = r.Settlement;
+            Toasts.Success(L.F("drv.settled", s.Number, Fmt.Money(s.NetPayable)), L["ui.print"], NavModel.Href(Company, $"print/settlement/{s.Id}"));
+            Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}"));
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private sealed class Model : IPaymentModel
+    {
+        public DateOnly? SettlementDate { get; set; }
+        public List<DeductionModel> Deductions { get; } = [];
+        public string? PaymentMethod { get; set; }
+        public string? CashBoxId { get; set; }
+        public string? BankAccountId { get; set; }
+        public string? Reference { get; set; }
+        public string ClientId { get; } = Guid.NewGuid().ToString();
+    }
+
+    private sealed class DeductionModel
+    {
+        public string? Type { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Note { get; set; }
+    }
+}

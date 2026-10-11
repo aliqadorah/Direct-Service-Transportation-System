@@ -1,0 +1,307 @@
+@page "/c/{Company}/invoices/{Id}"
+@*
+  SCR-23 invoice view (FR-041…046, FR-048, FR-058, FR-063): trips or lines, totals, receipts, credit notes, remaining balance, e-invoice
+  status, amount in words and full history. Draft: edit, print (DRAFT stamp), delete with a reason, approve (every refusal listed, FR-044).
+  Approved: print, receipt, credit note, void with a reason — not once the national system accepted it (credit note only, FR-046).
+  Void: reason shown, print with the VOID stamp. Rejected e-invoice: the reason and "resubmit" after correcting the data (FR-063).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var inv = _d!.Invoice; var draft = inv.Status == InvoiceCodes.Draft; var isVoid = inv.Status == InvoiceCodes.Void; }
+        <PageHeader Title="@(inv.Number ?? L.F("inv.draftOf", inv.Customer.Name))" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
+            <Badges>
+                <StatusTag Status="@BillingStatus.Invoice(inv.PaymentState)" />
+                @if (!draft && !isVoid) {<StatusTag Status="@BillingStatus.EInvoice(inv.EInvoiceStatus)" />}
+                @if (inv.IsOverdue) {<Badge Tone="Tone.Err" Icon="clock" Text="@L["inv.overdue"]" />}
+            </Badges>
+            <Actions>
+                @if (draft)
+                {
+                    @if (CanIssue) {<Btn Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"invoices/{inv.Id}/edit")" />}
+                    <Btn Icon="print" Text="@L["inv.printDraft"]" Href="@PrintHref" />
+                    @if (CanIssue)
+                    {
+                        <Btn Danger="true" Icon="trash" Text="@L["inv.deleteDraft"]" OnClick="() => _deleting = true" />
+                        <Btn Primary="true" Icon="check" Text="@L["inv.approve"]" Busy="_busy" Disabled="!_postingReady" OnClick="Approve" />
+                    }
+                }
+                else if (isVoid)
+                {
+                    <Btn Icon="print" Text="@L["inv.printVoid"]" Href="@PrintHref" />
+                }
+                else
+                {
+                    @if (_submission is { Status: EInvoiceCodes.Rejected } && CanIssue)
+                    {
+                        <Btn Icon="edit" Text="@L["inv.editCustomer"]" Href="@NavModel.Href(Company, $"masters/customers")" />
+                        <Btn Primary="true" Icon="send" Text="@L["inv.resubmit"]" Busy="_busy" OnClick="Resubmit" />
+                    }
+                    <Btn Icon="print" Text="@L["ui.print"]" Href="@PrintHref" />
+                    @if (Shell.Can(PermissionKeys.RcptManage) && inv.RemainingAmount > 0)
+                    {
+                        <Btn Icon="cash" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, $"receipts/new?customer={inv.Customer.Id}&invoice={inv.Id}")" />
+                    }
+                    @if (CanIssue && inv.RemainingAmount > 0)
+                    {
+                        <Btn Icon="file" Text="@L["cn.new"]" Href="@NavModel.Href(Company, $"credit-notes/new?invoice={inv.Id}")" Disabled="!_postingReady" />
+                    }
+                    @if (Shell.Can(PermissionKeys.InvVoid))
+                    {
+                        <Btn Danger="true" Icon="x" Text="@L["inv.void"]" Disabled="@(inv.EInvoiceStatus == EInvoiceCodes.Submitted || !_postingReady)" Title="@(inv.EInvoiceStatus == EInvoiceCodes.Submitted ? L["inv.acceptedNoVoid"] : null)"
+                             OnClick="() => _voiding = true" />
+                    }
+                }
+            </Actions>
+        </PageHeader>
+        <PostingBanner OnStatus="r => _postingReady = r" />
+        @if (draft) {<Banner Tone="Tone.Info" Text="@L["inv.draftBanner"]" />}
+        else if (isVoid) {<Banner Tone="Tone.Err" Text="@L.F("inv.voidBanner", inv.VoidReason ?? "")" />}
+        else if (inv.EInvoiceStatus == EInvoiceCodes.Submitted) {<Banner Tone="Tone.Lock" Text="@L["inv.acceptedBanner"]" />}
+        @if (_submission is { Status: EInvoiceCodes.Rejected } s)
+        {
+            <Banner Tone="Tone.Err" Text="@L.F("inv.rejectedBanner", s.LastError ?? string.Join(" · ", s.Problems.Select(p => p.Message)))" />
+        }
+        else if (_submission is { Problems.Count: > 0 } q)
+        {
+            <Banner Tone="Tone.Warn" Text="@L.F("inv.problemsBanner", string.Join(" · ", q.Problems.Select(p => p.Message)))">
+                <Actions>@if (Shell.Can(PermissionKeys.SettingsManage)) {<a href="@NavModel.Href(Company, "settings/e-invoicing")">@L["inv.fixSettings"]</a>}</Actions>
+            </Banner>
+        }
+        @if (inv.PostingPending) {<Banner Tone="Tone.Warn" Text="@L["doc.postingPending"]" />}
+        <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
+            <div class="stack" style="min-width:0;min-height:0">
+                <Box><KeyValues Columns="3" Items="Details(inv)" /></Box>
+                <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@L["inv.sections"]" />
+                <Box NoPad="true" Class="fill">
+                    @switch (_tab)
+                    {
+                        case "receipts":
+                            @if (_receipts.Count == 0)
+                            {
+                                <EmptyState Icon="cash" Title="@L["inv.noReceipts"]" Text="@(inv.RemainingAmount > 0 && !draft && !isVoid ? L.F("inv.noReceiptsText", Fmt.Money(inv.RemainingAmount)) : null)">
+                                    <Actions>@if (Shell.Can(PermissionKeys.RcptManage) && inv.RemainingAmount > 0 && !draft && !isVoid) {<Btn Primary="true" Icon="cash" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, $"receipts/new?customer={inv.Customer.Id}&invoice={inv.Id}")" />}</Actions>
+                                </EmptyState>
+                            }
+                            else
+                            {
+                                <DataGrid TItem="ReceiptResponse" Items="_receipts" Key="r => r.Id" Caption="@L["nav.receipts"]" OnRowClick="@(r => Nav.NavigateTo(NavModel.Href(Company, $"receipts/{r.Id}")))"
+                                          RowClass="@(r => r.Status == "Void" ? "void" : null)">
+                                    <Columns>
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" />
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReceiptDate, Shell.DateFormat)" Ltr="true" />
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["cash.method"]" Value="@(r => L["pay." + r.PaymentMethod])" />
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["cash.reference"]" Value="r => r.Reference" Ltr="true" />
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["inv.amount"]" Value="r => Fmt.Money(r.Amount)" Numeric="true" />
+                                        <GridColumn TItem="ReceiptResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                                    </Columns>
+                                </DataGrid>
+                            }
+                            break;
+                        case "credits":
+                            @if (_d.CreditNotes.Count == 0) {<EmptyState Icon="file" Title="@L["cn.noneOnInvoice"]" />}
+                            else
+                            {
+                                <DataGrid TItem="CreditNoteSummary" Items="_d.CreditNotes" Key="c => c.Id" Caption="@L["nav.creditNotes"]" OnRowClick="@(c => Nav.NavigateTo(NavModel.Href(Company, $"credit-notes/{c.Id}")))"
+                                          RowClass="@(c => c.Status == "Void" ? "void" : null)">
+                                    <Columns>
+                                        <GridColumn TItem="CreditNoteSummary" Title="@L["doc.number"]" Value="c => c.Number" Ltr="true" />
+                                        <GridColumn TItem="CreditNoteSummary" Title="@L["trip.date"]" Value="c => Fmt.Date(c.CreditDate, Shell.DateFormat)" Ltr="true" />
+                                        <GridColumn TItem="CreditNoteSummary" Title="@L["inv.total"]" Value="c => Fmt.Money(c.Total)" Numeric="true" />
+                                        <GridColumn TItem="CreditNoteSummary" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                                    </Columns>
+                                </DataGrid>
+                            }
+                            break;
+                        case "history":
+                            <div class="pad"><RecordHistory Items="_d.History" /></div>
+                            break;
+                        default:
+                            <InvoiceLinesGrid Lines="_d.Lines" Manual="@(inv.InvoiceType == InvoiceCodes.Manual)" />
+                            break;
+                    }
+                </Box>
+            </div>
+            <div class="stack" style="min-height:0">
+                <Box Title="@L["inv.totals"]">
+                    <div class="ln"><span>@L["inv.subtotal"]</span><Money Value="inv.Subtotal" /></div>
+                    @if (inv.Discount != 0) {<div class="ln"><span>@L["inv.discount"]</span><Money Value="inv.Discount" /></div>}
+                    @if (inv.ExtraFees != 0) {<div class="ln"><span><Tx Value="@(inv.ExtraFeesDescription is null ? L["inv.fees"] : L["inv.fees"] + " · " + inv.ExtraFeesDescription)" /></span><Money Value="inv.ExtraFees" /></div>}
+                    <div class="ln"><span>@L["inv.base"]</span><Money Value="inv.BaseAmount" /></div>
+                    <div class="ln"><span>@L.F("inv.taxAt", Fmt.Percent(inv.TaxRate))</span><Money Value="inv.Tax" /></div>
+                    <div class="ln tot big"><span>@L["inv.total"]</span><Money Value="inv.Total" /></div>
+                    @if (!draft && !isVoid)
+                    {
+                        @if (inv.PaidAmount != 0) {<div class="ln"><span>@L["nav.receipts"]</span><Money Value="-inv.PaidAmount" /></div>}
+                        @if (inv.ReturnedAmount != 0) {<div class="ln"><span>@L["nav.creditNotes"]</span><Money Value="-inv.ReturnedAmount" /></div>}
+                        <div class="ln tot"><span>@L["inv.remaining"]</span><Money Value="inv.RemainingAmount" /></div>
+                    }
+                    <p class="muted" style="margin:8px 0 0"><Tx Value="@L.F("doc.inWords", _d.AmountInWords)" /></p>
+                </Box>
+                @if (_submission is { } sub)
+                {
+                    <Box Title="@L["inv.einvoice"]">
+                        <KeyValues Columns="1" Items="@(EInvoiceDetails(sub))" />
+                    </Box>
+                }
+                @if (inv.JournalEntry is { } je)
+                {
+                    <Box Title="@L["doc.entry"]">
+                        @if (Shell.Can(PermissionKeys.AcctView) || Shell.Can(PermissionKeys.JeView)) {<a href="@NavModel.Href(Company, $"accounting/journal/{je.Id}")"><bdi>@je.Number</bdi></a>}
+                        else {<bdi>@je.Number</bdi>}
+                    </Box>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</StateView>
+
+<ConfirmDialog @bind-Open="_voiding" Title="@L.F("inv.voidTitle", _d?.Invoice.Number ?? "")" Danger="true" AskReason="true" ConfirmText="@L["inv.void"]"
+               Message="@L["inv.voidText"]" Busy="_busy" Error="@_dialogError" OnConfirm="Void" />
+<ConfirmDialog @bind-Open="_deleting" Title="@L["inv.deleteDraft"]" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["inv.deleteText"]" Busy="_busy" Error="@_dialogError" OnConfirm="Delete" />
+<Modal @bind-Open="_blocked" Title="@L["inv.approveFailed"]" Icon="alert" Alert="true">
+    <ChildContent>
+        <Banner Tone="Tone.Err" Text="@L["inv.cannotApprove"]" />
+        <ul style="margin:0;padding-inline-start:18px">@foreach (var m in _blockers) {<li><Tx Value="@m" /></li>}</ul>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.close"]" OnClick="() => _blocked = false" />
+        @if (Shell.Can(PermissionKeys.AcctSetup)) {<Btn Primary="true" Text="@L["post.complete"]" Href="@NavModel.Href(Company, "settings/mapping")" />}
+    </Footer>
+</Modal>
+
+@code {
+    private InvoiceDetails? _d;
+    private EInvoiceSubmissionResponse? _submission;
+    private IReadOnlyList<ReceiptResponse> _receipts = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _dialogError;
+    private string _tab = "lines";
+    private bool _busy, _voiding, _deleting, _blocked, _postingReady = true;
+    private IReadOnlyList<string> _blockers = [];
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private bool CanIssue => Shell.Can(PermissionKeys.InvIssue);
+    private string PrintHref => NavModel.Href(Company, $"print/invoice/{Id}");
+
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("lines", L[_d?.Invoice.InvoiceType == InvoiceCodes.Manual ? "inv.items" : "nav.trips"], _d?.Lines.Count),
+        new("receipts", L["nav.receipts"], _receipts.Count), new("credits", L["nav.creditNotes"], _d?.CreditNotes.Count), new("history", L["ui.history"]),
+    ];
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; return; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; return; }
+        _submission = null;
+        if (_d.Invoice.Status != InvoiceCodes.Draft)
+        {
+            try { _submission = (await Api.GetAsync<EInvoiceSubmissionDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}/e-invoice"))).Submission; } catch (ApiException) { }
+        }
+        if (Shell.Can(PermissionKeys.RcptManage) || Shell.Can(PermissionKeys.InvView))
+        {
+            try { _receipts = (await Api.GetAsync<ReceiptPage>(Api.C($"receipts?invoice={Uri.EscapeDataString(Id)}&status=all&pageSize=200"))).Page.Items; } catch (ApiException) { _receipts = []; }
+        }
+    }
+
+    private IReadOnlyList<KeyValue> Details(InvoiceResponse i) =>
+    [
+        new(L["trip.customer"], i.Customer.Name),
+        new(L["inv.date"], Fmt.Date(i.InvoiceDate, Shell.DateFormat)),
+        new(L["inv.due"], Fmt.Date(i.DueDate, Shell.DateFormat)),
+        new(L["inv.layout"], L[i.LayoutType == InvoiceCodes.TaxInvoice ? "inv.layoutTax" : "inv.layoutClaim"]),
+        new(L["inv.type"], L[i.InvoiceType == InvoiceCodes.Manual ? "inv.typeManual" : "inv.typeTrip"]),
+        new(L["inv.approvedBy"], i.ApprovedBy is null ? "—" : $"{i.ApprovedBy} · {Fmt.DateTime(i.ApprovedAt?.ToLocalTime(), Shell.DateFormat)}"),
+        new(L["md.notes"], i.Notes),
+    ];
+
+    private IReadOnlyList<KeyValue> EInvoiceDetails(EInvoiceSubmissionResponse s) =>
+    [
+        new(L["ml.status"], null, @<StatusTag Status="@BillingStatus.EInvoice(s.Status)" />),
+        new("ICV", s.Icv?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        new("UUID", s.UniqueId?.ToString()),
+        new(L["ei.systemNumber"], s.SystemNumber),
+        new(L["ei.attempts"], Fmt.Count(s.Attempts)),
+        new(L["ei.submittedAt"], Fmt.DateTime(s.SubmittedAt?.ToLocalTime(), Shell.DateFormat)),
+        new(L["ei.qr"], s.HasQr ? L["ei.qrPrinted"] : "—"),
+    ];
+
+    private async Task Approve()
+    {
+        _busy = true;
+        try
+        {
+            var r = await Api.PostAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}/approve"), new DirectService.Transportation.Contracts.Accounting.StatusChangeRequest(_d!.Invoice.RowVersion));
+            Toasts.Success(L.F("inv.approved", r.Invoice.Number ?? "", Fmt.Money(r.Invoice.Total)));
+            await Load();
+        }
+        catch (ApiException e)
+        {
+            // Every reason the approval is refused (FR-044).
+            _blockers = e.Problem.Errors is { Count: > 0 } list ? list.Select(x => x.Message ?? x.Code ?? "").ToList() : [e.Problem.Detail ?? L["ui.loadFailed"]];
+            _blocked = true;
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task Void(string reason)
+    {
+        _busy = true;
+        _dialogError = null;
+        try
+        {
+            await Api.PostAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}/void"), new InvoiceVoidRequest(reason, _d!.Invoice.RowVersion));
+            _voiding = false;
+            Toasts.Success(L.F("inv.voided", _d.Invoice.Number ?? ""));
+            await Load();
+        }
+        catch (ApiException e) { _dialogError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete(string reason)
+    {
+        _busy = true;
+        _dialogError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"invoices/{Uri.EscapeDataString(Id)}/delete"), new InvoiceDeleteRequest(reason, _d!.Invoice.RowVersion));
+            Toasts.Success(L["inv.draftDeleted"]);
+            Nav.NavigateTo(NavModel.Href(Company, "invoices"));
+        }
+        catch (ApiException e) { _dialogError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Resubmit()
+    {
+        if (_submission is null) return;
+        _busy = true;
+        try
+        {
+            _submission = (await Api.PostAsync<EInvoiceSubmissionDetails>(Api.C($"einvoice-submissions/{Uri.EscapeDataString(_submission.Id)}/submit"), null)).Submission;
+            if (_submission.Status == EInvoiceCodes.Submitted) Toasts.Success(L.F("ei.accepted", _d!.Invoice.Number ?? ""));
+            else Toasts.Error(_submission.LastError ?? string.Join(" · ", _submission.Problems.Select(p => p.Message)));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+}

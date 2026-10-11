@@ -1,0 +1,65 @@
+@page "/c/{Company}/driver-accounts/advances/{Id}"
+@* SCR-27 advance view (FR-072…074): driver, date, method, account, reference, settlement; edit while unsettled, print the voucher, void (drv.advance). *@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var a = _d!.Advance; var open = a.Status != "Void" && a.Settlement is null; }
+        <CashDocView Title="@a.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(a.Driver.Name, NavModel.Href(Company, $"driver-accounts/{a.Driver.Id}"))])"
+                     IsVoid="@(a.Status == "Void")" VoidReason="@a.VoidReason" PostingPending="a.PostingPending" Details="Details(a)" Amount="a.Amount" AmountLabel="@L["inv.amount"]"
+                     AmountInWords="@_d.AmountInWords" Entry="a.JournalEntry" History="_d.History" PrintHref="@NavModel.Href(Company, $"print/advance/{Id}")"
+                     CanVoid="@(open && Shell.Can(PermissionKeys.DrvAdvance))" VoidText="@L["drv.advanceVoidText"]" OnVoid="Void">
+            <Actions>@if (open && Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"driver-accounts/advances/{Id}/edit")" />}</Actions>
+            <Above>@if (a.Settlement is { } s) {<Banner Tone="Tone.Lock" Text="@L.F("drv.advanceSettled", s.Number ?? "")" />}</Above>
+        </CashDocView>
+    </ChildContent>
+</StateView>
+
+@code {
+    private AdvanceDetails? _d;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _d = await Api.GetAsync<AdvanceDetails>(Api.C($"advances/{Uri.EscapeDataString(Id)}"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<KeyValue> Details(AdvanceResponse a) =>
+    [
+        new(L["trip.driver"], null, @<a href="@NavModel.Href(Company, $"driver-accounts/{a.Driver.Id}")">@a.Driver.Name</a>),
+        new(L["trip.date"], Fmt.Date(a.AdvanceDate, Shell.DateFormat)),
+        new(L["cash.method"], L["pay." + a.PaymentMethod]),
+        new(L["cash.account"], a.Account.Name),
+        new(L["cash.reference"], a.Reference),
+        a.Settlement is { } s ? new(L["drv.settlement"], null, @<a href="@NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}")"><bdi>@s.Number</bdi></a>) : new(L["drv.settlement"], "—"),
+        new(L["md.notes"], a.Notes),
+    ];
+
+    private async Task<string?> Void(string reason)
+    {
+        try
+        {
+            await Api.PostAsync<AdvanceDetails>(Api.C($"advances/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Advance.RowVersion));
+            Toasts.Success(L.F("cash.voided", _d.Advance.Number));
+            await Load();
+            return null;
+        }
+        catch (ApiException e) { return e.Problem.Detail ?? L["ui.loadFailed"]; }
+    }
+}

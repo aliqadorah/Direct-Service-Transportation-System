@@ -70,6 +70,22 @@ public sealed record UnbilledTripsResponse(IReadOnlyList<TripResponse> Trips, in
 
 public sealed record InvoiceVoidRequest(string? Reason, string? RowVersion);
 
+/// <summary>Live totals of an invoice form (screen preview, nothing saved): selected trips or manual lines, discount and fees.</summary>
+public sealed record InvoiceCalculationRequest(
+    string? InvoiceType, string? CustomerId, DateOnly? InvoiceDate, IReadOnlyList<string>? TripIds, IReadOnlyList<ManualLineRequest>? Lines, decimal? Discount, decimal? ExtraFees);
+
+/// <summary>
+/// Totals as the server computes them on save (8.3, BR-022, DT-79), the company's tax mode and decimals, the due date from the customer's
+/// payment terms, and whether Save creates a draft (FR-041).
+/// </summary>
+public sealed record InvoiceCalculationResponse(
+    decimal Subtotal, decimal Discount, decimal ExtraFees, decimal BaseAmount, decimal TaxRate, decimal Tax, decimal Total, bool TaxInclusive, int Decimals,
+    DateOnly Today, DateOnly? DueDate, int? PaymentTermsDays, bool ApprovalRequired);
+
+/// <summary>Totals a credit note would have (screen preview): proportional shares, tax, total and the invoice's remaining balance (BR-025 … BR-027).</summary>
+public sealed record CreditNoteCalculation(
+    decimal Subtotal, decimal DiscountShare, decimal FeesShare, decimal BaseAmount, decimal Tax, decimal Total, decimal Remaining, decimal TaxRate, int Decimals);
+
 /// <summary>Deleting a draft: reason and the version last seen (review L7).</summary>
 public sealed record InvoiceDeleteRequest(string? Reason, string? RowVersion);
 

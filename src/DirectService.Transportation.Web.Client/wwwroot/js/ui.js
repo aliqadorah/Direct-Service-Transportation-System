@@ -38,6 +38,23 @@ function onShortcut(e) {
   const typing = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
   if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
   else if (k === "/" && !typing) { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
+  else if ((e.ctrlKey || e.metaKey) && k === "p" && document.querySelector('button[data-shortcut="Ctrl P"]')) {
+    // Print preview: Ctrl+P prints the logged copy through the screen's Print button, never the unlogged preview (FR-058).
+    e.preventDefault();
+    const b = document.querySelector('button[data-shortcut="Ctrl P"]:not([disabled])');
+    if (b) b.click();
+  }
+  else if ((e.ctrlKey || e.metaKey) && k === "s") {
+    // Ctrl+S: the screen's save button (shown with its shortcut on the button).
+    const b = document.querySelector('button[data-shortcut="Ctrl S"]:not([disabled])');
+    if (b) {
+      e.preventDefault();
+      // Commit the field being typed in first (fields bind on change).
+      const a = document.activeElement;
+      if (a && a !== document.body) a.dispatchEvent(new Event("change", { bubbles: true }));
+      b.click();
+    }
+  }
 }
 export function registerShortcuts(ref) {
   shortcutRef = ref;
@@ -116,4 +133,18 @@ export function saveFile(name, contentType, bytes) {
   a.href = url; a.download = name || "download"; a.rel = "noopener";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+/** Print preview (SCR-09): loads the document's HTML into the sandboxed frame (no scripts) and opens the browser's print dialog for it. */
+export function printHtml(el, html) {
+  return new Promise((resolve) => {
+    if (!el) { resolve(); return; }
+    const done = () => {
+      el.removeEventListener("load", done);
+      try { el.contentWindow.focus(); el.contentWindow.print(); } catch { /* print unavailable */ }
+      resolve();
+    };
+    el.addEventListener("load", done);
+    el.srcdoc = html;
+  });
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Core;
@@ -13,9 +14,14 @@ namespace DirectService.Transportation.Web.Pipeline;
 /// </summary>
 internal sealed class RequestContextMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext http, RequestContext ctx, DataScope scope, IAppDbContext db)
+    public async Task InvokeAsync(HttpContext http, RequestContext ctx, DataScope scope, IAppDbContext db, PrintMode print)
     {
         ctx.IpAddress = http.Connection.RemoteIpAddress?.ToString();
+        // On-screen print preview (SCR-09): the HTML rendered like the print, not logged as one. Only HTML: a PDF is always a logged print
+        // (FR-058, FR-090), so a "preview" can never produce an unlogged original.
+        print.Preview = http.Request.Method == HttpMethods.Get && string.Equals(http.Request.Query["preview"], "true", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(http.Request.Query["format"], "html", StringComparison.OrdinalIgnoreCase)
+            && (http.Request.Path.Value?.EndsWith("/print", StringComparison.OrdinalIgnoreCase) ?? false);
         ctx.UserAgent = http.Request.Headers.UserAgent.ToString();
         if (http.Items[typeof(SessionPrincipal)] is SessionPrincipal p)
         {

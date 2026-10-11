@@ -1,0 +1,98 @@
+@*
+  Driver or partner statement for a period (FR-083, FR-088): opening balance, each trip, advance, deduction, settlement or payment with its
+  document, shipment details for trips, what increases or decreases the amount owed, running balance, totals and closing; Excel / PDF.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject Downloads Files
+@inject NavigationManager Nav
+<div class="row pad" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+    <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+    <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+    <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Load" />
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+    </span>
+</div>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="file" Title="@L["stmt.empty"]" /></Empty>
+    <ChildContent>
+        @{ var s = _s!; }
+        <DataGrid TItem="StatementLine" Items="s.Lines" Key="l => (object)new Rk(l)" Caption="@L["md.statement"]"
+                  OnRowClick="Open" FooterLabel="@L["stmt.closing"]">
+            <Columns>
+                <GridColumn TItem="StatementLine" Title="@L["trip.date"]" Value="l => Fmt.Date(l.Date, Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="StatementLine" Title="@L["stmt.document"]" Value="l => l.Document.Number" Ltr="true" />
+                <GridColumn TItem="StatementLine" Title="@L["stmt.description"]" Value="Describe" Wrap="true" />
+                <GridColumn TItem="StatementLine" Title="@L["stmt.increase"]" Value="l => l.Increase == 0 ? null : Fmt.Money(l.Increase)" Numeric="true" Footer="@Fmt.Money(s.TotalIncrease)" />
+                <GridColumn TItem="StatementLine" Title="@L["stmt.decrease"]" Value="l => l.Decrease == 0 ? null : Fmt.Money(l.Decrease)" Numeric="true" Footer="@Fmt.Money(s.TotalDecrease)" />
+                <GridColumn TItem="StatementLine" Title="@L["dash.balance"]" Value="l => Fmt.Money(l.Balance)" Numeric="true" Footer="@Fmt.Money(s.Closing)" />
+            </Columns>
+        </DataGrid>
+        <p class="muted pad" style="margin:0"><Tx Value="@L.F("stmt.opening", Fmt.Date(s.From, Shell.DateFormat), Fmt.Money(s.Opening))" /></p>
+    </ChildContent>
+</StateView>
+
+@code {
+    private StatementResponse? _s;
+
+    /// <summary>Row key by reference: two statement lines may carry equal values.</summary>
+    private sealed class Rk(StatementLine line)
+    {
+        public StatementLine Line { get; } = line;
+        public override bool Equals(object? obj) => obj is Rk o && ReferenceEquals(o.Line, Line);
+        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Line);
+    }
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private DateOnly? _from, _to;
+
+    /// <summary>The statement path under the company: <c>drivers/{id}/statement</c> or <c>partners/{id}/statement</c>.</summary>
+    [Parameter, EditorRequired] public string Path { get; set; } = "";
+
+    private string Query
+    {
+        get
+        {
+            var p = new List<string>();
+            if (_from is { } f) p.Add("from=" + f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            if (_to is { } t) p.Add("to=" + t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            return p.Count == 0 ? "" : "?" + string.Join('&', p);
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _s = await Api.GetAsync<StatementResponse>(Api.C(Path + Query));
+            _from ??= _s.From;
+            _to ??= _s.To;
+            _state = _s.Lines.Count == 0 && _s.Opening == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private string Describe(StatementLine l) =>
+        l.Route is null ? l.Description : $"{l.Description} · {l.Route}" + (l.Weight is { } w ? $" · {Fmt.Qty(w)} t × {Fmt.Money(l.Rate, 4)}" : "");
+
+    private Task Export(string format) => Files.SaveAsync(Api.C(Path + "/export" + Query), format);
+
+    private void Open(StatementLine l)
+    {
+        if (Shell.Company is not { } c) return;
+        var route = l.Kind switch
+        {
+            "Trip" => $"trips/{l.Document.Id}",
+            "Advance" => $"driver-accounts/advances/{l.Document.Id}",
+            "Settlement" or "Deduction" => $"driver-accounts/settlements/{l.Document.Id}",
+            "Payment" => $"partner-accounts/payments/{l.Document.Id}",
+            _ => null,
+        };
+        if (route is not null) Nav.NavigateTo(NavModel.Href(c.Id, route));
+    }
+}

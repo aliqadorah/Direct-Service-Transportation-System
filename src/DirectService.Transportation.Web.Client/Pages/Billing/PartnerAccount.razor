@@ -1,0 +1,108 @@
+@page "/c/{Company}/partner-accounts/{Id}"
+@*
+  SCR-28 partner account (FR-084, FR-088): partner trips with their cost, payments and the balance due; tabs for the trips, payments and the
+  statement of a period (Excel / PDF). New payment (drv.settle) — never above the balance due (FR-085).
+*@
+@using DirectService.Transportation.Contracts.Trips
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var a = _a!; }
+        <PageHeader Title="@a.Partner.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
+            <Actions>
+                <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />
+                @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="cash" Text="@L["prt.payment"]" Href="@NavModel.Href(Company, $"partner-accounts/{Id}/pay")" Disabled="@(a.BalanceDue <= 0)" />}
+            </Actions>
+        </PageHeader>
+        <Figures Items="@([new Figure(L["prt.trips"], Fmt.Count(a.Trips)), new Figure(L["prt.cost"], Fmt.Money(a.Cost)), new Figure(L["prt.paid"], Fmt.Money(a.Paid)), new Figure(L["prt.balance"], Fmt.Money(a.BalanceDue))])" />
+        <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@a.Partner.Name" />
+        <Box NoPad="true" Class="fill">
+            @switch (_tab)
+            {
+                case "payments":
+                    @if (a.RecentPayments.Count == 0) {<EmptyState Icon="cash" Title="@L["prt.noPayments"]" />}
+                    else
+                    {
+                        <DataGrid TItem="PartnerPaymentResponse" Items="a.RecentPayments" Key="p => p.Id" Caption="@L["prt.payments"]" RowClass="@(p => p.Status == "Void" ? "void" : null)"
+                                  OnRowClick="@(p => Nav.NavigateTo(NavModel.Href(Company, $"partner-accounts/payments/{p.Id}")))">
+                            <Columns>
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.method"]" Value="@(p => L["pay." + p.PaymentMethod])" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.reference"]" Value="p => p.Reference" Ltr="true" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["inv.amount"]" Value="p => Fmt.Money(p.Amount)" Numeric="true" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
+                            </Columns>
+                        </DataGrid>
+                    }
+                    break;
+                case "statement":
+                    <StatementPanel Path="@($"partners/{Uri.EscapeDataString(Id)}/statement")" />
+                    break;
+                default:
+                    @if (!Shell.Can(PermissionKeys.TripsView)) {<p class="muted pad" style="margin:0">@L["prt.tripsNeedView"]</p>}
+                    else if (_trips is null) {<Skeleton Kind="SkeletonKind.List" />}
+                    else if (_trips.Page.Items.Count == 0) {<EmptyState Icon="truck" Title="@L["prt.noTrips"]" Text="@L["prt.noTripsText"]" />}
+                    else
+                    {
+                        <DataGrid TItem="TripResponse" Items="_trips.Page.Items" Key="t => t.Id" Caption="@L["prt.trips"]" FooterLabel="@L.F("trip.totalOf", Fmt.Count(_trips.Totals.Trips))"
+                                  OnRowClick="@(t => Nav.NavigateTo(NavModel.Href(Company, $"trips/{t.Id}")))" RowClass="@(t => t.Status == "Void" ? "void" : null)">
+                            <Columns>
+                                <GridColumn TItem="TripResponse" Title="@L["trip.date"]" Value="t => Fmt.Date(t.TripDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["trip.receiptNo"]" Value="t => t.ReceiptNo" Ltr="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["trip.driver"]" Value="t => t.Driver.Name" Clip="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["drv.route"]" Value="@(t => t.LoadingSite.Name + (L.En ? " → " : " ← ") + t.UnloadingSite.Name)" Clip="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["drv.wageQty"]" Value="t => Fmt.Qty(t.BillingQty)" Numeric="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["trip.partnerRate"]" Value="t => Fmt.Money(t.PartnerRate, 4)" Numeric="true" />
+                                <GridColumn TItem="TripResponse" Title="@L["trip.partnerCost"]" Value="t => Fmt.Money(t.PartnerCost)" Numeric="true" Footer="@Fmt.Money(_trips.Totals.PartnerCost)" />
+                            </Columns>
+                        </DataGrid>
+                        <Pager Page="_page" PageSize="50" Total="_trips.Page.TotalCount" OnPage="Go" />
+                    }
+                    break;
+            }
+        </Box>
+    </ChildContent>
+</StateView>
+
+@code {
+    private PartnerAccountResponse? _a;
+    private TripPage? _trips;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private string _tab = "trips";
+    private int _page = 1;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Tabs => [new("trips", L["prt.trips"], _a?.Trips), new("payments", L["prt.payments"], _a?.RecentPayments.Count), new("statement", L["md.statement"])];
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _a = await Api.GetAsync<PartnerAccountResponse>(Api.C($"partners/{Uri.EscapeDataString(Id)}/account"));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; return; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; return; }
+        await LoadTrips();
+    }
+
+    private async Task LoadTrips()
+    {
+        if (!Shell.Can(PermissionKeys.TripsView)) { _trips = null; return; }
+        try { _trips = await Api.GetAsync<TripPage>(Api.C($"trips?partner={Uri.EscapeDataString(Id)}&sort=-tripDate&page={_page}&pageSize=50")); }
+        catch (ApiException) { _trips = null; }
+    }
+
+    private Task Go(int p) { _page = p; return LoadTrips(); }
+}

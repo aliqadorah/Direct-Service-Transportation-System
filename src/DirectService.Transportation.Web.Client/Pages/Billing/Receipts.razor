@@ -1,0 +1,108 @@
+@page "/c/{Company}/receipts"
+@*
+  SCR-26 receipts list (FR-071): views All / On account / Void, customer, period, method and applied filters, number / reference / invoice
+  search, totals of the matching active receipts, Excel/CSV export, new receipt (rcpt.manage).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.receipts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"])])">
+    <Actions>@if (Shell.Can(PermissionKeys.RcptManage)) {<Btn Primary="true" Icon="plus" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, "receipts/new")" />}</Actions>
+</PageHeader>
+
+<ListShell Label="@L["nav.receipts"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" SearchPlaceholder="@L["rcpt.search"]" OnSearch="Search"
+           Exports="@(["xlsx", "csv"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="cash" EmptyTitle="@L["rcpt.none"]" EmptyText="@L["rcpt.noneText"]" Filtered="Filtered" OnClear="ClearAll"
+           Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">
+    <Filters>
+        <ComboField TValue="string?" @bind-Value="_customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <SelectField TValue="string?" @bind-Value="_method" Options="MoneyAccounts.Methods(L)" Empty="@L["tar.all"]" Label="@L["cash.method"]" FieldClass="w160" />
+        <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
+        @if (Filtered) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
+    </Filters>
+    <EmptyActions>@if (Shell.Can(PermissionKeys.RcptManage)) {<Btn Primary="true" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, "receipts/new")" />}</EmptyActions>
+    <ChildContent>
+        <DataGrid TItem="ReceiptResponse" Items="_page!.Page.Items" Key="r => r.Id" Caption="@L["nav.receipts"]" SortKey="@_q.Sort" SortDesc="_q.Desc" OnSort="Sort"
+                  OnRowClick="Open" RowClass="@(r => r.Status == "Void" ? "void" : null)" FooterLabel="@L.F("rcpt.totalOf", Fmt.Count(_page.Totals.Count))">
+            <Columns>
+                <GridColumn TItem="ReceiptResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" SortKey="number" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReceiptDate, Shell.DateFormat)" Ltr="true" SortKey="receiptDate" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["trip.customer"]" Value="r => r.Customer.Name" SortKey="customer" Clip="true" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["cn.invoice"]" Value="@(r => r.Invoice?.Number ?? L["rcpt.onAccount"])" Ltr="true" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["cash.method"]" Value="@(r => L["pay." + r.PaymentMethod])" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["cash.account"]" Value="r => r.Account.Name" Clip="true" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["cash.reference"]" Value="r => r.Reference" Ltr="true" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["inv.amount"]" Value="r => Fmt.Money(r.Amount)" Numeric="true" SortKey="amount" Footer="@Fmt.Money(_page.Totals.Amount)" />
+                <GridColumn TItem="ReceiptResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.PostingPending ? "pending" : BillingStatus.Document(context.Status))" /></Template></GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+@code {
+    private readonly ListQuery _q = new() { Sort = "receiptDate", Desc = true };
+    private ReceiptPage? _page;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _customer, _method;
+    private string _view = "all";
+    private DateOnly? _from, _to;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("account", L["rcpt.onAccount"]), new("void", L["st.void"])];
+    private bool Filtered => _q.Q is not null || _customer is not null || _method is not null || _from is not null || _to is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        await Load();
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new ListQuery { Q = _q.Q, Sort = _q.Sort, Desc = _q.Desc, Page = _q.Page, PageSize = _q.PageSize };
+        void Set(string k, string? v) { if (v is not null) q.Fixed[k] = v; }
+        Set("applied", _view == "account" ? "account" : null);
+        Set("status", _view switch { "void" => "void", "all" => "all", _ => "active" });
+        Set("customer", _customer);
+        Set("method", _method);
+        Set("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Set("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        return q.ToQuery(statusParam: null, paged);
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _page = await Api.GetAsync<ReceiptPage>(Api.C("receipts" + Query(true)));
+            _state = _page.Page.Items.Count == 0 && _q.Page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _q.Page = 1; return Load(); }
+    private Task Search(string? text) { _q.Q = text; _q.Page = 1; return Load(); }
+    private Task Apply() { _q.Page = 1; return Load(); }
+    private Task Sort((string Key, bool Desc) s) { _q.SetSort(s); return Load(); }
+    private Task Go(int p) { _q.Page = p; return Load(); }
+    private Task Size(int s) { _q.PageSize = s; _q.Page = 1; return Load(); }
+
+    private Task ClearAll()
+    {
+        _q.Q = _customer = _method = null;
+        _from = _to = null;
+        _q.Page = 1;
+        return Load();
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("receipts/export" + Query(false)), format);
+
+    private void Open(ReceiptResponse r) => Nav.NavigateTo(NavModel.Href(Company, $"receipts/{r.Id}"));
+}

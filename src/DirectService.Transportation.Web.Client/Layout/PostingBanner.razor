@@ -1,0 +1,32 @@
+@*
+  FR-094 banner on screens that post entries (invoicing, credit notes, cash documents): while required posting keys are not mapped, posting
+  and invoicing are disabled; the banner names the missing keys and links to account mapping (settings). Silent when posting is ready or
+  the status cannot be read.
+*@
+@using DirectService.Transportation.Contracts.Accounting
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@if (_status is { PostingReady: false } s)
+{
+    <Banner Tone="Tone.Err" Text="@L.F("post.disabled", string.Join("، ", s.MissingPostingKeys))">
+        <Actions>@if (Shell.Can(PermissionKeys.AcctSetup) && Shell.Company is { } c) {<a href="@NavModel.Href(c.Id, "settings/mapping")">@L["post.complete"]</a>}</Actions>
+    </Banner>
+}
+
+@code {
+    private AccountingStatusResponse? _status;
+
+    /// <summary>Raised once the status is known (true = posting ready), so a screen can disable its posting actions.</summary>
+    [Parameter] public EventCallback<bool> OnStatus { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _status = await Api.GetAsync<AccountingStatusResponse>(Api.C("accounting/status"));
+            await OnStatus.InvokeAsync(_status.PostingReady);
+        }
+        catch (ApiException) { }
+    }
+}
