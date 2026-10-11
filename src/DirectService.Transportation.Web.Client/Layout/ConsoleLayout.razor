@@ -1,0 +1,45 @@
+@*
+  Shell of the provider console (SCR-90…94, DT-66): its own menu (tenants, plans, support access, announcements, health) for platform staff
+  only; anyone else sees "not found" (the API also refuses every /platform request — PlatformStaffFilter).
+*@
+@inherits LayoutComponentBase
+@inject AppSession Session
+@inject ShellState Shell
+@inject NavigationManager Nav
+@inject Loc L
+
+@if (_state == LoadState.Loading)
+{
+    <div class="empty" style="height:100vh" role="status"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@L["ui.loading"]</span></div>
+}
+else
+{
+    <AppShell Provider="true" OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
+        <ChildContent>
+            @if (_state == LoadState.Error) {<ErrorState Reference="@_reference" OnRetry="Load" />}
+            else if (_state == LoadState.Empty) {<NotFoundView />}
+            else {<div @key="Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath" style="display:contents">@Body</div>}
+        </ChildContent>
+    </AppShell>
+}
+
+@code {
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await Session.EnsureLoadedAsync();
+            _state = Shell.Me?.IsPlatformStaff == true ? LoadState.Ready : LoadState.Empty;
+        }
+        catch (ApiException e)
+        {
+            _reference = e.Problem.Reference;
+            _state = LoadState.Error;
+        }
+    }
+}
