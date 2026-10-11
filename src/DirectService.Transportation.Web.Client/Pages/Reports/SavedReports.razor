@@ -1,0 +1,178 @@
+@page "/c/{Company}/reports/saved"
+@*
+  SCR-53 saved reports (FR-145, FR-146, FR-140, DT-116): views All / Mine / Shared / Pinned, search; open in the builder (run), export
+  Excel / PDF, pin to the dashboard with a measure and warning / critical thresholds, unpin, delete (owner, or settings.manage for shared).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject UiJs Js
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.savedReports"]" Crumbs="@([new Crumb(L["nav.reports"]), new Crumb(L["nav.savedReports"])])">
+    <Actions><Btn Primary="true" Icon="plus" Text="@L["sr.new"]" Href="@NavModel.Href(Company, "reports/builder")" /></Actions>
+</PageHeader>
+<ListShell Label="@L["nav.savedReports"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q" OnSearch="Search" State="_state" Reference="@_reference" OnRetry="Load"
+           EmptyIcon="chart" EmptyTitle="@L["sr.none"]" EmptyText="@L["sr.noneText"]" Filtered="_q is not null" OnClear="() => Search(null)"
+           Page="_page" PageSize="50" Total="_result?.TotalCount" OnPage="Go">
+    <EmptyActions><Btn Primary="true" Text="@L["nav.reportBuilder"]" Href="@NavModel.Href(Company, "reports/builder")" /></EmptyActions>
+    <ChildContent>
+        <DataGrid TItem="SavedReportResponse" Items="_result!.Items" Key="r => r.Id" Caption="@L["nav.savedReports"]"
+                  OnRowClick="@(r => Nav.NavigateTo(NavModel.Href(Company, $"reports/builder/{r.Id}")))">
+            <Columns>
+                <GridColumn TItem="SavedReportResponse" Title="@L["md.name"]" Value="r => r.Name" />
+                <GridColumn TItem="SavedReportResponse" Title="@L["rb.source"]" Value="r => SourceLabel(r.Source)" />
+                <GridColumn TItem="SavedReportResponse" Title="@L["sr.owner"]" Value="r => r.Owner.Name" />
+                <GridColumn TItem="SavedReportResponse" Title="@L["sr.lastRun"]" Value="r => Fmt.DateTime(r.LastRunAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="SavedReportResponse" Title="@L["ml.status"]">
+                    <Template>
+                        @if (context.IsShared) {<Badge Tone="Tone.Info" Icon="users" Text="@L["sr.shared"]" />}
+                        @if (context.Pinned) {<Badge Tone="Tone.Primary" Icon="pin" Text="@L["sr.pinned"]" />}
+                    </Template>
+                </GridColumn>
+                <GridColumn TItem="SavedReportResponse" Title="@L["profile.action"]" HideTitle="true">
+                    <Template>
+                        <span style="display:inline-flex;gap:4px" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+                            <Btn Small="true" Ghost="true" Icon="export" AriaLabel="@L.F("sr.exportOf", context.Name)" Title="Excel" OnClick="@(() => Export(context, "xlsx"))" />
+                            <Btn Small="true" Ghost="true" Icon="print" AriaLabel="@L.F("sr.pdfOf", context.Name)" Title="PDF" OnClick="@(() => Export(context, "pdf"))" />
+                            @if (_pins.FirstOrDefault(p => p.Report.Id == context.Id) is { } pin)
+                            {
+                                <Btn Small="true" Ghost="true" Icon="pin" AriaLabel="@L.F("sr.unpinOf", context.Name)" Title="@L["sr.unpin"]" OnClick="() => Unpin(pin)" />
+                            }
+                            else
+                            {
+                                <Btn Small="true" Ghost="true" Icon="pin" AriaLabel="@L.F("sr.pinOf", context.Name)" Title="@L["sr.pin"]" OnClick="() => AskPin(context)" />
+                            }
+                            @if (context.CanEdit) {<Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("ml.deleteTitle", context.Name)" OnClick="() => { _target = context; _deleting = true; }" />}
+                        </span>
+                    </Template>
+                </GridColumn>
+            </Columns>
+        </DataGrid>
+    </ChildContent>
+</ListShell>
+
+<Modal @bind-Open="_pinning" Title="@L.F("sr.pinTitle", _target?.Name ?? "")" Busy="_busy" Icon="pin">
+    <ChildContent>
+        <SelectField TValue="int?" @bind-Value="_measure" Options="MeasureOptions" Label="@L["sr.measure"]" />
+        <NumberField @bind-Value="_warning" Label="@L["sr.warning"]" Help="@L["sr.thresholdHelp"]" />
+        <NumberField @bind-Value="_critical" Label="@L["sr.critical"]" />
+        @if (_pinError is not null) {<Banner Tone="Tone.Err" Text="@_pinError" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _pinning = false" />
+        <Btn Primary="true" Icon="pin" Text="@L["sr.pin"]" Busy="_busy" OnClick="Pin" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target?.Name ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["sr.deleteText"]"
+               Busy="_busy" Error="@_deleteError" OnConfirm="Delete" />
+
+@code {
+    private PagedResult<SavedReportResponse>? _result;
+    private IReadOnlyList<DashboardPinResponse> _pins = [];
+    private IReadOnlyList<DataSourceInfo> _sources = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _q, _pinError, _deleteError;
+    private string _view = "all";
+    private int _page = 1;
+    private SavedReportResponse? _target;
+    private bool _pinning, _deleting, _busy;
+    private int? _measure = 0;
+    private decimal? _warning, _critical;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("mine", L["sr.mine"]), new("shared", L["sr.shared"]), new("pinned", L["sr.pinned"])];
+
+    private IReadOnlyList<Option<int?>> MeasureOptions =>
+        (_target?.Definition.Measures ?? []).Select((m, i) => new Option<int?>(i, (MeasureName(m.Function) + " " + FieldLabel(m.Field)).Trim())).ToList();
+
+    private string MeasureName(string function) => L["rb." + function] is var f && !f.StartsWith("rb.", StringComparison.Ordinal) ? f : function;
+
+    private string SourceLabel(string key) => _sources.FirstOrDefault(s => s.Key == key)?.Label ?? key;
+
+    private string? FieldLabel(string? field) => field is null ? null : _sources.SelectMany(s => s.Fields).FirstOrDefault(f => f.Key == field)?.Label ?? field;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _sources = await Api.GetAsync<IReadOnlyList<DataSourceInfo>>(Api.C("reports/builder/sources")); } catch (ApiException) { }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            var q = $"reports/saved?scope={_view}&page={_page}" + (_q is null ? "" : "&q=" + Uri.EscapeDataString(_q));
+            _result = await Api.GetAsync<PagedResult<SavedReportResponse>>(Api.C(q));
+            try { _pins = await Api.GetAsync<IReadOnlyList<DashboardPinResponse>>(Api.C("dashboard/pins")); } catch (ApiException) { _pins = []; }
+            _state = _result.Items.Count == 0 && _page == 1 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task SetView(string v) { _view = v; _page = 1; return Load(); }
+    private Task Search(string? q) { _q = q; _page = 1; return Load(); }
+    private Task Go(int p) { _page = p; return Load(); }
+
+    private async Task Export(SavedReportResponse r, string format)
+    {
+        try
+        {
+            var file = await Api.FileAsync(Api.C($"reports/saved/{Uri.EscapeDataString(r.Id)}/export?format={format}"), new { });
+            await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private void AskPin(SavedReportResponse r)
+    {
+        _target = r;
+        _measure = 0;
+        _warning = _critical = null;
+        _pinError = null;
+        _pinning = true;
+    }
+
+    private async Task Pin()
+    {
+        _busy = true;
+        _pinError = null;
+        try
+        {
+            await Api.PostAsync<DashboardPinResponse>(Api.C("dashboard/pins"), new DashboardPinRequest(_target!.Id, _measure ?? 0, _warning, _critical));
+            _pinning = false;
+            Toasts.Success(L.F("sr.pinnedToast", _target.Name), L["nav.dashboard"], NavModel.Href(Company, ""));
+            await Load();
+        }
+        catch (ApiException e) { _pinError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private async Task Unpin(DashboardPinResponse pin)
+    {
+        try
+        {
+            await Api.PostAsync(Api.C($"dashboard/pins/{Uri.EscapeDataString(pin.Id)}/delete"), null);
+            Toasts.Success(L.F("sr.unpinned", pin.Report.Name));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private async Task Delete(string _)
+    {
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"reports/saved/{Uri.EscapeDataString(_target!.Id)}/delete"), null);
+            _deleting = false;
+            Toasts.Success(L.F("ml.deleted", _target.Name));
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+}

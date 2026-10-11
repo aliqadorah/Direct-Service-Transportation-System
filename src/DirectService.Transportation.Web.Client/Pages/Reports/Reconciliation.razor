@@ -1,0 +1,37 @@
+@* Sub-ledger reconciliation (FR-105, RPT-23, DT-104): per control account the ledger balance, the party balances on its lines, the difference
+   (must be 0.000), the document-rebuilt balance, and the unmatched lines (without a party or with a party of another type) with their entries. *@
+@inject Loc L
+@inject ShellState Shell
+@if (Report.Reconciled) {<Banner Tone="Tone.Ok" Text="@L["rec.ok"]" />}
+else {<Banner Tone="Tone.Err" Text="@L["rec.notOk"]" />}
+@if (Report.PendingPostings > 0) {<Banner Tone="Tone.Warn" Text="@L.F("per.pending", Report.PendingPostings)" />}
+@foreach (var row in Report.Rows)
+{
+    var r = row;
+    <Box Title="@($"{r.Account.Code} · {L.Pick(r.Account.NameAr, r.Account.NameEn)} — {L["party." + r.PartyType]}")">
+        <KeyValues Columns="3" Items="@([
+            new KeyValue(L["rec.ledger"], Fmt.Money(r.LedgerBalance)), new KeyValue(L["rec.parties"], Fmt.Money(r.PartyBalances)),
+            new KeyValue(L["acc.difference"], Fmt.Money(r.Difference)), new KeyValue(L["rec.partyCount"], Fmt.Count(r.Parties)),
+            new KeyValue(L["rec.documents"], r.DocumentBalance is decimal db ? Fmt.Money(db) : "—"),
+            new KeyValue(L["rec.documentDiff"], r.DocumentDifference is decimal dd ? Fmt.Money(dd) : "—")])" />
+        @if (r.Unmatched.Count > 0)
+        {
+            <DataGrid TItem="UnmatchedLine" Items="r.Unmatched" Key="u => (object)u" Caption="@L["rec.unmatched"]">
+                <Columns>
+                    <GridColumn TItem="UnmatchedLine" Title="@L["trip.date"]" Value="u => Fmt.Date(u.Date, Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="UnmatchedLine" Title="@L["rep.entry"]">
+                        <Template>@if (Shell.Company is { } c) {<a href="@NavModel.Href(c.Id, $"accounting/journal/{context.Entry.Id}")"><bdi>@context.Entry.Number</bdi></a>}</Template>
+                    </GridColumn>
+                    <GridColumn TItem="UnmatchedLine" Title="@L["je.description"]" Value="u => u.Description" Clip="true" />
+                    <GridColumn TItem="UnmatchedLine" Title="@L["je.debit"]" Value="@(u => u.Debit == 0 ? null : Fmt.Money(u.Debit))" Numeric="true" />
+                    <GridColumn TItem="UnmatchedLine" Title="@L["je.credit"]" Value="@(u => u.Credit == 0 ? null : Fmt.Money(u.Credit))" Numeric="true" />
+                    <GridColumn TItem="UnmatchedLine" Title="@L["rec.problem"]" Value="u => u.Problem" Wrap="true" />
+                </Columns>
+            </DataGrid>
+        }
+    </Box>
+}
+
+@code {
+    [Parameter, EditorRequired] public ReconciliationReport Report { get; set; } = default!;
+}

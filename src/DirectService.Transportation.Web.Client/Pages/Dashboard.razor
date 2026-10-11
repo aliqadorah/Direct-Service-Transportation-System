@@ -27,7 +27,7 @@
         @if (_data!.OpeningDifference is decimal diff && diff != 0)
         {
             <Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(diff))">
-                <Actions><a href="@NavModel.Href(Company, "accounting/chart?tab=openings")">@L["dash.openings"]</a></Actions>
+                <Actions><a href="@NavModel.Href(Company, "accounting/opening-balances")">@L["dash.openings"]</a></Actions>
             </Banner>
         }
         <Figures Items="Figures" />

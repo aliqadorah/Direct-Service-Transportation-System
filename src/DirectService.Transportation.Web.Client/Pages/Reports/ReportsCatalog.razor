@@ -1,0 +1,207 @@
+@page "/c/{Company}/reports/operational"
+@page "/c/{Company}/reports/financial"
+@*
+  SCR-50 operational reports (7.7.2, FR-018, FR-024, FR-142, FR-148…151) and SCR-51 financial statements, registers and ageing (7.7.3,
+  FR-105, FR-128): the catalog of the group the user may run (DT-117); a report's own filters, the result with totals and drill-down,
+  Excel / PDF, or a background export for large results (FR-151). Reports served by their own screen (trips list, statements, ledger,
+  ageing, registers, e-invoicing) open that screen; the sub-ledger reconciliation (RPT-23) is shown here.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject TripLookups Lookups
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L[Financial ? "nav.finReports" : "nav.opReports"]" Crumbs="@([new Crumb(L["nav.reports"]), new Crumb(L[Financial ? "nav.finReports" : "nav.opReports"])])" />
+<div class="cols fill" style="grid-template-columns:260px 1fr;min-height:0">
+    <nav class="box" aria-label="@L[Financial ? "nav.finReports" : "nav.opReports"]" style="overflow:auto">
+        @if (_catalog is null) {<Skeleton Kind="SkeletonKind.List" />}
+        else if (Entries.Count == 0) {<EmptyState Icon="chart" Title="@L["rep.noneAllowed"]" />}
+        else
+        {
+            <ul class="menu-list" style="list-style:none;margin:0;padding:6px">
+                @foreach (var e in Entries)
+                {
+                    var entry = e;
+                    <li>
+                        <button type="button" class="btn ghost" style="width:100%;justify-content:flex-start;text-align:start;height:auto;padding:6px 8px"
+                                aria-current="@(_selected?.Key == entry.Key ? "page" : null)" @onclick="() => Select(entry)">
+                            <span><bdi class="num muted">@entry.Code</bdi> @entry.Title</span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+    </nav>
+    <div class="stack" style="min-width:0;min-height:0">
+        @if (_selected is null)
+        {
+            <Box Fill="true"><EmptyState Icon="chart" Title="@L["rep.pick"]" Text="@L["rep.pickText"]" /></Box>
+        }
+        else if (_selected.Path is not null && _selected.Key != "reconciliation")
+        {
+            <Box Fill="true">
+                <EmptyState Icon="file" Title="@_selected.Title" Text="@L["rep.ownScreen"]">
+                    <Actions>@foreach (var (label, href) in Screens(_selected)) {<Btn Primary="true" Text="@label" Href="@href" />}</Actions>
+                </EmptyState>
+            </Box>
+        }
+        else
+        {
+            <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+                @if (Has("from")) {<DateField @bind-Value="_q.From" Label="@L["trip.from"]" FieldClass="w160" />}
+                @if (Has("to")) {<DateField @bind-Value="_q.To" Label="@L["trip.to"]" FieldClass="w160" />}
+                @if (Has("asOf")) {<DateField @bind-Value="_q.AsOf" Label="@L["rep.asOf"]" FieldClass="w160" />}
+                @if (Has("customer")) {<ComboField TValue="string?" @bind-Value="_q.Customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+                @if (Has("driver")) {<ComboField TValue="string?" @bind-Value="_q.Driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+                @if (Has("partner")) {<ComboField TValue="string?" @bind-Value="_q.Partner" Options="Lookups.Partners" Label="@L["md.partner"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+                @if (Has("loadingSite")) {<ComboField TValue="string?" @bind-Value="_q.LoadingSite" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
+                @if (Has("unloadingSite")) {<ComboField TValue="string?" @bind-Value="_q.UnloadingSite" Options="Lookups.UnloadingSites" Label="@L["trip.unloading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
+                @if (Has("material")) {<ComboField TValue="string?" @bind-Value="_q.Material" Options="Lookups.Materials" Label="@L["trip.material"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
+                @if (Has("groupBy")) {<SelectField TValue="string?" @bind-Value="_q.GroupBy" Options="GroupBys" Label="@L["rep.groupBy"]" FieldClass="w160" />}
+                @if (Has("side")) {<SelectField TValue="string?" @bind-Value="_q.Side" Options="Sides" Label="@L["rep.side"]" FieldClass="w160" />}
+                <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Run" />
+                <span style="margin-inline-start:auto;display:flex;gap:6px">
+                    <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+                    <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+                    @if (_selected.Path is null) {<Btn Small="true" Icon="clock" Text="@L["rep.background"]" Title="@L["rep.backgroundHelp"]" OnClick="Background" />}
+                </span>
+            </div>
+            <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Run">
+                <Empty><EmptyState Icon="chart" Title="@L["rep.noRows"]" Text="@L["rep.noRowsText"]" /></Empty>
+                <ChildContent>
+                    @if (_result is not null)
+                    {
+                        <ListFrame Label="@_result.Title"><ChildContent><ReportGrid Result="_result" /></ChildContent></ListFrame>
+                    }
+                    else if (_reconciliation is not null)
+                    {
+                        <Reconciliation Report="_reconciliation" />
+                    }
+                </ChildContent>
+            </StateView>
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<ReportCatalogEntry>? _catalog;
+    private ReportCatalogEntry? _selected;
+    private ReportResult? _result;
+    private ReconciliationReport? _reconciliation;
+    private QueryModel _q = new();
+    private LoadState _state = LoadState.Empty;
+    private string? _reference;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool Financial => Nav.Uri.Contains("/reports/financial", StringComparison.Ordinal);
+    private IReadOnlyList<ReportCatalogEntry> Entries => _catalog?.Where(e => e.Group == (Financial ? "financial" : "operational")).ToList() ?? [];
+
+    private IReadOnlyList<Option<string?>> GroupBys => [new("customer", L["trip.customer"]), new("route", L["drv.route"]), new("driver", L["trip.driver"]), new("month", L["per.month"])];
+    private IReadOnlyList<Option<string?>> Sides => [new("customer", L["trip.customer"]), new("partner", L["md.partner"])];
+
+    private bool Has(string parameter) => _selected?.Parameters.Contains(parameter) == true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { await Lookups.EnsureAsync(); } catch (ApiException) { }
+        try { _catalog = await Api.GetAsync<IReadOnlyList<ReportCatalogEntry>>(Api.C("reports/catalog")); } catch (ApiException) { _catalog = []; }
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["report"] is { Length: > 0 } key && Entries.FirstOrDefault(e => e.Key == key) is { } e) await Select(e);
+    }
+
+    private async Task Select(ReportCatalogEntry e)
+    {
+        _selected = e;
+        _q = new QueryModel();
+        _result = null;
+        _reconciliation = null;
+        _state = LoadState.Empty;
+        if (e.Path is null || e.Key == "reconciliation") await Run();
+    }
+
+    /// <summary>Screens that serve a report listed in the catalog with its own path (7.7.2 / 7.7.3).</summary>
+    private IEnumerable<(string Label, string Href)> Screens(ReportCatalogEntry e)
+    {
+        (string, string) S(string key, string route) => (L[key], NavModel.Href(Company, route));
+        return e.Key switch
+        {
+            "trips" => [S("nav.trips", "trips/list")],
+            "driver-statement" => [S("nav.driverAccounts", "driver-accounts")],
+            "partner-statement" => [S("nav.partnerAccounts", "partner-accounts")],
+            "account-statement" => [S("nav.statement", "accounting/statement")],
+            "cash-bank-statement" => [S("nav.cashBanks", "accounting/cash-banks")],
+            "receivables-ageing" => [S("nav.receivables", "accounting/receivables?tab=ageing")],
+            "payables-ageing" => [S("nav.payables", "accounting/payables?tab=ageing")],
+            "registers" => [S("nav.invoices", "invoices"), S("nav.creditNotes", "credit-notes"), S("nav.receipts", "receipts"), S("drv.advancesList", "driver-accounts/advances"),
+                            S("drv.settlementsList", "driver-accounts/settlements"), S("prt.paymentsList", "partner-accounts/payments")],
+            "e-invoicing" => [S("nav.einvoicing", "e-invoicing")],
+            _ => [],
+        };
+    }
+
+    private string Query()
+    {
+        var p = new List<string>();
+        void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
+        string? D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        Add("from", D(_q.From)); Add("to", D(_q.To)); Add("asOf", D(_q.AsOf));
+        Add("customer", _q.Customer); Add("driver", _q.Driver); Add("partner", _q.Partner);
+        Add("loadingSite", _q.LoadingSite); Add("unloadingSite", _q.UnloadingSite); Add("material", _q.Material);
+        Add("groupBy", _q.GroupBy); Add("side", _q.Side);
+        return p.Count == 0 ? "" : "?" + string.Join('&', p);
+    }
+
+    private string Path => _selected!.Key == "reconciliation" ? "accounting/reports/reconciliation" : $"reports/standard/{_selected.Key}";
+
+    private async Task Run()
+    {
+        if (_selected is null) return;
+        _state = LoadState.Loading;
+        try
+        {
+            if (_selected.Key == "reconciliation")
+            {
+                _reconciliation = await Api.GetAsync<ReconciliationReport>(Api.C(Path + Query()));
+                _state = LoadState.Ready;
+            }
+            else
+            {
+                _result = await Api.GetAsync<ReportResult>(Api.C(Path + Query()));
+                _state = _result.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+            }
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C(Path + "/export" + Query()), format);
+
+    /// <summary>Large exports run in the background; a notification links to the file when it is ready (FR-151, DT-122).</summary>
+    private async Task Background()
+    {
+        try
+        {
+            var q = new StandardReportQuery(_q.From, _q.To, _q.AsOf, _q.Customer, _q.Driver, _q.Partner, _q.LoadingSite, _q.UnloadingSite, _q.Material, _q.GroupBy, _q.Side);
+            await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new { Kind = "standard", Key = _selected!.Key, Query = q, From = _q.From, To = _q.To, Format = "xlsx" });
+            Toasts.Success(L["rep.backgroundQueued"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private sealed class QueryModel
+    {
+        public DateOnly? From { get; set; }
+        public DateOnly? To { get; set; }
+        public DateOnly? AsOf { get; set; }
+        public string? Customer { get; set; }
+        public string? Driver { get; set; }
+        public string? Partner { get; set; }
+        public string? LoadingSite { get; set; }
+        public string? UnloadingSite { get; set; }
+        public string? Material { get; set; }
+        public string? GroupBy { get; set; }
+        public string? Side { get; set; }
+    }
+}

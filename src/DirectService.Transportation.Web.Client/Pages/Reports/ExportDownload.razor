@@ -1,0 +1,28 @@
+@page "/c/{Company}/exports/{Id}"
+@* A background export that is ready (FR-151, DT-122): opened from its notification; downloads the file (kept 7 days) and offers it again. *@
+@inject Loc L
+@inject Api Api
+@inject Downloads Files
+
+<PageHeader Title="@L["exp.title"]" Crumbs="@([new Crumb(L["nav.reports"])])" />
+<Box Fill="true">
+    <EmptyState Icon="@(_failed ? "alert" : "export")" Title="@L[_failed ? "exp.failed" : _done ? "exp.done" : "exp.preparing"]" Text="@L["exp.keep"]">
+        <Actions><Btn Primary="true" Icon="export" Text="@L["exp.download"]" OnClick="Download" /></Actions>
+    </EmptyState>
+</Box>
+
+@code {
+    private bool _done, _failed;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    protected override Task OnParametersSetAsync() => Download();
+
+    private async Task Download()
+    {
+        var ok = await Files.SaveAsync(Api.C($"exports/{Uri.EscapeDataString(Id)}"));
+        _done = ok;
+        _failed = !ok;
+    }
+}
