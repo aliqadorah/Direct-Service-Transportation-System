@@ -45,7 +45,7 @@ Settings come from `appsettings.json`, then `appsettings.<Environment>.json`, th
 | Key | Meaning | Default / note |
 |---|---|---|
 | `ConnectionStrings:MasterDb` | the Master Database | required |
-| `UrlTokens:Key` | 16-byte base64 key for the hashed public ids in URLs | **required secret** (`dotnet user-secrets set UrlTokens:Key <base64>` in development; secret store in production). Changing it breaks every saved link |
+| `UrlTokens:Key` | **32-byte** (256-bit) base64 key for the hashed public ids in URLs — 44 characters ending in `=` | **required secret**, checked when the host starts (see below). Changing it breaks every saved link |
 | `App:PublicBaseUrl` | absolute address used in e-mails | e.g. `https://app.example.com` |
 | `App:AbsoluteSessionHours` / `App:PlatformStaffIdleMinutes` | session lifetime 12 h (Q-04) / staff idle timeout | 12 / 30 |
 | `App:TrialDays`, `App:InvitationDays`, `App:TermsVersion` | trial length, invitation validity, terms version recorded at sign-up | 14 / 7 / draft-1 |
@@ -60,6 +60,22 @@ Settings come from `appsettings.json`, then `appsettings.<Environment>.json`, th
 | `EInvoicing:JoFotara:TestUrl` / `ProductionUrl` / `TimeoutSeconds` | national e-invoicing endpoints | **to verify with the owner's test credentials (R-01)** |
 | `EInvoicing:AllowSimulator` | offers the e-invoicing simulator connector | development/tests only, never in production |
 
+### The URL token key (`UrlTokens:Key`)
+
+The key must be exactly **32 random bytes**, written in base64 (44 characters). A 16-byte key, a key that is not base64 or a missing key stops the host at start-up with a message that says which of the three it is and how to set it. Create one key per environment and keep it:
+
+- PowerShell (Windows PowerShell 5.1 or PowerShell 7):
+  `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)`
+- Git Bash / Linux: `openssl rand -base64 32`
+
+Store it outside the files:
+
+- Development (user secrets, kept in your Windows profile):
+  `dotnet user-secrets set UrlTokens:Key "<key>" --project src/DirectService.Transportation.Web`
+- Production: the environment variable `UrlTokens__Key` (two underscores) or the hosting provider's secret store.
+
+Do not put it in `appsettings.json` (it would be committed with the code). Changing the key later breaks every saved or e-mailed link to a record.
+
 ## 5. Run (development)
 
 ```bash
@@ -71,6 +87,16 @@ dotnet run --project src/DirectService.Transportation.Web --launch-profile Direc
 Open `https://localhost:52233`. Health: `/health/live`, `/health/ready`. API reference (Development only): `/scalar`, OpenAPI document `/openapi/v1.json` (exported copy in `docs/api/openapi-v1.json`, linted with `npx @redocly/cli lint docs/api/openapi-v1.json`). Development e-mails (verification, invitations, password resets) are written to `.local/mail`.
 
 The only launch profile is `DirectService.Transportation.Web`; any other profile name silently runs as Production without a connection string.
+
+### Visual Studio stops on `NavigationException` when you sign in
+
+Signing in, signing out and the two-step pages move you to another page with Blazor's `NavigationManager.NavigateTo`. On the server-rendered account pages Blazor does this by throwing a `Microsoft.AspNetCore.Components.NavigationException`, which the framework catches and turns into a normal redirect. It is expected and harmless, but when you run with the debugger (F5) Visual Studio pauses on it as a "first-chance exception". Either:
+
+- press **Continue** (F5) — the redirect completes; or
+- turn the break off: when Visual Studio pauses, clear **Break when this exception type is user-handled** in the exception box; or open **Debug → Windows → Exception Settings** (Ctrl+Alt+E), search for `NavigationException` (under Common Language Runtime Exceptions) and clear its check box; or
+- run without the debugger: **Debug → Start Without Debugging** (**Ctrl+F5**) or `dotnet run` as above.
+
+"Just My Code" (Tools → Options → Debugging → General) should stay on; with it off Visual Studio also stops inside framework code.
 
 ## 6. Operations commands
 

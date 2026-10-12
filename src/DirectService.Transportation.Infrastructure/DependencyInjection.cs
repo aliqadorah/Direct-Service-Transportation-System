@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DirectService.Transportation.Infrastructure;
 
@@ -57,7 +58,8 @@ public static class DependencyInjection
             .AddDefaultTokenProviders();
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(24)); // SEC-04
 
-        services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section));
+        services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section)).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<UrlTokenOptions>, UrlTokenOptionsValidator>();
         services.AddSingleton<IUrlTokenService, UrlTokenService>();
         services.AddScoped<INumberingService, NumberingService>();
         services.AddScoped<IMonthlyRateLock, MonthlyRateLock>();

@@ -13,6 +13,35 @@ public sealed class UrlTokenOptions
     public const string Section = "UrlTokens";
 
     public string Key { get; set; } = string.Empty;
+
+    /// <summary>What is wrong with a configured key, with how to set a correct one; null when the key is a base64 string of 32 bytes.</summary>
+    public static string? Problem(string? key)
+    {
+        string what;
+        if (string.IsNullOrWhiteSpace(key)) what = "UrlTokens:Key is not set.";
+        else
+        {
+            var bytes = new byte[key.Length];
+            if (!Convert.TryFromBase64String(key.Trim(), bytes, out var length)) what = "UrlTokens:Key is not valid base64.";
+            else if (length != 32) what = $"UrlTokens:Key is {length} bytes; it must be exactly 32 bytes (256 bits), which is 44 base64 characters ending in '='.";
+            else return null;
+        }
+        return what + " Create a key in PowerShell with "
+            + "$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b) "
+            + "(or in Git Bash: openssl rand -base64 32). Development: dotnet user-secrets set UrlTokens:Key \"<key>\" --project src/DirectService.Transportation.Web. "
+            + "Production: the environment variable UrlTokens__Key or the host's secret store. Never put it in appsettings.json. "
+            + "Keep the same key afterwards: changing it breaks every saved link. See docs/step9/Setup_and_Run.md section 4.";
+    }
+}
+
+/// <summary>Checks the key when the host starts (instead of failing the first request that needs a URL token).</summary>
+public sealed class UrlTokenOptionsValidator : IValidateOptions<UrlTokenOptions>
+{
+    public ValidateOptionsResult Validate(string? name, UrlTokenOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return UrlTokenOptions.Problem(options.Key) is { } problem ? ValidateOptionsResult.Fail(problem) : ValidateOptionsResult.Success;
+    }
 }
 
 /// <summary>
@@ -29,11 +58,8 @@ public sealed class UrlTokenService : IUrlTokenService
     public UrlTokenService(IOptions<UrlTokenOptions> options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (string.IsNullOrWhiteSpace(options.Value.Key))
-            throw new InvalidOperationException("UrlTokens:Key is not configured (base64, 32 bytes). Set it with dotnet user-secrets or an environment variable.");
-        _master = Convert.FromBase64String(options.Value.Key);
-        if (_master.Length != 32)
-            throw new InvalidOperationException("UrlTokens:Key must be 32 bytes (base64).");
+        if (UrlTokenOptions.Problem(options.Value.Key) is { } problem) throw new InvalidOperationException(problem);
+        _master = Convert.FromBase64String(options.Value.Key.Trim());
     }
 
     public string Encode<TEntity>(Guid publicId) => Encode(typeof(TEntity), publicId);
