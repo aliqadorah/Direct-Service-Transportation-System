@@ -62,6 +62,7 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
   border-radius: var(--r); padding: 0 var(--sp-5); color: var(--muted); font-size: var(--fs-md); background: var(--surface-filter); cursor: text; text-align: start;
 }
 .cmdk .kbd { margin-inline-start: auto; }
+.cmdk > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line; ellipsis when the bar is narrow */
 .bell { position: relative; }
 .bell .dot {
   position: absolute; top: 2px; inset-inline-end: 2px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--err); color: #fff;
@@ -122,6 +123,8 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
 .row { display: flex; gap: var(--sp-5); min-height: 0; }
 .cols { display: grid; gap: var(--sp-5); min-height: 0; }
 .stack { display: flex; flex-direction: column; gap: var(--sp-5); min-height: 0; }
+/* A group of fields never shrinks below its content (inside a scrolling form it would be squeezed until its rows overlap, SCR-74). */
+fieldset.stack, .stack > fieldset { flex-shrink: 0; }
 
 /* ============================================================ badges / status tags (icon + text, never colour alone — UX-05) */
 .badge { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); padding: 1px 7px; border-radius: var(--r); white-space: nowrap; line-height: 1.6; }
@@ -346,6 +349,16 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 .auth .brandside { background: var(--primary-dark); color: #DCE7E9; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; }
 .auth .brandside img { filter: brightness(0) invert(1); width: 44px; }
 .auth .formside { display: grid; place-items: center; padding: 32px; }
+/* Trips quick entry (SCR-10): one row on wide screens, two rows when the window is narrower, never squeezed pick lists.
+   Children in order: receipt, date, driver, customer, loading, unloading, material, loaded, unloaded, price, rate, save. */
+.qe-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; padding: 8px 10px; background: var(--surface-foot); border-bottom: 1px solid var(--border); }
+.qe-row > * { flex: 1 1 150px; min-width: 0; }
+.qe-row > :nth-child(1) { flex: 0 0 124px; }
+.qe-row > :nth-child(2) { flex: 0 0 148px; }
+.qe-row > :nth-child(3) { flex: 1 1 200px; }
+.qe-row > :nth-child(n+8) { flex: 0 0 100px; }
+.qe-row > :last-child { flex: 0 0 auto; }
+.qe-row .field > label, .qe-row .field > .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Help pages (D-18): a readable column of text. */
 .helpdoc, .hd-index, .hd-lead { max-width: 760px; line-height: var(--lh); }
 .helpdoc { display: flex; flex-direction: column; gap: var(--sp-6); font-size: var(--fs-md); }
@@ -358,6 +371,12 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 .hd-index li > a { font-weight: var(--fw-semibold); }
 .hd-index li > span { display: block; }
 .auth .card { width: 380px; max-width: 100%; display: flex; flex-direction: column; gap: var(--sp-7); }
+/* Two-step set-up (SCR-05): the QR code's SVG (fixed pixel size from the renderer) is scaled into its box. */
+.tfa-setup { display: flex; flex-direction: column; gap: var(--sp-4); font-size: var(--fs-md); line-height: var(--lh); }
+.tfa-setup p { margin: 0; }
+.tfa-qr { align-self: center; width: 176px; height: 176px; padding: 8px; box-sizing: border-box; background: #fff; border: 1px solid var(--border); border-radius: var(--r); }
+.tfa-qr svg { display: block; width: 100%; height: 100%; }
+.tfa-key { align-self: center; max-width: 100%; text-align: center; background: var(--page); border: 1px solid var(--border); border-radius: var(--r); padding: var(--sp-3) var(--sp-5); letter-spacing: .06em; overflow-wrap: anywhere; }
 
 /* ---- reduced motion */
 @media (prefers-reduced-motion: reduce) {
@@ -369,12 +388,6 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 .menu-toggle { display: none; }
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 200px minmax(0, 1fr); }
-/* Two-step set-up (SCR-05): the QR code's SVG (fixed pixel size from the renderer) is scaled into its box. */
-.tfa-setup { display: flex; flex-direction: column; gap: var(--sp-4); font-size: var(--fs-md); line-height: var(--lh); }
-.tfa-setup p { margin: 0; }
-.tfa-qr { align-self: center; width: 176px; height: 176px; padding: 8px; box-sizing: border-box; background: #fff; border: 1px solid var(--border); border-radius: var(--r); }
-.tfa-qr svg { display: block; width: 100%; height: 100%; }
-.tfa-key { align-self: center; max-width: 100%; text-align: center; background: var(--page); border: 1px solid var(--border); border-radius: var(--r); padding: var(--sp-3) var(--sp-5); letter-spacing: .06em; overflow-wrap: anywhere; }
   .side .foot { display: none; }
   .cmdk { width: auto; flex: 1; }
   .auth { grid-template-columns: 1fr; }

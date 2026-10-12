@@ -1,29 +1,8 @@
-import fs from "node:fs";
-import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
-import { firstSignIn, signIn, signUp, submitForm, type Account, type Lang } from "../support/auth";
-import { PASSWORD, STATE_FILE } from "../support/env";
-import { linkFromMail } from "../support/mail";
+import { expect, test } from "@playwright/test";
+import { firstSignIn, signUp, type Lang } from "../support/auth";
+import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
 import { button, field, toast } from "../support/ui";
-
-const STAFF_FILE = path.join(path.dirname(STATE_FILE), "staff.json");
-
-/** The platform staff account created by the operations command in global setup (DT-131): password set from the e-mailed link once. */
-async function staffSignIn(page: Page, lang: Lang): Promise<Account> {
-  if (fs.existsSync(STAFF_FILE)) {
-    const account = JSON.parse(fs.readFileSync(STAFF_FILE, "utf8")) as Account;
-    await signIn(page, account, lang);
-    return account;
-  }
-  await page.goto(await linkFromMail("staff@e2e.test", "PasswordReset"));
-  await page.locator('[name="Input.NewPassword"]').fill(PASSWORD);
-  await page.locator('[name="Input.ConfirmPassword"]').fill(PASSWORD);
-  await submitForm(page, "reset");
-  const account = await firstSignIn(page, { email: "staff@e2e.test", password: PASSWORD, key: "" }, lang);
-  fs.writeFileSync(STAFF_FILE, JSON.stringify(account));
-  return account;
-}
 
 /**
  * Platform staff and a tenant Owner (PRD 5.5, D-13, BR-014), in Arabic RTL and English: the console lists the tenant with its plan and

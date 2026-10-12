@@ -114,6 +114,7 @@ Signing in, signing out and the two-step pages move you to another page with Bla
 | UI component and page tests | `dotnet test --project tests/DirectService.Transportation.UI.Tests` | bUnit against a fake API |
 | E2E (Playwright) | `cd tests/e2e && npm ci && npx playwright test` | builds nothing: run `dotnet build` first. Recreates `DirectServiceMaster_E2E`, creates the staff account, starts the host on port 52301 with its own mail folder (`.local/e2e/mail`), uses the installed Edge. Report: `TestResults/e2e-report` |
 | Accessibility | `npx playwright test accessibility` (in `tests/e2e`) | axe-core WCAG 2.1 AA on every screen, AR and EN; findings in `TestResults/a11y-*.json` |
+| Visual layout | `npx playwright test visual` (in `tests/e2e`) | every screen, dialog, side panel and menu, AR and EN, at 1280 and 1366 px wide, compact and comfortable density: fails on overlapping text (text over text, or a picture/field over text), text cut off by its box, and sideways page scroll (`support/layout.ts`). Screenshots of every combination in `TestResults/visual/<lang>/<width>-<density>/`, problems in `TestResults/visual/problems-*.json`; `VISUAL_SHOTS=0` skips the screenshots. `visual-checker.spec.ts` proves the checker catches the two layouts reported on 12 Oct 2026 and stays quiet on dialogs, scrolled lists, ellipses, unit adornments and sticky totals. ~45 min |
 
 ## 8. Hosting notes (the provider and residency are deferred, DEF-01)
 

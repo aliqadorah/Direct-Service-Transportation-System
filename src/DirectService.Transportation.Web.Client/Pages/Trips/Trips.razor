@@ -34,7 +34,7 @@
 <section class="box" style="flex:none;position:relative;z-index:3" aria-label="@L["trip.quickEntry"]">
     <EditForm Model="_q" OnValidSubmit="Save" id="quick-entry">
         <ProblemValidator @ref="_problems" />
-        <div style="display:grid;grid-template-columns:116px 120px 1.4fr 1.3fr 1fr 1fr .9fr 88px 88px 88px 88px auto;gap:6px;align-items:start;padding:8px 10px;background:var(--surface-foot);border-bottom:1px solid var(--border)">
+        <div class="qe-row">
             <TextField @bind-Value="_q.ReceiptNo" Label="@L["trip.receiptNo"]" Required="true" Ltr="true" MaxLength="30" Id="qe-receipt" autofocus />
             <DateField @bind-Value="_q.TripDate" Label="@L["trip.date"]" Required="true" />
             <ComboField TValue="string?" @bind-Value="_q.DriverId" SearchAsync="Lookups.SearchDriversAsync" Selected="_driver" Label="@L["trip.driver"]" Required="true" OnSelected="DriverPicked" />
