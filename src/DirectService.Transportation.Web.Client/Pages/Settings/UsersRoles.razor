@@ -115,21 +115,28 @@
             <label for="role-name">@L["md.name"] <span class="req" aria-hidden="true">*</span></label>
             <input id="role-name" class="input" maxlength="50" @bind="_role.Name" @bind:event="oninput" disabled="@_role.Locked" />
         </div>
-        @foreach (var group in _permissions.GroupBy(p => p.Group))
-        {
-            <fieldset class="stack" style="gap:4px;border:1px solid var(--border);padding:8px">
-                <legend class="lbl">@group.Key</legend>
-                @foreach (var p in group)
-                {
-                    var perm = p;
-                    var held = Shell.Can(perm.Key);
-                    <label style="display:flex;gap:6px;align-items:flex-start">
-                        <input type="checkbox" checked="@_role.Permissions.Contains(perm.Key)" disabled="@(_role.Locked || !held)" @onchange="e => TogglePermission(perm.Key, e.Value is true)" />
-                        <span><bdi class="num muted">@perm.PrdName</bdi> @L.Pick(perm.DescriptionAr, perm.DescriptionEn) @if (!held) {<span class="muted">(@L["usr.notHeld"])</span>}</span>
-                    </label>
-                }
-            </fieldset>
-        }
+        @* Permissions by group (stored English group codes, DT-09, shown in the user's language): one row per key — checkbox, description,
+           key in small text — in a list that scrolls inside the dialog. *@
+        <div class="perm-list" role="group" aria-label="@L["usr.permissions"]" tabindex="0">
+            @foreach (var group in _permissions.GroupBy(p => p.Group))
+            {
+                <fieldset class="perm-group">
+                    <legend>@GroupName(group.Key)</legend>
+                    @foreach (var p in group)
+                    {
+                        var perm = p;
+                        var held = Shell.Can(perm.Key);
+                        <label class="perm-row">
+                            <input type="checkbox" checked="@_role.Permissions.Contains(perm.Key)" disabled="@(_role.Locked || !held)" @onchange="e => TogglePermission(perm.Key, e.Value is true)" />
+                            <span class="perm-text">
+                                <span>@L.Pick(perm.DescriptionAr, perm.DescriptionEn)@if (!held) {<span class="muted"> (@L["usr.notHeld"])</span>}</span>
+                                <bdi class="perm-key num" dir="ltr">@perm.PrdName</bdi>
+                            </span>
+                        </label>
+                    }
+                </fieldset>
+            }
+        </div>
         @if (_roleError is not null) {<Banner Tone="Tone.Err" Text="@_roleError" />}
     </ChildContent>
     <Footer>
@@ -289,6 +296,9 @@
         _roleError = null;
         _roleOpen = true;
     }
+
+    // A group code without a translation (added to the seed later) is shown as stored.
+    private string GroupName(string group) => UiText.All.ContainsKey("usr.grp." + group) ? L["usr.grp." + group] : group;
 
     private void TogglePermission(string key, bool on) { if (on) _role.Permissions.Add(key); else _role.Permissions.Remove(key); }
 

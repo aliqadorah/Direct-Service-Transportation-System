@@ -122,6 +122,7 @@ public static partial class UiText
         ["acct.setupLead"] = ("إلزامي لكل مستخدم.", "Required for every user."),
         ["acct.setupStep1"] = ("1. افتح تطبيق المصادقة (Microsoft أو Google Authenticator).", "1. Open your authenticator app (Microsoft or Google Authenticator)."),
         ["acct.setupStep2"] = ("2. امسح الرمز، أو أدخل المفتاح:", "2. Scan the code, or enter the key:"),
+        ["acct.setupStep3"] = ("3. اكتب الرمز المكوّن من 6 أرقام الذي يظهر في التطبيق:", "3. Type the 6-digit code the app shows:"),
         ["acct.setupQr"] = ("رمز QR لتطبيق المصادقة", "QR code for the authenticator app"),
         ["acct.setupSubmit"] = ("تأكيد وتفعيل", "Confirm and turn on"),
         ["acct.setupNote"] = ("لا يمكن تعطيل التحقق بخطوتين. يمكن لمسؤول المستخدمين إعادة تعيينه عند فقدان الهاتف.", "Two-step verification cannot be turned off. A user administrator can reset it if you lose your phone."),

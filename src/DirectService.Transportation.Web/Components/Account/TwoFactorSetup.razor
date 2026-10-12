@@ -31,13 +31,13 @@ else
                 <ProblemValidator @ref="_problems" />
                 @if (_setup is not null)
                 {
-                    <div style="display:flex;gap:14px;align-items:center">
-                        <div role="img" aria-label="@L["acct.setupQr"]" style="width:132px;height:132px;flex:none;background:#fff;border:1px solid var(--border)">@((MarkupString)Qr.Svg(_setup.AuthenticatorUri))</div>
-                        <div style="font-size:13px">
-                            <div>@L["acct.setupStep1"]</div>
-                            <div>@L["acct.setupStep2"]</div>
-                            <div class="num" dir="ltr" style="margin-top:4px;background:var(--page);padding:3px 6px;border-radius:var(--r);word-break:break-all">@Grouped(_setup.SharedKey)</div>
-                        </div>
+                    @* Stacked so nothing overlaps in either direction: steps, the QR code (its SVG scaled into a fixed box), the manual key, step 3. *@
+                    <div class="tfa-setup">
+                        <p>@L["acct.setupStep1"]</p>
+                        <p>@L["acct.setupStep2"]</p>
+                        <div class="tfa-qr" role="img" aria-label="@L["acct.setupQr"]">@((MarkupString)Qr.Svg(_setup.AuthenticatorUri))</div>
+                        <div class="tfa-key num" dir="ltr">@Grouped(_setup.SharedKey)</div>
+                        <p>@L["acct.setupStep3"]</p>
                     </div>
                 }
                 <TextField @bind-Value="Input.Code" Label="@L["acct.codeField"]" Ltr="true" Autocomplete="one-time-code" Required="true" MaxLength="7"

@@ -46,4 +46,27 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         cut.WaitForAssertion(() => Assert.Contains(L["usr.roleBeyondCaller"], cut.Markup));
         Assert.DoesNotContain(cut.FindAll(".dialog button"), b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Role_editor_lists_each_permission_as_its_own_row_under_a_translated_group()
+    {
+        // Owner feedback SCR-76: group headings in the user's language; each row = checkbox + description + key, inside a scrolling list.
+        Respond("roles/permissions", new[]
+        {
+            new PermissionItem(PermissionKeys.TripsView, "trips.view", "Trips", "عرض الرحلات", "View trips"),
+            new PermissionItem(PermissionKeys.UsersManage, "users.manage", "Administration", "إدارة المستخدمين", "Manage users"),
+        });
+        Respond("roles", Array.Empty<RoleResponse>());
+        Respond("users", new PagedResult<UserListItem>([], 1, 50, 0));
+        var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.newRole"], StringComparison.Ordinal)));
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.newRole"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".perm-list .perm-row").Count));
+        Assert.Equal(["الرحلات", "الإدارة"], cut.FindAll(".perm-group > legend").Select(l => l.TextContent.Trim()));
+        var row = cut.FindAll(".perm-row")[0];
+        Assert.NotNull(row.QuerySelector("input[type=checkbox]"));
+        Assert.Contains("عرض الرحلات", row.TextContent, StringComparison.Ordinal);
+        Assert.Equal("trips.view", row.QuerySelector(".perm-key")!.TextContent);
+        Assert.Equal("0", cut.Find(".perm-list").GetAttribute("tabindex"));   // keyboard users can scroll the list
+    }
 }
