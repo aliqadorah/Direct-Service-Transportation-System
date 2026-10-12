@@ -11,7 +11,7 @@
 @inject ToastService Toasts
 @inject NavigationManager Nav
 
-<PageHeader Title="@(_inv is null ? L["cn.new"] : L.F("cn.fromNumber", _inv.Invoice.Number ?? ""))"
+<PageHeader Help="credit-notes" Title="@(_inv is null ? L["cn.new"] : L.F("cn.fromNumber", _inv.Invoice.Number ?? ""))"
             Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"], NavModel.Href(Company, "credit-notes"))])">
     <Actions>
         @if (_inv is not null) {<Btn Primary="true" Text="@L["cn.approve"]" Busy="_saving" Disabled="!CanSave" OnClick="Save" />}

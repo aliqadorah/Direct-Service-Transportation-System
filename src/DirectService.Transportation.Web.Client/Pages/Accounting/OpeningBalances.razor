@@ -9,7 +9,7 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 
-<PageHeader Title="@L["acc.openings"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"], NavModel.Href(Company, "accounting/chart"))])">
+<PageHeader Help="setup" Title="@L["acc.openings"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"], NavModel.Href(Company, "accounting/chart"))])">
     <Actions>
         @if (CanEdit)
         {

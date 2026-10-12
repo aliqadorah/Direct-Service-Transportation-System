@@ -10,7 +10,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
-<PageHeader Title="@L["nav.driverAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"])])">
+<PageHeader Help="driver-accounts" Title="@L["nav.driverAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"])])">
     <Actions><Btn Icon="file" Text="@L["drv.advancesList"]" Href="@NavModel.Href(Company, "driver-accounts/advances")" /><Btn Icon="file" Text="@L["drv.settlementsList"]" Href="@NavModel.Href(Company, "driver-accounts/settlements")" /></Actions>
 </PageHeader>
 <div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">

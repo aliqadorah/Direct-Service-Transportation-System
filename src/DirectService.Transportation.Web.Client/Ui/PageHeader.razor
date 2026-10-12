@@ -1,4 +1,6 @@
-@* Page title with breadcrumbs, status badges and page actions (at the far end). The title is the page's h1. *@
+@* Page title with breadcrumbs, status badges and page actions (at the far end). The title is the page's h1. Help names the help page
+   (D-18, Help/HelpTopics.cs) of the flow this screen belongs to; its link comes first in the actions. *@
+@using DirectService.Transportation.Web.Client.Help
 <header class="ph">
     <div class="t">
         @if (Crumbs is { Count: > 0 })
@@ -7,13 +9,26 @@
         }
         <h1 tabindex="-1" id="page-title"><Tx Value="@Title" />@Badges</h1>
     </div>
-    @if (Actions is not null) {<div class="act">@Actions</div>}
+    @if (Actions is not null || HelpHref is not null)
+    {
+        <div class="act">
+            @if (HelpHref is not null && HelpTopics.Find(Help) is { } topic)
+            {
+                <Btn Ghost="true" Icon="info" Text="@L["help.link"]" Href="@HelpHref" AriaLabel="@L.F("help.linkTo", L.Pick(topic.Ar.Title, topic.En.Title))" />
+            }
+            @Actions
+        </div>
+    }
 </header>
 
 @code {
     [Inject] private Loc L { get; set; } = default!;
+    [Inject] private ShellState Shell { get; set; } = default!;
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public IReadOnlyList<Crumb>? Crumbs { get; set; }
     [Parameter] public RenderFragment? Badges { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string? Help { get; set; }
+
+    private string? HelpHref => Help is not null && Shell.Company is { } c && HelpTopics.Find(Help) is not null ? $"/c/{c.Id}/help/{Help}" : null;
 }

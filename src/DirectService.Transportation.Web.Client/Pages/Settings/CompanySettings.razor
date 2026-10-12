@@ -10,7 +10,7 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 
-<PageHeader Title="@L["nav.companySettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.companySettings"])])" />
+<PageHeader Help="setup" Title="@L["nav.companySettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.companySettings"])])" />
 <TabStrip Items="Tabs" Selected="@_tab" SelectedChanged="@(t => { _tab = t; _extra = null; })" Label="@L["nav.companySettings"]" />
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <ChildContent>

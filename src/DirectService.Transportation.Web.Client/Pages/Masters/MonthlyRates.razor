@@ -9,7 +9,7 @@
 @inject ToastService Toasts
 @inject UiJs Js
 
-<PageHeader Title="@L["nav.monthlyRates"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.monthlyRates"])])">
+<PageHeader Help="monthly-rates" Title="@L["nav.monthlyRates"]" Crumbs="@([new Crumb(L["nav.masterData"]), new Crumb(L["nav.monthlyRates"])])">
     <Actions>
         <Btn Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" Disabled="_month is null" />
         <Btn Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" Disabled="_month is null" />

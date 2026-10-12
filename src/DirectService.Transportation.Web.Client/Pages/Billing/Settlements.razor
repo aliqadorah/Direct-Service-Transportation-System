@@ -7,7 +7,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.Settlement"])" OnChange="Load" />
-<PageHeader Title="@L["drv.settlementsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.settlementsList"])])" />
+<PageHeader Help="driver-accounts" Title="@L["drv.settlementsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.settlementsList"])])" />
 <ListShell Label="@L["drv.settlementsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search"
            State="_state" Reference="@_reference" OnRetry="Load" EmptyIcon="file" EmptyTitle="@L["drv.noSettlements"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_q.Page" PageSize="_q.PageSize" Total="_page?.Page.TotalCount" OnPage="Go" OnPageSize="Size">

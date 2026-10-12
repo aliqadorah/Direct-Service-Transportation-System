@@ -11,7 +11,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.Receipt"])" OnChange="Load" />
-<PageHeader Title="@L["nav.receipts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"])])">
+<PageHeader Help="receipts" Title="@L["nav.receipts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.receipts"])])">
     <Actions>@if (Shell.Can(PermissionKeys.RcptManage)) {<Btn Primary="true" Icon="plus" Text="@L["nav.newReceipt"]" Href="@NavModel.Href(Company, "receipts/new")" />}</Actions>
 </PageHeader>
 

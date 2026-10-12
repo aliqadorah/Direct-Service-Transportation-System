@@ -16,7 +16,7 @@
     <Empty><NotFoundView /></Empty>
     <ChildContent>
         @{ var inv = _d!.Invoice; var draft = inv.Status == InvoiceCodes.Draft; var isVoid = inv.Status == InvoiceCodes.Void; }
-        <PageHeader Title="@(inv.Number ?? L.F("inv.draftOf", inv.Customer.Name))" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
+        <PageHeader Help="invoicing" Title="@(inv.Number ?? L.F("inv.draftOf", inv.Customer.Name))" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
             <Badges>
                 <StatusTag Status="@BillingStatus.Invoice(inv.PaymentState)" />
                 @if (!draft && !isVoid) {<StatusTag Status="@BillingStatus.EInvoice(inv.EInvoiceStatus)" />}

@@ -346,6 +346,17 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 .auth .brandside { background: var(--primary-dark); color: #DCE7E9; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; }
 .auth .brandside img { filter: brightness(0) invert(1); width: 44px; }
 .auth .formside { display: grid; place-items: center; padding: 32px; }
+/* Help pages (D-18): a readable column of text. */
+.helpdoc, .hd-index, .hd-lead { max-width: 760px; line-height: var(--lh); }
+.helpdoc { display: flex; flex-direction: column; gap: var(--sp-6); font-size: var(--fs-md); }
+.helpdoc p { margin: 0; }
+.helpdoc h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0 0 var(--sp-3); }
+.helpdoc ol, .helpdoc ul { margin: 0; padding-inline-start: 1.5em; display: flex; flex-direction: column; gap: var(--sp-3); }
+.hd-links { list-style: none; padding: 0 !important; flex-direction: row !important; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6) !important; }
+.hd-ref { font-size: var(--fs-sm); }
+.hd-index { margin: 0; padding-inline-start: 1.5em; display: flex; flex-direction: column; gap: var(--sp-5); font-size: var(--fs-md); }
+.hd-index li > a { font-weight: var(--fw-semibold); }
+.hd-index li > span { display: block; }
 .auth .card { width: 380px; max-width: 100%; display: flex; flex-direction: column; gap: var(--sp-7); }
 
 /* ---- reduced motion */

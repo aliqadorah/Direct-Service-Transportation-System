@@ -110,7 +110,7 @@ DT-152 … DT-158 (step 8: support-session companies, data-export package, live 
 | Legal check of anonymisation and keeping the audit log (SEC-19, DT-134) | Owner |
 | Terms of Service / Privacy texts (G-20) | Placeholders "draft-1" |
 | Reference data set and reconciliation after a reference month (TST-08, TST-11) | Needs the owner's reference month |
-| Help pages (D-18) | Planned at the end |
+| ~~Help pages (D-18)~~ | Done 12 Oct 2026: in-app help page per PRD 9.1–9.14 in Arabic and English, linked from the screens (DT-166) |
 
 ## 6. Traceability
 

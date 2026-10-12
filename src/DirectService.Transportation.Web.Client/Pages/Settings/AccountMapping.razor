@@ -9,7 +9,7 @@
 @inject ToastService Toasts
 @inject AccountingLookups Lookups
 
-<PageHeader Title="@L["nav.mapping"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.mapping"])])" />
+<PageHeader Help="setup" Title="@L["nav.mapping"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.mapping"])])" />
 <PostingBanner @key="_bannerVersion" />
 <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
     <Empty>

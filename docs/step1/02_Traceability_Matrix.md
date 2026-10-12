@@ -607,4 +607,4 @@ Section 8.9 validation rules are covered by FR-002, FR-152, FR-157, FR-158, FR-0
 | ASM-01…14 | Confirmed values | Used as constants/settings (trial 14 d, grace 7 d, 30 d, 90 d, invitation 7 d, targets) | — |
 | DEF-01…02 | Deferred decisions | Provider-neutral interfaces (A-13, A-14) | — |
 
-> Note on REL-10 (user guide and help pages, Arabic and English): the PRD lists it as a go-live readiness item, not a functional requirement, and the build prompt's deliverables do not include it. Please tell me whether help pages are in the build scope.
+> Note on REL-10 (user guide and help pages, Arabic and English): the PRD lists it as a go-live readiness item, not a functional requirement, and the build prompt's deliverables do not include it. Please tell me whether help pages are in the build scope. **Decided D-18 (in scope); done 12 Oct 2026** — in-app help pages per PRD 9.1–9.14, Arabic and English (`Web.Client/Help/HelpTopics.cs`, DT-166).

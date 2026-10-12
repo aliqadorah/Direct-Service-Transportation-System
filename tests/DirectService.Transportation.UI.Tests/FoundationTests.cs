@@ -145,6 +145,41 @@ public sealed class FoundationTests
     }
 
     [Fact]
+    public void Help_pages_cover_every_Section_9_flow_in_both_languages()
+    {
+        var topics = Web.Client.Help.HelpTopics.All;
+        Assert.Equal(Enumerable.Range(1, 14).Select(i => $"9.{i}"), topics.Select(t => t.Prd));
+        Assert.Equal(topics.Count, topics.Select(t => t.Key).Distinct().Count());
+        Assert.All(topics, t =>
+        {
+            Assert.Equal(t.Ar.Steps.Count, t.En.Steps.Count);
+            Assert.Equal(t.Ar.Problems.Count, t.En.Problems.Count);
+            Assert.All(new[] { t.Ar.Title, t.Ar.Summary, t.Ar.Who, t.En.Title, t.En.Summary, t.En.Who }.Concat(t.Ar.Steps).Concat(t.En.Steps),
+                s => Assert.False(string.IsNullOrWhiteSpace(s), t.Key));
+            Assert.NotEmpty(t.Screens);
+            Assert.All(t.Screens, s => Assert.True(UiText.All.ContainsKey(s.LabelKey), $"{t.Key}: {s.LabelKey}"));
+        });
+    }
+
+    [Fact]
+    public void Screens_link_only_to_existing_help_pages()
+    {
+        var root = FindRepoRoot();
+        var pages = Directory.EnumerateFiles(Path.Combine(root, "src", "DirectService.Transportation.Web.Client", "Pages"), "*.razor", SearchOption.AllDirectories);
+        var helped = pages.Where(p => File.ReadAllText(p).Contains("<PageHeader Help=", StringComparison.Ordinal)).ToList();
+        Assert.True(helped.Count >= 30, $"{helped.Count} screens link to help");
+        foreach (var page in helped)
+        {
+            var attr = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(page), "<PageHeader Help=\"(@\\([^)]*\\)|[^\"]*)\"").Groups[1].Value;
+            var keys = attr.StartsWith('@')
+                ? System.Text.RegularExpressions.Regex.Matches(attr, "\"([a-z-]+)\"").Select(m => m.Groups[1].Value).ToList()
+                : [attr];
+            Assert.NotEmpty(keys);
+            Assert.All(keys, k => Assert.True(Web.Client.Help.HelpTopics.Find(k) is not null, $"{Path.GetFileName(page)}: {k}"));
+        }
+    }
+
+    [Fact]
     public void Every_permission_group_of_the_seed_has_its_heading_in_both_languages()
     {
         // Role editor (owner feedback SCR-76): the stored English group codes (DT-09) are shown through usr.grp.<code>.

@@ -16,7 +16,7 @@
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        <PageHeader Title="@(_existing is null ? L["drv.newAdvance"] : L.F("drv.editAdvance", _existing.Number))"
+        <PageHeader Help="driver-accounts" Title="@(_existing is null ? L["drv.newAdvance"] : L.F("drv.editAdvance", _existing.Number))"
                     Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts"))])">
             <Actions>
                 <Btn Icon="print" Text="@L["drv.savePrintVoucher"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />

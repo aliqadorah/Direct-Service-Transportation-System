@@ -12,7 +12,7 @@
 @inject MoneyAccounts Accounts
 @inject NavigationManager Nav
 
-<PageHeader Title="@L["prt.newPayment"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
+<PageHeader Help="partner-payments" Title="@L["prt.newPayment"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
     <Actions>
         <Btn Icon="print" Text="@L["cash.savePrint"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
         <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />

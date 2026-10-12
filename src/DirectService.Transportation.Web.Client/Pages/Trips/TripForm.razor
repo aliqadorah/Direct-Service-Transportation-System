@@ -21,7 +21,7 @@
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        <PageHeader Title="@(_trip?.ReceiptNo ?? L["nav.newTrip"])" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips/list"))])">
+        <PageHeader Help="@(Id is null ? "quick-entry" : "trip-edit")" Title="@(_trip?.ReceiptNo ?? L["nav.newTrip"])" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips/list"))])">
             <Badges>@if (_trip is not null) {<TripTags Trip="_trip" />}</Badges>
             <Actions>
                 @if (_trip is not null && _trip.Status != "Void")

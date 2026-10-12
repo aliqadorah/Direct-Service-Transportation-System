@@ -15,7 +15,7 @@
     <Empty><NotFoundView /></Empty>
     <ChildContent>
         @{ var cn = _d!.CreditNote; var isVoid = cn.Status == "Void"; }
-        <PageHeader Title="@cn.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"], NavModel.Href(Company, "credit-notes"))])">
+        <PageHeader Help="credit-notes" Title="@cn.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"], NavModel.Href(Company, "credit-notes"))])">
             <Badges>
                 <StatusTag Status="@BillingStatus.Document(cn.Status)" />
                 @if (!isVoid) {<StatusTag Status="@BillingStatus.EInvoice(cn.EInvoiceStatus)" />}

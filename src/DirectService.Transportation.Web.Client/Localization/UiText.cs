@@ -648,6 +648,17 @@ public static partial class UiText
         ["nav.supportAccess"] = ("وصول الدعم", "Support access"),
         ["nav.announcements"] = ("الإعلانات", "Announcements"),
         ["nav.health"] = ("صحة المنصة", "Platform health"),
+        ["nav.help"] = ("المساعدة", "Help"),
+        // ---- help pages (D-18, REL-10)
+        ["help.title"] = ("المساعدة", "Help"),
+        ["help.lead"] = ("صفحة قصيرة لكل عملية رئيسية: الخطوات، ومن يستطيع تنفيذها، وماذا تفعل إذا لم تسر كما يجب.", "A short page per main task: the steps, who can do it, and what to do when it does not go as expected."),
+        ["help.link"] = ("المساعدة", "Help"),
+        ["help.linkTo"] = ("المساعدة: {0}", "Help: {0}"),
+        ["help.who"] = ("من يستطيع:", "Who can do it:"),
+        ["help.steps"] = ("الخطوات", "Steps"),
+        ["help.problems"] = ("إذا لم تسر الأمور كما يجب", "If something goes wrong"),
+        ["help.screens"] = ("الشاشات", "Screens"),
+        ["help.prd"] = ("المرجع: وثيقة المتطلبات، التدفق {0}", "Reference: requirements document, flow {0}"),
 
         // ---- status tags (UX-05: icon + text)
         ["st.unbilled"] = ("غير مفوترة", "Unbilled"),

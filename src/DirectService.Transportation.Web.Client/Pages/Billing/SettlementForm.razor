@@ -15,7 +15,7 @@
     <Empty><NotFoundView /></Empty>
     <ChildContent>
         @{ var p = _p!; }
-        <PageHeader Title="@L.F("drv.newSettlementFor", p.Driver.Name)"
+        <PageHeader Help="driver-accounts" Title="@L.F("drv.newSettlementFor", p.Driver.Name)"
                     Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(p.Driver.Name, NavModel.Href(Company, $"driver-accounts/{DriverId}"))])">
             <Actions><Btn Primary="true" Text="@L["drv.confirmSettlement"]" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
         </PageHeader>

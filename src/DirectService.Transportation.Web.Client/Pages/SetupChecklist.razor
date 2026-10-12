@@ -8,7 +8,7 @@
 @inject ToastService Toasts
 @inject NavigationManager Nav
 
-<PageHeader Title="@L["setup.title"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
+<PageHeader Help="setup" Title="@L["setup.title"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
     <Actions>@if (Shell.Can(PermissionKeys.TenantManage)) {<Btn Icon="building" Text="@L["setup.demo"]" Busy="_demoBusy" OnClick="Demo" />}</Actions>
 </PageHeader>
 

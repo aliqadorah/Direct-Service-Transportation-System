@@ -10,7 +10,7 @@
 @inject ToastService Toasts
 @inject FormConfig Forms
 
-<PageHeader Title="@L["nav.fields"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.fields"])])">
+<PageHeader Help="fields" Title="@L["nav.fields"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.fields"])])">
     <Actions>
         <Btn Icon="plus" Text="@L["fld.newCustom"]" OnClick="() => EditCustom(null)" />
         <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="SaveStandard" />

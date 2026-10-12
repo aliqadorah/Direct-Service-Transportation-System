@@ -13,7 +13,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.EInvoiceSubmission", "TRN.Invoice"])" OnChange="Load" />
-<PageHeader Title="@L["nav.einvoicing"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.einvoicing"])])">
+<PageHeader Help="e-invoicing" Title="@L["nav.einvoicing"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.einvoicing"])])">
     <Badges>@if (_settings is { } s) {<Badge Tone="@(s.IsEnabled ? Tone.Info : Tone.Mute)" Text="@(s.IsEnabled ? L["ei.env" + s.Environment] : L["ei.off"])" />}</Badges>
     <Actions>
         @if (Shell.Can(PermissionKeys.InvIssue)) {<Btn Icon="send" Text="@L.F("ei.submitSelected", _selected.Count)" Disabled="_selected.Count == 0" Busy="_busy" OnClick="SubmitSelected" />}

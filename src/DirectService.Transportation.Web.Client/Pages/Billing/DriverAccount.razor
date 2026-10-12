@@ -15,7 +15,7 @@
     <Empty><NotFoundView /></Empty>
     <ChildContent>
         @{ var a = _a!; var last = a.Settlements.Where(s => s.Status != "Void").OrderByDescending(s => s.SettlementDate).FirstOrDefault(); }
-        <PageHeader Title="@a.Driver.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts"))])">
+        <PageHeader Help="driver-accounts" Title="@a.Driver.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts"))])">
             <Badges>@if (a.TruckPlate is not null) {<Badge Tone="Tone.Mute" Text="@a.TruckPlate" />}</Badges>
             <Actions>
                 <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />

@@ -11,7 +11,7 @@
 @inject Loc L
 @inject ToastService Toasts
 
-<PageHeader Title="@L["nav.tripImport"]" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips"))])" />
+<PageHeader Help="trip-import" Title="@L["nav.tripImport"]" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips"))])" />
 
 <ol class="row" style="list-style:none;margin:0;padding:0;gap:6px;flex:none" aria-label="@L["imp.steps"]">
     @foreach (var (n, key) in new[] { (1, "imp.file"), (2, "imp.columns"), (3, "imp.preview"), (4, "imp.import") })

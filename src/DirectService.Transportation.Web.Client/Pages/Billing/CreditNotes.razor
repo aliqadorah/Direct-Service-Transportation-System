@@ -12,7 +12,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.CreditNote"])" OnChange="Load" />
-<PageHeader Title="@L["nav.creditNotes"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"])])">
+<PageHeader Help="credit-notes" Title="@L["nav.creditNotes"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.creditNotes"])])">
     <Actions>
         <Btn Icon="send" Text="@L["cn.waiting"]" Href="@NavModel.Href(Company, "e-invoicing?type=CreditNote&status=Queued")" />
         @if (Shell.Can(PermissionKeys.InvIssue)) {<Btn Primary="true" Icon="plus" Text="@L["cn.fromInvoice"]" Href="@NavModel.Href(Company, "credit-notes/new")" />}

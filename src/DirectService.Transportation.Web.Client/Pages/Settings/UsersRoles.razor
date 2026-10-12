@@ -10,7 +10,7 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 
-<PageHeader Title="@L["nav.users"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.users"])])">
+<PageHeader Help="setup" Title="@L["nav.users"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.users"])])">
     <Actions>
         <Btn Icon="mail" Text="@L["usr.invite"]" OnClick="() => { _inviteEmail = null; _inviteRole = null; _inviteError = null; _inviting = true; }" />
         <Btn Primary="true" Icon="plus" Text="@L["usr.newRole"]" OnClick="() => EditRole(null)" />

@@ -8,7 +8,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.PartnerPayment"])" OnChange="Load" />
-<PageHeader Title="@L["prt.paymentsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts")), new Crumb(L["prt.paymentsList"])])">
+<PageHeader Help="partner-payments" Title="@L["prt.paymentsList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts")), new Crumb(L["prt.paymentsList"])])">
     <Actions>@if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="plus" Text="@L["prt.newPayment"]" Href="@NavModel.Href(Company, "partner-accounts/payments/new")" />}</Actions>
 </PageHeader>
 <ListShell Label="@L["prt.paymentsList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export"

@@ -8,7 +8,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.Advance"])" OnChange="Load" />
-<PageHeader Title="@L["drv.advancesList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.advancesList"])])">
+<PageHeader Help="driver-accounts" Title="@L["drv.advancesList"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(L["drv.advancesList"])])">
     <Actions>@if (Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Primary="true" Icon="plus" Text="@L["drv.newAdvance"]" Href="@NavModel.Href(Company, "driver-accounts/advances/new")" />}</Actions>
 </PageHeader>
 <ListShell Label="@L["drv.advancesList"]" Views="Views" View="@_view" ViewChanged="SetView" Search="@_q.Q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export"

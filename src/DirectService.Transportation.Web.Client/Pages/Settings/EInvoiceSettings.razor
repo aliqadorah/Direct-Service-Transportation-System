@@ -8,7 +8,7 @@
 @inject Loc L
 @inject ToastService Toasts
 
-<PageHeader Title="@L["nav.einvoiceSettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.einvoiceSettings"])])" />
+<PageHeader Help="e-invoicing" Title="@L["nav.einvoiceSettings"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.einvoiceSettings"])])" />
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <ChildContent>
         <EditForm EditContext="_ctx" OnValidSubmit="Save" class="box pad stack" style="max-width:900px">

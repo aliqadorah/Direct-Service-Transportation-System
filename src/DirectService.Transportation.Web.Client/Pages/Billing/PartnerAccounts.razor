@@ -7,7 +7,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
-<PageHeader Title="@L["nav.partnerAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"])])">
+<PageHeader Help="partner-payments" Title="@L["nav.partnerAccounts"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"])])">
     <Actions><Btn Icon="file" Text="@L["prt.paymentsList"]" Href="@NavModel.Href(Company, "partner-accounts/payments")" /></Actions>
 </PageHeader>
 <div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">

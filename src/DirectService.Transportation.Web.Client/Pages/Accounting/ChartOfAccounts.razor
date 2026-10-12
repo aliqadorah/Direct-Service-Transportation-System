@@ -12,7 +12,7 @@
 @inject Downloads Files
 @inject AccountingLookups Lookups
 
-<PageHeader Title="@L["nav.chart"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"])])">
+<PageHeader Help="setup" Title="@L["nav.chart"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.chart"])])">
     <Actions>
         @if (CanSetup) {<Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "accounting/chart/import")" />}
         <Btn Icon="export" Text="@L["ui.export"]" OnClick="@(() => Files.SaveAsync(Api.C("accounting/accounts/export")))" />

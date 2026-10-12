@@ -19,7 +19,7 @@
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        <PageHeader Title="@Title" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
+        <PageHeader Help="invoicing" Title="@Title" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"], NavModel.Href(Company, "invoices"))])">
             <Badges>@if (_draft is not null) {<StatusTag Status="draft" />}</Badges>
             <Actions>
                 @if (_calc?.ApprovalRequired == true)

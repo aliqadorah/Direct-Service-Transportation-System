@@ -16,7 +16,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.Trip"])" OnChange="LoadRecent" />
-<PageHeader Title="@L["nav.trips"]" Crumbs="@([new Crumb(L["nav.operations"])])">
+<PageHeader Help="quick-entry" Title="@L["nav.trips"]" Crumbs="@([new Crumb(L["nav.operations"])])">
     <Actions>
         <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "trips/import")" />
         <Btn Icon="file" Text="@L["trip.fullForm"]" Href="@NavModel.Href(Company, "trips/new")" />

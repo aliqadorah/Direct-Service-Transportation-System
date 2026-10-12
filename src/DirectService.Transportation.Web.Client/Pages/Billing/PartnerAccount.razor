@@ -13,7 +13,7 @@
     <Empty><NotFoundView /></Empty>
     <ChildContent>
         @{ var a = _a!; }
-        <PageHeader Title="@a.Partner.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
+        <PageHeader Help="partner-payments" Title="@a.Partner.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
             <Actions>
                 <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />
                 @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="cash" Text="@L["prt.payment"]" Href="@NavModel.Href(Company, $"partner-accounts/{Id}/pay")" Disabled="@(a.BalanceDue <= 0)" />}

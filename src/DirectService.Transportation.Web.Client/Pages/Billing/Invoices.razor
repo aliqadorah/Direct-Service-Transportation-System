@@ -12,7 +12,7 @@
 @inject NavigationManager Nav
 
 <LiveRefresh EntityTypes="@(["TRN.Invoice"])" OnChange="Load" />
-<PageHeader Title="@L["nav.invoices"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"])])">
+<PageHeader Help="invoicing" Title="@L["nav.invoices"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.invoices"])])">
     <Actions>
         @if (Shell.Can(PermissionKeys.InvIssue))
         {

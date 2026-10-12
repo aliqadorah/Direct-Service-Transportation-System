@@ -95,6 +95,7 @@ public static class NavModel
             new("nav.dataExport", "/tenant/export", PermissionKeys.TenantManage),
             new("nav.supportApprovals", "/tenant/support-access", PermissionKeys.TenantManage),
         ], PermissionKeys.TenantManage),
+        new("nav.help", "info", "help", []),   // D-18 help pages, for every member
     ];
 
     /// <summary>Provider console menu (separate shell, DT-66).</summary>
