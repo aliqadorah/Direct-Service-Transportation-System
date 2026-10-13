@@ -35,6 +35,7 @@
             <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));flex:none">
                 <Box Title="@L.F("ten.currentPlan", L.Pick(s.Plan.NameAr, s.Plan.NameEn), L["ten.cycle." + s.BillingCycle])">
                     <KeyValues Columns="2" Items="@Facts(s)" />
+                    <p class="help" style="margin:6px 0 0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate))</p>
                 </Box>
                 <Box Title="@L["ten.usage"]">
                     <div class="stack" style="gap:8px">
@@ -78,7 +79,7 @@
                     </Columns>
                 </DataGrid>
                 }
-                <p class="pad help" style="margin:0">@L["ten.plansHelp"]</p>
+                <p class="pad help" style="margin:0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate)) @L["ten.plansHelp"]</p>
             </Box>
             <Box Title="@L["ten.invoices"]" NoPad="true" Fill="true">
                 @if (_invoices.Count == 0)
@@ -92,9 +93,8 @@
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.date"]" Value="i => Fmt.Date(i.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.period"]" Value="@(i => Fmt.Date(i.PeriodStart, Shell.DateFormat) + " – " + Fmt.Date(i.PeriodEnd, Shell.DateFormat))" Ltr="true" />
-                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.amount"]" Value="i => Fmt.Money(i.Amount)" Numeric="true" />
-                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.tax"]" Value="i => Fmt.Money(i.Tax)" Numeric="true" />
-                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
+                            @* Tenants see only the final, tax-inclusive amount (owner decision 13 Oct 2026); the printout shows the tax inside it. *@
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.amount"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@InvoiceStatus(context.Status)" /></Template></GridColumn>
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
                                 <Template>
@@ -103,6 +103,7 @@
                             </GridColumn>
                         </Columns>
                     </DataGrid>
+                    <p class="pad help" style="margin:0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate))</p>
                 }
             </Box>
         }

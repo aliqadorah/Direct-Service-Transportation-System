@@ -147,7 +147,9 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Contains(sub.Plans, p => p.Id == basic.Id);
         var checkout = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(basic.Id)));
         Assert.StartsWith("SUB-", checkout.Invoice.Number, StringComparison.Ordinal);
-        Assert.Equal(58.000m, checkout.Invoice.Total);                     // 50 + 16 % tax
+        // Plan fees are tax-inclusive (owner decision 13 Oct 2026): the total is the fee; net and tax derived from it, adding up exactly.
+        Assert.Equal((50.000m, 43.103m, 6.897m), (checkout.Invoice.Total, checkout.Invoice.Amount, checkout.Invoice.Tax));
+        Assert.Equal(16m, sub.Plans.Single(p => p.Id == basic.Id).TaxRate);
         Assert.StartsWith("https://pay.test/checkout/", checkout.PaymentUrl, StringComparison.Ordinal);
 
         // A new checkout replaces the unpaid one: paying the old page later changes nothing (review F2).
@@ -172,10 +174,12 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal("Paid", Assert.Single(invoices).Status);
         var html = await (await owner.Client.GetAsync($"/api/v1/tenant/subscription/invoices/{invoices[0].Id}/print?format=html")).Content.ReadAsStringAsync();
         Assert.Contains(checkout.Invoice.Number, html, StringComparison.Ordinal);
+        Assert.Contains("Price includes 16% sales tax", html, StringComparison.Ordinal);
 
-        // Upgrade now, pro-rated (at most the price difference plus tax).
+        // Upgrade now, pro-rated (at most the price difference, tax included).
         var upgrade = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(pro.Id)));
-        Assert.InRange(upgrade.Invoice.Amount, 0.001m, 50m);
+        Assert.InRange(upgrade.Invoice.Total, 0.001m, 50m);
+        Assert.Equal(upgrade.Invoice.Total, upgrade.Invoice.Amount + upgrade.Invoice.Tax);
         await (await WebhookAsync(upgrade.Invoice, "succeeded", pro.Code, kind: "upgrade")).EnsureOkAsync();
         Assert.Equal(pro.Id, (await ReadAsync<SubscriptionResponse>(await owner.Client.GetAsync("/api/v1/tenant/subscription"))).Plan.Id);
         Assert.Equal("subscription.notUpgrade", await (await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(basic.Id))).ProblemCodeAsync());
@@ -199,6 +203,7 @@ public sealed class PlatformTests(ApiFactory f)
             new ApplyCreditRequest(again.Invoice.Id, 1.160m, "Goodwill")));
         Assert.Equal(again.Invoice.Total - 1.160m, credited.Total);
         Assert.Equal(credited.Total, credited.Amount + credited.Tax);
+        Assert.Equal(Math.Round(credited.Total / 1.16m, 3, MidpointRounding.AwayFromZero), credited.Amount);   // still tax-inclusive
         var log = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.Action == "Credit" && a.EntityType == "CORE.SubscriptionInvoice"));
         Assert.True(log);
     }

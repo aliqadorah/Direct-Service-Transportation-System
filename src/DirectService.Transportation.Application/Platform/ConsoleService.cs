@@ -163,8 +163,8 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     }
 
     /// <summary>
-    /// A credit reduces only the invoice it is applied to (D-11): the full amount marks it Credited; a part lowers its amount and tax in
-    /// proportion (Total = Amount + Tax kept).
+    /// A credit reduces only the invoice it is applied to (D-11): the full amount marks it Credited; a part lowers its total, and the net
+    /// amount and tax are derived from the new total (tax-inclusive, Total = Amount + Tax kept).
     /// </summary>
     public async Task<SubscriptionInvoiceResponse> CreditAsync(string token, ApplyCreditRequest r, CancellationToken ct)
     {
@@ -184,10 +184,9 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         }
         else
         {
+            // The lower total stays tax-inclusive: net and tax derived from it again (owner decision 13 Oct 2026).
             var total = invoice.Total - credit;
-            var tax = Accounting.Money.Round(invoice.Tax * total / invoice.Total, decimals);
-            invoice.Tax = tax;
-            invoice.Amount = total - tax;
+            (invoice.Amount, invoice.Tax) = BillingService.Split(total, options.Value.TaxRate, decimals);
             invoice.Total = total;
         }
         changes.SetAction(invoice, "Credit", why + " · " + Accounting.Money.Format(credit));

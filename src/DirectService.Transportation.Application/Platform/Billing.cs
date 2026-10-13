@@ -145,7 +145,8 @@ public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider 
 }
 
 /// <summary>
-/// Subscription invoices (5.3, P-04, P-05): numbered platform-wide (SUB-), tax at the provider's rate rounded half-up, paid through the
+/// Subscription invoices (5.3, P-04, P-05): numbered platform-wide (SUB-), the plan fee tax-inclusive (net and tax derived from it at the
+/// provider's rate, owner decision 13 Oct 2026), paid through the
 /// gateway; a paid invoice starts or extends the tenant's period and restores full access at once (BR-011).
 /// </summary>
 public sealed class BillingService(IAppDbContext db, IPlatformNumbers numbers, IPaymentGateway gateway, IOptions<PlatformOptions> options, IChangeContext changes,
@@ -153,17 +154,29 @@ public sealed class BillingService(IAppDbContext db, IPlatformNumbers numbers, I
 {
     private PlatformOptions O => options.Value;
 
+    /// <summary>
+    /// Plan fees are tax-inclusive (owner decision 13 Oct 2026): the fee is what the tenant pays. Net and tax are derived backwards from
+    /// it at <paramref name="rate"/> percent — net = round(gross ÷ (1 + rate)), tax = gross − net — so net + tax = gross exactly.
+    /// </summary>
+    public static (decimal Net, decimal Tax) Split(decimal gross, decimal rate, int decimals)
+    {
+        var total = Money.Round(Math.Max(0, gross), decimals);
+        var net = Money.Round(total / (1m + rate / 100m), decimals);
+        return (net, total - net);
+    }
+
+    /// <summary>An invoice whose total is <paramref name="amount"/> (a tax-inclusive fee or pro-rated part of one), with net and tax inside it.</summary>
     public async Task<SubscriptionInvoice> CreateInvoiceAsync(Tenant tenant, decimal amount, DateOnly start, DateOnly end, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(tenant);
-        var net = Money.Round(Math.Max(0, amount), O.CurrencyDecimals);
-        var tax = Money.Round(net * O.TaxRate / 100m, O.CurrencyDecimals);
+        var total = Money.Round(Math.Max(0, amount), O.CurrencyDecimals);
+        var (net, tax) = Split(total, O.TaxRate, O.CurrencyDecimals);
         return await db.InTransactionAsync(async c =>
         {
             var invoice = new SubscriptionInvoice
             {
                 TenantId = tenant.Id, Number = await numbers.NextSubscriptionInvoiceAsync(c).ConfigureAwait(false), PeriodStart = start, PeriodEnd = end < start ? start : end,
-                Amount = net, Tax = tax, Total = net + tax, Status = LifecycleCodes.Due,
+                Amount = net, Tax = tax, Total = total, Status = LifecycleCodes.Due,
             };
             db.Set<SubscriptionInvoice>().Add(invoice);
             await db.SaveChangesAsync(c).ConfigureAwait(false);

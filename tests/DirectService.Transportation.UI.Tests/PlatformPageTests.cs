@@ -14,7 +14,7 @@ namespace DirectService.Transportation.UI.Tests;
 /// <summary>Tenant screens (SCR-80 … SCR-83), the provider console (SCR-90 … SCR-94) and the shell banners, against a fake API.</summary>
 public sealed class PlatformPageTests : PageTestBase
 {
-    private static readonly PlanResponse Pro = new("pl2", "PRO", "احترافية", "Professional", 180, "Monthly", 3, 25, 5000, 2048, true, 4, "A");
+    private static readonly PlanResponse Pro = new("pl2", "PRO", "احترافية", "Professional", 180, "Monthly", 3, 25, 5000, 2048, true, 4, "A", 16m);
     private static readonly PlanResponse Basic = new("pl1", "BASIC", "أساسية", "Basic", 90, "Monthly", 1, 10, 1000, 1024, true, 7, "A");
     private static readonly PlanResponse Enterprise = new("pl3", "ENT", "مؤسسات", "Enterprise", 1900, "Annual", 10, 100, 30000, 10240, true, 1, "A");
     private static readonly UsageResponse Usage = new(2, 3, 18, 25, 412, 5000, 640, 2048);
@@ -26,7 +26,7 @@ public sealed class PlatformPageTests : PageTestBase
 
     private void Subscription(string status)
     {
-        Respond("/tenant/subscription/invoices", new[] { new SubscriptionInvoiceResponse("si1", "SUB-000010", new(2026, 10, 1), new(2026, 10, 31), 180, 28.8m, 208.8m, "Paid", null, null, DateTime.UtcNow) });
+        Respond("/tenant/subscription/invoices", new[] { new SubscriptionInvoiceResponse("si1", "SUB-000010", new(2026, 10, 1), new(2026, 10, 31), 155.172m, 24.828m, 180m, "Paid", null, null, DateTime.UtcNow) });
         Respond("/tenant/subscription", new SubscriptionResponse(status, Pro, "Monthly", null, DateTime.UtcNow.AddDays(20), null, null, Usage, [Basic, Pro, Enterprise]));
     }
 
@@ -40,6 +40,32 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Contains(L["ten.current"], cut.Markup);
         Assert.Contains(L["ten.downgrade"], cut.Markup);   // Basic: cheaper, same cycle
         Assert.Contains(L["ten.upgrade"], cut.Markup);     // Enterprise: other cycle → checkout
+    }
+
+    /// <summary>Owner decision 13 Oct 2026: tenants see only the final, tax-inclusive amount, with the note that it includes the tax.</summary>
+    [Fact]
+    public void Subscription_shows_only_tax_inclusive_amounts_with_the_note()
+    {
+        Subscription("Active");
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000010", cut.Markup));
+        var text = Text(cut);
+        Assert.Contains(L.F("ten.taxIncluded", "16%"), text);
+        Assert.Contains("180.000", text);                    // the invoice shows the fee
+        Assert.DoesNotContain("155.172", text);              // never the net…
+        Assert.DoesNotContain("24.828", text);               // …or the tax
+        Assert.DoesNotContain(L["ten.tax"], text);
+    }
+
+    [Fact]
+    public void Console_plan_price_is_labelled_tax_inclusive()
+    {
+        Respond("/platform/plans", new[] { Pro });
+        var cut = Render<Plans>();
+        cut.WaitForAssertion(() => Assert.Contains("PRO", cut.Markup));
+        Assert.Contains(L["con.priceInclusive"], cut.Markup);
+        cut.Find("tbody tr").Click();
+        cut.WaitForAssertion(() => Assert.Contains(L.F("con.priceInclusiveHelp", "16%"), Text(cut)));
     }
 
     [Fact]

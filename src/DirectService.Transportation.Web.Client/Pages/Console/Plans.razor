@@ -18,7 +18,7 @@
             <DataGrid TItem="PlanResponse" Items="_plans" Key="p => p.Id" Caption="@L["nav.plans"]" OnRowClick="Edit">
                 <Columns>
                     <GridColumn TItem="PlanResponse" Title="@L["ten.plan"]" Value="@(p => $"{L.Pick(p.NameAr, p.NameEn)} ({p.Code})")" />
-                    <GridColumn TItem="PlanResponse" Title="@L["ten.price"]" Value="p => Fmt.Money(p.Price)" Numeric="true" />
+                    <GridColumn TItem="PlanResponse" Title="@L["con.priceInclusive"]" Value="p => Fmt.Money(p.Price)" Numeric="true" />
                     <GridColumn TItem="PlanResponse" Title="@L["ten.cycle"]" Value="@(p => L["ten.cycle." + p.BillingCycle])" />
                     <GridColumn TItem="PlanResponse" Title="@L["ten.companies"]" Value="p => Fmt.Count(p.MaxCompanies)" Numeric="true" />
                     <GridColumn TItem="PlanResponse" Title="@L["ten.activeUsers"]" Value="p => Fmt.Count(p.MaxActiveUsers)" Numeric="true" />
@@ -42,7 +42,7 @@
                 <TextField @bind-Value="_m.Code" Label="@L["con.code"]" Required="true" MaxLength="30" Ltr="true" />
                 <TextField @bind-Value="_m.NameAr" Label="@L["set.nameAr"]" Required="true" MaxLength="100" />
                 <TextField @bind-Value="_m.NameEn" Label="@L["set.nameEn"]" Required="true" MaxLength="100" Ltr="true" />
-                <NumberField @bind-Value="_m.Price" Label="@L["ten.price"]" Required="true" Min="0m" Decimals="3" />
+                <NumberField @bind-Value="_m.Price" Label="@L["con.priceInclusive"]" Required="true" Min="0m" Decimals="3" Help="@L.F("con.priceInclusiveHelp", Fmt.Percent(TaxRate))" />
                 <SelectField TValue="string?" @bind-Value="_m.BillingCycle" Options="Cycles" Label="@L["ten.cycle"]" Required="true" />
                 <ToggleField @bind-Value="_m.IsActive" Label="@L["con.onSale"]" />
                 <IntField @bind-Value="_m.MaxCompanies" Label="@L["ten.companies"]" Required="true" Min="1" />
@@ -63,6 +63,9 @@
 
 @code {
     private IReadOnlyList<PlanResponse> _plans = [];
+
+    /// <summary>The platform's sales-tax rate (Platform:TaxRate) that plan prices include (owner decision 13 Oct 2026).</summary>
+    private decimal TaxRate => _plans.Count > 0 ? _plans[0].TaxRate : 16m;
     private PlanResponse? _target;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _error;

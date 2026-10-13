@@ -25,7 +25,7 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
     private Task<Tenant> TenantAsync(CancellationToken ct) => db.Set<Tenant>().Include(t => t.Plan).SingleAsync(t => t.Id == TenantId, ct);
 
     internal PlanResponse Plan(Plan p, int tenants = 0) => new(support.Token<Plan>(p.PublicId), p.Code, p.NameAr, p.NameEn, p.Price, p.BillingCycle, p.MaxCompanies,
-        p.MaxActiveUsers, p.MaxTripsPerMonth, p.MaxStorageMb, p.IsActive, tenants, Convert.ToBase64String(p.RowVersion));
+        p.MaxActiveUsers, p.MaxTripsPerMonth, p.MaxStorageMb, p.IsActive, tenants, Convert.ToBase64String(p.RowVersion), options.Value.TaxRate);
 
     internal SubscriptionInvoiceResponse Invoice(SubscriptionInvoice i) => new(support.Token<SubscriptionInvoice>(i.PublicId), i.Number, i.PeriodStart, i.PeriodEnd, i.Amount,
         i.Tax, i.Total, i.Status, i.PaidAt is DateTime p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : null, i.GatewayReference, DateTime.SpecifyKind(i.CreatedAt, DateTimeKind.Utc));
@@ -180,13 +180,16 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
         var i = await support.FindAsync<SubscriptionInvoice>(token, ct).ConfigureAwait(false);
         var t = await db.Set<Tenant>().AsNoTracking().SingleAsync(x => x.Id == i.TenantId, ct).ConfigureAwait(false);
         var o = options.Value;
+        var rate = o.TaxRate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
         string L(string ar, string en) => printer.L(ar, en);
         var body = $"<div class=\"hd\"><div><b style=\"font-size:13pt\">{E(o.SellerName)}</b><div>{L("الرقم الضريبي", "Tax no.")} {N(o.SellerTaxNumber)}</div></div></div>"
             + $"<h1>{E(L("فاتورة ضريبية — اشتراك", "Tax invoice — subscription"))}</h1><div class=\"meta\">{L("رقم", "No.")} {N(i.Number)} · {L("التاريخ", "Date")} {N(D(DateOnly.FromDateTime(i.CreatedAt)))}</div>"
             + $"<div class=\"fields\"><b>{E(L("العميل", "Customer"))}</b><div>{E(t.Name)}</div><b>{E(L("الفترة", "Period"))}</b><div>{N(D(i.PeriodStart) + " – " + D(i.PeriodEnd))}</div>"
             + $"<b>{E(L("الحالة", "Status"))}</b><div>{E(i.Status)}</div></div>"
-            + $"<div class=\"totals\"><div><span>{E(L("المبلغ", "Amount"))}</span>{N(M(i.Amount))}</div><div><span>{E(L("الضريبة", "Tax"))} {N(o.TaxRate.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))}%</span>{N(M(i.Tax))}</div>"
-            + $"<div class=\"grand\"><span>{E(L("الإجمالي", "Total"))}</span>{N(M(i.Total) + " " + o.Currency)}</div></div>";
+            // The plan fee is tax-inclusive: the total is the fee; the amount before tax and the tax are derived from it (owner decision 13 Oct 2026).
+            + $"<div class=\"totals\"><div><span>{E(L("المبلغ قبل الضريبة", "Amount before tax"))}</span>{N(M(i.Amount))}</div><div><span>{E(L("ضريبة المبيعات", "Sales tax"))} {N(rate)}%</span>{N(M(i.Tax))}</div>"
+            + $"<div class=\"grand\"><span>{E(L("الإجمالي شامل الضريبة", "Total including tax"))}</span>{N(M(i.Total) + " " + o.Currency)}</div></div>"
+            + $"<p>{E(L($"السعر شامل ضريبة المبيعات {rate}%", $"Price includes {rate}% sales tax"))}</p>";
         return await printer.OutputAsync(printer.Shell(i.Number, body, null), format, i.Number, ct).ConfigureAwait(false);
     }
 }

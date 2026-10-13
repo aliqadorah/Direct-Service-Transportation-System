@@ -28,8 +28,9 @@ public static class LifecycleCodes
 public sealed record PlanRequest(string? Code, string? NameAr, string? NameEn, decimal? Price, string? BillingCycle, int? MaxCompanies, int? MaxActiveUsers, int? MaxTripsPerMonth,
     int? MaxStorageMb, bool IsActive, string? RowVersion);
 
+/// <summary>A plan; <paramref name="Price"/> is the final, tax-inclusive fee and <paramref name="TaxRate"/> the sales-tax percent it includes.</summary>
 public sealed record PlanResponse(string Id, string Code, string NameAr, string NameEn, decimal Price, string BillingCycle, int MaxCompanies, int MaxActiveUsers,
-    int MaxTripsPerMonth, int MaxStorageMb, bool IsActive, int Tenants, string RowVersion);
+    int MaxTripsPerMonth, int MaxStorageMb, bool IsActive, int Tenants, string RowVersion, decimal TaxRate = 0m);
 
 // ------------------------------------------------------------------ usage and tenants (5.5, P-11)
 
