@@ -57,6 +57,37 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.DoesNotContain(L["ten.tax"], text);
     }
 
+    private static SubscriptionInvoiceResponse[] Monthly(int count) => Enumerable.Range(1, count).Reverse().Select(n =>
+        new SubscriptionInvoiceResponse($"si{n}", $"SUB-{n:000000}", new DateOnly(2024, 1, 1).AddMonths(n - 1), new DateOnly(2024, 1, 1).AddMonths(n).AddDays(-1),
+            155.172m, 24.828m, 180m, "Paid", null, "pay_" + n, DateTime.UtcNow)).ToArray();
+
+    /// <summary>Owner feedback 13 Oct 2026 (second round): the invoices take their natural height (no box of their own to scroll) and are paged.</summary>
+    [Fact]
+    public void Subscription_invoices_use_their_natural_height_and_are_paged()
+    {
+        Subscription("Active");
+        Respond("/tenant/subscription/invoices", Monthly(30));
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000030", cut.Markup));
+        var box = cut.FindAll("section.box").Single(b => b.QuerySelector("caption")?.TextContent == L["ten.invoices"]);
+        Assert.DoesNotContain("fill", box.ClassList);
+        Assert.Equal(24, box.QuerySelectorAll("tbody tr").Length);
+        Assert.Contains(L.F("ui.rowsOf", "1", "24", "30"), Text(cut));
+        cut.Find($"button[aria-label='{L.F("ui.page", 2)}']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000006", cut.Markup));
+        Assert.DoesNotContain("SUB-000030", cut.Markup);
+        Assert.Equal(6, cut.FindAll("section.box").Single(b => b.QuerySelector("caption")?.TextContent == L["ten.invoices"]).QuerySelectorAll("tbody tr").Length);
+    }
+
+    [Fact]
+    public void Subscription_with_few_invoices_has_no_pager()
+    {
+        Subscription("Active");
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000010", cut.Markup));
+        Assert.Empty(cut.FindAll("nav.tbl-foot"));
+    }
+
     [Fact]
     public void Console_plan_price_is_labelled_tax_inclusive()
     {

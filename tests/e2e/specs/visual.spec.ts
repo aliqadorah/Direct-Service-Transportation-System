@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { api, c } from "../support/api";
 import { companyOf, signUp, submitForm, useLanguage, waitForApp, type Account, type Lang } from "../support/auth";
-import { ROOT } from "../support/env";
+import { BASE_URL, ROOT } from "../support/env";
 import { totp } from "../support/totp";
 import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
@@ -126,6 +126,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await enrol(page, lang, new VisualRun(lang, "screens-enrol", false));
     const company = companyOf(page);
     const { w, ids } = await documents(page, company);
+    if (wanted("/tenant/subscription")) await planChosen(page, lang);
     for (const route of companyRoutes(company, w, ids)) {
       if (!wanted(route.replace(`/c/${company}`, "") || "dashboard")) continue;
       if (!(await open(page, route))) {
@@ -137,6 +138,23 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await sweepStates(page, run, lang, company, states(company, w, ids));
     run.assertClean();
   });
+}
+
+/**
+ * Subscription page with content (owner feedback 13 Oct 2026, second round): staff publish a plan, the trial tenant chooses it and leaves
+ * the payment page unpaid — the plans table, the tax notes and an invoice awaiting payment are on screen.
+ */
+async function planChosen(page: Page, lang: Lang): Promise<void> {
+  const staff = await page.context().browser()!.newPage({ baseURL: BASE_URL, ignoreHTTPSErrors: true });
+  try {
+    await staffSignIn(staff, lang);
+    const plan = await api<{ id: string }>(staff, "POST", "/api/v1/platform/plans", {
+      code: `V${lang.toUpperCase()}${Date.now() % 100000}`, nameAr: "الخطة المهنية", nameEn: "Professional", price: 232, billingCycle: "Monthly",
+      maxCompanies: 5, maxActiveUsers: 25, maxTripsPerMonth: 20000, maxStorageMb: 10240, isActive: true, rowVersion: null });
+    await api(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
+  } finally {
+    await staff.close();
+  }
 }
 
 /** A dialog, side panel or popup: the screen it is on and how a user opens it (only openers that write nothing). */

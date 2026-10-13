@@ -56,7 +56,7 @@
             @if (d.Invoices.Count == 0) {<p class="muted" style="margin:0">@L["ten.noInvoices"]</p>}
             else
             {
-                <DataGrid TItem="SubscriptionInvoiceResponse" Items="d.Invoices" Key="i => i.Id" Caption="@L["ten.invoices"]">
+                <DataGrid TItem="SubscriptionInvoiceResponse" Items="@d.Invoices.Skip((_invoicePage - 1) * InvoicePageSize).Take(InvoicePageSize).ToList()" Key="i => i.Id" Caption="@L["ten.invoices"]">
                     <Columns>
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
@@ -68,6 +68,7 @@
                         </GridColumn>
                     </Columns>
                 </DataGrid>
+                @if (d.Invoices.Count > InvoicePageSize) {<Pager Page="_invoicePage" PageSize="InvoicePageSize" Total="d.Invoices.Count" Sizes="[InvoicePageSize]" OnPage="p => _invoicePage = p" />}
             }
             <h3 class="lbl" style="margin:8px 0 0">@L["nav.supportAccess"]</h3>
             @if (d.SupportAccess.Count == 0) {<p class="muted" style="margin:0">@L["ten.noSupport"]</p>}
@@ -115,6 +116,8 @@
     private int? _days = 7;
     private decimal? _amount;
     private SubscriptionInvoiceResponse? _invoice;
+    private int _invoicePage = 1;
+    private const int InvoicePageSize = 12;   // a year of monthly invoices per page in the panel
 
     private IReadOnlyList<TabItem> Views =>
     [
@@ -187,6 +190,7 @@
     {
         var version = ++_detailsVersion;
         _details = null;   // no action on the previous tenant while this one loads
+        _invoicePage = 1;
         try
         {
             var details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{Uri.EscapeDataString(id)}");

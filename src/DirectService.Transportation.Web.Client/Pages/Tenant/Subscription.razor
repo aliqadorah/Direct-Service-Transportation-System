@@ -81,14 +81,15 @@
                 }
                 <p class="pad help" style="margin:0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate)) @L["ten.plansHelp"]</p>
             </Box>
-            <Box Title="@L["ten.invoices"]" NoPad="true" Fill="true">
+            @* Natural height: the page scrolls, never the box (owner feedback 13 Oct 2026); long lists are paged. *@
+            <Box Title="@L["ten.invoices"]" NoPad="true" Style="flex:none">
                 @if (_invoices.Count == 0)
                 {
                     <EmptyState Icon="file" Title="@L["ten.noInvoices"]" />
                 }
                 else
                 {
-                    <DataGrid TItem="SubscriptionInvoiceResponse" Items="_invoices" Key="i => i.Id" Caption="@L["ten.invoices"]">
+                    <DataGrid TItem="SubscriptionInvoiceResponse" Items="InvoicePage" Key="i => i.Id" Caption="@L["ten.invoices"]">
                         <Columns>
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.date"]" Value="i => Fmt.Date(i.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
@@ -103,6 +104,10 @@
                             </GridColumn>
                         </Columns>
                     </DataGrid>
+                    @if (_invoices.Count > InvoicePageSize)
+                    {
+                        <Pager Page="_invoicePage" PageSize="InvoicePageSize" Total="_invoices.Count" Sizes="[InvoicePageSize]" OnPage="p => _invoicePage = p" />
+                    }
                     <p class="pad help" style="margin:0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate))</p>
                 }
             </Box>
@@ -122,6 +127,12 @@
     private string? _reference, _error, _planError, _busyPlan;
     private PlanResponse? _target;
     private bool _busy, _downgrading, _cancelling;
+    private int _invoicePage = 1;
+
+    /// <summary>Subscription invoices per page: one a month, so a page holds two years (the whole list comes from the API).</summary>
+    internal const int InvoicePageSize = 24;
+
+    private IReadOnlyList<SubscriptionInvoiceResponse> InvoicePage => _invoices.Skip((_invoicePage - 1) * InvoicePageSize).Take(InvoicePageSize).ToList();
 
     protected override Task OnInitializedAsync() => Load();
 
