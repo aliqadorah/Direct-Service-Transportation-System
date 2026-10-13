@@ -102,11 +102,14 @@
         await Load();
     }
 
-    private void AskType(string t)
+    /// <summary>Unsaved changes are confirmed first; the load is awaited so one click shows the other type's layout (owner feedback 13 Oct 2026).</summary>
+    private Task AskType(string t)
     {
-        if (t == _type) return;
-        if (_dirty) { _pendingType = t; _confirmSwitch = true; }
-        else _ = SetType(t);
+        if (t == _type) return Task.CompletedTask;
+        if (!_dirty) return SetType(t);
+        _pendingType = t;
+        _confirmSwitch = true;
+        return Task.CompletedTask;
     }
 
     private Task SetType(string t)

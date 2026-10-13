@@ -1,6 +1,8 @@
 using DirectService.Transportation.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Common;
+using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Contracts.Identity;
+using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Pages.Settings;
 
@@ -68,5 +70,34 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Assert.Contains("عرض الرحلات", row.TextContent, StringComparison.Ordinal);
         Assert.Equal("trips.view", row.QuerySelector(".perm-key")!.TextContent);
         Assert.Equal("0", cut.Find(".perm-list").GetAttribute("tabindex"));   // keyboard users can scroll the list
+    }
+
+    /// <summary>Owner feedback 13 Oct 2026: one click on a tab shows that tab's data once the (slow) answer arrives.</summary>
+    [Fact]
+    public void Field_configuration_tab_shows_its_data_after_one_click()
+    {
+        ResponseDelay = TimeSpan.FromMilliseconds(40);
+        Respond("standard-fields/TRN.Trip", new[] { new StandardFieldResponse("receiptNo", "رقم السند", "Receipt no.", null, true, true, false, true, 1) });
+        Respond("standard-fields/TRN.Driver", new[] { new StandardFieldResponse("nationalId", "الرقم الوطني", "National ID", null, false, false, false, true, 1) });
+        Respond("custom-fields/", Array.Empty<CustomFieldResponse>());
+        var cut = Render<FieldConfiguration>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("رقم السند", cut.Markup));
+        cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["nav.drivers"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains("الرقم الوطني", cut.Markup));
+        Assert.DoesNotContain("رقم السند", cut.Markup);
+        Assert.Equal("true", cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["nav.drivers"], StringComparison.Ordinal)).GetAttribute("aria-selected"));
+    }
+
+    [Fact]
+    public void Invoice_layout_designer_tab_shows_the_other_layout_after_one_click()
+    {
+        ResponseDelay = TimeSpan.FromMilliseconds(40);
+        InvoiceLayoutResponse Layout(string type, string title) => new(type, title, null, "None", ["amount"], new Dictionary<string, string>(), null, [], true, true, ["amount"], "A");
+        Respond("invoice-layouts/Claim", Layout(InvoiceCodes.Claim, "مطالبة مالية"));
+        Respond("invoice-layouts/TaxInvoice", Layout(InvoiceCodes.TaxInvoice, "فاتورة ضريبية"));
+        var cut = Render<InvoiceLayoutDesigner>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("مطالبة مالية", cut.Markup));
+        cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["inv.layoutTax"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains("فاتورة ضريبية", cut.Markup));
     }
 }

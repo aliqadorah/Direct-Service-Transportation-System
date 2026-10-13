@@ -21,6 +21,12 @@ public abstract class PageTestBase : UiTestBase
     /// <summary>Requests the screen sent (method and company-relative path with query).</summary>
     protected List<(string Method, string Path, string? Body)> Requests { get; } = [];
 
+    /// <summary>
+    /// When set, every answer arrives after this delay (a real network): a screen that starts a load without awaiting it never shows the
+    /// answer, as in the browser.
+    /// </summary>
+    protected TimeSpan ResponseDelay { get; set; }
+
     protected PageTestBase(params string[] permissions)
     {
         Services.AddScoped(_ => new HttpClient(new FakeHandler(this)) { BaseAddress = new Uri("https://localhost/") });
@@ -72,6 +78,7 @@ public abstract class PageTestBase : UiTestBase
             else if (path.StartsWith("/api/v1/", StringComparison.Ordinal)) relative = path["/api/v1".Length..];
             else return NotFound();
             test.Requests.Add((request.Method.Method, relative, body));
+            if (test.ResponseDelay > TimeSpan.Zero) await Task.Delay(test.ResponseDelay, cancellationToken).ConfigureAwait(false);
             var match = test._routes.Keys.Where(k => relative.StartsWith(k, StringComparison.Ordinal)).OrderByDescending(k => k.Length).FirstOrDefault();
             if (match is null) return NotFound();
             var value = test._routes[match](request);

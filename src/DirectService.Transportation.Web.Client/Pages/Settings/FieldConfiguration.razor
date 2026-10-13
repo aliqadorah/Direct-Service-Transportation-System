@@ -140,12 +140,17 @@
 
     protected override Task OnInitializedAsync() => Load();
 
-    /// <summary>Unsaved standard-field changes are confirmed before switching entity (review M3).</summary>
-    private void AskEntity(string e)
+    /// <summary>
+    /// Unsaved standard-field changes are confirmed before switching entity (review M3). The load is awaited so the page re-renders with
+    /// the new entity's fields on the first click (owner feedback 13 Oct 2026).
+    /// </summary>
+    private Task AskEntity(string e)
     {
-        if (e == _entity) return;
-        if (_dirty) { _pendingEntity = e; _confirmSwitch = true; }
-        else _ = SetEntity(e);
+        if (e == _entity) return Task.CompletedTask;
+        if (!_dirty) return SetEntity(e);
+        _pendingEntity = e;
+        _confirmSwitch = true;
+        return Task.CompletedTask;
     }
 
     private Task SetEntity(string e) { _entity = e; _confirmSwitch = false; return Load(); }
