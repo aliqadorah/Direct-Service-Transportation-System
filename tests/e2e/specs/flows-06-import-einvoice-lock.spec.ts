@@ -33,12 +33,16 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await page.goto(`/c/${company}/trips/import`);
     await page.locator("#trip-file").setInputFiles(csv);
     await page.getByRole("radio", { name: t("trip.strict") }).check();
-    await expect(button(page, t("trip.importValid", 1))).toBeDisabled();   // strict: the unknown driver blocks the file
-    await expect(page.getByRole("row").filter({ hasText: `IMP-2-${lang}` })).toBeVisible();
+    await button(page, t("ui.next")).click();   // column matching
+    await button(page, t("ui.next")).click();   // check
+    await expect(page.getByRole("row").filter({ hasText: `IMP-2-${lang}` })).toBeVisible();   // row, column, problem and fix
+    await expect(button(page, t("ui.next"))).toBeDisabled();   // strict: the unknown driver blocks the file
+    await button(page, t("imp.back")).click();
+    await button(page, t("imp.back")).click();
     await page.getByRole("radio", { name: t("trip.tolerant") }).check();
-    await button(page, t("imp.preview")).click();
+    for (let i = 0; i < 3; i++) await button(page, t("ui.next")).click();
     await button(page, t("trip.importValid", 1)).click();
-    await expect(page.locator(".dialog").filter({ hasText: t("trip.importDone") })).toBeVisible();
+    await expect(page.getByRole("heading", { name: t("trip.importDone") })).toBeVisible();
 
     // 9.7 E-invoicing with the simulator.
     const settings = await api<{ rowVersion: string }>(page, "GET", c(company, "settings/e-invoicing"));

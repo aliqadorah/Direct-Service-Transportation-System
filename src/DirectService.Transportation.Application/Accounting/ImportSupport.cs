@@ -10,16 +10,22 @@ namespace DirectService.Transportation.Application.Accounting;
 /// <summary>Shared parsing and problem collection for the accounting imports (strict mode: any rejected row blocks the import).</summary>
 internal sealed class ImportProblems(string language)
 {
-    private readonly SortedDictionary<int, (string? Key, List<string> Problems)> _rows = [];
+    private readonly SortedDictionary<int, (string? Key, List<ImportProblem> Problems)> _rows = [];
 
-    public void Add(int row, string? key, string code, params object?[] args)
+    public void Add(int row, string? key, string code, params object?[] args) => AddAt(row, key, null, code, null, args);
+
+    /// <summary>
+    /// A problem of a row in a column of the file (null = the whole row), with its fix: <paramref name="fix"/> when given (e.g.
+    /// <see cref="ImportFixCatalog.Date"/>), otherwise the fix of the code.
+    /// </summary>
+    public void AddAt(int row, string? key, string? column, string code, string? fix, params object?[] args)
     {
         if (!_rows.TryGetValue(row, out var entry))
         {
             entry = (key, []);
             _rows[row] = entry;
         }
-        entry.Problems.Add(ErrorCatalog.Format(code, language, args));
+        entry.Problems.Add(new ImportProblem(code, column, ErrorCatalog.Format(code, language, args), ImportFixCatalog.For(fix ?? code, language)));
     }
 
     public bool Has(int row) => _rows.ContainsKey(row);
@@ -29,7 +35,7 @@ internal sealed class ImportProblems(string language)
     public ImportPreview Preview(IReadOnlyList<(int Row, string? Key)> allRows) =>
         new(allRows.Count, allRows.Count - _rows.Count, _rows.Count,
             allRows.Select(r => _rows.TryGetValue(r.Row, out var p)
-                ? new ImportRowResult(r.Row, r.Key, p.Problems)
+                ? new ImportRowResult(r.Row, r.Key, p.Problems.Select(x => x.Message).ToList(), p.Problems)
                 : new ImportRowResult(r.Row, r.Key, [])).ToList());
 }
 

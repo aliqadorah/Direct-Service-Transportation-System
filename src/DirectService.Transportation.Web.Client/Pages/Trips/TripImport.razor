@@ -1,8 +1,10 @@
 @page "/c/{Company}/trips/import"
 @*
-  SCR-12 trip import (US-02, FR-013, FR-033, DT-72): Excel / CSV / TSV file; mode strict (any rejected row blocks) or tolerant (optional
-  values take defaults and the row is flagged "Needs review"); automatic column matching with Arabic header alternatives and an editable
-  mapping; preview with rejected, duplicate and review rows; import with the batch result (import log).
+  SCR-12 trip import (US-02, FR-013, FR-033, DT-72) as four steps with Back and Next (owner feedback 13 Oct 2026): 1 file and mode
+  (strict: any rejected row blocks; tolerant: optional values take defaults and the row is flagged "Needs review"); 2 column matching
+  (automatic, editable, required columns marked); 3 check: summary and every rejected row with its row number, column, problem and how
+  to fix it, and a corrected file can be uploaded again; 4 import with the batch result (import log). The file, mode and matching are
+  kept while moving between the steps; a corrected file keeps the matching of the columns it still has.
 *@
 @using System.Text.Json
 @using DirectService.Transportation.Contracts.Trips
@@ -13,108 +15,148 @@
 
 <PageHeader Help="trip-import" Title="@L["nav.tripImport"]" Crumbs="@([new Crumb(L["nav.operations"]), new Crumb(L["nav.trips"], NavModel.Href(Company, "trips"))])" />
 
-<ol class="row" style="list-style:none;margin:0;padding:0;gap:6px;flex:none" aria-label="@L["imp.steps"]">
-    @foreach (var (n, key) in new[] { (1, "imp.file"), (2, "imp.columns"), (3, "imp.preview"), (4, "imp.import") })
+<ol class="row" style="list-style:none;margin:0;padding:0;gap:6px;flex:none;flex-wrap:wrap" aria-label="@L["imp.steps"]">
+    @foreach (var (n, key) in new[] { (1, "imp.file"), (2, "imp.columns"), (3, "imp.check"), (4, "imp.import") })
     {
-        var cur = n == Step;
-        <li><span class="chip" aria-current="@(cur ? "step" : null)" style="@(cur ? "background:var(--tint);border-color:var(--primary);font-weight:600" : null)"><bdi class="num">@n</bdi> @L[key]</span></li>
+        var cur = n == _step;
+        <li><span class="chip" aria-current="@(cur ? "step" : null)" style="@(cur ? "background:var(--tint);border-color:var(--primary);font-weight:600" : n < _step ? "border-color:var(--primary)" : null)"><bdi class="num">@n</bdi> @L[key]</span></li>
     }
 </ol>
 
-<div class="cols" style="grid-template-columns:1fr 340px;align-items:start">
-    <Box Title="@L["imp.file"]">
-        <div class="field">
-            <label for="trip-file">@L["imp.choose"]</label>
-            <InputFile id="trip-file" class="input" style="padding-top:4px" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
-            <span class="help">@L["imp.help"]</span>
-        </div>
-        @if (_fileName is not null) {<p style="margin-top:8px"><Icon Name="file" /> <bdi class="num">@_fileName</bdi></p>}
-    </Box>
-    <Box Title="@L["trip.importMode"]">
-        <fieldset style="border:0;padding:0;margin:0" class="stack">
-            <legend class="sr-only">@L["trip.importMode"]</legend>
-            <label class="chk"><input type="radio" name="mode" checked="@(_mode == "strict")" @onchange="@(() => Mode("strict"))" /> @L["trip.strict"]</label>
-            <label class="chk"><input type="radio" name="mode" checked="@(_mode == "tolerant")" @onchange="@(() => Mode("tolerant"))" /> @L["trip.tolerant"]</label>
-            <p class="help">@L["trip.importHelp"]</p>
-        </fieldset>
-    </Box>
-</div>
+@if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
 
-@if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
-
-@if (_preview is not null)
+@switch (_step)
 {
-    <Box Title="@L.F("trip.matched", _preview.Columns.Matched.Count)">
-        <Actions><Btn Small="true" Icon="refresh" Text="@L["imp.preview"]" Busy="_busy" OnClick="Preview" /></Actions>
-        <ChildContent>
-            <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-                @foreach (var (field, header) in _mapping.OrderBy(x => x.Key))
+    case 1:
+        <div class="cols" style="grid-template-columns:minmax(0,1fr) minmax(0,340px);align-items:start">
+            <Box Title="@L["imp.file"]">
+                <div class="field">
+                    <label for="trip-file">@L[_fileName is null ? "imp.choose" : "imp.replaceFile"]</label>
+                    <InputFile id="trip-file" class="input" style="padding-top:4px" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
+                    <span class="help">@L["imp.help"]</span>
+                </div>
+                @if (_fileName is not null)
                 {
-                    var key = field;
+                    <p style="margin:8px 0 0"><Icon Name="file" /> <bdi class="num">@_fileName</bdi>@if (_preview is not null) {<span class="muted"> · @L.F("imp.fileRead", _preview.TotalRows, _preview.Columns.Matched.Count)</span>}</p>
+                }
+            </Box>
+            <Box Title="@L["trip.importMode"]">
+                <fieldset style="border:0;padding:0;margin:0" class="stack">
+                    <legend class="sr-only">@L["trip.importMode"]</legend>
+                    <label class="chk"><input type="radio" name="mode" checked="@(_mode == "strict")" @onchange="@(() => Mode("strict"))" /> @L["trip.strict"]</label>
+                    <label class="chk"><input type="radio" name="mode" checked="@(_mode == "tolerant")" @onchange="@(() => Mode("tolerant"))" /> @L["trip.tolerant"]</label>
+                    <p class="help">@L["trip.importHelp"]</p>
+                </fieldset>
+            </Box>
+        </div>
+        break;
+
+    case 2 when _preview is not null:
+        <Box Title="@L.F("trip.matched", _preview.Columns.Matched.Count)">
+            <p class="help" style="margin:0 0 8px">@L["imp.matchHelp"]</p>
+            <div class="fg" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+                @foreach (var f in Fields)
+                {
+                    var field = f;
+                    var missing = Missing.Contains(field.Key);
+                    var id = "map-" + field.Key.Replace('.', '-');
                     <div class="field">
-                        <label for="map-@key"><bdi class="num">@key</bdi></label>
-                        <select id="map-@key" class="input" value="@header" @onchange="e => Map(key, e.Value?.ToString())">
+                        <label for="@id"><Tx Value="@field.Label" />@if (field.Required) {<span class="req" aria-hidden="true"> *</span>}</label>
+                        <select id="@id" class="input" value="@(_mapping.GetValueOrDefault(field.Key) ?? "")" aria-invalid="@(missing ? "true" : null)"
+                                aria-describedby="@(missing ? id + "-err" : null)" @onchange="e => Map(field.Key, e.Value?.ToString())">
                             <option value="">@L["trip.notImported"]</option>
                             @foreach (var h in Headers) {<option value="@h">@h</option>}
                         </select>
+                        @if (missing) {<span id="@(id + "-err")" class="help err"><Icon Name="alert" /> @L["imp.requiredColumn"]</span>}
                     </div>
                 }
             </div>
-        </ChildContent>
-    </Box>
-    <Figures Items="@([new Figure(L["imp.total"], Fmt.Count(_preview.TotalRows)), new Figure(L["imp.valid"], Fmt.Count(_preview.ValidRows)), new Figure(L["st.review"], Fmt.Count(_preview.ReviewRows), L["trip.defaults"]), new Figure(L["imp.rejected"], Fmt.Count(_preview.RejectedRows)), new Figure(L["trip.duplicates"], Fmt.Count(_preview.DuplicateRows))])" />
-    <div class="formbar">
-        @if (_preview.Mode == "Strict" && _preview.RejectedRows > 0) {<Banner Tone="Tone.Warn" Text="@L["imp.fixFirst"]" />}
-        <Btn Primary="true" Icon="import" Busy="_busy" Disabled="@(_preview.ValidRows == 0 || (_preview.Mode == "Strict" && _preview.RejectedRows > 0))"
-             Text="@L.F("trip.importValid", _preview.ValidRows)" OnClick="Import" />
-    </div>
-    <ListFrame Label="@L["imp.rows"]">
-        <DataGrid TItem="ImportRowResult" Items="Rows" Key="r => r.Row" Caption="@L["imp.rows"]" RowClass="@(r => r.Problems.Count > 0 ? "sel" : null)">
-            <Columns>
-                <GridColumn TItem="ImportRowResult" Title="@L["imp.row"]" Value="r => Fmt.Count(r.Row)" Numeric="true" Width="70px" />
-                <GridColumn TItem="ImportRowResult" Title="@L["trip.receiptNo"]" Value="r => r.Key" Ltr="true" />
-                <GridColumn TItem="ImportRowResult" Title="@L["imp.problems"]" Wrap="true">
-                    <Template>@if (context.Problems.Count == 0) {<StatusTag Status="approved" />} else {<ul style="margin:0;padding-inline-start:16px">@foreach (var p in context.Problems) {<li><Tx Value="@p" /></li>}</ul>}</Template>
-                </GridColumn>
-            </Columns>
-        </DataGrid>
-    </ListFrame>
-}
+            @if (_preview.Columns.Unused.Count > 0)
+            {
+                <p class="help" style="margin:8px 0 0">@L["imp.unused"] <bdi>@string.Join(" · ", _preview.Columns.Unused)</bdi></p>
+            }
+        </Box>
+        break;
 
-<Modal Open="_result is not null" OpenChanged="_ => _result = null" Title="@L["trip.importDone"]" Icon="check">
-    <ChildContent>
-        @if (_result is not null)
+    case 3 when _preview is not null:
+        <Figures Items="@([new Figure(L["imp.total"], Fmt.Count(_preview.TotalRows)), new Figure(L["imp.valid"], Fmt.Count(_preview.ValidRows)), new Figure(L["st.review"], Fmt.Count(_preview.ReviewRows), L["trip.defaults"]), new Figure(L["imp.rejected"], Fmt.Count(_preview.RejectedRows)), new Figure(L["trip.duplicates"], Fmt.Count(_preview.DuplicateRows))])" />
+        @if (_preview.RejectedRows > 0)
         {
+            <Banner Tone="@(Blocked ? Tone.Warn : Tone.Info)" Text="@L[Blocked ? "imp.fixFirst" : "imp.skipRejected"]">
+                <Actions>
+                    <label for="trip-file-again" class="btn sm"><Icon Name="upload" /> @L["imp.reupload"]</label>
+                    <InputFile id="trip-file-again" class="sr-only" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
+                </Actions>
+            </Banner>
+        }
+        <ImportProblemList Rows="_preview.Rows" KeyTitle="@L["trip.receiptNo"]" />
+        break;
+
+    case 4 when _result is not null:
+        <Box Title="@L["trip.importDone"]">
             <KeyValues Columns="2" Items="@([new KeyValue(L["trip.imported"], Fmt.Count(_result.ImportedRows)), new KeyValue(L["st.review"], Fmt.Count(_result.ReviewRows)), new KeyValue(L["imp.rejected"], Fmt.Count(_result.RejectedRows)), new KeyValue(L["trip.batch"], _result.BatchId)])" />
             <p class="help">@L["trip.importLogged"]</p>
-        }
-    </ChildContent>
-    <Footer><Btn Primary="true" Text="@L["trip.created"]" Href="@NavModel.Href(Company, "trips/list")" /></Footer>
-</Modal>
+            <div class="row" style="gap:8px">
+                <Btn Primary="true" Text="@L["trip.created"]" Href="@NavModel.Href(Company, "trips/list")" />
+                <Btn Text="@L["imp.another"]" OnClick="Reset" />
+            </div>
+        </Box>
+        break;
+
+    case 4 when _preview is not null:
+        <Box Title="@L["imp.import"]">
+            <p style="margin:0 0 6px">@L.F("imp.confirm", _preview.ValidRows, _fileName ?? "")</p>
+            @if (_preview.RejectedRows > 0) {<p class="help" style="margin:0 0 6px">@L.F("imp.skipped", _preview.RejectedRows)</p>}
+            @if (_preview.ReviewRows > 0) {<p class="help" style="margin:0 0 6px">@L.F("imp.flagged", _preview.ReviewRows)</p>}
+            <Btn Primary="true" Icon="import" Busy="_busy" Disabled="@(!CanImport)" Text="@L.F("trip.importValid", _preview.ValidRows)" OnClick="Import" />
+        </Box>
+        break;
+}
+
+@if (_result is null)
+{
+    <div class="formbar">
+        @if (_step > 1) {<Btn Text="@L["imp.back"]" Disabled="_busy" OnClick="Back" />}
+        @if (_step < 4) {<Btn Primary="true" Text="@L["ui.next"]" Busy="_busy" Disabled="@(!CanNext)" OnClick="Next" />}
+    </div>
+}
 
 @code {
     private string _mode = "tolerant";
-    private int _previewVersion;
+    private int _previewVersion, _step = 1;
     private string? _fileName, _error;
     private byte[]? _bytes;
     private TripImportPreview? _preview;
     private TripImportResult? _result;
-    private Dictionary<string, string> _mapping = new(StringComparer.Ordinal);
+    /// <summary>Field key → header of the file; "" = not imported. Kept across steps and when a corrected file is uploaded.</summary>
+    private readonly Dictionary<string, string> _mapping = new(StringComparer.Ordinal);
     private bool _busy;
 
     [Parameter] public string Company { get; set; } = "";
 
-    private int Step => _result is not null ? 4 : _preview is not null ? 3 : _fileName is not null ? 2 : 1;
+    private IReadOnlyList<string> Headers => _preview is null ? [] : _preview.Columns.Matched.Values.Concat(_preview.Columns.Unused).Distinct().OrderBy(h => h, StringComparer.Ordinal).ToList();
 
-    private IReadOnlyList<string> Headers => _preview is null ? [] : _preview.Columns.Matched.Values.Concat(_preview.Columns.Unused).Distinct().OrderBy(h => h).ToList();
+    private IReadOnlyList<ImportField> Fields => _preview?.Fields ?? _preview?.Columns.Matched.Keys.Select(k => new ImportField(k, k, false)).ToList() ?? [];
 
-    private IReadOnlyList<ImportRowResult> Rows => _preview!.Rows.OrderBy(r => r.Problems.Count == 0).ThenBy(r => r.Row).ToList();
+    /// <summary>Required fields the matching leaves without a column.</summary>
+    private HashSet<string> Missing => Fields.Where(f => f.Required && string.IsNullOrEmpty(_mapping.GetValueOrDefault(f.Key))).Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
+
+    private bool Blocked => _preview is { Mode: "Strict", RejectedRows: > 0 };
+
+    private bool CanImport => _preview is { ValidRows: > 0 } && !Blocked && !_busy;
+
+    private bool CanNext => !_busy && _step switch
+    {
+        1 => _preview is not null,
+        2 => _preview is not null && Missing.Count == 0,
+        3 => CanImport,
+        _ => false,
+    };
 
     private async Task Picked(InputFileChangeEventArgs e)
     {
         _error = null;
-        _preview = null;
-        _mapping.Clear();
+        _result = null;
         try
         {
             await using var s = e.File.OpenReadStream(10 * 1024 * 1024);
@@ -122,9 +164,11 @@
             await s.CopyToAsync(ms);
             _bytes = ms.ToArray();
             _fileName = e.File.Name;
-            await Preview();
         }
-        catch (IOException) { _error = L["imp.tooLarge"]; _fileName = null; }
+        catch (IOException) { _error = L["imp.tooLarge"]; return; }
+        await Preview();
+        // A corrected file uploaded on the check step is checked at once; one missing a required column goes back to the matching.
+        if (_step == 3 && _preview?.MissingColumns is { Count: > 0 }) _step = 2;
     }
 
     private async Task Mode(string mode)
@@ -133,12 +177,9 @@
         if (_bytes is not null) await Preview();
     }
 
-    private void Map(string field, string? header)
-    {
-        if (string.IsNullOrEmpty(header)) _mapping.Remove(field); else _mapping[field] = header;
-    }
+    private void Map(string field, string? header) => _mapping[field] = header ?? "";
 
-    private Dictionary<string, string> Fields => new() { ["mode"] = _mode, ["mapping"] = _mapping.Count == 0 ? "" : JsonSerializer.Serialize(_mapping) };
+    private Dictionary<string, string> Form => new() { ["mode"] = _mode, ["mapping"] = _mapping.Count == 0 ? "" : JsonSerializer.Serialize(_mapping) };
 
     private async Task Preview()
     {
@@ -148,27 +189,66 @@
         _error = null;
         try
         {
-            var preview = await Api.UploadAsync<TripImportPreview>(Api.C("trips/import/preview"), new MemoryStream(_bytes), _fileName, Fields);
+            var preview = await Api.UploadAsync<TripImportPreview>(Api.C("trips/import/preview"), new MemoryStream(_bytes), _fileName, Form);
             // Only the latest preview counts: an earlier answer (e.g. of the other mode) must never enable the import (found by E2E).
             if (version != _previewVersion) return;
             _preview = preview;
+            // Headers no longer in the file (a corrected file) were matched again automatically: take the new matching for them.
+            var headers = Headers.ToHashSet(StringComparer.Ordinal);
+            foreach (var (k, v) in _mapping.Where(m => m.Value.Length > 0 && !headers.Contains(m.Value)).ToList()) _mapping.Remove(k);
             foreach (var (k, v) in _preview.Columns.Matched) _mapping.TryAdd(k, v);
         }
         catch (ApiException e) when (version == _previewVersion) { _error = e.Problem.Detail; _preview = null; }
         finally { if (version == _previewVersion) _busy = false; }
     }
 
+    private async Task Next()
+    {
+        if (!CanNext) return;
+        switch (_step)
+        {
+            case 1:
+                _step = 2;
+                break;
+            case 2:
+                // The matching chosen on step 2 is applied by checking the file again.
+                await Preview();
+                if (_preview is not null && _preview.MissingColumns is not { Count: > 0 }) _step = 3;
+                break;
+            case 3:
+                _step = 4;
+                break;
+        }
+    }
+
+    private void Back()
+    {
+        _error = null;
+        if (_step > 1) _step--;
+    }
+
     private async Task Import()
     {
-        if (_bytes is null || _fileName is null) return;
+        if (_bytes is null || _fileName is null || !CanImport) return;
         _busy = true;
+        _error = null;
         try
         {
-            _result = await Api.UploadAsync<TripImportResult>(Api.C("trips/import"), new MemoryStream(_bytes), _fileName, Fields);
+            _result = await Api.UploadAsync<TripImportResult>(Api.C("trips/import"), new MemoryStream(_bytes), _fileName, Form);
             Toasts.Success(L.F("imp.done", _result.ImportedRows));
-            _preview = null;
         }
         catch (ApiException e) { _error = e.Problem.Detail; }
         finally { _busy = false; }
+    }
+
+    private void Reset()
+    {
+        _result = null;
+        _preview = null;
+        _bytes = null;
+        _fileName = null;
+        _error = null;
+        _mapping.Clear();
+        _step = 1;
     }
 }

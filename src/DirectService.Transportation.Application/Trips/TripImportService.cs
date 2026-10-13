@@ -49,6 +49,12 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
         new("notes", "ملاحظات", "Notes"),
     ];
 
+    /// <summary>Columns the file must have (the other columns are optional).</summary>
+    public static readonly string[] RequiredColumns = ["receiptNo", "tripDate", "driverId", "customerId", "loadingSiteId", "unloadingSiteId", "materialId", "loadedWeight"];
+
+    /// <summary>The importable column keys in their template order.</summary>
+    public static IEnumerable<string> ColumnKeys => Columns.Select(c => c.Key);
+
     private sealed record Prepared(int Row, Trip Trip, bool Review, string? Reason);
 
     private bool En => ctx.Language == "en";
@@ -127,9 +133,15 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
         var rules = await fields.RulesAsync(FieldCatalog.Trip, ct).ConfigureAwait(false);
         var matched = new Dictionary<string, string>(StringComparer.Ordinal);
         var index = new Dictionary<string, int>(StringComparer.Ordinal);
+        // A mapping to "" leaves the field out; a mapped header missing from the file (a corrected file uploaded again) falls back to the
+        // automatic matching (owner feedback 13 Oct 2026).
+        int Match(string key, string[] aliases) =>
+            !mapping.TryGetValue(key, out var header) ? sheet.Column(aliases)
+            : header.Length == 0 ? -1
+            : sheet.Column(header) is var m and >= 0 ? m : sheet.Column(aliases);
         foreach (var c in Columns)
         {
-            var i = mapping.TryGetValue(c.Key, out var header) ? sheet.Column(header) : sheet.Column([c.Key, rules.Label(c.Key), .. c.Aliases]);
+            var i = Match(c.Key, [c.Key, rules.Label(c.Key), .. c.Aliases]);
             if (i >= 0) matched[c.Key] = sheet.Headers[i];
             index[c.Key] = i;
         }
@@ -137,13 +149,20 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
         var customIndex = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var d in defs)
         {
-            var i = mapping.TryGetValue("custom." + d.FieldKey, out var h) ? sheet.Column(h) : sheet.Column(new[] { d.FieldKey, d.LabelAr, d.LabelEn }.Where(a => a is not null).Select(a => a!).ToArray());
+            var i = Match("custom." + d.FieldKey, new[] { d.FieldKey, d.LabelAr, d.LabelEn }.Where(a => a is not null).Select(a => a!).ToArray());
             if (i >= 0) matched["custom." + d.FieldKey] = sheet.Headers[i];
             customIndex[d.FieldKey] = i;
         }
-        ImportParse.RequireColumns(sheet, (index["receiptNo"], rules.Label("receiptNo")), (index["tripDate"], rules.Label("tripDate")),
-            (index["driverId"], rules.Label("driverId")), (index["customerId"], rules.Label("customerId")), (index["loadingSiteId"], rules.Label("loadingSiteId")),
-            (index["unloadingSiteId"], rules.Label("unloadingSiteId")), (index["materialId"], rules.Label("materialId")), (index["loadedWeight"], rules.Label("loadedWeight")));
+        var importable = Columns.Select(c => new ImportField(c.Key, rules.Label(c.Key), RequiredColumns.Contains(c.Key)))
+            .Concat(defs.Select(d => new ImportField("custom." + d.FieldKey, customFields.Label(d), false))).ToList();
+        var unused = sheet.Headers.Where(h => !string.IsNullOrWhiteSpace(h) && !matched.Values.Contains(h, StringComparer.Ordinal)).ToList();
+        // Required columns not found: the preview returns the headers so they can be matched by hand; the import itself is refused.
+        var missingColumns = RequiredColumns.Where(k => index[k] < 0).ToList();
+        if (missingColumns.Count > 0)
+        {
+            if (locking) ImportParse.RequireColumns(sheet, RequiredColumns.Select(k => (index[k], rules.Label(k))).ToArray());
+            return ([], new TripImportPreview(sheet.Rows.Count, 0, 0, 0, 0, mode, [], new ImportColumns(matched, unused), importable, missingColumns));
+        }
 
         // Lookups among active records (the trip form selects only active master data, FR-167).
         var drivers = await db.Set<Driver>().AsNoTracking().Include(d => d.OwnershipType).Where(d => d.Status == MasterCodes.Active).ToListAsync(ct).ConfigureAwait(false);
@@ -175,19 +194,27 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             existing.UnionWith(await db.Set<Trip>().AsNoTracking().Where(t => part.Contains(t.ReceiptNoKey)).Select(t => t.ReceiptNoKey).ToListAsync(ct).ConfigureAwait(false));
         }
 
+        // The column of the file a field was read from (its header), or the field's label when the file has no such column.
+        string? Col(string? field) => field is null ? null : matched.TryGetValue(field, out var h) ? h : field.StartsWith("customValues.", StringComparison.Ordinal)
+            && matched.TryGetValue("custom." + field["customValues.".Length..], out var ch) ? ch : rules.Label(field);
+
         foreach (var row in sheet.Rows)
         {
             var receipt = Cell(row, "receiptNo");
             keys.Add((row.RowNumber, receipt));
             var review = new List<string>();
             var ok = true;
-            void Problem(string code, params object?[] args) { problems.Add(row.RowNumber, receipt, code, args); ok = false; }
+            void Problem(string? field, string code, string? fix, params object?[] args)
+            {
+                problems.AddAt(row.RowNumber, receipt, Col(field), code, fix, args);
+                ok = false;
+            }
 
             var key = TextNormalizer.Key(receipt);
             if (key.Length > 0 && (existing.Contains(key) || !seen.Add(key)))
             {
                 duplicates++;
-                Problem(ErrorCodes.ImportDuplicate, receipt);
+                Problem("receiptNo", ErrorCodes.ImportDuplicate, null, receipt);
                 continue;
             }
             DateOnly? Date(string field, bool optional)
@@ -196,7 +223,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
                 if (text is null) return null;
                 if (ImportParse.TryDate(text, out var d)) return d;
                 if (optional && tolerant) { review.Add(rules.Label(field)); return null; }
-                Problem(ErrorCodes.ImportInvalid, rules.Label(field), text);
+                Problem(field, ErrorCodes.ImportInvalid, ImportFixCatalog.Date, rules.Label(field), text);
                 return null;
             }
             decimal? Number(string field, bool optional)
@@ -205,7 +232,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
                 if (text is null) return null;
                 if (ImportParse.TryAmount(text, 4, out var v)) return v;
                 if (optional && tolerant) { review.Add(rules.Label(field)); return null; }
-                Problem(ErrorCodes.ImportInvalid, rules.Label(field), text);
+                Problem(field, ErrorCodes.ImportInvalid, ImportFixCatalog.Number, rules.Label(field), text);
                 return null;
             }
             T? Find<T>(Dictionary<string, List<T>> map, string field) where T : class
@@ -213,7 +240,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
                 var text = Cell(row, field);
                 if (text is null) return null;
                 if (map.TryGetValue(TextNormalizer.Key(MasterDataSupport.Name(text)), out var found) && found.Count == 1) return found[0];
-                Problem(ErrorCodes.ImportUnknown, rules.Label(field), text);
+                Problem(field, ErrorCodes.ImportUnknown, null, rules.Label(field), text);
                 return null;
             }
 
@@ -227,7 +254,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             var partnerRate = Number("partnerRate", false);
             var driverText = Cell(row, "driverId");
             var driver = driverText is null ? null : FindDriver(drivers, driverText);
-            if (driverText is not null && driver is null) Problem(ErrorCodes.ImportUnknown, rules.Label("driverId"), driverText);
+            if (driverText is not null && driver is null) Problem("driverId", ErrorCodes.ImportUnknown, null, rules.Label("driverId"), driverText);
             var customer = Find(customers, "customerId");
             var loading = Find(loadingSites, "loadingSiteId");
             var unloading = Find(unloadingSites, "unloadingSiteId");
@@ -243,7 +270,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
                     review.Add(rules.Label("partnerId"));
                     if (driver?.PartnerId is long fallback && partnerById.TryGetValue(fallback, out var fp)) partner = fp;
                 }
-                else Problem(ErrorCodes.ImportUnknown, rules.Label("partnerId"), partnerText);
+                else Problem("partnerId", ErrorCodes.ImportUnknown, null, rules.Label("partnerId"), partnerText);
             }
             else if (driver?.PartnerId is long dp && partnerById.TryGetValue(dp, out var dpp))
             {
@@ -256,14 +283,14 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
                 if (text is null) continue;
                 if (CustomFieldService.TryParseCell(d, text, out var v)) { if (v is JsonElement value) custom[d.FieldKey] = value; }
                 else if (tolerant) review.Add(customFields.Label(d));
-                else Problem(ErrorCodes.ImportInvalid, customFields.Label(d), text);
+                else Problem("custom." + d.FieldKey, ErrorCodes.ImportInvalid, null, customFields.Label(d), text);
             }
             // Required values missing (driver, customer, sites, material, dates, weight) are reported by the form rules below.
             if (!ok) continue;
             if (driver is null || customer is null || loading is null || unloading is null || material is null)
             {
                 foreach (var (field, missing) in new[] { ("driverId", driver is null), ("customerId", customer is null), ("loadingSiteId", loading is null), ("unloadingSiteId", unloading is null), ("materialId", material is null) })
-                    if (missing) Problem(ErrorCodes.ValidationRequired, rules.Label(field));
+                    if (missing) Problem(field, ErrorCodes.ValidationRequired, null, rules.Label(field));
                 continue;
             }
             try
@@ -277,13 +304,16 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             }
             catch (AppException ex)
             {
-                if (ex.Errors.Count > 0) foreach (var e in ex.Errors) problems.Add(row.RowNumber, receipt, e.Code, e.Args.Length > 0 && e.Args[0] is string f ? [rules.Label(f), .. e.Args.Skip(1)] : e.Args);
-                else problems.Add(row.RowNumber, receipt, ex.Code, ex.Args);
+                if (ex.Errors.Count > 0)
+                    foreach (var e in ex.Errors)
+                        problems.AddAt(row.RowNumber, receipt, Col(e.Field), e.Code, null, e.Args.Length > 0 && e.Args[0] is string f ? [rules.Label(f), .. e.Args.Skip(1)] : e.Args);
+                // Rules tied to a field name its column; a closed period concerns the dates of the row.
+                else problems.AddAt(row.RowNumber, receipt, ex.Field is not null ? Col(ex.Field) : ex.Code == ErrorCodes.PeriodClosed ? Col("tripDate") : null, ex.Code, null, ex.Args);
             }
         }
         var p0 = problems.Preview(keys);
-        var unused = sheet.Headers.Where(h => !string.IsNullOrWhiteSpace(h) && !matched.Values.Contains(h, StringComparer.Ordinal)).ToList();
-        return (prepared, new TripImportPreview(p0.TotalRows, prepared.Count, p0.RejectedRows, duplicates, prepared.Count(p => p.Review), mode, p0.Rows, new ImportColumns(matched, unused)));
+        return (prepared, new TripImportPreview(p0.TotalRows, prepared.Count, p0.RejectedRows, duplicates, prepared.Count(p => p.Review), mode, p0.Rows,
+            new ImportColumns(matched, unused), importable));
     }
 
     private async Task<Dictionary<string, List<T>>> Active<T>(Func<T, string> name, CancellationToken ct) where T : AuditableEntity, IArchivable =>

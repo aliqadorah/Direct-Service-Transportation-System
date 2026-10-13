@@ -82,10 +82,17 @@ public sealed record TripVoidRequest(string? Reason, string? RowVersion);
 /// <summary>Clearing "Needs review" after checking (FR-014).</summary>
 public sealed record TripReviewRequest(string? RowVersion);
 
-/// <summary>Trip import preview (FR-013): rows with problems, duplicates, rows flagged for review, matched columns.</summary>
+/// <summary>
+/// Trip import preview (FR-013): rows with problems, duplicates, rows flagged for review, matched columns, and the importable fields
+/// with their labels and whether the file must have them (for the column-matching step). When required columns are not found
+/// (<paramref name="MissingColumns"/>, field keys) the rows are not checked: the columns are matched by hand first.
+/// </summary>
 public sealed record TripImportPreview(
     int TotalRows, int ValidRows, int RejectedRows, int DuplicateRows, int ReviewRows, string Mode,
-    IReadOnlyList<Accounting.ImportRowResult> Rows, ImportColumns Columns);
+    IReadOnlyList<Accounting.ImportRowResult> Rows, ImportColumns Columns, IReadOnlyList<ImportField>? Fields = null, IReadOnlyList<string>? MissingColumns = null);
+
+/// <summary>A field an import can fill: key (mapping key), label in the user's language, and whether the file must have the column.</summary>
+public sealed record ImportField(string Key, string Label, bool Required);
 
 /// <summary>Trip import result: batch, imported, rejected and flagged counts (import log).</summary>
 public sealed record TripImportResult(string BatchId, int TotalRows, int ImportedRows, int RejectedRows, int ReviewRows);

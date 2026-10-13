@@ -142,11 +142,11 @@ public static class HelpTopics
                 "إضافة رحلات كثيرة من ملف Excel أو CSV أو بلصقها.",
                 "من يملك صلاحية إنشاء الرحلات.",
                 [
-                    "العمليات ← استيراد الرحلات: ارفع ملف Excel أو CSV، أو الصق الجدول.",
-                    "تُطابق الأعمدة تلقائياً بأسماء الحقول؛ عدّل المطابقة إن لزم.",
-                    "المعاينة تعرض الصفوف الصالحة والمرفوضة (مع السبب) والمكرّرة.",
-                    "اختر الوضع: «صارم» (أي صف خاطئ يوقف الاستيراد) أو «متساهل» (القيم الاختيارية الخاطئة تأخذ الافتراضي ويُعلَّم الصف «تحتاج مراجعة»).",
-                    "اضغط «استيراد N صفاً صالحاً». تُرحّل القيود ويُسجّل الاستيراد.",
+                    "العمليات ← استيراد الرحلات. الخطوة 1 «الملف»: ارفع ملف Excel أو CSV واختر الوضع: «صارم» (أي صف خاطئ يوقف الاستيراد) أو «متساهل» (القيم الاختيارية الخاطئة تأخذ الافتراضي ويُعلَّم الصف «تحتاج مراجعة»).",
+                    "الخطوة 2 «مطابقة الأعمدة»: تُطابق الأعمدة تلقائياً بأسماء الحقول؛ اختر لكل حقل عموده في الملف. الحقول المعلَّمة بـ * يجب أن تكون في الملف.",
+                    "الخطوة 3 «التحقق»: ملخص بعدد الصفوف الصالحة والمرفوضة والمكرّرة، ولكل صف مرفوض رقم الصف والعمود والمشكلة وطريقة التصحيح. صحّح الملف واضغط «رفع الملف المصحَّح»؛ تبقى المطابقة كما هي.",
+                    "«التالي» و«السابق» تنقلان بين الخطوات دون فقد الملف أو المطابقة.",
+                    "الخطوة 4 «استيراد»: اضغط «استيراد N صفاً صالحاً». تُرحّل القيود ويُسجّل الاستيراد.",
                     "راجع الصفوف المعلَّمة «تحتاج مراجعة» في قائمة الرحلات وصحّحها ثم اضغط «مسح تحتاج مراجعة».",
                 ],
                 [
@@ -158,11 +158,11 @@ public static class HelpTopics
                 "Adding many trips from an Excel or CSV file, or by pasting them.",
                 "Users who may create trips.",
                 [
-                    "Operations → Import trips: upload an Excel or CSV file, or paste the table.",
-                    "Columns are matched automatically by field name; adjust the matching if needed.",
-                    "The preview shows valid, rejected (with the reason) and duplicate rows.",
-                    "Choose the mode: Strict (any wrong row stops the import) or Tolerant (wrong optional values take their default and the row is flagged Needs review).",
-                    "Press “Import N valid rows”. The entries are posted and the import is logged.",
+                    "Operations → Import trips. Step 1 “File”: upload an Excel or CSV file and choose the mode: Strict (any wrong row stops the import) or Tolerant (wrong optional values take their default and the row is flagged Needs review).",
+                    "Step 2 “Column matching”: columns are matched automatically by field name; choose the file's column for each field. Fields marked * must be in the file.",
+                    "Step 3 “Check”: a summary of valid, rejected and duplicate rows, and for each rejected row its row number, column, problem and how to fix it. Correct the file and press “Upload the corrected file”; the matching is kept.",
+                    "Next and Back move between the steps without losing the file or the matching.",
+                    "Step 4 “Import”: press “Import N valid rows”. The entries are posted and the import is logged.",
                     "Find the rows flagged Needs review in the trip list, correct them, then press Clear “Needs review”.",
                 ],
                 [

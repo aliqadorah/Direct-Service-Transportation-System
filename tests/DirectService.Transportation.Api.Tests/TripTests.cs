@@ -292,6 +292,58 @@ public sealed class TripTests(ApiFactory f)
         Assert.Equal("rates.inUse", await (await o.Client.PutAsJsonAsync(U(o, $"/monthly-rates/{Month(Today)}"), new MonthRatesRequest([new SiteRateRequest(w.Loading.Id, null, null, row.RowVersion)]))).ProblemCodeAsync());
     }
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026 (SCR-12): each problem names its column (the file's header) and how to fix it, in the user's language;
+    /// a file without a required column still returns its headers for matching by hand (the import is refused); a column left out with
+    /// "" is not imported; a mapped header missing from a corrected file falls back to the automatic matching.
+    /// </summary>
+    [Fact]
+    public async Task Import_preview_gives_column_and_fix_per_problem_and_lets_columns_be_matched_by_hand()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var d = Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        MultipartFormDataContent Form(string csv, string? mapping = null)
+        {
+            var form = new MultipartFormDataContent { { new ByteArrayContent(Encoding.UTF8.GetBytes(csv)), "file", "trips.csv" }, { new StringContent("strict"), "mode" } };
+            if (mapping is not null) form.Add(new StringContent(mapping), "mapping");
+            return form;
+        }
+        async Task<TripImportPreview> PreviewAsync(string csv, string? mapping = null)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, U(o, "/trips/import/preview")) { Content = Form(csv, mapping) };
+            return await ReadAsync<TripImportPreview>(await o.Client.SendAsync(req));
+        }
+
+        const string header = "Receipt no,Date,Driver,Customer,Loading site,Unloading site,Material,Loaded weight,Notes\n";
+        var csv = header + $"P-1,{d},9871234560,Arab Potash,Ghor Al-Safi,Aqaba Port,Potash,32.000,ok\n" +
+                  $"P-2,12/31/x,9871234560,Arab Potash,Maan Yard,Aqaba Port,Potash,3 t,\n";
+        var p = await PreviewAsync(csv);
+        var row = p.Rows.Single(r => r.Row == 3);
+        Assert.Equal(3, row.Details!.Count);
+        Assert.Contains(row.Details, x => x.Column == "Date" && x.Fix.Contains("yyyy-mm-dd", StringComparison.Ordinal));
+        Assert.Contains(row.Details, x => x.Column == "Loading site" && x.Code == "import.unknown" && x.Message.Contains("Maan Yard", StringComparison.Ordinal)
+            && x.Fix.Contains("master data", StringComparison.Ordinal));
+        Assert.Contains(row.Details, x => x.Column == "Loaded weight" && x.Fix.Contains("31.850", StringComparison.Ordinal));
+        Assert.Contains(p.Fields!, f => f.Key == "driverId" && f.Required);
+        Assert.Contains(p.Fields!, f => f.Key == "notes" && !f.Required);
+
+        // A required column under another name: headers returned, rows not checked, import refused; matched by hand it works.
+        var renamed = csv.Replace("Driver,", "Truck driver,", StringComparison.Ordinal);
+        var missing = await PreviewAsync(renamed);
+        Assert.Equal(["driverId"], missing.MissingColumns);
+        Assert.Contains("Truck driver", missing.Columns.Unused);
+        Assert.Empty(missing.Rows);
+        Assert.Equal("import.missingColumn", await (await o.Client.PostAsync(U(o, "/trips/import"), Form(renamed))).ProblemCodeAsync());
+        var byHand = await PreviewAsync(renamed, """{"driverId":"Truck driver"}""");
+        Assert.Null(byHand.MissingColumns);
+        Assert.Equal(1, byHand.ValidRows);
+
+        // "" leaves an optional column out; a mapped header the corrected file no longer has falls back to the automatic matching.
+        Assert.False((await PreviewAsync(csv, """{"notes":""}""")).Columns.Matched.ContainsKey("notes"));
+        Assert.Equal("Driver", (await PreviewAsync(csv, """{"driverId":"Truck driver"}""")).Columns.Matched["driverId"]);
+    }
+
     [Fact]
     public async Task Import_strict_and_tolerant_with_rate_rules_and_review_FR013_FR033_FR014()
     {

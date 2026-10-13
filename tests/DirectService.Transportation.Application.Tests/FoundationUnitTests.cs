@@ -95,6 +95,22 @@ public sealed class FoundationUnitTests
         Assert.Equal("Field «Phone» is required.", ErrorCatalog.Format(ErrorCodes.ValidationRequired, "en", "Phone"));
     }
 
+    /// <summary>Owner feedback 13 Oct 2026: every import fix exists in Arabic and English; a code without its own fix gets the general one.</summary>
+    [Fact]
+    public void Every_import_fix_has_both_languages_and_unknown_codes_get_the_default()
+    {
+        foreach (var (code, (ar, en)) in ImportFixCatalog.All)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(ar), code);
+            Assert.False(string.IsNullOrWhiteSpace(en), code);
+            Assert.NotEqual(ar, en);
+            Assert.True(code.StartsWith("fix.", StringComparison.Ordinal) || ErrorCatalog.IsKnown(code), $"{code} is not an error code");
+        }
+        Assert.Contains("البيانات الأساسية", ImportFixCatalog.For(ErrorCodes.ImportUnknown, "ar"), StringComparison.Ordinal);
+        Assert.Contains("master data", ImportFixCatalog.For(ErrorCodes.ImportUnknown, "en"), StringComparison.Ordinal);
+        Assert.Equal(ImportFixCatalog.For(ImportFixCatalog.Default, "en"), ImportFixCatalog.For("some.other", "en"));
+    }
+
     [Theory]
     [InlineData("a@b.co", true)]
     [InlineData("name.surname@company.jo", true)]
