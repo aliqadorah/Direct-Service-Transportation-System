@@ -157,3 +157,54 @@ export function printHtml(el, html) {
     el.srcdoc = html;
   });
 }
+
+/**
+ * Places an open combo list as an overlay fixed to the window (owner feedback 13 Oct 2026, SCR-32): a list inside a scrolling table or
+ * panel is no longer clipped by it nor covers the next rows inside it. Below the field when there is room, else above; it follows the
+ * field while the page or a panel scrolls and on resize, until unfloatList.
+ */
+const floating = new Map();
+export function floatList(wrap, id) {
+  const place = () => {
+    const list = wrap && wrap.querySelector(".ddlist");
+    const input = wrap && wrap.querySelector("input");
+    if (!list || !input) return;
+    const r = input.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+    const width = Math.min(Math.max(r.width, 300), vw - 16);
+    list.style.position = "fixed";
+    list.style.minWidth = width + "px";
+    list.style.maxWidth = (vw - 16) + "px";
+    if (getComputedStyle(wrap).direction === "rtl") {
+      list.style.left = "auto";
+      list.style.right = Math.max(8, vw - r.right) + "px";
+    } else {
+      list.style.right = "auto";
+      list.style.left = Math.max(8, Math.min(r.left, vw - width - 8)) + "px";
+    }
+    const below = vh - r.bottom - 8, above = r.top - 8;
+    const wantHeight = Math.min(list.scrollHeight, 280);
+    if (below < wantHeight && above > below) {
+      list.style.top = "auto";
+      list.style.bottom = (vh - r.top + 2) + "px";
+      list.style.maxHeight = Math.min(280, above) + "px";
+    } else {
+      list.style.bottom = "auto";
+      list.style.top = (r.bottom + 2) + "px";
+      list.style.maxHeight = Math.min(280, Math.max(below, 120)) + "px";
+    }
+  };
+  place();
+  if (floating.has(id)) return;
+  const handler = () => place();
+  window.addEventListener("scroll", handler, true);
+  window.addEventListener("resize", handler);
+  floating.set(id, handler);
+}
+export function unfloatList(id) {
+  const h = floating.get(id);
+  if (!h) return;
+  window.removeEventListener("scroll", h, true);
+  window.removeEventListener("resize", h);
+  floating.delete(id);
+}

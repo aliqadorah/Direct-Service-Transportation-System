@@ -10,9 +10,13 @@ public abstract class UiTestBase : BunitContext
     protected UiTestBase()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JSInterop.SetupModule("./js/ui.js").Mode = JSRuntimeMode.Loose;
+        UiModule = JSInterop.SetupModule("./js/ui.js");
+        UiModule.Mode = JSRuntimeMode.Loose;
         Services.AddClientUi();
     }
+
+    /// <summary>The design system's JS module (<c>js/ui.js</c>): its calls are recorded for checks.</summary>
+    protected BunitJSModuleInterop UiModule { get; }
 
     protected Loc L => Services.GetRequiredService<Loc>();
 

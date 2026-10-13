@@ -188,6 +188,29 @@ public sealed class ComponentTests : UiTestBase
         cut.WaitForAssertion(() => Assert.Equal("سامي العبادي", cut.Find("[role=option] span").TextContent));
     }
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026 (SCR-32): an open list is placed as an overlay fixed to the window (never clipped by the journal lines' scroll
+    /// box), placed again while it changes, and released when it closes.
+    /// </summary>
+    [Fact]
+    public void Combo_list_floats_above_scrolling_containers_while_open()
+    {
+        string? value = null;
+        IReadOnlyList<Option<string?>> options = [new("a1", "1101 · الصندوق"), new("a2", "110201 · البنك")];
+        var cut = Render<ComboField<string?>>(p => p.Add(x => x.Value, value).Add(x => x.ValueChanged, v => value = v)
+            .Add(x => x.ValueExpression, () => value).Add(x => x.Options, options).Add(x => x.Label, "الحساب"));
+        Assert.DoesNotContain(UiModule.Invocations, i => i.Identifier == "floatList");
+        cut.Find("input").Click();
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("[role=option]").Count));
+        Assert.Contains(UiModule.Invocations, i => i.Identifier == "floatList");
+        cut.Find("input").Input("البنك");
+        var placed = UiModule.Invocations.Count(i => i.Identifier == "floatList");
+        Assert.True(placed >= 2, "placed again when the list changes");
+        cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        Assert.Equal("a2", value);
+        Assert.Contains(UiModule.Invocations, i => i.Identifier == "unfloatList");
+    }
+
     [Fact]
     public void Error_summary_lists_field_errors_with_links_to_the_fields()
     {

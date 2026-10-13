@@ -172,6 +172,26 @@
         _active = -1;
     }
 
+    private bool _floating;
+
+    /// <summary>
+    /// The open list is an overlay fixed to the window, placed at the field (owner feedback 13 Oct 2026, SCR-32: inside the journal lines'
+    /// scroll box it was clipped and covered the next row). Placed again after every render while open (the list's height changes).
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open)
+        {
+            await Js.FloatList(_wrap, _ctl);
+            _floating = true;
+        }
+        else if (_floating)
+        {
+            _floating = false;
+            await Js.UnfloatList(_ctl);
+        }
+    }
+
     private async Task Listen()
     {
         if (_listening) return;
@@ -200,6 +220,7 @@
     public async ValueTask DisposeAsync()
     {
         if (_listening) await Js.OffOutside(_ctl);
+        if (_floating) await Js.UnfloatList(_ctl);
         _search?.Cancel();
         _search?.Dispose();
         _ref?.Dispose();

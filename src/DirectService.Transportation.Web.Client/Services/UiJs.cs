@@ -45,6 +45,10 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask PrintHtml(Microsoft.AspNetCore.Components.ElementReference el, string html) => Call("printHtml", el, html);
     public ValueTask ScrollIntoView(Microsoft.AspNetCore.Components.ElementReference el) => Call("scrollIntoView", el);
 
+    /// <summary>An open combo list as an overlay fixed to the window (never clipped by a scrolling table or panel); <see cref="UnfloatList"/> ends it.</summary>
+    public ValueTask FloatList(Microsoft.AspNetCore.Components.ElementReference wrap, string id) => Call("floatList", wrap, id);
+    public ValueTask UnfloatList(string id) => Call("unfloatList", id);
+
     public async ValueTask DisposeAsync()
     {
         if (_module is null) return;
