@@ -27,6 +27,7 @@ internal static class PlatformEndpoints
             await s.DeletePlanAsync(plan, r.Reason, ct).ConfigureAwait(false);
             return TypedResults.NoContent();
         });
+        p.MapGet("/search", async (string? q, ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.SearchAsync(q, ct).ConfigureAwait(false)));
         p.MapGet("/tenants", async ([AsParameters] ConsoleTenantQuery q, ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.TenantsAsync(q, ct).ConfigureAwait(false)));
         p.MapGet("/tenants/{tenant}", async (string tenant, ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.TenantDetailsAsync(tenant, ct).ConfigureAwait(false)));
         p.MapPost("/tenants/{tenant}/extend-trial", async (string tenant, ExtendTrialRequest r, ConsoleService s, CancellationToken ct) =>

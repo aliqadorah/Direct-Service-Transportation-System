@@ -9,6 +9,8 @@
 @inject Loc L
 @inject ShellState Shell
 @inject ToastService Toasts
+@inject NavigationManager Nav
+@implements IDisposable
 
 <PageHeader Title="@L["nav.tenants"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.tenants"])])" />
 <ListShell Label="@L["nav.tenants"]" Views="Views" View="@_status" ViewChanged="SetView" Search="@_q" OnSearch="Search" State="_state" Reference="@_reference" OnRetry="Load"
@@ -126,7 +128,20 @@
         "credit" => L.F("con.creditTitle", _invoice?.Number ?? ""), "support" => L["con.requestSupport"], _ => "",
     };
 
-    protected override Task OnInitializedAsync() => Load();
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += Navigated;
+        await Load();
+        await OpenFromAddress();
+    }
+
+    /// <summary>A search result (?tenant=…, owner feedback 13 Oct 2026) opens that tenant's panel, also when the console is already on this list.</summary>
+    private void Navigated(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => _ = InvokeAsync(async () => { await OpenFromAddress(); StateHasChanged(); });
+
+    private Task OpenFromAddress() =>
+        System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tenant"] is { Length: > 0 } id ? OpenId(id) : Task.CompletedTask;
+
+    public void Dispose() => Nav.LocationChanged -= Navigated;
 
     private Task SetView(string v) { _status = v; _page = 1; return Load(); }
     private Task Search(string? q) { _q = string.IsNullOrWhiteSpace(q) ? null : q; _page = 1; return Load(); }
@@ -166,13 +181,15 @@
         return list;
     }
 
-    private async Task Open(ConsoleTenantResponse t)
+    private Task Open(ConsoleTenantResponse t) => OpenId(t.Id);
+
+    private async Task OpenId(string id)
     {
         var version = ++_detailsVersion;
         _details = null;   // no action on the previous tenant while this one loads
         try
         {
-            var details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{Uri.EscapeDataString(t.Id)}");
+            var details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{Uri.EscapeDataString(id)}");
             if (version != _detailsVersion) return;   // another tenant was clicked meanwhile
             _details = details;
             _panel = true;

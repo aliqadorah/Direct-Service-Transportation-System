@@ -7,7 +7,7 @@
 <Modal Open="Open" OpenChanged="OpenChanged" Title="@L["shell.commandBar"]" Icon="search" Wide="true" Describe="false" CloseOnScrim="true">
     <div class="combo">
         <input class="input" type="search" role="combobox" aria-expanded="true" aria-controls="@_list" aria-autocomplete="list" autocomplete="off" autofocus
-               aria-label="@L["shell.commandBar"]" placeholder="@L["shell.search"]" aria-activedescendant="@(_active >= 0 ? $"{_list}-{_active}" : null)"
+               aria-label="@L["shell.commandBar"]" placeholder="@(Placeholder ?? L["shell.search"])" aria-activedescendant="@(_active >= 0 ? $"{_list}-{_active}" : null)"
                value="@_text" @oninput="Input" @onkeydown="Key" @ref="_input" />
     </div>
     <ul class="ddlist" role="listbox" id="@_list" style="position:static;box-shadow:none;max-height:360px" aria-label="@L["shell.commandBar"]">
@@ -38,6 +38,8 @@
     [Parameter] public IReadOnlyList<CommandResult> Commands { get; set; } = [];
     /// <summary>Record search (global search API); returns results with their links.</summary>
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<CommandResult>>>? SearchAsync { get; set; }
+    /// <summary>Hint in the search field: what this search finds (the provider console searches provider data only).</summary>
+    [Parameter] public string? Placeholder { get; set; }
 
     protected override void OnParametersSet()
     {

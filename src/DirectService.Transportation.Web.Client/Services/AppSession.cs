@@ -125,4 +125,15 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
             .Where(x => x.Href is not null)
             .Select(x => new CommandResult(x.Hit.Detail is null ? x.Hit.Title : $"{x.Hit.Title} · {x.Hit.Detail}", loc["search." + x.Hit.Type], x.Href!)).ToList();
     }
+
+    /// <summary>
+    /// The provider console's search (owner feedback 13 Oct 2026): tenants, subscriptions, subscription invoices and platform staff; a tenant,
+    /// subscription or invoice opens its tenant's panel, a staff member the staff screen.
+    /// </summary>
+    public async Task<IReadOnlyList<CommandResult>> ConsoleSearchAsync(string text, CancellationToken ct)
+    {
+        var r = await api.GetAsync<SearchResponse>("api/v1/platform/search?q=" + Uri.EscapeDataString(text), ct).ConfigureAwait(false);
+        return r.Hits.Select(h => new CommandResult(h.Detail is null ? h.Title : $"{h.Title} · {h.Detail}", loc["con.hit." + h.Type],
+            h.Type == ConsoleSearchKinds.Staff ? "/console/staff?staff=" + Uri.EscapeDataString(h.Id) : "/console/tenants?tenant=" + Uri.EscapeDataString(h.Id))).ToList();
+    }
 }

@@ -133,6 +133,42 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Contains(await ReadAsync<List<AnnouncementResponse>>(await owner.Client.GetAsync("/api/v1/announcements")), a => a.Title == "Maintenance");
     }
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026: the console search finds provider data only — tenants by name or a user's e-mail, subscriptions by plan,
+    /// subscription invoices by number, platform staff by name or e-mail — never company records; tenants' users cannot use it.
+    /// </summary>
+    [Fact]
+    public async Task Console_search_finds_tenants_subscriptions_invoices_and_staff_only()
+    {
+        var staff = await StaffAsync();
+        var organisation = "Searchable " + Guid.NewGuid().ToString("N")[..6];
+        var owner = await f.SignUpOwnerAsync(organisation);
+        var plan = await ReadAsync<PlanResponse>(await staff.Client.PostAsJsonAsync("/api/v1/platform/plans", Plan("S" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(), 40m)));
+        var checkout = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(plan.Id)));
+        // A company record whose text matches: never part of the console search.
+        await (await owner.Client.PostAsJsonAsync(U(owner, "/customers"), new CustomerRequest(organisation + " customer", null, null, "0781234567", null, null, null, null, 30,
+            null, null, null, null, null))).EnsureOkAsync();
+
+        async Task<SearchResponse> Search(string q) => await ReadAsync<SearchResponse>(await staff.Client.GetAsync("/api/v1/platform/search?q=" + Uri.EscapeDataString(q)));
+        var byName = await Search(organisation);
+        var tenantHit = Assert.Single(byName.Hits, h => h.Type == ConsoleSearchKinds.Tenant);
+        Assert.Equal(organisation, tenantHit.Title);
+        Assert.All(byName.Hits, h => Assert.Contains(h.Type, new[] { ConsoleSearchKinds.Tenant, ConsoleSearchKinds.Subscription, ConsoleSearchKinds.Invoice, ConsoleSearchKinds.Staff }));
+        Assert.DoesNotContain(byName.Hits, h => h.Title.Contains("customer", StringComparison.Ordinal));
+        Assert.Equal(tenantHit.Id, Assert.Single((await Search(owner.Email)).Hits, h => h.Type == ConsoleSearchKinds.Tenant).Id);
+        // The tenant list's own search also finds a tenant by a user's e-mail.
+        Assert.Equal(organisation, Assert.Single((await ReadAsync<PagedResult<ConsoleTenantResponse>>(
+            await staff.Client.GetAsync("/api/v1/platform/tenants?q=" + Uri.EscapeDataString(owner.Email)))).Items).Name);
+        // Subscriptions by plan code; subscription invoices by number (pointing to their tenant); staff by e-mail.
+        Assert.Contains((await Search("TRIAL")).Hits, h => h.Type == ConsoleSearchKinds.Subscription);
+        var invoiceHit = Assert.Single((await Search(checkout.Invoice.Number)).Hits, h => h.Type == ConsoleSearchKinds.Invoice);
+        Assert.Equal(tenantHit.Id, invoiceHit.Id);
+        Assert.Contains((await Search(staff.Email)).Hits, h => h.Type == ConsoleSearchKinds.Staff && h.Detail == staff.Email);
+        Assert.Empty((await Search("x")).Hits);   // two characters at least
+        // Not for tenants' users.
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/search?q=" + Uri.EscapeDataString(organisation))).StatusCode);
+    }
+
     [Fact]
     public async Task Checkout_webhook_upgrade_downgrade_and_credit_P04_P07_BR012()
     {

@@ -151,6 +151,36 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Contains("owner@example.test", Text(cut));
     }
 
+    /// <summary>Owner feedback 13 Oct 2026: the console's search finds provider data, says so in its hint, and opens the tenant a hit belongs to.</summary>
+    [Fact]
+    public async Task Console_search_lists_provider_hits_with_their_screens_and_a_matching_hint()
+    {
+        Respond("/platform/search", new Contracts.Collaboration.SearchResponse("نقل", [
+            new(ConsoleSearchKinds.Tenant, "t1", "نقليات الجنوب", "Trial"), new(ConsoleSearchKinds.Invoice, "t1", "SUB-000042", "نقليات الجنوب · 40.000 · Due"),
+            new(ConsoleSearchKinds.Staff, "u7", "رنا", "rana@platform.test")]));
+        var hits = await Services.GetRequiredService<AppSession>().ConsoleSearchAsync("نقل", CancellationToken.None);
+        Assert.Equal(["/console/tenants?tenant=t1", "/console/tenants?tenant=t1", "/console/staff?staff=u7"], hits.Select(h => h.Href));
+        Assert.Equal([L["con.hit.tenant"], L["con.hit.subscriptionInvoice"], L["con.hit.staff"]], hits.Select(h => h.Kind));
+        Assert.Contains(Requests, r => r.Path.StartsWith("/platform/search?q=", StringComparison.Ordinal));
+
+        var bar = Render<CommandBar>(p => p.Add(x => x.Open, true).Add(x => x.Placeholder, L["shell.searchConsole"]));
+        Assert.Equal(L["shell.searchConsole"], bar.Find("input[type=search]").GetAttribute("placeholder"));
+        Assert.NotEqual(L["shell.search"], L["shell.searchConsole"]);
+    }
+
+    [Fact]
+    public void Console_tenant_list_opens_the_tenant_of_a_search_hit()
+    {
+        var t = new ConsoleTenantResponse("t1", "نقليات الجنوب", "Trial", new PlanSummary("pl0", "TRIAL", "Trial"), "Monthly", Usage, DateTime.UtcNow.AddDays(-10),
+            DateTime.UtcNow.AddDays(4), null, null, null, null, "owner@example.test", "A");
+        Respond("/platform/tenants/t1", new ConsoleTenantDetails(t, [], []));
+        Respond("/platform/tenants", new PagedResult<ConsoleTenantResponse>([t], 1, 50, 1));
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/console/tenants?tenant=t1");
+        var cut = Render<Tenants>();
+        cut.WaitForAssertion(() => Assert.Contains(L["con.extendTrial"], cut.Markup));
+        Assert.Contains(Requests, r => r.Path == "/platform/tenants/t1");
+    }
+
     [Fact]
     public void Console_plans_open_the_editor_and_protect_used_plans()
     {

@@ -14,7 +14,7 @@
 }
 else
 {
-    <AppShell Provider="true" OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
+    <AppShell Provider="true" SearchAsync="Session.ConsoleSearchAsync" OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
         <ChildContent>
             @if (_state == LoadState.Error) {<ErrorState Reference="@_reference" OnRetry="Load" />}
             else if (_state == LoadState.Empty) {<NotFoundView />}

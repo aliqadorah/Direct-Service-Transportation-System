@@ -20,7 +20,7 @@
         </main>
     </div>
 </div>
-<CommandBar @bind-Open="_commandBar" Commands="Commands" SearchAsync="SearchAsync" />
+<CommandBar @bind-Open="_commandBar" Commands="Commands" SearchAsync="SearchAsync" Placeholder="@L[Provider ? "shell.searchConsole" : "shell.search"]" />
 <ToastHost />
 
 @code {

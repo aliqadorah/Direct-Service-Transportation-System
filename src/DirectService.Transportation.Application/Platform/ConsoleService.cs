@@ -109,13 +109,48 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             Utc(t.GraceEndsAt), Utc(t.CancelledAt), Utc(t.RetentionEndsAt), owner, Convert.ToBase64String(t.RowVersion));
     }
 
+    /// <summary>
+    /// The provider console's search (owner feedback 13 Oct 2026): provider data only — tenants by name or a user's e-mail, subscriptions by
+    /// plan code or name, subscription invoices by number or payment reference, platform staff by name or e-mail; at most 5 hits per kind.
+    /// Invoices and subscriptions point to their tenant. Company data (trips, invoices, drivers) is never searched here.
+    /// </summary>
+    public async Task<Contracts.Collaboration.SearchResponse> SearchAsync(string? q, CancellationToken ct)
+    {
+        _ = StaffId;
+        var text = MasterDataSupport.SearchText(q);
+        if (text is null || text.Length < 2) return new(q ?? "", []);
+        const int max = 5;
+        var hits = new List<Contracts.Collaboration.SearchHit>();
+        var tenants = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted);
+        var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email.Contains(text)).Select(u => u.TenantId);
+        foreach (var t in await tenants.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id)).OrderBy(t => t.Name).Take(max)
+                     .Select(t => new { t.PublicId, t.Name, t.Status }).ToListAsync(ct).ConfigureAwait(false))
+            hits.Add(new(ConsoleSearchKinds.Tenant, support.Token<Tenant>(t.PublicId), t.Name, t.Status));
+        foreach (var t in await tenants.Where(t => t.Plan.Code.Contains(text) || t.Plan.NameEn.Contains(text) || t.Plan.NameAr.Contains(text)).OrderBy(t => t.Name).Take(max)
+                     .Select(t => new { t.PublicId, t.Name, t.Status, t.Plan.Code }).ToListAsync(ct).ConfigureAwait(false))
+            hits.Add(new(ConsoleSearchKinds.Subscription, support.Token<Tenant>(t.PublicId), t.Name, $"{t.Code} · {t.Status}"));
+        foreach (var i in await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters()
+                     .Where(i => !i.IsDeleted && (i.Number.Contains(text) || i.GatewayReference == text))
+                     .Join(tenants, i => i.TenantId, t => t.Id, (i, t) => new { i.Number, i.Total, i.Status, t.PublicId, t.Name }).OrderByDescending(x => x.Number).Take(max)
+                     .ToListAsync(ct).ConfigureAwait(false))
+            hits.Add(new(ConsoleSearchKinds.Invoice, support.Token<Tenant>(i.PublicId), i.Number, $"{i.Name} · {Accounting.Money.Format(i.Total)} · {i.Status}"));
+        foreach (var u in await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.IsPlatformStaff && !u.IsDeleted && (u.FullName.Contains(text) || u.Email.Contains(text)))
+                     .OrderBy(u => u.FullName).Take(max).Select(u => new { u.PublicId, u.FullName, u.Email }).ToListAsync(ct).ConfigureAwait(false))
+            hits.Add(new(ConsoleSearchKinds.Staff, support.Token<User>(u.PublicId), u.FullName, u.Email));
+        return new(text, hits);
+    }
+
     public async Task<PagedResult<ConsoleTenantResponse>> TenantsAsync(ConsoleTenantQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
         _ = StaffId;
         var query = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted).Include(t => t.Plan).AsQueryable();
         if (!string.IsNullOrWhiteSpace(q.Status)) query = query.Where(t => t.Status == q.Status);
-        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(t => t.Name.Contains(text));
+        if (MasterDataSupport.SearchText(q.Q) is { } text)
+        {
+            var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email.Contains(text)).Select(u => u.TenantId);
+            query = query.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id));
+        }
         var paging = new PageRequest(q.Page, q.PageSize);
         var total = await query.CountAsync(ct).ConfigureAwait(false);
         var rows = await query.OrderByDescending(t => t.Id).Skip(paging.Skip).Take(paging.SafePageSize).ToListAsync(ct).ConfigureAwait(false);

@@ -92,3 +92,12 @@ public sealed record AnnouncementResponse(string Id, string Title, string Messag
 public sealed record HealthResponse(
     bool Database, IReadOnlyDictionary<string, int> TenantsByStatus, int Users, int Companies, int TripsThisMonth, int PendingPostings, int EInvoicesWaiting, long ProcessMemoryMb,
     TimeSpan Uptime, DateTime GeneratedAt);
+
+/// <summary>Kinds of hit of the provider console's search (GET /platform/search); invoices and subscriptions carry their tenant's id.</summary>
+public static class ConsoleSearchKinds
+{
+    public const string Tenant = "tenant";
+    public const string Subscription = "subscription";
+    public const string Invoice = "subscriptionInvoice";
+    public const string Staff = "staff";
+}

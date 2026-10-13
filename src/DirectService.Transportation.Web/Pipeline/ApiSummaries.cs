@@ -449,6 +449,7 @@ internal static class ApiSummaries
         ["POST /api/v1/platform/plans"] = "Provider console: create a plan with price and limits (P-03)",
         ["PUT /api/v1/platform/plans/{plan}"] = "Provider console: edit a plan; issued invoices never change (P-03)",
         ["POST /api/v1/platform/plans/{plan}/delete"] = "Provider console: delete an unused plan (BR-040)",
+        ["GET /api/v1/platform/search"] = "Provider console search: tenants (name, user e-mail), subscriptions (plan), subscription invoices (number, payment reference) and platform staff — never company data",
         ["GET /api/v1/platform/tenants"] = "Provider console: tenants with status, plan, usage against limits and dates (P-11)",
         ["GET /api/v1/platform/tenants/{tenant}"] = "Provider console: a tenant with its subscription invoices and support requests (P-11)",
         ["POST /api/v1/platform/tenants/{tenant}/extend-trial"] = "Provider console: extend a trial (P-12, audited)",

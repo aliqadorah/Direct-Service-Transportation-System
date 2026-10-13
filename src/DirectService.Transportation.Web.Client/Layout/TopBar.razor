@@ -21,7 +21,7 @@
         </MenuButton>
     }
     <button type="button" class="cmdk" aria-label="@L["shell.commandBar"]" aria-keyshortcuts="Control+K" @onclick="OnCommandBar">
-        <Icon Name="search" /><span>@L[Provider ? "shell.searchTenant" : "shell.search"]</span><Kbd Keys="Ctrl K" />
+        <Icon Name="search" /><span>@L[Provider ? "shell.searchConsole" : "shell.search"]</span><Kbd Keys="Ctrl K" />
     </button>
     @if (!Provider)
     {
