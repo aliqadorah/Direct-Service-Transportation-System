@@ -7956,6 +7956,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/accounting/accounts/import/template": {
+      "get": {
+        "tags": [
+          "Chart of accounts"
+        ],
+        "summary": "Excel template of the chart of accounts import with opening balances: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesAccountingAccountsImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/accounting/accounts/import/preview": {
       "post": {
         "tags": [
@@ -12862,6 +12962,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/accounting/journal-entries/import/template": {
+      "get": {
+        "tags": [
+          "Journal"
+        ],
+        "summary": "Excel template of the journal import: columns, a sample entry and notes on each column",
+        "operationId": "getCompaniesAccountingJournalEntriesImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/accounting/journal-entries/import/preview": {
       "post": {
         "tags": [
@@ -15650,6 +15850,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/drivers/import/template": {
+      "get": {
+        "tags": [
+          "Drivers"
+        ],
+        "summary": "Excel template of the drivers import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesDriversImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/drivers/import/preview": {
       "post": {
         "tags": [
@@ -17272,6 +17572,106 @@
               "type": "string"
             }
           },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/customers/import/template": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "summary": "Excel template of the customers import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesCustomersImportTemplate",
+        "parameters": [
           {
             "name": "company",
             "in": "path",
@@ -19078,6 +19478,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/partners/import/template": {
+      "get": {
+        "tags": [
+          "Partners"
+        ],
+        "summary": "Excel template of the partners import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesPartnersImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/partners/import/preview": {
       "post": {
         "tags": [
@@ -20700,6 +21200,106 @@
               "type": "string"
             }
           },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/materials/import/template": {
+      "get": {
+        "tags": [
+          "Materials"
+        ],
+        "summary": "Excel template of the materials import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesMaterialsImportTemplate",
+        "parameters": [
           {
             "name": "company",
             "in": "path",
@@ -22506,6 +23106,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/loading-sites/import/template": {
+      "get": {
+        "tags": [
+          "Loading sites"
+        ],
+        "summary": "Excel template of the loading sites import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesLoadingSitesImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/loading-sites/import/preview": {
       "post": {
         "tags": [
@@ -24220,6 +24920,106 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/unloading-sites/import/template": {
+      "get": {
+        "tags": [
+          "Unloading sites"
+        ],
+        "summary": "Excel template of the unloading sites import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesUnloadingSitesImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/unloading-sites/import/preview": {
       "post": {
         "tags": [
@@ -25410,6 +26210,106 @@
               "type": "string"
             }
           },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/ownership-types/import/template": {
+      "get": {
+        "tags": [
+          "Ownership types"
+        ],
+        "summary": "Excel template of the ownership types import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesOwnershipTypesImportTemplate",
+        "parameters": [
           {
             "name": "company",
             "in": "path",
@@ -27421,6 +28321,106 @@
               "type": "string"
             }
           },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/tariffs/import/template": {
+      "get": {
+        "tags": [
+          "Tariffs"
+        ],
+        "summary": "Excel template of the tariff import: columns, a sample row and notes on each column",
+        "operationId": "getCompaniesTariffsImportTemplate",
+        "parameters": [
           {
             "name": "company",
             "in": "path",
@@ -30633,6 +31633,106 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/trips/import/template": {
+      "get": {
+        "tags": [
+          "Trips"
+        ],
+        "summary": "Excel template of the trip import: the columns in the user's language, a sample row, and a sheet explaining each column",
+        "operationId": "getCompaniesTripsImportTemplate",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           },
           "400": {
             "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
@@ -51446,6 +52546,111 @@
         ]
       }
     },
+    "/api/v1/platform/search": {
+      "get": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Provider console search: tenants (name, user e-mail), subscriptions (plan), subscription invoices (number, payment reference) and platform staff — never company data",
+        "operationId": "getPlatformSearch",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/platform/tenants": {
       "get": {
         "tags": [
@@ -52888,6 +54093,638 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff": {
+      "get": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Platform staff: name, e-mail, state (active, disabled, invited, expired invitation), last sign-in (owner feedback 13 Oct 2026)",
+        "operationId": "getPlatformStaff",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff/invitations": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Invite a staff member by e-mail: a single-use link valid for 48 hours to set a password, then two-step verification",
+        "operationId": "postPlatformStaffInvitations",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffInviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff/{staff}/resend": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Send a new invitation link (the previous one stops working)",
+        "operationId": "postPlatformStaffResend",
+        "parameters": [
+          {
+            "name": "staff",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff/{staff}/cancel": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Cancel a pending staff invitation",
+        "operationId": "postPlatformStaffCancel",
+        "parameters": [
+          {
+            "name": "staff",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff/{staff}/deactivate": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Deactivate a staff member with a reason (sessions end); not oneself nor the last active staff member",
+        "operationId": "postPlatformStaffDeactivate",
+        "parameters": [
+          {
+            "name": "staff",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/staff/{staff}/reactivate": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Reactivate a deactivated staff member",
+        "operationId": "postPlatformStaffReactivate",
+        "parameters": [
+          {
+            "name": "staff",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
                 }
               }
             }
@@ -59805,6 +61642,25 @@
           }
         }
       },
+      "ImportField": {
+        "required": [
+          "key",
+          "label",
+          "required"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
       "ImportPreview": {
         "required": [
           "totalRows",
@@ -59843,6 +61699,32 @@
             "items": {
               "$ref": "#/components/schemas/ImportRowResult"
             }
+          }
+        }
+      },
+      "ImportProblem": {
+        "required": [
+          "code",
+          "column",
+          "message",
+          "fix"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "column": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "fix": {
+            "type": "string"
           }
         }
       },
@@ -59901,6 +61783,15 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "details": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportProblem"
             }
           }
         }
@@ -64775,6 +66666,15 @@
           },
           "rowVersion": {
             "type": "string"
+          },
+          "taxRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
           }
         }
       },
@@ -65754,6 +67654,15 @@
           },
           "parameters": {
             "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required": {
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
               "type": "string"
             }
@@ -67192,6 +69101,96 @@
           },
           "custom": {
             "type": "boolean"
+          }
+        }
+      },
+      "StaffInviteRequest": {
+        "required": [
+          "fullName",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "StaffResponse": {
+        "required": [
+          "id",
+          "fullName",
+          "email",
+          "state",
+          "lastSignInAt",
+          "invitedAt",
+          "invitationExpiresAt",
+          "twoFactorEnabled",
+          "isSelf"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "lastSignInAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "invitedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "invitationExpiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "twoFactorEnabled": {
+            "type": "boolean"
+          },
+          "isSelf": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StaffStatusRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -68759,6 +70758,24 @@
           },
           "columns": {
             "$ref": "#/components/schemas/ImportColumns"
+          },
+          "fields": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportField"
+            }
+          },
+          "missingColumns": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
