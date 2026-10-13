@@ -23,6 +23,8 @@ public sealed class ToastService
 
     private void Add(Toast t)
     {
+        // The same message is shown once: repeating it moves it to the end instead of stacking copies (owner feedback 13 Oct 2026, RPT-12).
+        _items.RemoveAll(x => x.IsError == t.IsError && x.Text == t.Text && x.LinkText == t.LinkText && x.Href == t.Href);
         _items.Add(t);
         if (_items.Count > 3) _items.RemoveAt(0);
         Changed?.Invoke();

@@ -50,11 +50,13 @@
         }
         else
         {
-            <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+            @* The report's filters: required ones are checked before loading, and a refusal of the server marks its field (owner feedback 13 Oct 2026, RPT-12). *@
+            <EditForm EditContext="_ctx" OnSubmit="Run" class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+                <ProblemValidator @ref="_problems" />
                 @if (Has("from")) {<DateField @bind-Value="_q.From" Label="@L["trip.from"]" FieldClass="w160" />}
                 @if (Has("to")) {<DateField @bind-Value="_q.To" Label="@L["trip.to"]" FieldClass="w160" />}
                 @if (Has("asOf")) {<DateField @bind-Value="_q.AsOf" Label="@L["rep.asOf"]" FieldClass="w160" />}
-                @if (Has("customer")) {<ComboField TValue="string?" @bind-Value="_q.Customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+                @if (Has("customer")) {<ComboField TValue="string?" @bind-Value="_q.Customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="@Needs("customer")" Placeholder="@(Needs("customer") ? L["ui.choose"] : L["tar.all"])" FieldClass="w220" />}
                 @if (Has("driver")) {<ComboField TValue="string?" @bind-Value="_q.Driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
                 @if (Has("partner")) {<ComboField TValue="string?" @bind-Value="_q.Partner" Options="Lookups.Partners" Label="@L["md.partner"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
                 @if (Has("loadingSite")) {<ComboField TValue="string?" @bind-Value="_q.LoadingSite" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
@@ -62,15 +64,15 @@
                 @if (Has("material")) {<ComboField TValue="string?" @bind-Value="_q.Material" Options="Lookups.Materials" Label="@L["trip.material"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
                 @if (Has("groupBy")) {<SelectField TValue="string?" @bind-Value="_q.GroupBy" Options="GroupBys" Label="@L["rep.groupBy"]" FieldClass="w160" />}
                 @if (Has("side")) {<SelectField TValue="string?" @bind-Value="_q.Side" Options="Sides" Label="@L["rep.side"]" FieldClass="w160" />}
-                <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Run" />
+                <Btn Type="submit" Primary="true" Icon="filter" Text="@L["rep.run"]" />
                 <span style="margin-inline-start:auto;display:flex;gap:6px">
                     <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
                     <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
                     @if (_selected.Path is null) {<Btn Small="true" Icon="clock" Text="@L["rep.background"]" Title="@L["rep.backgroundHelp"]" OnClick="Background" />}
                 </span>
-            </div>
+            </EditForm>
             <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Run">
-                <Empty><EmptyState Icon="chart" Title="@L["rep.noRows"]" Text="@L["rep.noRowsText"]" /></Empty>
+                <Empty>@if (_waiting) {<EmptyState Icon="filter" Title="@L["rep.chooseFilters"]" Text="@L["rep.chooseFiltersText"]" />} else {<EmptyState Icon="chart" Title="@L["rep.noRows"]" Text="@L["rep.noRowsText"]" />}</Empty>
                 <ChildContent>
                     @if (_result is not null)
                     {
@@ -92,6 +94,10 @@
     private ReportResult? _result;
     private ReconciliationReport? _reconciliation;
     private QueryModel _q = new();
+    private EditContext _ctx = new(new QueryModel());
+    private ProblemValidator? _problems;
+    /// <summary>A required filter is still empty: the report waits for it (nothing was asked of the server).</summary>
+    private bool _waiting;
     private LoadState _state = LoadState.Empty;
     private string? _reference;
 
@@ -105,6 +111,9 @@
 
     private bool Has(string parameter) => _selected?.Parameters.Contains(parameter) == true;
 
+    /// <summary>The report cannot run without this filter (catalogue "required", e.g. the customer of a customer statement).</summary>
+    private bool Needs(string parameter) => _selected?.Required?.Contains(parameter) == true;
+
     protected override async Task OnInitializedAsync()
     {
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
@@ -116,10 +125,17 @@
     {
         _selected = e;
         _q = new QueryModel();
+        _ctx = new EditContext(_q);
         _result = null;
         _reconciliation = null;
         _state = LoadState.Empty;
-        if (e.Path is null || e.Key == "reconciliation") await Run();
+        _waiting = e.Required is { Count: > 0 };
+        // A report that needs a filter (a customer statement needs the customer) waits for it instead of asking the server and failing.
+        if ((e.Path is null || e.Key == "reconciliation") && !_waiting)
+        {
+            StateHasChanged();   // the filters are on screen before the answer, so a refused filter can be marked on its field
+            await Run();
+        }
     }
 
     /// <summary>Screens that serve a report listed in the catalog with its own path (7.7.2 / 7.7.3).</summary>
@@ -159,6 +175,18 @@
     private async Task Run()
     {
         if (_selected is null) return;
+        _problems?.Clear();
+        var missing = (_selected.Required ?? []).Where(p => string.IsNullOrWhiteSpace(Value(p)))
+            .Select(p => new ApiFieldError(p, "validation.required", L.F("ui.requiredField", L[FilterLabel(p)]))).ToList();
+        if (missing.Count > 0)
+        {
+            // Marked on the field itself, with its own message; one message, nothing asked of the server.
+            _problems?.Show(new ApiProblem { Status = 400, Errors = missing });
+            _waiting = true;
+            _state = LoadState.Empty;
+            return;
+        }
+        _waiting = false;
         _state = LoadState.Loading;
         try
         {
@@ -173,8 +201,31 @@
                 _state = _result.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
             }
         }
+        catch (ApiException e) when (e.Problem.Status == 400 && e.Problem.Errors is { Count: > 0 })
+        {
+            // A filter the server refuses is marked on its field (one toast for anything that belongs to no field), not "could not load".
+            if (_problems?.Show(e.Problem) is { } other) Toasts.Error(other);
+            _state = LoadState.Empty;
+            _waiting = true;
+        }
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }
+
+    private string? Value(string parameter) => parameter switch
+    {
+        "customer" => _q.Customer, "driver" => _q.Driver, "partner" => _q.Partner, "loadingSite" => _q.LoadingSite, "unloadingSite" => _q.UnloadingSite,
+        "material" => _q.Material, "groupBy" => _q.GroupBy, "side" => _q.Side,
+        "from" => _q.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        "to" => _q.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        "asOf" => _q.AsOf?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        _ => null,
+    };
+
+    private static string FilterLabel(string parameter) => parameter switch
+    {
+        "customer" => "trip.customer", "driver" => "trip.driver", "partner" => "md.partner", "loadingSite" => "trip.loading", "unloadingSite" => "trip.unloading",
+        "material" => "trip.material", "groupBy" => "rep.groupBy", "side" => "rep.side", "from" => "trip.from", "to" => "trip.to", _ => "rep.asOf",
+    };
 
     private Task Export(string format) => Files.SaveAsync(Api.C(Path + "/export" + Query()), format);
 

@@ -5,6 +5,7 @@
 *@
 @inject Api Api
 @inject Loc L
+@inject ToastService Toasts
 @inject ShellState Shell
 @inject Downloads Files
 @inject NavigationManager Nav
@@ -72,6 +73,7 @@
 
     private async Task Load()
     {
+        var before = _state;
         _state = LoadState.Loading;
         try
         {
@@ -79,6 +81,12 @@
             _from ??= _r.From;
             _to ??= _r.To;
             _state = _r.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        // A refused filter (e.g. a period of more than the allowed years) is one message, not "could not load" (owner feedback 13 Oct 2026, RPT-12).
+        catch (ApiException e) when (e.Problem.Status == 400)
+        {
+            Toasts.Error(e.Problem.Errors is { Count: > 0 } errors ? string.Join(" · ", errors.Select(x => x.Message)) : e.Problem.Detail ?? L["ui.loadFailed"]);
+            _state = before == LoadState.Loading ? LoadState.Empty : before;
         }
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }

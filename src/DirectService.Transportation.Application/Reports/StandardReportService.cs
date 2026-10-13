@@ -29,7 +29,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
 
     private string L(string ar, string en) => En ? en : ar;
 
-    private sealed record Def(string Key, string Code, string Group, string Ar, string En, string? Path, string[] Parameters, string AltPermission);
+    private sealed record Def(string Key, string Code, string Group, string Ar, string En, string? Path, string[] Parameters, string AltPermission, string[]? Required = null);
 
     private static readonly Def[] Catalog =
     [
@@ -44,7 +44,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         new("partner-shipments", "RPT-09", "operational", "شحنات الشركاء", "Partner shipments", null, ["from", "to", "partner"], PermissionKeys.TripsView),
         new("margin", "RPT-10", "operational", "تحليل الهامش", "Margin analysis", null, ["from", "to", "groupBy"], PermissionKeys.TripsView),
         new("monthly-summary", "RPT-11", "operational", "الملخص الشهري", "Monthly summary", null, ["from", "to"], PermissionKeys.TripsView),
-        new("customer-statement", "RPT-12", "financial", "كشف حساب عميل", "Customer statement", null, ["customer", "from", "to"], PermissionKeys.InvView),
+        new("customer-statement", "RPT-12", "financial", "كشف حساب عميل", "Customer statement", null, ["customer", "from", "to"], PermissionKeys.InvView, Required: ["customer"]),
         new("driver-statement", "RPT-13", "financial", "كشف حساب سائق", "Driver statement", "/drivers/{driver}/statement", ["driver", "from", "to"], PermissionKeys.DrvView),
         new("partner-statement", "RPT-14", "financial", "كشف حساب شريك", "Partner statement", "/partners/{partner}/statement", ["partner", "from", "to"], PermissionKeys.DrvView),
         new("account-statement", "RPT-15", "financial", "كشف حساب أستاذ", "Ledger account statement", "/accounting/reports/account-statement", ["account", "from", "to"], PermissionKeys.AcctView),
@@ -60,7 +60,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
 
     /// <summary>Reports the caller may run: reports.view opens all (PRD 3.4), otherwise the module's view permission.</summary>
     public IReadOnlyList<ReportCatalogEntry> CatalogFor() => Catalog.Where(Allowed)
-        .Select(d => new ReportCatalogEntry(d.Key, d.Code, d.Group, En ? d.En : d.Ar, d.Path, d.Parameters)).ToList();
+        .Select(d => new ReportCatalogEntry(d.Key, d.Code, d.Group, En ? d.En : d.Ar, d.Path, d.Parameters, d.Required ?? [])).ToList();
 
     private bool Allowed(Def d) => ctx.HasPermission(PermissionKeys.ReportsView) || ctx.HasPermission(d.AltPermission);
 

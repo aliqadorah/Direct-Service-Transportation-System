@@ -14,6 +14,8 @@ public static partial class UiText
         ["rep.side"] = ("الطرف", "Side"),
         ["rep.noRows"] = ("لا نتائج", "No results"),
         ["rep.noRowsText"] = ("لا بيانات تطابق المرشحات. وسّع الفترة أو غيّر المرشحات.", "No data matches the filters. Widen the period or change the filters."),
+        ["rep.chooseFilters"] = ("اختر المرشحات المطلوبة", "Choose the required filters"),
+        ["rep.chooseFiltersText"] = ("هذا التقرير يحتاج المرشحات المعلّمة بـ *، ثم اضغط «عرض».", "This report needs the filters marked *, then press “Show”."),
         ["rep.background"] = ("تصدير في الخلفية", "Export in the background"),
         ["rep.backgroundHelp"] = ("للنتائج الكبيرة: يصلك إشعار عند جاهزية الملف.", "For large results: you are notified when the file is ready."),
         ["rep.backgroundQueued"] = ("بدأ التصدير في الخلفية؛ سيصلك إشعار عند جاهزية الملف.", "The export runs in the background; you will be notified when the file is ready."),

@@ -25,7 +25,8 @@ public sealed record ReportFilterValue(string Label, string Value);
 /// A standard report in the catalog: key, group (operational / financial), title, whether the caller may run it, and — for reports served by
 /// their own module (trips list, statements, ageing, registers, e-invoicing, reconciliation) — the API path that serves it.
 /// </summary>
-public sealed record ReportCatalogEntry(string Key, string Code, string Group, string Title, string? Path, IReadOnlyList<string> Parameters);
+/// <summary>A report of the catalogue: its filters (<paramref name="Parameters"/>) and those it cannot run without (<paramref name="Required"/>, checked by the screen first).</summary>
+public sealed record ReportCatalogEntry(string Key, string Code, string Group, string Title, string? Path, IReadOnlyList<string> Parameters, IReadOnlyList<string>? Required = null);
 
 /// <summary>
 /// Filters of the standard reports (each report uses the ones it lists): period, as-of date, customer, driver, partner, loading and
