@@ -127,6 +127,8 @@ public static partial class UiText
         ["cn.date"] = ("تاريخ الإشعار", "Credit note date"),
         ["cn.approve"] = ("اعتماد الإشعار", "Approve the credit note"),
         ["cn.remainingHelp"] = ("المتبقي على الفاتورة {0}", "Remaining on the invoice {0}"),
+        ["cn.balanceHelp"] = ("المتبقي غير المسدد {0} — الإجمالي {1}، المسدد {2}، المرتجع سابقاً {3}", "Unpaid remaining {0} — total {1}, paid {2}, already credited {3}"),
+        ["cn.returnedBefore"] = ("{0} من بنود الفاتورة مرتجعة سابقاً ولا تظهر هنا.", "{0} line(s) of the invoice were returned earlier and are not shown here."),
         ["cn.pickTrips"] = ("اختر الرحلات المرتجعة", "Choose the returned trips"),
         ["cn.pickLines"] = ("اختر البنود والكميات المرتجعة", "Choose the returned lines and quantities"),
         ["cn.nothingOpen"] = ("كل بنود الفاتورة مرتجعة", "Every line of the invoice is returned"),

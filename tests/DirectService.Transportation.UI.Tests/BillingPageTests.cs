@@ -77,6 +77,28 @@ public sealed class BillingPageTests : PageTestBase
         Assert.Contains(Requests, r => r.Path.Contains("receipts?invoice=i1", StringComparison.Ordinal));
     }
 
+    /// <summary>Owner feedback 13 Oct 2026 (SCR-24): the invoice's paid and credited amounts are shown, and a returned trip is not offered again.</summary>
+    [Fact]
+    public void Credit_note_shows_paid_and_credited_amounts_and_leaves_out_returned_trips()
+    {
+        InvoiceLineResponse Line(string id, string receipt, decimal qty, decimal amount, decimal returned) =>
+            new(id, 1, new Ref("t" + id, receipt), null, qty, 6m, amount, returned, Day, null, null, "سامي", "غور الصافي", null, null, null, null);
+        var inv = Invoice() with { Total = 662.244m, PaidAmount = 331.122m, ReturnedAmount = 221.676m, RemainingAmount = 109.446m };
+        Respond("invoices/i1", new InvoiceDetails(inv, [Line("l1", "DEMO-001", 31.85m, 191.1m, 31.85m), Line("l2", "DEMO-002", 31.4m, 188.4m, 0), Line("l3", "DEMO-003", 31.9m, 191.4m, 0)],
+            [], "", []));
+        Respond("invoices/calculate", new InvoiceCalculationResponse(0, 0, 0, 0, 16m, 0, 0, false, 3, Day, null, null, false));
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/credit-notes/new?invoice=i1");
+        var cut = Render<CreditNoteForm>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("DEMO-002", cut.Markup));
+        Assert.DoesNotContain("DEMO-001", cut.Markup);
+        Assert.Equal(2, cut.FindAll("tbody input[type=checkbox]").Count);
+        var text = Text(cut);
+        Assert.Contains("331.122", text);
+        Assert.Contains("221.676", text);
+        Assert.Contains("109.446", text);
+        Assert.Contains(L.F("cn.returnedBefore", 1), text);
+    }
+
     [Fact]
     public void Draft_invoice_offers_edit_delete_and_approve_but_a_viewer_gets_only_print()
     {

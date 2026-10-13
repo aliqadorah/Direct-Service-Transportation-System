@@ -226,6 +226,54 @@ public sealed class InvoiceTests(ApiFactory f)
         Assert.Equal("credit.tripReinvoiced", await (await o.Client.PostAsJsonAsync(U(o, $"/credit-notes/{cn.CreditNote.Id}/void"), new CreditNoteVoidRequest("x", cn.CreditNote.RowVersion))).ProblemCodeAsync());
     }
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026 (SCR-24, INV-00001): three trips 191.100 + 188.400 + 191.400 = 570.900, tax 16% → 662.244, half paid
+    /// by a receipt of 331.122. Returning all three is refused because 331.122 is still unpaid, and the message says what was paid and
+    /// credited; one trip (191.100 → 221.676) is accepted; a returned trip is no longer offered nor accepted again.
+    /// </summary>
+    [Fact]
+    public async Task Credit_note_on_a_half_paid_invoice_is_capped_at_the_unpaid_amount_and_says_why_owner_feedback()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var c = o.Client;
+        var trips = new List<TripResponse>();
+        foreach (var (no, qty) in new[] { ("R-1", 31.850m), ("R-2", 31.400m), ("R-3", 31.900m) })
+        {
+            var full = w.Trips[0];
+            var r = new TripRequest(no, Today, null, null, full.Driver.Id, w.Customer.Id, full.LoadingSite.Id, full.UnloadingSite.Id, full.Material.Id, null, qty, qty, 6.000m,
+                null, null, null, null, null, null);
+            trips.Add((await ReadAsync<TripSaveResult>(await c.PostAsJsonAsync(U(o, "/trips"), r))).Trip);
+        }
+        var inv = await ReadAsync<InvoiceDetails>(await c.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, trips, approve: true, discount: 0, fees: 0)));
+        Assert.Equal((570.900m, 91.344m, 662.244m), (inv.Invoice.Subtotal, inv.Invoice.Tax, inv.Invoice.Total));
+        var money = await ReadAsync<MoneyAccountOptions>(await c.GetAsync(U(o, "/accounting/money-accounts/options")));
+        await (await c.PostAsJsonAsync(U(o, "/receipts"), new Contracts.Cash.ReceiptRequest(w.Customer.Id, Today, inv.Invoice.Id, 331.122m, "Cash", money.CashBoxes[0].Id,
+            null, null, 0, null, null))).EnsureOkAsync();
+
+        // All three: the proportional amount is 662.244 but only 331.122 is unpaid — refused, saying what was paid and credited.
+        var all = inv.Lines.Select(l => new CreditLineRequest(l.Id, null)).ToList();
+        using var req = new HttpRequestMessage(HttpMethod.Post, U(o, "/credit-notes/calculate")) { Content = JsonContent.Create(new CreditNoteRequest(inv.Invoice.Id, Today, "Returned", all, null)) };
+        req.Headers.AcceptLanguage.ParseAdd("en");
+        var refused = await c.SendAsync(req);
+        Assert.Equal("credit.exceedsRemaining", await refused.ProblemCodeAsync());
+        var detail = await refused.Content.ReadAsStringAsync();
+        Assert.Contains("The credit note (662.244) is more than the unpaid remaining amount of the invoice (331.122)", detail, StringComparison.Ordinal);
+        Assert.Contains("331.122 already paid by receipts and 0.000 already credited", detail, StringComparison.Ordinal);
+
+        // One trip: its share of the invoice plus tax (191.100 × 1.16 = 221.676), within the unpaid amount.
+        var preview = await ReadAsync<CreditNoteCalculation>(await c.PostAsJsonAsync(U(o, "/credit-notes/calculate"),
+            new CreditNoteRequest(inv.Invoice.Id, Today, "Returned", [all[0]], null)));
+        Assert.Equal((191.100m, 30.576m, 221.676m, 331.122m), (preview.Subtotal, preview.Tax, preview.Total, preview.Remaining));
+        await (await c.PostAsJsonAsync(U(o, "/credit-notes"), new CreditNoteRequest(inv.Invoice.Id, Today, "Returned", [all[0]], null))).EnsureOkAsync();
+        var after = await ReadAsync<InvoiceDetails>(await c.GetAsync(U(o, $"/invoices/{inv.Invoice.Id}")));
+        Assert.Equal((331.122m, 221.676m, 109.446m), (after.Invoice.PaidAmount, after.Invoice.ReturnedAmount, after.Invoice.RemainingAmount));
+        // The returned trip shows as fully returned (the screen leaves it out) and cannot be returned again.
+        Assert.Equal(after.Lines[0].Quantity, after.Lines[0].ReturnedQuantity);
+        Assert.Equal("credit.lineReturned", await (await c.PostAsJsonAsync(U(o, "/credit-notes/calculate"),
+            new CreditNoteRequest(inv.Invoice.Id, Today, "again", [all[0]], null))).ProblemCodeAsync());
+    }
+
     [Fact]
     public async Task Void_reverses_releases_trips_and_keeps_the_number_FR045()
     {

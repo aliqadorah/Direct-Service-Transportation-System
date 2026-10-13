@@ -27,7 +27,7 @@
     <section class="box pad" style="flex:none">
         <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))">
             <ComboField TValue="string?" @bind-Value="_m.InvoiceId" SearchAsync="SearchInvoices" Selected="_invoiceOption" Label="@L["cn.invoice"]" Required="true" Span="2"
-                        OnSelected="InvoicePicked" Help="@(_inv is null ? null : L.F("cn.remainingHelp", Fmt.Money(_inv.Invoice.RemainingAmount)))" />
+                        OnSelected="InvoicePicked" Help="@(_inv is null ? null : L.F("cn.balanceHelp", Fmt.Money(_inv.Invoice.RemainingAmount), Fmt.Money(_inv.Invoice.Total), Fmt.Money(_inv.Invoice.PaidAmount), Fmt.Money(_inv.Invoice.ReturnedAmount)))" />
             <DateField @bind-Value="_m.CreditDate" Label="@L["cn.date"]" Required="true" />
             <div></div>
             <TextField @bind-Value="_m.Reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Span="4" />
@@ -42,6 +42,7 @@
         <div class="cols fill" style="grid-template-columns:1fr 310px;align-items:stretch;min-height:0">
             <Box NoPad="true" Style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
                 <div class="bh"><span>@L[_manual ? "cn.pickLines" : "cn.pickTrips"]</span><span class="a">@if (_open.Count > 0) {<Btn Small="true" Text="@L["ui.selectAll"]" OnClick="SelectAll" />}</span></div>
+                @if (_inv.Lines.Count - _open.Count is > 0 and var returned && _open.Count > 0) {<p class="help" style="margin:6px 12px 0">@L.F("cn.returnedBefore", returned)</p>}
                 @if (_open.Count == 0)
                 {
                     <EmptyState Icon="check" Title="@L["cn.nothingOpen"]" />

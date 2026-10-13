@@ -153,8 +153,10 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         var inclusive = inv.Subtotal != linesSum;
         var t = InvoiceCalculator.Credit(picked.Sum(p => p.Amount), linesSum, invoiceTotals, inv.TaxRate, inclusive, everything, before, decimals);
         t = InvoiceCalculator.CapToRemaining(t, inv.RemainingAmount, 0.010m);
-        // BR-026: never above the remaining balance.
-        if (t.Total > inv.RemainingAmount) throw Fail.Rule(ErrorCodes.CreditExceedsRemaining, Money.Format(t.Total), Money.Format(inv.RemainingAmount));
+        // BR-026: never above the remaining balance; the message says what was already paid and credited (owner feedback 13 Oct 2026).
+        if (t.Total > inv.RemainingAmount)
+            throw Fail.Rule(ErrorCodes.CreditExceedsRemaining, Money.Format(t.Total), Money.Format(inv.RemainingAmount), Money.Format(inv.Total),
+                Money.Format(inv.PaidAmount), Money.Format(inv.ReturnedAmount));
         if (t.Total <= 0) throw Fail.Rule(ErrorCodes.InvoiceTotalZero);
         return (picked, t);
     }
