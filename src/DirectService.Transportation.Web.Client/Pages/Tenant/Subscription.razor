@@ -35,7 +35,7 @@
             <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));flex:none">
                 <Box Title="@L.F("ten.currentPlan", L.Pick(s.Plan.NameAr, s.Plan.NameEn), L["ten.cycle." + s.BillingCycle])">
                     <KeyValues Columns="2" Items="@Facts(s)" />
-                    <p class="help" style="margin:6px 0 0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate))</p>
+                    @if (TaxNoteOnCard(s)) {<p class="help" style="margin:6px 0 0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate))</p>}
                 </Box>
                 <Box Title="@L["ten.usage"]">
                     <div class="stack" style="gap:8px">
@@ -78,8 +78,8 @@
                         </GridColumn>
                     </Columns>
                 </DataGrid>
-                }
                 <p class="pad help" style="margin:0">@L.F("ten.taxIncluded", Fmt.Percent(s.Plan.TaxRate)) @L["ten.plansHelp"]</p>
+                }
             </Box>
             @* Natural height: the page scrolls, never the box (owner feedback 13 Oct 2026); long lists are paged. *@
             <Box Title="@L["ten.invoices"]" NoPad="true" Style="flex:none">
@@ -147,6 +147,13 @@
         catch (ApiException e) when (e.Problem.Status is 403 or 404) { _state = LoadState.Empty; }
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
+
+    /// <summary>
+    /// The tax note appears once per section that shows prices, never in two sections in a row (owner feedback 13 Oct 2026): on the plan
+    /// card only for a paid plan when no plans table follows (the table right below carries the note); the plans and invoices sections
+    /// only when they list something.
+    /// </summary>
+    internal static bool TaxNoteOnCard(SubscriptionResponse s) => s.Plan.Price > 0 && s.Plans.Count == 0;
 
     private IReadOnlyList<KeyValue> Facts(SubscriptionResponse s)
     {

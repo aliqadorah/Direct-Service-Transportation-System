@@ -79,6 +79,33 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Equal(6, cut.FindAll("section.box").Single(b => b.QuerySelector("caption")?.TextContent == L["ten.invoices"]).QuerySelectorAll("tbody tr").Length);
     }
 
+    private static readonly PlanResponse Trial = new("pl0", "TRIAL", "تجريبية", "Trial", 0, "Monthly", 2, 5, 2000, 1024, false, 3, "A", 16m);
+
+    private int TaxNotes(IRenderedComponent<Subscription> cut) =>
+        cut.FindAll("p.help").Count(p => p.TextContent.Contains(L.F("ten.taxIncluded", "16%"), StringComparison.Ordinal));
+
+    /// <summary>Owner feedback 13 Oct 2026 (second round): the tax note once per section showing prices, never repeated section after section.</summary>
+    [Theory]
+    [InlineData("trial, no plans on offer, one invoice", 1)]
+    [InlineData("paid plan listed in the plans table, one invoice", 2)]
+    [InlineData("paid plan no longer offered, no invoices", 1)]
+    public void Subscription_tax_note_appears_once_per_section_with_prices(string situation, int notes)
+    {
+        var invoice = new SubscriptionInvoiceResponse("si2", "SUB-000002", new(2026, 10, 13), new(2026, 11, 12), 200m, 32m, 232m, "Paid", null, "pay_2", DateTime.UtcNow);
+        var (current, plans, invoices) = situation switch
+        {
+            "trial, no plans on offer, one invoice" => (Trial, Array.Empty<PlanResponse>(), new[] { invoice }),
+            "paid plan listed in the plans table, one invoice" => (Pro, new[] { Basic, Pro }, new[] { invoice }),
+            _ => (Pro, new[] { Basic }, Array.Empty<SubscriptionInvoiceResponse>()),
+        };
+        Respond("/tenant/subscription/invoices", invoices);
+        Respond("/tenant/subscription", new SubscriptionResponse(current == Trial ? "Trial" : "Active", current, "Monthly", DateTime.UtcNow.AddDays(10), null, null, null, Usage, plans));
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains(L["ten.invoices"], cut.Markup));
+        cut.WaitForAssertion(() => Assert.Equal(notes, TaxNotes(cut)));
+        if (plans.Length == 0) Assert.DoesNotContain(L["ten.plansHelp"], Text(cut));
+    }
+
     [Fact]
     public void Subscription_with_few_invoices_has_no_pager()
     {
