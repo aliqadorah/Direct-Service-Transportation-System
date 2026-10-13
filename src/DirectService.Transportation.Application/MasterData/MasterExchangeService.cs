@@ -196,7 +196,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
                     rows.Add([.. new object?[]
                     {
                         d.FullName, d.NationalId, d.Phone1, d.Phone2, d.Address, d.LicenceNo, d.LicenceType, d.LicenceExpiry, d.PaymentMethod,
-                        d.BankName, d.Iban, d.CliqAlias, d.PlateNumber, d.TruckType, d.TrailerNo, d.CapacityTons, d.OwnershipType.Name,
+                        d.BankName, d.Iban, d.CliqAlias, d.PlateNumber, d.TruckType, d.TrailerNo, d.CapacityTons, OwnershipTypeNames.Display(d.OwnershipType.Name, ctx.Language),
                         d.Partner?.Name, d.RegistrationExpiry, d.InsuranceExpiry, d.InspectionExpiry, d.Notes, d.Status,
                     }, .. CustomCells(custom, d.CustomValues)]);
                 }
@@ -399,7 +399,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
                 }
                 var method = cell("paymentMethod") is { } m ? PaymentMethod(m) : null;
                 if (cell("paymentMethod") is { } mText && method is null) { problems.Add(row, rowKey, ErrorCodes.ImportInvalid, rules.Label("paymentMethod"), mText); ok = false; }
-                var ownershipToken = await LinkAsync<OwnershipType>(cell("ownershipTypeId"), t => t.Name, row, rowKey, rules.Label("ownershipTypeId"), problems, ct).ConfigureAwait(false);
+                var ownershipToken = await LinkAsync<OwnershipType>(OwnershipTypeNames.IsBuiltIn(cell("ownershipTypeId")) ? Platform.CompanyProvisioningService.BuiltInOwnershipType : cell("ownershipTypeId"), t => t.Name, row, rowKey, rules.Label("ownershipTypeId"), problems, ct).ConfigureAwait(false);
                 var partnerToken = await LinkAsync<Partner>(cell("partnerId"), p => p.Name, row, rowKey, rules.Label("partnerId"), problems, ct).ConfigureAwait(false);
                 if (ownershipToken == "" || partnerToken == "") ok = false;
                 var request = new DriverRequest(cell("fullName"), cell("nationalId"), cell("phone1"), cell("phone2"), cell("address"), cell("licenceNo"),

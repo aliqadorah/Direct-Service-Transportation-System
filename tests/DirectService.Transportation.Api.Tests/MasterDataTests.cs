@@ -61,6 +61,38 @@ public sealed class MasterDataTests(ApiFactory f)
 
     // ------------------------------------------------------------------ drivers (FR-152 … FR-156)
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026: the built-in ownership type (stored "Company", DT-15) is shown in the reader's language everywhere — the type
+    /// list, driver records, exports, the report builder — and its Arabic name is accepted back (edit, import); no user type may take either name.
+    /// </summary>
+    [Fact]
+    public async Task Built_in_ownership_type_is_shown_and_accepted_in_the_readers_language()
+    {
+        var o = await f.SignUpOwnerAsync();
+        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest("ar", null, o.Me.DateFormat))).EnsureOkAsync();
+        var builtIn = await BuiltInAsync(o);
+        Assert.Equal("الشركة", builtIn.Name);
+        var driver = await CreateDriverAsync(o, Driver(builtIn.Id));
+        Assert.Equal("الشركة", driver.OwnershipType.Name);
+        // Saving the built-in type with its shown name keeps it (it cannot be renamed); no other type may be called by either name.
+        await (await o.Client.PutAsJsonAsync(U(o, $"/ownership-types/{builtIn.Id}"), new OwnershipTypeRequest("الشركة", "Own", null, builtIn.RowVersion))).EnsureOkAsync();
+        Assert.Equal("Company", await f.DbAsync(db => db.Set<OwnershipType>().IgnoreQueryFilters().Where(t => t.PublicId != Guid.Empty && t.IsBuiltIn)
+            .OrderByDescending(t => t.Id).Select(t => t.Name).FirstAsync()));
+        Assert.Equal(HttpStatusCode.Conflict, (await o.Client.PostAsJsonAsync(U(o, "/ownership-types"), new OwnershipTypeRequest("الشركة", "External", null, null))).StatusCode);
+        // Exports and the report builder.
+        var csv = await (await o.Client.GetAsync(U(o, "/drivers/export?format=csv"))).Content.ReadAsStringAsync();
+        Assert.Contains("الشركة", csv, StringComparison.Ordinal);
+        Assert.DoesNotContain(",Company,", csv, StringComparison.Ordinal);
+        var report = await ReadAsync<Contracts.Reports.ReportResult>(await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"),
+            new Contracts.Reports.ReportRunRequest("drivers", new Contracts.Reports.ReportDefinition(null, null, null, null, null, null, true, ["name", "ownershipType"]), null, null)));
+        Assert.Contains(report.Rows, r => r.Values.Any(v => v is JsonElement { ValueKind: JsonValueKind.String } s && s.GetString() == "الشركة"));
+        // An import naming the type in Arabic links the built-in type.
+        var file = "الاسم الكامل,الرقم الوطني,الهاتف 1,رقم الرخصة,فئة الرخصة,تاريخ انتهاء الرخصة,طريقة الدفع,رقم اللوحة,الحمولة (طن),نوع الملكية,تاريخ انتهاء الترخيص,تاريخ انتهاء التأمين,تاريخ انتهاء الفحص\n" +
+                   $"سامي العبادي,9871234569,0791234568,L-2,C,{Today.AddYears(1):yyyy-MM-dd},نقد,22-22222,30,الشركة,{Today.AddYears(1):yyyy-MM-dd},{Today.AddYears(1):yyyy-MM-dd},{Today.AddYears(1):yyyy-MM-dd}\n";
+        var form = new MultipartFormDataContent { { new ByteArrayContent(Encoding.UTF8.GetBytes(file)), "file", "drivers.csv" } };
+        await (await o.Client.PostAsync(U(o, "/drivers/import"), form)).EnsureOkAsync();
+    }
+
     [Fact]
     public async Task Driver_keys_are_unique_with_arabic_digits_folded_and_plate_spacing_ignored()
     {

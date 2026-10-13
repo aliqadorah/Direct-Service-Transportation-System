@@ -290,7 +290,7 @@ public sealed class UnloadingSiteService(IAppDbContext db, MasterDataSupport sup
 /// created with the company and cannot be renamed, reclassified or deleted (design rule + FR-161, DT-38). The table has no
 /// status, so types are not archived; a type is deleted (soft) only while no driver uses it (BR-040).
 /// </summary>
-public sealed class OwnershipTypeService(IAppDbContext db, MasterDataSupport support, IRecordLockGuard locks)
+public sealed class OwnershipTypeService(IAppDbContext db, MasterDataSupport support, IRecordLockGuard locks, IRequestContext ctx)
 {
     public const string EntityType = "TRN.OwnershipType";
 
@@ -359,12 +359,14 @@ public sealed class OwnershipTypeService(IAppDbContext db, MasterDataSupport sup
     internal async Task ApplyAsync(OwnershipType t, OwnershipTypeRequest r, CancellationToken ct)
     {
         var name = MasterDataSupport.Name(r.Name);
+        // The built-in type comes back with its shown name (either language): it stays the stored code.
+        if (t.IsBuiltIn && OwnershipTypeNames.IsBuiltIn(name)) name = t.Name;
         var fleet = MasterCodes.FleetClasses.FirstOrDefault(f => string.Equals(f, r.FleetClass?.Trim(), StringComparison.OrdinalIgnoreCase));
         new Validator().Require("name", name).MaxLength("name", name, 100)
             .Require("fleetClass", r.FleetClass).Check(r.FleetClass is null || fleet is not null, "fleetClass")
             .ThrowIfInvalid();
         if (t.IsBuiltIn && (name != t.Name || fleet != t.FleetClass)) throw Fail.Rule(ErrorCodes.BuiltInFixed, t.Name);
-        if (!t.IsBuiltIn && string.Equals(name, CompanyProvisioningService.BuiltInOwnershipType, StringComparison.OrdinalIgnoreCase))
+        if (!t.IsBuiltIn && OwnershipTypeNames.IsBuiltIn(name))
             throw Fail.Conflict(ErrorCodes.DuplicateKey, name!);
         if (await db.Set<OwnershipType>().AnyAsync(x => x.Name == name && x.Id != t.Id, ct).ConfigureAwait(false))
             throw Fail.Conflict(ErrorCodes.DuplicateKey, name!);
@@ -379,5 +381,5 @@ public sealed class OwnershipTypeService(IAppDbContext db, MasterDataSupport sup
     }
 
     internal OwnershipTypeResponse ToResponse(OwnershipType t) =>
-        new(support.Token<OwnershipType>(t.PublicId), t.Name, t.FleetClass, t.IsBuiltIn, Convert.ToBase64String(t.RowVersion));
+        new(support.Token<OwnershipType>(t.PublicId), OwnershipTypeNames.Display(t.Name, ctx.Language), t.FleetClass, t.IsBuiltIn, Convert.ToBase64String(t.RowVersion));
 }

@@ -106,7 +106,8 @@ public sealed class ImportTemplateService(IAppDbContext db, IRequestContext ctx,
     {
         var rules = await fields.RulesAsync(FieldCatalog.Driver, ct).ConfigureAwait(false);
         var types = await db.Set<OwnershipType>().AsNoTracking().OrderBy(t => t.Id).Select(t => new { t.Name, t.IsBuiltIn }).ToListAsync(ct).ConfigureAwait(false);
-        var builtIn = types.FirstOrDefault(t => t.IsBuiltIn)?.Name ?? "Company";
+        // The built-in type in the reader's language (owner feedback 13 Oct 2026); the import accepts it in either language.
+        var builtIn = OwnershipTypeNames.Display(types.FirstOrDefault(t => t.IsBuiltIn)?.Name ?? Platform.CompanyProvisioningService.BuiltInOwnershipType, ctx.Language);
         var info = new Dictionary<string, (string Format, string Allowed, object? Sample)>(StringComparer.Ordinal)
         {
             ["fullName"] = (Text(200), T("فريد بين السائقين", "Unique among drivers"), T("سامي العبادي", "Sami Abbadi")),
@@ -125,7 +126,7 @@ public sealed class ImportTemplateService(IAppDbContext db, IRequestContext ctx,
             ["truckType"] = (Text(100), "", "Volvo"),
             ["trailerNo"] = (Text(30), "", null),
             ["capacityTons"] = (T("رقم بالطن، حتى 3 خانات عشرية", "Tons, up to 3 decimals"), "", 32.000m),
-            ["ownershipTypeId"] = (Text(100), T("أحد أنواع الملكية: ", "One of the ownership types: ") + string.Join(T("، ", ", "), types.Select(t => t.Name)), builtIn),
+            ["ownershipTypeId"] = (Text(100), T("أحد أنواع الملكية: ", "One of the ownership types: ") + string.Join(T("، ", ", "), types.Select(t => OwnershipTypeNames.Display(t.Name, ctx.Language))), builtIn),
             ["partnerId"] = (Text(200), T("اسم شركة شريكة نشطة؛ فارغ لسائق الأسطول الخاص", "Name of an active partner company; empty for an own-fleet driver"), null),
             ["registrationExpiry"] = (DateFormat, "", today.AddYears(1)),
             ["insuranceExpiry"] = (DateFormat, "", today.AddYears(1)),

@@ -354,6 +354,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
             };
         }
         if (f.Type == FieldTypes.Bool) return n == 1 ? L("نعم", "Yes") : L("لا", "No");
+        if (f.Entity == typeof(Domain.Trn.OwnershipType) && s is not null) return MasterData.OwnershipTypeNames.Display(s, ctx.Language);
         return s ?? L("(فارغ)", "(empty)");
     }
 
@@ -562,7 +563,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
         var max = limits.Background ? MaxBackgroundRows : MaxDetailRows;   // FR-151
         var take = Math.Min(p.Definition.Top ?? max, max);
         var rows = await q.Select(projection).Take(take + 1).ToListAsync(ct).ConfigureAwait(false);
-        var resultRows = rows.Take(take).Select(r => new ResultRow(r.Take(columns.Count).Select(Cell).ToList(),
+        var resultRows = rows.Take(take).Select(r => new ResultRow(r.Take(columns.Count).Select((v, i) => Cell(columns[i], v)).ToList(),
             new DrillLink(p.Source.RowLink, r[^1] is Guid g ? tokens.Encode(Entity(p.Source), g) : null, null))).ToList();
         // Totals of the numeric columns over everything selected.
         var numeric = columns.Where(c => c.Measurable).ToList();
@@ -574,9 +575,10 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
             resultRows, totals, null, rows.Count > take);
     }
 
-    private object? Cell(object? v) => v switch
+    private object? Cell(FieldDef f, object? v) => v switch
     {
         bool b => b ? L("نعم", "Yes") : L("لا", "No"),
+        string s when f.Entity == typeof(Domain.Trn.OwnershipType) => MasterData.OwnershipTypeNames.Display(s, ctx.Language),
         _ => v,
     };
 
