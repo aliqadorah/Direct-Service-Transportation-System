@@ -460,6 +460,7 @@ internal static class ApiSummaries
         ["GET /api/v1/platform/tenants/{tenant}"] = "Provider console: a tenant with its subscription invoices and support requests (P-11)",
         ["POST /api/v1/platform/tenants/{tenant}/extend-trial"] = "Provider console: extend a trial (P-12, audited)",
         ["POST /api/v1/platform/tenants/{tenant}/credit"] = "Provider console: apply a credit to a subscription invoice (P-12, D-11, audited)",
+        ["POST /api/v1/platform/tenants/{tenant}/invoices/{invoice}/cancel"] = "Provider console: cancel an unpaid checkout invoice by crediting it in full, with a reason (DT-183, audited)",
         ["POST /api/v1/platform/tenants/{tenant}/suspend"] = "Provider console: suspend a tenant (read-only, BR-010, audited)",
         ["POST /api/v1/platform/tenants/{tenant}/reactivate"] = "Provider console: reactivate a tenant (BR-011, audited)",
         ["GET /api/v1/platform/support-access"] = "Provider console: the staff member's support-access requests and windows (P-13)",

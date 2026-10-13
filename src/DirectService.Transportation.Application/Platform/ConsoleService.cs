@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Acc;
@@ -213,6 +214,30 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var decimals = options.Value.CurrencyDecimals;
         if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Accounting.Money.IsValidAmount(credit, decimals))
             throw Fail.Field("amount", ErrorCodes.ValidationRange, "amount");
+        return await ApplyCreditAsync(invoice, credit, why, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Cancels an unpaid checkout (owner decision 13 Oct 2026, DT-183): the SUB- invoice is already an issued tax invoice (numbered without
+    /// gaps, printable), so it is never voided — staff credit its whole remaining total with a reason and it becomes Credited. Only an
+    /// invoice awaiting payment qualifies: Due with a gateway reference (a renewal is Due without one until charged; paid, failed and
+    /// credited invoices are refused). A late payment of its old payment page is recorded, never applied (BillingService.ApplyPaymentAsync).
+    /// </summary>
+    public async Task<SubscriptionInvoiceResponse> CancelCheckoutAsync(string token, string invoiceToken, ReasonRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var why = MasterIds.Reason(r.Reason);
+        var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
+        var pid = support.Decode<SubscriptionInvoice>(invoiceToken) ?? throw Fail.NotFound();
+        var invoice = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid && i.TenantId == t.Id && !i.IsDeleted, ct).ConfigureAwait(false)
+            ?? throw Fail.NotFound();
+        if (invoice.Status != LifecycleCodes.Due || string.IsNullOrEmpty(invoice.GatewayReference)) throw Fail.Rule(ErrorCodes.SubscriptionNotAwaitingPayment, invoice.Number);
+        return await ApplyCreditAsync(invoice, invoice.Total, "Unpaid checkout cancelled: " + why, ct).ConfigureAwait(false);
+    }
+
+    private async Task<SubscriptionInvoiceResponse> ApplyCreditAsync(SubscriptionInvoice invoice, decimal credit, string why, CancellationToken ct)
+    {
+        var decimals = options.Value.CurrencyDecimals;
         if (credit == invoice.Total)
         {
             invoice.Status = LifecycleCodes.Credited;

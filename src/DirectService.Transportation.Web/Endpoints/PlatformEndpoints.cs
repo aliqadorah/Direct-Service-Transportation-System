@@ -34,6 +34,8 @@ internal static class PlatformEndpoints
             TypedResults.Ok(await s.ExtendTrialAsync(tenant, r, ct).ConfigureAwait(false)));
         p.MapPost("/tenants/{tenant}/credit", async (string tenant, ApplyCreditRequest r, ConsoleService s, CancellationToken ct) =>
             TypedResults.Ok(await s.CreditAsync(tenant, r, ct).ConfigureAwait(false)));
+        p.MapPost("/tenants/{tenant}/invoices/{invoice}/cancel", async (string tenant, string invoice, ReasonRequest r, ConsoleService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.CancelCheckoutAsync(tenant, invoice, r, ct).ConfigureAwait(false)));
         p.MapPost("/tenants/{tenant}/suspend", async (string tenant, TenantStatusRequest r, ConsoleService s, CancellationToken ct) =>
             TypedResults.Ok(await s.SuspendAsync(tenant, r, ct).ConfigureAwait(false)));
         p.MapPost("/tenants/{tenant}/reactivate", async (string tenant, TenantStatusRequest r, ConsoleService s, CancellationToken ct) =>

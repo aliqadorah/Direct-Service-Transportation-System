@@ -216,6 +216,15 @@ public sealed class BillingService(IAppDbContext db, IPlatformNumbers numbers, I
     public async Task ApplyPaymentAsync(SubscriptionInvoice invoice, string reference, Plan? plan, string kind, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(invoice);
+        if (invoice.Status == LifecycleCodes.Credited && invoice.PaidAt is null)
+        {
+            // Money received for an invoice staff credited (a cancelled checkout, DT-183): recorded for staff to refund, never applied; the
+            // invoice stays Credited. A repeated notification finds PaidAt set and changes nothing.
+            invoice.PaidAt = clock.GetUtcNow().UtcDateTime;
+            changes.SetAction(invoice, "PaidNotApplied", reference + " · Invoice credited");
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return;
+        }
         if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) return;
         var now = clock.GetUtcNow().UtcDateTime;
         invoice.Status = LifecycleCodes.Paid;

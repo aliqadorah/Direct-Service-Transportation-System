@@ -274,6 +274,45 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Contains(Requests, r => r.Path == "/platform/tenants/t1");
     }
 
+    /// <summary>
+    /// Owner decision 13 Oct 2026 (DT-183): in the tenant panel only an invoice awaiting payment offers "Cancel invoice" (a full credit with a
+    /// reason); a renewal due offers the usual credit, paid and credited invoices nothing.
+    /// </summary>
+    [Fact]
+    public void Console_cancels_only_an_invoice_awaiting_payment_with_a_reason()
+    {
+        var t = new ConsoleTenantResponse("t1", "نقليات الجنوب", "Trial", new PlanSummary("pl0", "TRIAL", "Trial"), "Monthly", Usage, DateTime.UtcNow.AddDays(-10),
+            DateTime.UtcNow.AddDays(4), null, null, null, null, "owner@example.test", "A");
+        SubscriptionInvoiceResponse Invoice(string id, string number, string status, string? reference) =>
+            new(id, number, new(2026, 10, 13), new(2026, 11, 12), 200m, 32m, 232m, status, null, reference, DateTime.UtcNow);
+        var awaiting = Invoice("si2", "SUB-000002", "Due", "chk_0186");
+        Respond("/platform/tenants/t1/invoices/si2/cancel", Invoice("si2", "SUB-000002", "Credited", "chk_0186"));
+        Respond("/platform/tenants/t1", new ConsoleTenantDetails(t,
+            [awaiting, Invoice("si3", "SUB-000003", "Due", null), Invoice("si4", "SUB-000004", "Paid", "pay_4"), Invoice("si5", "SUB-000005", "Credited", "chk_5")], []));
+        Respond("/platform/tenants", new PagedResult<ConsoleTenantResponse>([t], 1, 50, 1));
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/console/tenants?tenant=t1");
+        var cut = Render<Tenants>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+
+        string? Action(string number) => cut.FindAll(".panel-side tbody tr").Single(r => r.TextContent.Contains(number, StringComparison.Ordinal))
+            .QuerySelector("button")?.GetAttribute("aria-label");
+        Assert.Equal(L.F("con.cancelInvoiceTitle", "SUB-000002"), Action("SUB-000002"));
+        Assert.Contains(L["st.awaitingPayment"], cut.Find(".panel-side").TextContent);
+        Assert.Equal(L.F("con.creditTitle", "SUB-000003"), Action("SUB-000003"));   // a renewal due: the usual credit
+        Assert.Null(Action("SUB-000004"));
+        Assert.Null(Action("SUB-000005"));
+
+        cut.Find($"button[aria-label='{L.F("con.cancelInvoiceTitle", "SUB-000002")}']").Click();
+        cut.WaitForAssertion(() => Assert.Contains(L.F("con.cancelInvoiceText", "SUB-000002", "232.000"), Text(cut)));
+        var confirm = cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ui.confirm"], StringComparison.Ordinal));
+        Assert.True(confirm.HasAttribute("disabled"));                              // no reason yet
+        cut.Find(".dialog textarea").Input("Plan withdrawn");
+        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ui.confirm"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "/platform/tenants/t1/invoices/si2/cancel"));
+        Assert.Contains("\"reason\":\"Plan withdrawn\"", Requests.Single(r => r.Path.EndsWith("/cancel", StringComparison.Ordinal)).Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(Requests, r => r.Path == "/platform/tenants/t1/credit");
+    }
+
     /// <summary>Owner feedback 13 Oct 2026, item 8b: the staff screen offers per state only the allowed actions, and invites by name and e-mail.</summary>
     [Fact]
     public void Console_staff_lists_states_with_their_actions_and_invites()

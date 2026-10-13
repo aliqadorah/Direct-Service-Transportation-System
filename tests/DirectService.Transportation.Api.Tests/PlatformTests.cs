@@ -172,6 +172,57 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/search?q=" + Uri.EscapeDataString(organisation))).StatusCode);
     }
 
+    /// <summary>
+    /// Owner decision 13 Oct 2026 (DT-183): staff cancel an invoice awaiting payment by crediting it in full with a reason — the SUB-
+    /// invoice is already a numbered tax invoice, so it is never voided. Only unpaid checkouts qualify; a late payment of the old page is
+    /// recorded, not applied.
+    /// </summary>
+    [Fact]
+    public async Task Staff_cancel_an_unpaid_checkout_by_a_full_credit_only()
+    {
+        var staff = await StaffAsync();
+        var owner = await f.SignUpOwnerAsync();
+        var plan = await ReadAsync<PlanResponse>(await staff.Client.PostAsJsonAsync("/api/v1/platform/plans", Plan(Code("CXL"), 232m)));
+        var checkout = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(plan.Id)));
+        var tenant = (await ReadAsync<PagedResult<ConsoleTenantResponse>>(await staff.Client.GetAsync("/api/v1/platform/tenants?pageSize=200"))).Items.Single(t => t.OwnerEmail == owner.Email).Id;
+        string Cancel(string invoice) => $"/api/v1/platform/tenants/{tenant}/invoices/{invoice}/cancel";
+
+        // A reason is required; tenants' users cannot reach the console.
+        Assert.Equal(HttpStatusCode.BadRequest, (await staff.Client.PostAsJsonAsync(Cancel(checkout.Invoice.Id), new ReasonRequest(" "))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.PostAsJsonAsync(Cancel(checkout.Invoice.Id), new ReasonRequest("Not wanted"))).StatusCode);
+
+        var cancelled = await ReadAsync<SubscriptionInvoiceResponse>(await staff.Client.PostAsJsonAsync(Cancel(checkout.Invoice.Id), new ReasonRequest("Plan withdrawn")));
+        Assert.Equal(("Credited", 232.000m, checkout.Invoice.Number), (cancelled.Status, cancelled.Total, cancelled.Number));
+        var listed = Assert.Single(await ReadAsync<List<SubscriptionInvoiceResponse>>(await owner.Client.GetAsync("/api/v1/tenant/subscription/invoices")));
+        Assert.Equal("Credited", listed.Status);   // no longer awaiting payment on the tenant page
+        Assert.True(await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.Action == "Credit" && a.EntityType == "CORE.SubscriptionInvoice"
+            && a.NewValues!.Contains("Unpaid checkout cancelled: Plan withdrawn"))));
+
+        // Twice, or any invoice not awaiting payment: refused (credited; a renewal — due without a payment page; paid).
+        Assert.Equal("subscription.notAwaitingPayment", await (await staff.Client.PostAsJsonAsync(Cancel(checkout.Invoice.Id), new ReasonRequest("Again"))).ProblemCodeAsync());
+        var renewal = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(plan.Id)));
+        await f.DbAsync(async db =>
+        {
+            var i = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleAsync(x => x.Number == renewal.Invoice.Number);
+            i.GatewayReference = null;
+            return await db.SaveChangesAsync();
+        });
+        Assert.Equal("subscription.notAwaitingPayment", await (await staff.Client.PostAsJsonAsync(Cancel(renewal.Invoice.Id), new ReasonRequest("Renewal"))).ProblemCodeAsync());
+        var paid = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(plan.Id)));
+        await (await WebhookAsync(paid.Invoice, "succeeded", plan.Code)).EnsureOkAsync();
+        Assert.Equal("subscription.notAwaitingPayment", await (await staff.Client.PostAsJsonAsync(Cancel(paid.Invoice.Id), new ReasonRequest("Paid"))).ProblemCodeAsync());
+        Assert.Equal("Active", (await ReadAsync<SubscriptionResponse>(await owner.Client.GetAsync("/api/v1/tenant/subscription"))).Status);
+
+        // A late payment from the cancelled invoice's old page: recorded for staff to refund, the invoice stays Credited, nothing applied.
+        var before = await TenantOfAsync(owner);
+        await (await WebhookAsync(checkout.Invoice, "succeeded", plan.Code)).EnsureOkAsync();
+        await (await WebhookAsync(checkout.Invoice, "succeeded", plan.Code)).EnsureOkAsync();   // repeated: no change
+        var stored = await f.DbAsync(db => db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleAsync(x => x.Number == checkout.Invoice.Number));
+        Assert.Equal(("Credited", true), (stored.Status, stored.PaidAt is not null));
+        Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.Action == "PaidNotApplied" && a.EntityId == stored.Id)));
+        Assert.Equal(before.CurrentPeriodEnd, (await TenantOfAsync(owner)).CurrentPeriodEnd);
+    }
+
     [Fact]
     public async Task Checkout_webhook_upgrade_downgrade_and_credit_P04_P07_BR012()
     {

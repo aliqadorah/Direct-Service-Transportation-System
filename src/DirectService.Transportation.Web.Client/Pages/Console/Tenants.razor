@@ -63,7 +63,9 @@
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Subscription.InvoiceStatus(context)" /></Template></GridColumn>
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
                             <Template>
-                                @if (context.Status is LifecycleCodes.Due or LifecycleCodes.Failed) {<Btn Small="true" Ghost="true" Text="@L["con.credit"]" AriaLabel="@L.F("con.creditTitle", context.Number)" OnClick="() => AskCredit(context)" />}
+                                @* An unpaid checkout is cancelled by a full credit (DT-183); other due or failed invoices take a credit of any amount. *@
+                                @if (Subscription.IsCheckout(context)) {<Btn Small="true" Ghost="true" Icon="x" Text="@L["con.cancelInvoice"]" AriaLabel="@L.F("con.cancelInvoiceTitle", context.Number)" OnClick="() => AskCancel(context)" />}
+                                else if (context.Status is LifecycleCodes.Due or LifecycleCodes.Failed) {<Btn Small="true" Ghost="true" Text="@L["con.credit"]" AriaLabel="@L.F("con.creditTitle", context.Number)" OnClick="() => AskCredit(context)" />}
                             </Template>
                         </GridColumn>
                     </Columns>
@@ -93,6 +95,10 @@
         {
             <p style="margin:0">@L.F("con.creditText", _invoice.Number, Fmt.Money(_invoice.Total))</p>
             <NumberField @bind-Value="_amount" Label="@L["con.creditAmount"]" Required="true" Min="0.001m" Max="_invoice.Total" Help="@L["con.creditHelp"]" />
+        }
+        @if (_action == "cancelInvoice" && _invoice is not null)
+        {
+            <p style="margin:0"><Tx Value="@L.F("con.cancelInvoiceText", _invoice.Number, Fmt.Money(_invoice.Total))" /></p>
         }
         @if (_action is "suspend") {<Banner Tone="Tone.Warn" Text="@L["con.suspendText"]" />}
         @if (_action is "support") {<p class="muted" style="margin:0">@L["con.supportText"]</p>}
@@ -128,7 +134,8 @@
     private string ActionTitle => _action switch
     {
         "extend" => L["con.extendTrial"], "suspend" => L["con.suspend"], "reactivate" => L["con.reactivate"],
-        "credit" => L.F("con.creditTitle", _invoice?.Number ?? ""), "support" => L["con.requestSupport"], _ => "",
+        "credit" => L.F("con.creditTitle", _invoice?.Number ?? ""), "cancelInvoice" => L.F("con.cancelInvoiceTitle", _invoice?.Number ?? ""),
+        "support" => L["con.requestSupport"], _ => "",
     };
 
     protected override async Task OnInitializedAsync()
@@ -213,6 +220,12 @@
         _acting = true;
     }
 
+    private void AskCancel(SubscriptionInvoiceResponse i)
+    {
+        _invoice = i;
+        Ask("cancelInvoice");
+    }
+
     private void AskCredit(SubscriptionInvoiceResponse i)
     {
         _invoice = i;
@@ -234,6 +247,9 @@
                 case "suspend": await Api.PostAsync<ConsoleTenantResponse>($"api/v1/platform/tenants/{id}/suspend", new TenantStatusRequest(_reason)); break;
                 case "reactivate": await Api.PostAsync<ConsoleTenantResponse>($"api/v1/platform/tenants/{id}/reactivate", new TenantStatusRequest(_reason)); break;
                 case "credit": await Api.PostAsync<SubscriptionInvoiceResponse>($"api/v1/platform/tenants/{id}/credit", new ApplyCreditRequest(_invoice?.Id, _amount, _reason)); break;
+                case "cancelInvoice":
+                    await Api.PostAsync<SubscriptionInvoiceResponse>($"api/v1/platform/tenants/{id}/invoices/{Uri.EscapeDataString(_invoice!.Id)}/cancel", new ReasonRequest(_reason ?? ""));
+                    break;
                 case "support": await Api.PostAsync<SupportAccessResponse>("api/v1/platform/support-access", new SupportAccessRequest(_details.Tenant.Id, _reason)); break;
             }
             _acting = false;

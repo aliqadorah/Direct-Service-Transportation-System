@@ -164,6 +164,16 @@ type Popup = { name: string; route: string; open: (page: Page, t: Text) => Promi
 const popupShown = (page: Page) => page.locator(".dialog, .panel-side, [role=menu], [role=listbox]").last();
 const header = (key: string) => async (page: Page, t: Text) => { await button(page.locator("main"), t(key)).click(); };
 const firstRow = async (page: Page) => { await page.locator("main table tbody tr").first().click(); };
+/** Opens tenant rows until a panel offers "Cancel invoice" (an invoice awaiting payment); returns that button. */
+const awaitingPanel = async (page: Page, t: Text) => {
+  const rows = page.locator("main table tbody tr");
+  const cancel = page.locator(".panel-side tbody button").filter({ hasText: t("con.cancelInvoice") }).first();
+  for (let i = 0, n = await rows.count(); i < n; i++) {
+    await rows.nth(i).click();
+    if (await cancel.waitFor({ timeout: 3_000 }).then(() => true, () => false)) return cancel;
+  }
+  throw new Error("no tenant with an invoice awaiting payment");
+};
 const rolesTab = async (page: Page, t: Text) => { await page.getByRole("tab", { name: t("usr.roles") }).click(); };
 
 function companyPopups(ids: Record<string, string | null>, w: World, roleName: string): Popup[] {
@@ -323,6 +333,9 @@ for (const lang of ["ar", "en"] as Lang[]) {
       { name: "console-tenants#panel", route: "/console/tenants", open: firstRow },
       { name: "console-tenants#extend", route: "/console/tenants", optional: true, open: async (p, t) => {
         await firstRow(p); await button(p.locator(".panel-side"), t("con.extendTrial")).click(); } },
+      // DT-183: the panel of a tenant whose checkout is unpaid (made by the screens test), with "Cancel invoice", and its dialog.
+      { name: "console-tenants#awaiting-invoice", route: "/console/tenants", open: async (p, t) => { await awaitingPanel(p, t); } },
+      { name: "console-tenants#cancel-invoice", route: "/console/tenants", open: async (p, t) => { await (await awaitingPanel(p, t)).click(); } },
       { name: "console-plans#new", route: "/console/plans", open: header("con.newPlan") },
       { name: "console-announcements#new", route: "/console/announcements", open: header("con.newAnnouncement") },
       { name: "console-support#request", route: "/console/support-access", open: header("con.requestSupport") },

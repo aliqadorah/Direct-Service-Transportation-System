@@ -141,6 +141,11 @@ public static partial class UiText
         ["con.suspendText"] = ("يصبح المشترك للقراءة فقط حتى إعادة التفعيل.", "The tenant becomes read-only until reactivated."),
         ["con.reactivate"] = ("إعادة التفعيل", "Reactivate"),
         ["con.credit"] = ("رصيد دائن", "Credit"),
+        ["con.cancelInvoice"] = ("إلغاء", "Cancel"),   // short: the panel's invoice table is narrow; the button's name is con.cancelInvoiceTitle
+        ["con.cancelInvoiceTitle"] = ("إلغاء الفاتورة {0}", "Cancel invoice {0}"),
+        ["con.cancelInvoiceText"] = ("الفاتورة {0} ({1}) بانتظار الدفع منذ اختيار خطة. صدرت كفاتورة ضريبية برقمها، لذا تُلغى برصيد دائن بكامل مبلغها: تصبح «مُستردة برصيد»، ولا تظهر للمشترك بانتظار الدفع، وأي دفعة متأخرة من صفحة الدفع القديمة تُسجَّل ولا تُطبَّق.",
+            "Invoice {0} ({1}) has been awaiting payment since a plan was chosen. It was issued as a numbered tax invoice, so it is cancelled by a credit of its full amount: it becomes Credited, the tenant no longer sees it awaiting payment, and a late payment from the old payment page is recorded, not applied."),
+        ["con.done.cancelInvoice"] = ("أُلغيت الفاتورة برصيد دائن (سُجّل الإجراء).", "The invoice was cancelled by a credit (logged)."),
         ["con.creditTitle"] = ("رصيد دائن على {0}", "Credit on {0}"),
         ["con.creditText"] = ("الفاتورة {0} بإجمالي {1}.", "Invoice {0}, total {1}."),
         ["con.creditAmount"] = ("المبلغ", "Amount"),
