@@ -20,7 +20,9 @@ export const VISUAL_DIR = path.join(ROOT, "TestResults", "visual");
  * `VISUAL_ONLY=reports/builder,builder#` with `VISUAL_WIDTHS=1366,1920`), to re-check the screens a change touched; unset = everything.
  */
 export function wanted(...names: string[]): boolean {
-  const only = process.env.VISUAL_ONLY?.split(",").map((x) => x.trim()).filter(Boolean);
+  // Git Bash rewrites a value starting with "/" into a Windows path ("/tenant/x" → "C:/Program Files/Git/tenant/x"): undo it, or the
+  // filter silently matches nothing (13 Oct 2026: the subscription screens were skipped and the console waited for a tenant row).
+  const only = process.env.VISUAL_ONLY?.split(",").map((x) => x.trim().replace(/^[A-Za-z]:\/Program Files\/Git(?=\/)/i, "")).filter(Boolean);
   return !only || only.length === 0 || names.some((n) => only.some((o) => n.includes(o)));
 }
 

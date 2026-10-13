@@ -275,6 +275,7 @@ async function sweepStates(page: Page, run: VisualRun, lang: Lang, company: stri
 
 async function sweepPopups(page: Page, run: VisualRun, lang: Lang, company: string | null, popups: Popup[]): Promise<void> {
   const t = texts(lang);
+  page.setDefaultTimeout(15_000);   // an opener that cannot act (e.g. no row to click) fails that popup instead of waiting for the test's limit
   for (const p of popups.filter((x) => wanted(x.name, x.route))) {
     const route = p.route.startsWith("/") ? p.route : `/c/${company}${p.route ? `/${p.route}` : ""}`;
     const fail = (why: string) => run.findings.push({ kind: "not-shown", text: `not opened: ${why}`, where: route, screen: p.name, lang, width: 0, density: "" });
@@ -309,7 +310,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
   });
 
   test(`Visual — provider console (${lang})`, async ({ page }) => {
-    test.skip(!wanted("/console", "console"), "not among VISUAL_ONLY");
+    test.skip(!["/console", "console", "/console/tenants", "/console/plans", "/console/announcements", "/console/support-access", "/console/staff", "/console/health"].some((r) => wanted(r)), "not among VISUAL_ONLY");
     test.setTimeout(30 * 60_000);
     const run = new VisualRun(lang, "console");
     await staffSignIn(page, lang);

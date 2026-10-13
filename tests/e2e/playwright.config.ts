@@ -21,6 +21,9 @@ export default defineConfig({
     channel: "msedge",
     ignoreHTTPSErrors: true,
     viewport: { width: 1366, height: 860 },
+    // No click or page load may wait without end: a missing element fails its step (owner, 13 Oct 2026: a visual run hung 52 minutes).
+    actionTimeout: 30_000,
+    navigationTimeout: 60_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
