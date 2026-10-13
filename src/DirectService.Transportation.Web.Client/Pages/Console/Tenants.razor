@@ -60,7 +60,7 @@
                     <Columns>
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.number"]" Value="i => i.Number" Ltr="true" />
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.total"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
-                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Subscription.InvoiceStatus(context.Status)" /></Template></GridColumn>
+                        <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Subscription.InvoiceStatus(context)" /></Template></GridColumn>
                         <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
                             <Template>
                                 @if (context.Status is LifecycleCodes.Due or LifecycleCodes.Failed) {<Btn Small="true" Ghost="true" Text="@L["con.credit"]" AriaLabel="@L.F("con.creditTitle", context.Number)" OnClick="() => AskCredit(context)" />}

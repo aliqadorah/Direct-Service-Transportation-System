@@ -58,7 +58,7 @@ public static class Statuses
         ["queued"] = (Tone.Info, "clock"), ["submitted"] = (Tone.Ok, "check"), ["rejected"] = (Tone.Err, "x"), ["notRequired"] = (Tone.Mute, null),
         ["mapped"] = (Tone.Ok, "check"), ["missing"] = (Tone.Err, "alert"), ["disabled"] = (Tone.Mute, "lock"), ["invited"] = (Tone.Info, "mail"),
         ["trial"] = (Tone.Info, "clock"), ["pastDue"] = (Tone.Warn, "alert"), ["suspended"] = (Tone.Err, "lock"), ["cancelled"] = (Tone.Mute, "x"),
-        ["failed"] = (Tone.Err, "alert"), ["paid"] = (Tone.Ok, "check"), ["due"] = (Tone.Info, "clock"), ["requested"] = (Tone.Info, "clock"),
+        ["failed"] = (Tone.Err, "alert"), ["paid"] = (Tone.Ok, "check"), ["due"] = (Tone.Info, "clock"), ["awaitingPayment"] = (Tone.Mute, "clock"), ["requested"] = (Tone.Info, "clock"),
         ["approved"] = (Tone.Ok, "check"), ["expired"] = (Tone.Mute, "clock"), ["credited"] = (Tone.Mute, "refresh"), ["deleted"] = (Tone.Mute, "trash"),
     };
 }

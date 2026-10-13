@@ -761,6 +761,7 @@ public static partial class UiText
         ["st.failed"] = ("فشل", "Failed"),
         ["st.paid"] = ("مدفوعة", "Paid"),
         ["st.due"] = ("مستحقة", "Due"),
+        ["st.awaitingPayment"] = ("بانتظار الدفع", "Awaiting payment"),
         ["st.requested"] = ("مطلوب", "Requested"),
         ["st.approved"] = ("موافق عليه", "Approved"),
         ["st.expired"] = ("منتهٍ", "Expired"),

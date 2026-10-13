@@ -32,6 +32,14 @@
                     <Actions><a href="/tenant/export">@L["nav.dataExport"]</a></Actions>
                 </Banner>
             }
+            @if (Awaiting is { } waiting)
+            {
+                @* An unpaid checkout is not money owed: the plan changes only after payment (owner feedback 13 Oct 2026, DT-182). *@
+                <Banner Tone="Tone.Info" Icon="clock">
+                    <strong><Tx Value="@L.F("ten.awaitingTitle", waiting.Number)" /></strong>
+                    <Tx Value="@(" " + L.F("ten.awaitingText", Fmt.Money(waiting.Total), Fmt.Date(waiting.PeriodStart, Shell.DateFormat) + " – " + Fmt.Date(waiting.PeriodEnd, Shell.DateFormat), L.Pick(s.Plan.NameAr, s.Plan.NameEn)))" />
+                </Banner>
+            }
             <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));flex:none">
                 <Box Title="@L.F("ten.currentPlan", L.Pick(s.Plan.NameAr, s.Plan.NameEn), L["ten.cycle." + s.BillingCycle])">
                     <KeyValues Columns="2" Items="@Facts(s)" />
@@ -96,7 +104,7 @@
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.period"]" Value="@(i => Fmt.Date(i.PeriodStart, Shell.DateFormat) + " – " + Fmt.Date(i.PeriodEnd, Shell.DateFormat))" Ltr="true" />
                             @* Tenants see only the final, tax-inclusive amount (owner decision 13 Oct 2026); the printout shows the tax inside it. *@
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ten.amount"]" Value="i => Fmt.Money(i.Total)" Numeric="true" />
-                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@InvoiceStatus(context.Status)" /></Template></GridColumn>
+                            <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@InvoiceStatus(context)" /></Template></GridColumn>
                             <GridColumn TItem="SubscriptionInvoiceResponse" Title="@L["profile.action"]" HideTitle="true">
                                 <Template>
                                     <Btn Small="true" Icon="import" Text="@L["ten.download"]" AriaLabel="@L.F("ten.downloadInvoice", context.Number)" OnClick="() => Print(context)" />
@@ -198,10 +206,21 @@
         LifecycleCodes.Cancelled => "cancelled", LifecycleCodes.Deleted => "deleted", _ => "active",
     };
 
-    internal static string InvoiceStatus(string s) => s switch
+    /// <summary>
+    /// An invoice's status tag. A Due invoice with a gateway reference is a checkout (a plan chosen, its payment page not paid): it is
+    /// "awaiting payment", not owed; renewal invoices are due without a reference until they are charged (TenantLifecycleService).
+    /// </summary>
+    internal static string InvoiceStatus(SubscriptionInvoiceResponse i) => i.Status switch
     {
-        LifecycleCodes.Paid => "paid", LifecycleCodes.Failed => "failed", LifecycleCodes.Credited => "credited", _ => "due",
+        LifecycleCodes.Paid => "paid", LifecycleCodes.Failed => "failed", LifecycleCodes.Credited => "credited",
+        _ when IsCheckout(i) => "awaitingPayment",
+        _ => "due",
     };
+
+    internal static bool IsCheckout(SubscriptionInvoiceResponse i) => i.Status == LifecycleCodes.Due && !string.IsNullOrEmpty(i.GatewayReference);
+
+    /// <summary>The unpaid checkout, if any (a new checkout replaces the previous one, so there is at most one).</summary>
+    private SubscriptionInvoiceResponse? Awaiting => _invoices.FirstOrDefault(IsCheckout);
 
     private async Task Checkout(PlanResponse p)
     {

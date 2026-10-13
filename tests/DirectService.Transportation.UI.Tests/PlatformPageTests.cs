@@ -106,6 +106,41 @@ public sealed class PlatformPageTests : PageTestBase
         if (plans.Length == 0) Assert.DoesNotContain(L["ten.plansHelp"], Text(cut));
     }
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026 (third round): on the trial, invoice SUB-000002 of 232.000 came from choosing a plan whose payment page was
+    /// left unpaid. It is shown as awaiting payment with what it means — not as due beside a 0.000 trial plan.
+    /// </summary>
+    [Fact]
+    public void Unpaid_checkout_is_awaiting_payment_and_explained_not_due()
+    {
+        Respond("/tenant/subscription/invoices", new[]
+        {
+            new SubscriptionInvoiceResponse("si2", "SUB-000002", new(2026, 10, 13), new(2026, 11, 12), 200m, 32m, 232m, "Due", null, "chk_0186", DateTime.UtcNow),
+        });
+        Respond("/tenant/subscription", new SubscriptionResponse("Trial", Trial, "Monthly", DateTime.UtcNow.AddDays(13), null, null, null, Usage, []));
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+        var text = Text(cut);
+        Assert.Contains(L["st.awaitingPayment"], text);
+        Assert.DoesNotContain(L["st.due"], text);
+        Assert.Contains(L.F("ten.awaitingTitle", "SUB-000002"), text);
+        Assert.Contains(L.F("ten.awaitingText", "232.000", "2026-10-13 – 2026-11-12", "تجريبية"), text);
+    }
+
+    [Fact]
+    public void Renewal_invoice_without_a_payment_page_stays_due_without_the_note()
+    {
+        Respond("/tenant/subscription/invoices", new[]
+        {
+            new SubscriptionInvoiceResponse("si3", "SUB-000003", new(2026, 11, 1), new(2026, 11, 30), 155.172m, 24.828m, 180m, "Due", null, null, DateTime.UtcNow),
+        });
+        Respond("/tenant/subscription", new SubscriptionResponse("Active", Pro, "Monthly", null, DateTime.UtcNow.AddDays(1), null, null, Usage, [Basic, Pro]));
+        var cut = Render<Subscription>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000003", cut.Markup));
+        Assert.Contains(L["st.due"], Text(cut));
+        Assert.DoesNotContain(L.F("ten.awaitingTitle", "SUB-000003"), Text(cut));
+    }
+
     [Fact]
     public void Subscription_with_few_invoices_has_no_pager()
     {

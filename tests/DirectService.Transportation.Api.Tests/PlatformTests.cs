@@ -190,6 +190,14 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal((50.000m, 43.103m, 6.897m), (checkout.Invoice.Total, checkout.Invoice.Amount, checkout.Invoice.Tax));
         Assert.Equal(16m, sub.Plans.Single(p => p.Id == basic.Id).TaxRate);
         Assert.StartsWith("https://pay.test/checkout/", checkout.PaymentUrl, StringComparison.Ordinal);
+        // Owner feedback 13 Oct 2026 (third round): an unpaid checkout is Due with its gateway reference (the screen shows it as awaiting
+        // payment) and changes nothing until it is paid: the tenant stays on the trial plan. Plans staff have not published are not offered.
+        var listed = Assert.Single(await ReadAsync<List<SubscriptionInvoiceResponse>>(await owner.Client.GetAsync("/api/v1/tenant/subscription/invoices")));
+        Assert.Equal(("Due", true), (listed.Status, listed.GatewayReference is not null));
+        var hidden = await ReadAsync<PlanResponse>(await staff.Client.PostAsJsonAsync("/api/v1/platform/plans", Plan(Code("HIDDEN"), 70m, active: false)));
+        var afterCheckout = await ReadAsync<SubscriptionResponse>(await owner.Client.GetAsync("/api/v1/tenant/subscription"));
+        Assert.Equal(("Trial", "TRIAL"), (afterCheckout.Status, afterCheckout.Plan.Code));
+        Assert.DoesNotContain(afterCheckout.Plans, p => p.Id == hidden.Id);
 
         // A new checkout replaces the unpaid one: paying the old page later changes nothing (review F2).
         var stale = checkout;
