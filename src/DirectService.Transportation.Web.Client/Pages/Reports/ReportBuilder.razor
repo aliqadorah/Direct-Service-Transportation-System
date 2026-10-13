@@ -25,18 +25,20 @@
 @if (_problem is not null) {<Banner Tone="Tone.Err" Text="@_problem" />}
 <div class="cols fill" style="grid-template-columns:340px 1fr;min-height:0">
     <div class="box pad stack scrolls" style="gap:10px">
-        <SelectField TValue="string?" Value="_source" ValueChanged="SourceChanged" ValueExpression="() => _source" Options="SourceOptions" Empty="@L["ui.choose"]" Label="@L["rb.source"]" Required="true" />
+        <SelectField TValue="string?" Value="_source" ValueChanged="SourceChanged" ValueExpression="() => _source" Options="SourceOptions" Empty="@L["ui.choose"]" Label="@L["rb.source"]" Required="true" Error="@Mark("source")" />
         @if (Fields.Count > 0)
         {
             <div class="row" style="gap:8px">
-                <DateField @bind-Value="_from" Label="@L["trip.from"]" />
-                <DateField @bind-Value="_to" Label="@L["trip.to"]" />
+                <DateField @bind-Value="_from" Label="@L["trip.from"]" Error="@Mark("from")" />
+                <DateField @bind-Value="_to" Label="@L["trip.to"]" Error="@Mark("to")" />
             </div>
-            <ToggleField @bind-Value="_detail" Label="@L["rb.detail"]" Help="@L["rb.detailHelp"]" />
+            <ToggleField @bind-Value="_detail" Label="@L["rb.detail"]" Help="@L[_detail ? "rb.detailOnHint" : "rb.detailHelp"]" />
             @if (_detail)
             {
-                <fieldset class="stack" style="border:0;padding:0;margin:0;gap:4px">
+                @* Detail mode lists records: groupings and measures are hidden (kept for when it is turned off), DT-180. *@
+                <fieldset class="stack" style="border:0;padding:0;margin:0;gap:4px" aria-describedby="@(Mark("columns") is null ? null : "rb-columns-e")">
                     <legend class="lbl">@L["rb.columns"]</legend>
+                    @if (Mark("columns") is { } columnsError) {<div id="rb-columns-e" class="help err"><Icon Name="alert" /><span><Tx Value="@columnsError" /></span></div>}
                     @foreach (var f in Fields)
                     {
                         var field = f;
@@ -51,15 +53,17 @@
                 {
                     var g = _rows[i];
                     var n = i + 1;
+                    var at = i;
                     <div class="row" style="gap:6px;align-items:flex-end">
-                        <SelectField TValue="string?" @bind-Value="g.Field" Options="Groupable" Empty="—" Label="@L.F("rb.groupN", n)" />
+                        <SelectField TValue="string?" @bind-Value="g.Field" Options="Groupable" Empty="—" Label="@L.F("rb.groupN", n)" Error="@Mark("row", at)" />
                         @if (IsDate(g.Field)) {<SelectField TValue="string?" @bind-Value="g.Unit" Options="Units" Label="@L["rb.unit"]" />}
-                        <Btn Ghost="true" Icon="trash" AriaLabel="@L.F("rb.removeGroup", n)" OnClick="() => _rows.Remove(g)" />
+                        <Btn Ghost="true" Icon="trash" AriaLabel="@L.F("rb.removeGroup", n)" Disabled="_rows.Count <= 1" OnClick="() => _rows.Remove(g)" />
                     </div>
                 }
                 @if (_rows.Count < 2) {<Btn Small="true" Icon="plus" Text="@L["rb.addGroup"]" OnClick="() => _rows.Add(new GroupModel())" />}
+                <h3 class="lbl" style="margin:0">@L["rb.columnGroup"]</h3>
                 <div class="row" style="gap:6px;align-items:flex-end">
-                    <SelectField TValue="string?" @bind-Value="_column.Field" Options="Groupable" Empty="—" Label="@L["rb.columnGroup"]" />
+                    <SelectField TValue="string?" @bind-Value="_column.Field" Options="Groupable" Empty="—" Label="@L["rb.field"]" Help="@L["rb.columnGroupHelp"]" Error="@Mark("column")" />
                     @if (IsDate(_column.Field)) {<SelectField TValue="string?" @bind-Value="_column.Unit" Options="Units" Label="@L["rb.unit"]" />}
                 </div>
                 <h3 class="lbl" style="margin:0">@L["rb.measures"]</h3>
@@ -67,9 +71,10 @@
                 {
                     var m = _measures[i];
                     var n = i + 1;
+                    var at = i;
                     <div class="row" style="gap:6px;align-items:flex-end">
-                        <SelectField TValue="string?" @bind-Value="m.Function" Options="Functions" Label="@L.F("rb.measureN", n)" />
-                        @if (m.Function != "count") {<SelectField TValue="string?" @bind-Value="m.Field" Options="Measurable" Empty="—" Label="@L["rb.field"]" />}
+                        <SelectField TValue="string?" @bind-Value="m.Function" Options="Functions" Label="@L.F("rb.measureN", n)" Error="@(m.Function == "count" ? Mark("measure", at) : null)" />
+                        @if (m.Function != "count") {<SelectField TValue="string?" @bind-Value="m.Field" Options="Measurable" Empty="—" Label="@L["rb.field"]" Error="@Mark("measure", at)" />}
                         <Btn Ghost="true" Icon="trash" AriaLabel="@L.F("rb.removeMeasure", n)" Disabled="_measures.Count <= 1" OnClick="() => _measures.Remove(m)" />
                     </div>
                 }
@@ -77,7 +82,7 @@
                 <div class="row" style="gap:6px;align-items:flex-end">
                     <SelectField TValue="string?" @bind-Value="_sortBy" Options="SortOptions" Empty="—" Label="@L["rb.sort"]" />
                     <CheckField @bind-Value="_sortDesc" Label="@L["rb.desc"]" />
-                    <IntField @bind-Value="_top" Label="@L["rb.top"]" Min="1" Max="1000" />
+                    <IntField @bind-Value="_top" Label="@L["rb.top"]" Min="1" Max="1000" Error="@Mark("top")" />
                 </div>
             }
             <h3 class="lbl" style="margin:0">@L["rb.filters"]</h3>
@@ -85,15 +90,16 @@
             {
                 var flt = _filters[i];
                 var n = i + 1;
+                var at = i;
                 <div class="stack" style="gap:4px;border-bottom:1px solid var(--border);padding-bottom:6px">
                     <div class="row" style="gap:6px;align-items:flex-end">
-                        <SelectField TValue="string?" @bind-Value="flt.Field" Options="Filterable" Empty="—" Label="@L.F("rb.filterN", n)" />
+                        <SelectField TValue="string?" @bind-Value="flt.Field" Options="Filterable" Empty="—" Label="@L.F("rb.filterN", n)" Error="@(flt.Operator is "empty" or "notEmpty" ? Mark("filter", at) : null)" />
                         <SelectField TValue="string?" @bind-Value="flt.Operator" Options="Operators" Label="@L["rb.operator"]" />
                         <Btn Ghost="true" Icon="trash" AriaLabel="@L.F("rb.removeFilter", n)" OnClick="() => _filters.Remove(flt)" />
                     </div>
                     @if (flt.Operator is not ("empty" or "notEmpty"))
                     {
-                        <TextField @bind-Value="flt.Value" Label="@L[flt.Operator is "in" ? "rb.values" : "rb.value"]" Help="@(flt.Operator is "in" ? L["rb.valuesHelp"] : null)" />
+                        <TextField @bind-Value="flt.Value" Label="@L[flt.Operator is "in" ? "rb.values" : "rb.value"]" Help="@(flt.Operator is "in" ? L["rb.valuesHelp"] : null)" Error="@Mark("filter", at)" />
                         @if (flt.Operator == "between") {<TextField @bind-Value="flt.Value2" Label="@L["rb.value2"]" />}
                     }
                 </div>
@@ -106,13 +112,20 @@
         {
             <Box Fill="true"><EmptyState Icon="chart" Title="@L["rb.empty"]" Text="@L["rb.emptyText"]" /></Box>
         }
-        else if (_result.Rows.Count == 0)
-        {
-            <Box Fill="true"><EmptyState Icon="chart" Title="@L["rep.noRows"]" Text="@L["rep.noRowsText"]" /></Box>
-        }
         else
         {
-            <ListFrame Label="@_result.Title"><ChildContent><ReportGrid Result="_result" /></ChildContent></ListFrame>
+            @* A failed run leaves no stale rows that look like its answer: the earlier result is dimmed and marked (owner feedback 13 Oct 2026). *@
+            @if (_stale) {<Banner Tone="Tone.Warn" Icon="clock" Text="@L["rb.stale"]" />}
+            <div class="stack@(_stale ? " stale" : null)" style="min-width:0;min-height:0;flex:1" inert="@_stale" aria-hidden="@(_stale ? "true" : null)">
+                @if (_result.Rows.Count == 0)
+                {
+                    <Box Fill="true"><EmptyState Icon="chart" Title="@L["rep.noRows"]" Text="@L["rep.noRowsText"]" /></Box>
+                }
+                else
+                {
+                    <ListFrame Label="@_result.Title"><ChildContent><ReportGrid Result="_result" /></ChildContent></ListFrame>
+                }
+            </div>
         }
     </div>
 </div>
@@ -138,9 +151,15 @@
     private ReportResult? _result;
     private string? _source, _sortBy, _problem, _name, _saveError;
     private DateOnly? _from, _to;
-    private bool _detail, _sortDesc = true, _busy, _saving, _shared;
+    private bool _detail, _sortDesc = true, _busy, _saving, _shared, _stale;
     private int? _top;
-    private List<GroupModel> _rows = [];
+    // Summary mode opens with one (empty) row grouping, so the first list under "Row grouping" is a row grouping (owner feedback 13 Oct 2026).
+    private List<GroupModel> _rows = [new()];
+    // Messages on the side panel's settings ("row:0", "measure:1", "filter:0", "columns", "top", "source", "from", "to").
+    private readonly Dictionary<string, string> _marks = new(StringComparer.Ordinal);
+    // The groupings and filters of the last definition sent, in order: the server's indexes point into these.
+    private List<GroupModel> _sentRows = [];
+    private List<FilterModel> _sentFilters = [];
     private GroupModel _column = new();
     private List<MeasureModel> _measures = [new()];
     private List<FilterModel> _filters = [];
@@ -184,12 +203,15 @@
     private void SourceChanged(string? s)
     {
         _source = s;
-        _rows = [];
+        _rows = [new GroupModel()];
         _column = new GroupModel();
         _measures = [new MeasureModel()];
         _filters = [];
         _columns.Clear();
         _result = null;
+        _stale = false;
+        _problem = null;
+        _marks.Clear();
     }
 
     private void ToggleColumn(string key, bool on) { if (on) _columns.Add(key); else _columns.Remove(key); }
@@ -200,6 +222,7 @@
         _source = source;
         _detail = d.Detail;
         _rows = (d.Rows ?? []).Select(r => new GroupModel { Field = r.Field, Unit = r.DateUnit }).ToList();
+        if (_rows.Count == 0) _rows.Add(new GroupModel());
         _column = d.Column is { } c ? new GroupModel { Field = c.Field, Unit = c.DateUnit } : new GroupModel();
         _measures = (d.Measures ?? []).Select(m => new MeasureModel { Function = m.Function, Field = m.Field }).ToList();
         if (_measures.Count == 0) _measures.Add(new MeasureModel());
@@ -220,51 +243,124 @@
             "between" => [f.Value ?? "", f.Value2 ?? ""],
             _ => [f.Value ?? ""],
         };
-        var filters = _filters.Where(f => f.Field is not null).Select(f => new ReportFilter(f.Field!, f.Operator ?? "eq", Values(f))).ToList();
+        _sentFilters = _filters.Where(f => f.Field is not null).ToList();
+        _sentRows = _detail ? [] : _rows.Where(r => r.Field is not null).ToList();
+        var filters = _sentFilters.Select(f => new ReportFilter(f.Field!, f.Operator ?? "eq", Values(f))).ToList();
         if (_detail) return new ReportDefinition(null, null, null, filters, null, null, true, _columns.ToList());
         return new ReportDefinition(
-            _rows.Where(r => r.Field is not null).Select(r => new ReportGrouping(r.Field!, IsDate(r.Field) ? r.Unit ?? "month" : null)).ToList(),
+            _sentRows.Select(r => new ReportGrouping(r.Field!, IsDate(r.Field) ? r.Unit ?? "month" : null)).ToList(),
             _column.Field is null ? null : new ReportGrouping(_column.Field, IsDate(_column.Field) ? _column.Unit ?? "month" : null),
             _measures.Select(m => new ReportMeasure(m.Function ?? "sum", m.Function == "count" ? null : m.Field)).ToList(),
             filters, _sortBy is null ? null : new ReportSort(_sortBy, _sortDesc), _top, false, null);
     }
 
+    private string? Mark(string kind, int index = 0) => _marks.GetValueOrDefault(kind + ":" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private void SetMark(string kind, int index, string message) => _marks.TryAdd(kind + ":" + index.ToString(System.Globalization.CultureInfo.InvariantCulture), message);
+
+    /// <summary>
+    /// Checks the settings before anything is sent (owner feedback 13 Oct 2026): a summary needs a row grouping and a field for every
+    /// measure but Count, detail mode its columns, a filter its value, a period its order. Problems are marked on their setting.
+    /// </summary>
+    private IReadOnlyList<string> Check()
+    {
+        _marks.Clear();
+        var problems = new List<string>();
+        void Add(string kind, int index, string message) { SetMark(kind, index, message); problems.Add(message); }
+        if (_from is { } from && _to is { } to && from > to) Add("to", 0, L["rb.periodOrder"]);
+        if (_detail)
+        {
+            if (_columns.Count is < 1 or > MaxColumns) Add("columns", 0, L.F("rb.needColumns", MaxColumns));
+        }
+        else
+        {
+            if (_rows.Count == 0) _rows.Add(new GroupModel());
+            if (_rows.All(r => r.Field is null)) Add("row", 0, L["rb.needRow"]);
+            for (var i = 0; i < _measures.Count; i++)
+                if (_measures[i].Function != "count" && _measures[i].Field is null) Add("measure", i, L.F("rb.needMeasureField", i + 1));
+        }
+        for (var i = 0; i < _filters.Count; i++)
+        {
+            var f = _filters[i];
+            if (f.Field is null || f.Operator is "empty" or "notEmpty") continue;
+            if (string.IsNullOrWhiteSpace(f.Value) || f.Operator == "between" && string.IsNullOrWhiteSpace(f.Value2)) Add("filter", i, L.F("rb.needValue", i + 1));
+        }
+        return problems;
+    }
+
+    /// <summary>The server's refusal as messages on the settings; never an internal name (field paths are only used to find the setting).</summary>
+    private IReadOnlyList<string> Refused(ApiProblem p)
+    {
+        _marks.Clear();
+        if (p.Errors is not { Count: > 0 } errors) return [p.Detail ?? L["rb.checkSettings"]];
+        var messages = new List<string>();
+        foreach (var e in errors)
+        {
+            var message = ReportProblems.Message(e, L);
+            if (!messages.Contains(message)) messages.Add(message);
+            if (ReportProblems.PlaceOf(e.Field) is not { } place) continue;
+            var index = place.Kind switch
+            {
+                "row" => place.Index < _sentRows.Count ? _rows.IndexOf(_sentRows[place.Index]) : 0,
+                "filter" => place.Index < _sentFilters.Count ? _filters.IndexOf(_sentFilters[place.Index]) : place.Index,
+                _ => place.Index,
+            };
+            SetMark(place.Kind, Math.Max(index, 0), message);
+        }
+        return messages;
+    }
+
+    private void Failed(IReadOnlyList<string> messages, bool run)
+    {
+        var text = string.Join(" · ", messages);
+        _problem = run ? L.F("rb.notShown", text) : text;
+        _stale = _result is not null;
+    }
+
     private async Task Run()
     {
         if (_source is null) return;
-        _busy = true;
         _problem = null;
-        try { _result = await Api.PostAsync<ReportResult>(Api.C("reports/builder/run"), new ReportRunRequest(_source, Definition(), _from, _to)); }
-        catch (ApiException e) { _problem = Messages(e.Problem); }
+        if (Check() is { Count: > 0 } problems) { Failed(problems, true); return; }
+        _busy = true;
+        try
+        {
+            _result = await Api.PostAsync<ReportResult>(Api.C("reports/builder/run"), new ReportRunRequest(_source, Definition(), _from, _to));
+            _stale = false;
+        }
+        catch (ApiException e) { Failed(Refused(e.Problem), true); }
         finally { _busy = false; }
     }
 
-    private static string Messages(ApiProblem p) => p.Errors is { Count: > 0 } list ? string.Join(" · ", list.Select(x => x.Message)) : p.Detail ?? p.Code ?? "";
-
     private async Task Export(string format)
     {
+        _problem = null;
+        if (Check() is { Count: > 0 } problems) { Failed(problems, false); return; }
         try
         {
             var file = await Api.FileAsync(Api.C("reports/builder/export?format=" + format), new ReportRunRequest(_source, Definition(), _from, _to));
             await Js.SaveFile(file.Name, file.ContentType, file.Bytes);
         }
-        catch (ApiException e) { Toasts.Error(Messages(e.Problem)); }
+        catch (ApiException e) { Failed(Refused(e.Problem), false); }
     }
 
     private async Task Background()
     {
+        _problem = null;
+        if (Check() is { Count: > 0 } problems) { Failed(problems, false); return; }
         try
         {
             await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new { Kind = "builder", Source = _source, Definition = Definition(), From = _from, To = _to, Format = "xlsx" });
             Toasts.Success(L["rep.backgroundQueued"]);
         }
-        catch (ApiException e) { Toasts.Error(Messages(e.Problem)); }
+        catch (ApiException e) { Failed(Refused(e.Problem), false); }
     }
 
     private async Task Save()
     {
-        _busy = true;
         _saveError = null;
+        if (Check() is { Count: > 0 } problems) { _saveError = string.Join(" · ", problems); return; }
+        _busy = true;
         try
         {
             var req = new SavedReportRequest(_name?.Trim(), _source, Definition(), _shared, _saved?.RowVersion);
@@ -276,9 +372,11 @@
             if (_saved is null) Nav.NavigateTo(NavModel.Href(Company, $"reports/builder/{r.Id}"));
             else _saved = r;
         }
-        catch (ApiException e) { _saveError = Messages(e.Problem); }
+        catch (ApiException e) { _saveError = string.Join(" · ", Refused(e.Problem)); }
         finally { _busy = false; }
     }
+
+    private const int MaxColumns = 30;   // ReportBuilderService.MaxColumns
 
     private sealed class GroupModel
     {

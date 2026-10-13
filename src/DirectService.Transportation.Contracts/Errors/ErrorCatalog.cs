@@ -197,6 +197,27 @@ public static class ErrorCatalog
         [ErrorCodes.SupportWindow] = ("نافذة الدعم يجب أن تبدأ قبل نهايتها وألا تتجاوز 7 أيام.", "The support window must start before it ends and last at most 7 days."),
         [ErrorCodes.SupportNotRequested] = ("طلب الدعم {0} ليس بانتظار القرار.", "Support request {0} is not waiting for a decision."),
         [ErrorCodes.MaintenanceResetBlocked] = ("رُفضت إعادة الضبط الكاملة: {0}.", "Full reset refused: {0}."),
+        // Report builder (owner feedback 13 Oct 2026): {0} is the setting as the side panel names it ("Grouping 1", "Measure 2", "Filter 1"…).
+        [ErrorCodes.ReportSource] = ("اختر مصدر البيانات.", "Choose a data source."),
+        [ErrorCodes.ReportDefinition] = ("التقرير بلا إعدادات. اختر التجميع والمقاييس، أو شغّل «وضع التفاصيل» واختر الأعمدة.", "The report has no settings. Choose the groupings and measures, or turn on “Detail mode” and choose the columns."),
+        [ErrorCodes.ReportRowsNone] = ("اختر حقلاً في «تجميع الصفوف» (التجميع 1)، أو شغّل «وضع التفاصيل». «تجميع الأعمدة» وحده لا يكفي.", "Choose a field under “Row grouping” (Grouping 1), or turn on “Detail mode”. A column grouping alone is not enough."),
+        [ErrorCodes.ReportRowsTooMany] = ("يمكن تجميع الصفوف بحقلين على الأكثر. احذف ما زاد.", "Rows can be grouped by at most {0} fields. Remove the extra grouping."),
+        [ErrorCodes.ReportMeasuresCount] = ("أضف من مقياس واحد إلى {0} مقاييس.", "Add between 1 and {0} measures."),
+        [ErrorCodes.ReportColumnsCount] = ("في «وضع التفاصيل» اختر من عمود واحد إلى {0} عموداً، أو أوقف «وضع التفاصيل».", "In “Detail mode” tick between 1 and {0} columns, or turn “Detail mode” off."),
+        [ErrorCodes.ReportTop] = ("«أعلى N» يجب أن يكون بين 1 و{0}. غيّر القيمة أو امسحها.", "“Top N” must be between 1 and {0}. Change it or clear it."),
+        [ErrorCodes.ReportFiltersCount] = ("يمكن إضافة {0} مرشحاً على الأكثر. احذف ما زاد.", "At most {0} filters can be added. Remove the extra filters."),
+        [ErrorCodes.ReportItemEmpty] = ("{0}: الإعداد فارغ. أكمله أو احذفه.", "{0}: this setting is empty. Complete it or remove it."),
+        [ErrorCodes.ReportFieldMissing] = ("{0}: اختر حقلاً من القائمة.", "{0}: choose a field from the list."),
+        [ErrorCodes.ReportNotGroupable] = ("{0}: لا يمكن التجميع بهذا الحقل. اختر حقلاً آخر.", "{0}: this field cannot be used for grouping. Choose another field."),
+        [ErrorCodes.ReportNotMeasurable] = ("{0}: اختر حقلاً رقمياً، أو استخدم «العدد».", "{0}: choose a number field, or use “Count”."),
+        [ErrorCodes.ReportFunction] = ("{0}: اختر الحساب (مجموع، عدد، متوسط، أصغر، أكبر).", "{0}: choose the calculation (sum, count, average, minimum, maximum)."),
+        [ErrorCodes.ReportDateUnit] = ("{0}: اختر الوحدة (يوم، شهر، ربع سنة، سنة).", "{0}: choose the unit (day, month, quarter, year)."),
+        [ErrorCodes.ReportFilterOperator] = ("{0}: هذا الشرط لا يناسب الحقل. اختر شرطاً آخر.", "{0}: this condition does not fit the field. Choose another condition."),
+        [ErrorCodes.ReportFilterValueRequired] = ("{0}: أدخل القيمة.", "{0}: enter the value."),
+        [ErrorCodes.ReportFilterValueFormat] = ("{0}: القيمة لا تناسب الحقل. التاريخ بالشكل 2026-10-31، والرقم بالأرقام فقط، ونعم/لا بـ true أو false، وللقوائم اختر من الخيارات.", "{0}: the value does not fit the field. Write dates as 2026-10-31, numbers in digits only, yes/no as true or false, and pick list values from the options."),
+        [ErrorCodes.ReportName] = ("اكتب اسم التقرير ({0} حرفاً على الأكثر).", "Enter the report name (at most {0} characters)."),
+        [ErrorCodes.ReportMeasure] = ("اختر مقياساً من مقاييس التقرير المحفوظ (التقارير في «وضع التفاصيل» لا تُثبّت).", "Choose one of the saved report's measures (reports in “Detail mode” cannot be pinned)."),
+        [ErrorCodes.ReportThresholds] = ("حد التنبيه يجب ألا يتجاوز الحد الحرج.", "The warning threshold must not be above the critical threshold."),
     };
 
     /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
@@ -403,4 +424,24 @@ public static class ErrorCodes
     public const string SubscriptionInvoiceNotDue = "subscription.invoiceNotDue";
     public const string SupportWindow = "support.window";
     public const string SupportNotRequested = "support.notRequested";
+    public const string ReportSource = "report.source";
+    public const string ReportDefinition = "report.definition";
+    public const string ReportRowsNone = "report.rowsNone";
+    public const string ReportRowsTooMany = "report.rowsTooMany";
+    public const string ReportMeasuresCount = "report.measuresCount";
+    public const string ReportColumnsCount = "report.columnsCount";
+    public const string ReportTop = "report.top";
+    public const string ReportFiltersCount = "report.filtersCount";
+    public const string ReportItemEmpty = "report.itemEmpty";
+    public const string ReportFieldMissing = "report.fieldMissing";
+    public const string ReportNotGroupable = "report.notGroupable";
+    public const string ReportNotMeasurable = "report.notMeasurable";
+    public const string ReportFunction = "report.function";
+    public const string ReportDateUnit = "report.dateUnit";
+    public const string ReportFilterOperator = "report.filterOperator";
+    public const string ReportFilterValueRequired = "report.filterValueRequired";
+    public const string ReportFilterValueFormat = "report.filterValueFormat";
+    public const string ReportName = "report.name";
+    public const string ReportMeasure = "report.measure";
+    public const string ReportThresholds = "report.thresholds";
 }

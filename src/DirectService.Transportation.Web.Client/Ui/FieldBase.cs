@@ -107,7 +107,10 @@ public abstract class FieldBase<TValue> : InputBase<TValue>
             b.OpenComponent<Icon>(23);
             b.AddComponentParameter(24, nameof(Icon.Name), "alert");
             b.CloseComponent();
-            Bidi.Write(b, 25, err);
+            // One element for the text: its isolated numbers must not become separate flex items of the error line.
+            b.OpenElement(25, "span");
+            Bidi.Write(b, 26, err);
+            b.CloseElement();
             b.CloseElement();
         }
         else if (Help is not null)

@@ -263,7 +263,12 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 
 /* ============================================================ banners, toasts, dialogs, panels */
 .banner { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-6); font-size: var(--fs-md); border-radius: var(--r); flex: none; }
-.banner .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); }
+/* The message takes the banner's whole width and wraps inside it; the icon stays at its first line (owner feedback 13 Oct 2026). */
+.banner > .ic { flex: none; align-self: flex-start; margin-block-start: 3px; }
+.banner > .t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.banner .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); flex: none; }
+/* An earlier result kept on screen after a refused run: dimmed and not interactive, under a "not up to date" banner. */
+.stale { opacity: .4; filter: grayscale(1); }
 .banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
 .banner.err { background: var(--err-bg); color: var(--err); border: 1px solid var(--err-line); }
 .banner.info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-line); }

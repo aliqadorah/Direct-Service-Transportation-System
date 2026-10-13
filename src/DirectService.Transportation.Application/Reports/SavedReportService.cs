@@ -126,7 +126,10 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     private async Task<(string Name, string Source, string Json)> ValidateAsync(SavedReportRequest r, CancellationToken ct)
     {
         var name = TextNormalizer.CleanText(r.Name);
-        new Validator().Require("name", name).MaxLength("name", name, 150).Check(r.Definition is not null, "definition", ErrorCodes.ValidationRequired).ThrowIfInvalid();
+        var errors = new List<FieldError>();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 150) errors.Add(new FieldError("name", ErrorCodes.ReportName, [150]));
+        if (r.Definition is null) errors.Add(new FieldError("definition", ErrorCodes.ReportDefinition, []));
+        if (errors.Count > 0) throw Fail.Fields(errors);
         var source = builder.Source(r.Source).Key;
         await builder.ValidateAsync(source, r.Definition!, ct).ConfigureAwait(false);
         return (name!, source, JsonSerializer.Serialize(r.Definition, ReportJson.Options));
@@ -216,8 +219,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", ErrorCodes.ValidationRequired, "savedReportId"), ct).ConfigureAwait(false);
         var measures = Parse(report.Definition).Measures?.Count ?? 0;
         var measure = r.Measure ?? 0;
-        new Validator().Check(measure >= 0 && measure < measures, "measure", ErrorCodes.ValidationRange)
-            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ValidationRange)
+        new Validator().Check(measure >= 0 && measure < measures, "measure", ErrorCodes.ReportMeasure)
+            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ReportThresholds)
             .ThrowIfInvalid();
         var me = UserId;
         var order = (await db.Set<DashboardPin>().Where(p => p.UserId == me).MaxAsync(p => (int?)p.SortOrder, ct).ConfigureAwait(false) ?? 0) + 10;
@@ -237,8 +240,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         var pin = await MyPinAsync(token, ct).ConfigureAwait(false);
         var report = await db.Set<SavedReport>().AsNoTracking().SingleAsync(x => x.Id == pin.SavedReportId, ct).ConfigureAwait(false);
         var measure = r.Measure ?? int.Parse(pin.Measure, System.Globalization.CultureInfo.InvariantCulture);
-        new Validator().Check(measure >= 0 && measure < (Parse(report.Definition).Measures?.Count ?? 0), "measure", ErrorCodes.ValidationRange)
-            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ValidationRange)
+        new Validator().Check(measure >= 0 && measure < (Parse(report.Definition).Measures?.Count ?? 0), "measure", ErrorCodes.ReportMeasure)
+            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ReportThresholds)
             .ThrowIfInvalid();
         pin.Measure = measure.ToString(System.Globalization.CultureInfo.InvariantCulture);
         pin.WarningThreshold = r.WarningThreshold;

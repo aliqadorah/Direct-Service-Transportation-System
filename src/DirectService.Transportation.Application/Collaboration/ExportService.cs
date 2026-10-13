@@ -70,8 +70,8 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
         {
             case "builder":
                 if (!ctx.HasPermission(PermissionKeys.ReportsView)) throw Fail.Forbidden();
-                await builder.ValidateAsync(r.Source ?? throw Fail.Field("source", ErrorCodes.ValidationRequired, "source"),
-                    r.Definition ?? throw Fail.Field("definition", ErrorCodes.ValidationRequired, "definition"), ct).ConfigureAwait(false);
+                await builder.ValidateAsync(r.Source ?? throw Fail.Field("source", ErrorCodes.ReportSource),
+                    r.Definition ?? throw Fail.Field("definition", ErrorCodes.ReportDefinition), ct).ConfigureAwait(false);
                 break;
             case "saved":
                 if (!ctx.HasPermission(PermissionKeys.ReportsView)) throw Fail.Forbidden();

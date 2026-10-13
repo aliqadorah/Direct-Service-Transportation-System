@@ -204,9 +204,28 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
   void ids; void w;
   return [
     { name: "builder#groups-measures-filters", route: "reports/builder", act: async (p, t) => {
-      await builderSource(p, t); await clickTimes(p, t("rb.addGroup"), 2); await clickTimes(p, t("rb.addMeasure"), 2); await clickTimes(p, t("rb.addFilter"), 3); } },
+      await builderSource(p, t); await clickTimes(p, t("rb.addGroup"), 1); await clickTimes(p, t("rb.addMeasure"), 2); await clickTimes(p, t("rb.addFilter"), 3); } },
     { name: "builder#detail-filters", route: "reports/builder", act: async (p, t) => {
       await builderSource(p, t); await p.getByRole("switch", { name: t("rb.detail") }).click(); await clickTimes(p, t("rb.addFilter"), 2); } },
+    // Owner feedback 13 Oct 2026: a detail result, then a summary with only a column grouping — stopped on the screen, the setting
+    // marked, the earlier result dimmed under "not up to date".
+    { name: "builder#not-up-to-date", route: "reports/builder", act: async (p, t) => {
+      await builderSource(p, t); await p.getByRole("switch", { name: t("rb.detail") }).click();
+      await p.locator("main fieldset input[type=checkbox]").first().check(); await button(p.locator("main"), t("rep.run")).click();
+      await expect(p.locator("main table").first()).toBeVisible();
+      await p.getByRole("switch", { name: t("rb.detail") }).click();
+      await p.getByLabel(t("rb.field"), { exact: true }).first().selectOption({ index: 1 });
+      await button(p.locator("main"), t("rep.run")).click();
+      await expect(p.locator(".banner.err")).toBeVisible(); await expect(p.locator("main .stale")).toBeVisible(); } },
+    // A refusal from the server (a text field compared with "greater than"): the message names "Filter 1" and the filter is marked.
+    { name: "builder#server-refused", route: "reports/builder", act: async (p, t) => {
+      await builderSource(p, t); await p.getByLabel(t("rb.groupN", 1), { exact: true }).selectOption({ index: 1 });
+      await clickTimes(p, t("rb.addFilter"), 1);
+      await p.getByLabel(t("rb.filterN", 1), { exact: true }).selectOption({ index: 1 });
+      await p.getByLabel(t("rb.operator"), { exact: true }).selectOption({ index: 2 });
+      await p.getByLabel(t("rb.value"), { exact: true }).fill("1");
+      await button(p.locator("main"), t("rep.run")).click();
+      await expect(p.locator(".banner.err")).toBeVisible(); await expect(p.locator("main [aria-invalid=true]").first()).toBeVisible(); } },
     // New journal entry (SCR-32): the account list of a line, open over the lines' scroll box.
     { name: "journal-new#account-list", route: "accounting/journal/new", act: async (p) => {
       const combo = p.locator("main table [role=combobox]").first(); await combo.click(); await combo.press("ArrowDown");

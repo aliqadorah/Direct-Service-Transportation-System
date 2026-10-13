@@ -85,6 +85,20 @@ public static partial class UiText
         ["rb.shared"] = ("مشترك مع الشركة", "Shared with the company"),
         ["rb.sharedHelp"] = ("يراه كل من له صلاحية مصدر البيانات", "Visible to everyone who can read the data source"),
         ["rb.saved"] = ("تم حفظ التقرير «{0}».", "Report “{0}” saved."),
+        // Report builder messages (owner feedback 13 Oct 2026): a setting is named as on the panel, with what to change; never an internal name.
+        ["rb.detailOnHint"] = ("التجميع والمقاييس لا تُستخدم في وضع التفاصيل (تبقى محفوظة). أوقفه لتلخيص البيانات.", "Groupings and measures are not used in detail mode (they are kept). Turn it off to summarise."),
+        ["rb.columnGroupHelp"] = ("اختياري: يوزّع المقاييس على أعمدة حسب هذا الحقل", "Optional: spreads the measures across columns by this field"),
+        ["rb.notShown"] = ("لم يُعرض التقرير: {0}", "The report was not shown: {0}"),
+        ["rb.stale"] = ("النتيجة أدناه ليست محدّثة: هي من عرض سابق بإعدادات أخرى.", "The result below is not up to date: it comes from an earlier run with other settings."),
+        ["rb.needRow"] = ("اختر حقلاً في «تجميع الصفوف» (التجميع 1)، أو شغّل «وضع التفاصيل». «تجميع الأعمدة» وحده لا يكفي.", "Choose a field under “Row grouping” (Grouping 1), or turn on “Detail mode”. A column grouping alone is not enough."),
+        ["rb.needMeasureField"] = ("المقياس {0}: اختر حقلاً رقمياً، أو استخدم «العدد».", "Measure {0}: choose a number field, or use “Count”."),
+        ["rb.needColumns"] = ("في «وضع التفاصيل» اختر من عمود واحد إلى {0} عموداً، أو أوقف «وضع التفاصيل».", "In “Detail mode” tick between 1 and {0} columns, or turn “Detail mode” off."),
+        ["rb.needValue"] = ("المرشح {0}: أدخل القيمة.", "Filter {0}: enter the value."),
+        ["rb.periodOrder"] = ("الفترة: تاريخ «إلى» قبل تاريخ «من». صحّح أحدهما.", "Period: the “To” date is before the “From” date. Correct one of them."),
+        ["rb.checkSetting"] = ("{0}: راجع هذا الإعداد.", "{0}: check this setting."),
+        ["rb.checkSettings"] = ("راجع إعدادات التقرير في اللوحة الجانبية ثم اضغط «عرض».", "Check the report settings in the side panel, then press “Show”."),
+        ["rb.columnsSetting"] = ("الأعمدة", "Columns"),
+        ["rb.period"] = ("الفترة", "Period"),
 
         // ---- saved reports (SCR-53)
         ["sr.new"] = ("تقرير جديد", "New report"),

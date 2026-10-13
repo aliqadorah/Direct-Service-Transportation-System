@@ -1,7 +1,7 @@
 @* Inline message across the page or a section: info, ok, warn, err, lock (read-only / locked record). Errors are announced (role=alert). *@
 <div class="banner @ToneCss.Banner(Tone)" role="@(Tone is Tone.Err ? "alert" : Live ? "status" : null)">
     <Icon Name="@(Icon ?? ToneCss.Icon(Tone))" />
-    <span>@if (Text is not null) {<Tx Value="@Text" />}@ChildContent</span>
+    <span class="t">@if (Text is not null) {<Tx Value="@Text" />}@ChildContent</span>
     @if (Actions is not null) {<span class="a">@Actions</span>}
 </div>
 

@@ -54,7 +54,7 @@ public sealed class GroupRow(string? s1, long? n1, Guid? g1, string? s2, long? n
 /// top-N; detail mode. Grouping and aggregation run in SQL (expression trees over the source query, NFR-01); the column grouping is pivoted
 /// from the SQL result. Sources with a status show active documents unless the definition filters on status (DT-115).
 /// </summary>
-public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, LedgerReportService ledger, Collaboration.ExportLimits limits)
+public sealed partial class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, LedgerReportService ledger, Collaboration.ExportLimits limits)
 {
     public const int MaxGroups = 5000;
     public const int MaxDetailRows = 5000;
@@ -67,6 +67,28 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
     private bool En => ctx.Language == "en";
 
     private string L(string ar, string en) => En ? en : ar;
+
+    /// <summary>
+    /// The setting a definition path points at, named as the builder's side panel names it ("definition.rows[0].field" → "Grouping 1"), so
+    /// that refusals never show internal names (owner feedback 13 Oct 2026). The path stays the error's field for the screen to mark it.
+    /// </summary>
+    private string Setting(string at)
+    {
+        var m = SettingPath().Match(at);
+        var n = m.Groups[2].Success ? int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture) + 1 : 0;
+        return m.Groups[1].Value switch
+        {
+            "rows" => L($"التجميع {n}", $"Grouping {n}"),
+            "column" => L("تجميع الأعمدة", "Column grouping"),
+            "measures" => L($"المقياس {n}", $"Measure {n}"),
+            "filters" => L($"المرشح {n}", $"Filter {n}"),
+            "columns" => L("الأعمدة", "Columns"),
+            _ => L("إعدادات التقرير", "Report settings"),
+        };
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^definition\.(rows|columns|column|measures|filters)(?:\[(\d+)\])?", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex SettingPath();
 
     // ============================================================ sources
 
@@ -113,7 +135,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
 
     public SourceDef Source(string? key)
     {
-        var s = ReportSources.Find(key?.Trim().ToLowerInvariant()) ?? throw Fail.Field("source", ErrorCodes.ValidationFormat, "source");
+        var s = ReportSources.Find(key?.Trim().ToLowerInvariant()) ?? throw Fail.Field("source", ErrorCodes.ReportSource);
         if (!CanUse(s)) throw Fail.Forbidden();
         return s;
     }
@@ -126,16 +148,22 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
     /// <summary>Validates a definition against the source (FR-144) and builds the filter predicate.</summary>
     private async Task<Plan> PlanAsync(SourceDef s, ReportDefinition d, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
-        if (d.Rows?.Any(r => r is null) == true) throw Fail.Field("definition.rows", ErrorCodes.ValidationFormat, "definition.rows");
-        if (d.Measures?.Any(m => m is null) == true) throw Fail.Field("definition.measures", ErrorCodes.ValidationFormat, "definition.measures");
-        if (d.Filters?.Any(f => f is null) == true) throw Fail.Field("definition.filters", ErrorCodes.ValidationFormat, "definition.filters");
-        if (d.Columns?.Any(c => c is null) == true) throw Fail.Field("definition.columns", ErrorCodes.ValidationFormat, "definition.columns");
+        Exception Bad(string at, string code, params object?[] args) => Fail.Field(at, code, args.Length > 0 ? args : [Setting(at)]);
+        void NoEmpty<TItem>(IReadOnlyList<TItem>? items, string at)
+        {
+            var i = items?.ToList().FindIndex(it => it is null) ?? -1;
+            if (i >= 0) throw Bad($"{at}[{i}]", ErrorCodes.ReportItemEmpty);
+        }
+        NoEmpty(d.Rows, "definition.rows");
+        NoEmpty(d.Measures, "definition.measures");
+        NoEmpty(d.Filters, "definition.filters");
+        NoEmpty(d.Columns, "definition.columns");
         var fields = await FieldsAsync(s, ct).ConfigureAwait(false);
-        FieldDef Field(string? key, string at) => fields.FirstOrDefault(f => f.Key == key) ?? throw Fail.Field(at, ErrorCodes.ValidationFormat, at);
+        FieldDef Field(string? key, string at) => fields.FirstOrDefault(f => f.Key == key) ?? throw Bad(at, ErrorCodes.ReportFieldMissing);
         (FieldDef, string?) Grouping(ReportGrouping g, string at)
         {
             var f = Field(g.Field, at + ".field");
-            if (!f.Groupable) throw Fail.Field(at + ".field", ErrorCodes.ValidationFormat, at + ".field");
+            if (!f.Groupable) throw Bad(at + ".field", ErrorCodes.ReportNotGroupable);
             string? unit = null;
             if (f.Type == FieldTypes.Date)
             {
@@ -145,7 +173,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
                     "day" => "day",
                     "quarter" => "quarter",
                     "year" => "year",
-                    _ => throw Fail.Field(at + ".dateUnit", ErrorCodes.ValidationFormat, at + ".dateUnit"),
+                    _ => throw Bad(at + ".dateUnit", ErrorCodes.ReportDateUnit),
                 };
             }
             return (f, unit);
@@ -156,41 +184,44 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
         var measures = new List<(string, FieldDef?)>();
         if (!d.Detail)
         {
-            if (rows.Count is < 1 or > 2) throw Fail.Field("definition.rows", ErrorCodes.ValidationRange, "definition.rows");
-            if ((d.Measures?.Count ?? 0) is < 1 or > MaxMeasures) throw Fail.Field("definition.measures", ErrorCodes.ValidationRange, "definition.measures");
+            // Summary mode needs a row grouping; a column grouping alone is refused with what to change (owner feedback 13 Oct 2026).
+            if (rows.Count < 1) throw Fail.Field("definition.rows", ErrorCodes.ReportRowsNone);
+            if (rows.Count > 2) throw Bad("definition.rows", ErrorCodes.ReportRowsTooMany, 2);
+            if ((d.Measures?.Count ?? 0) is < 1 or > MaxMeasures) throw Bad("definition.measures", ErrorCodes.ReportMeasuresCount, MaxMeasures);
             for (var i = 0; i < d.Measures!.Count; i++)
             {
                 var m = d.Measures[i];
                 var fn = (m.Function?.Trim().ToLowerInvariant()) switch
                 {
                     "sum" or "count" or "avg" or "min" or "max" => m.Function!.Trim().ToLowerInvariant(),
-                    _ => throw Fail.Field($"definition.measures[{i}].function", ErrorCodes.ValidationFormat, $"definition.measures[{i}].function"),
+                    _ => throw Bad($"definition.measures[{i}].function", ErrorCodes.ReportFunction),
                 };
                 FieldDef? f = null;
                 if (fn != "count" || !string.IsNullOrWhiteSpace(m.Field))
                 {
                     f = Field(m.Field, $"definition.measures[{i}].field");
-                    if (fn != "count" && !f.Measurable) throw Fail.Field($"definition.measures[{i}].field", ErrorCodes.ValidationFormat, $"definition.measures[{i}].field");
+                    if (fn != "count" && !f.Measurable) throw Bad($"definition.measures[{i}].field", ErrorCodes.ReportNotMeasurable);
                 }
                 measures.Add((fn, f));
             }
         }
         else
         {
-            if ((d.Columns?.Count ?? 0) is < 1 or > MaxColumns) throw Fail.Field("definition.columns", ErrorCodes.ValidationRange, "definition.columns");
+            if ((d.Columns?.Count ?? 0) is < 1 or > MaxColumns) throw Bad("definition.columns", ErrorCodes.ReportColumnsCount, MaxColumns);
             foreach (var (c, i) in d.Columns!.Select((c, i) => (c, i))) Field(c, $"definition.columns[{i}]");
         }
-        if (d.Top is < 1 or > MaxGroups) throw Fail.Field("definition.top", ErrorCodes.ValidationRange, "definition.top");
-        if ((d.Filters?.Count ?? 0) > MaxFilters) throw Fail.Field("definition.filters", ErrorCodes.ValidationRange, "definition.filters");
+        if (d.Top is < 1 or > MaxGroups) throw Bad("definition.top", ErrorCodes.ReportTop, MaxGroups);
+        if ((d.Filters?.Count ?? 0) > MaxFilters) throw Bad("definition.filters", ErrorCodes.ReportFiltersCount, MaxFilters);
 
         var x = Expression.Parameter(s.Row, "x");
         Expression? where = null;
         void And(Expression e) => where = where is null ? e : Expression.AndAlso(where, e);
         // A period given at run time replaces the definition's own filters on the main date (review B10-3).
         var overriding = (from is not null || to is not null) && s.DateField is not null;
-        var filters = (d.Filters ?? []).Where(f => !(overriding && f.Field == s.DateField)).ToList();
+        var indexed = (d.Filters ?? []).Select((f, i) => (f, i)).Where(p => !(overriding && p.f.Field == s.DateField)).ToList();
+        var filters = indexed.Select(p => p.f).ToList();
         if (s.DefaultFilter is not null && !filters.Any(f => f.Field == "status")) And(Replace(s.DefaultFilter, x));
-        for (var i = 0; i < filters.Count; i++) And(Filter(Field(filters[i].Field, $"definition.filters[{i}].field"), filters[i], x, $"definition.filters[{i}]"));
+        foreach (var (f, i) in indexed) And(Filter(Field(f.Field, $"definition.filters[{i}].field"), f, x, $"definition.filters[{i}]"));
         if ((from is not null || to is not null) && s.DateField is not null)
         {
             var dateField = fields.First(f => f.Key == s.DateField);
@@ -206,7 +237,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
     public async Task<ReportResult> RunAsync(string? sourceKey, ReportDefinition? definition, DateOnly? from, DateOnly? to, string? title, CancellationToken ct)
     {
         var s = Source(sourceKey);
-        var d = definition ?? throw Fail.Field("definition", ErrorCodes.ValidationRequired, "definition");
+        var d = definition ?? throw Fail.Field("definition", ErrorCodes.ReportDefinition);
         if (from is not null || to is not null) (from, to) = await ledger.PeriodAsync(from, to, ct).ConfigureAwait(false);
         var plan = await PlanAsync(s, d, from, to, ct).ConfigureAwait(false);
         var method = (d.Detail ? DetailMethod : GroupedMethod).MakeGenericMethod(s.Row);
@@ -229,7 +260,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
     {
         ArgumentNullException.ThrowIfNull(d);
         var s = Source(sourceKey);
-        if (d.Detail || d.Measures is null || measure < 0 || measure >= d.Measures.Count) throw Fail.Field("measure", ErrorCodes.ValidationRange, "measure");
+        if (d.Detail || d.Measures is null || measure < 0 || measure >= d.Measures.Count) throw Fail.Field("measure", ErrorCodes.ReportMeasure);
         var plan = await PlanAsync(s, d, null, null, ct).ConfigureAwait(false);
         var method = TotalMethod.MakeGenericMethod(s.Row);
         var totals = await ((Task<IReadOnlyList<decimal?>>)method.Invoke(this, [plan, ct])!).ConfigureAwait(false);
@@ -591,9 +622,11 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
     {
         var op = r.Operator?.Trim().ToLowerInvariant() ?? string.Empty;
         var values = r.Values ?? [];
-        string V(int i) => i < values.Count && values[i] is { } v ? v : throw Fail.Field(at + ".values", ErrorCodes.ValidationRequired, at + ".values");
+        var setting = Setting(at);
+        Exception Value() => Fail.Field(at + ".values", ErrorCodes.ReportFilterValueFormat, setting);
+        string V(int i) => i < values.Count && !string.IsNullOrWhiteSpace(values[i]) ? values[i] : throw Fail.Field(at + ".values", ErrorCodes.ReportFilterValueRequired, setting);
         var body = Replace(f.Value, x);
-        Exception Bad() => Fail.Field(at + ".operator", ErrorCodes.ValidationFormat, at + ".operator");
+        Exception Bad() => Fail.Field(at + ".operator", ErrorCodes.ReportFilterOperator, setting);
 
         if (op is "empty" or "notempty")
         {
@@ -608,20 +641,20 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
             {
                 var pid = Expression.Convert(Replace(f.Pid!, x), typeof(Guid?));
                 if (op == "contains") return Contains(body, V(0));
-                var ids = values.Select(v => tokens.Decode(f.Entity!, v) ?? throw Fail.Field(at + ".values", ErrorCodes.ValidationFormat, at + ".values")).Select(g => (Guid?)g).ToList();
-                if (ids.Count == 0) throw Fail.Field(at + ".values", ErrorCodes.ValidationRequired, at + ".values");
+                var ids = values.Select(v => tokens.Decode(f.Entity!, v) ?? throw Value()).Select(g => (Guid?)g).ToList();
+                if (ids.Count == 0) throw Fail.Field(at + ".values", ErrorCodes.ReportFilterValueRequired, setting);
                 Expression inList = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(Guid?)], Expression.Constant(ids), pid);
                 return op switch { "eq" or "in" => inList, "ne" => Expression.Not(inList), _ => throw Bad() };
             }
             case FieldTypes.Bool:
             {
-                var b = V(0).Trim().ToLowerInvariant() switch { "true" or "1" or "yes" => true, "false" or "0" or "no" => false, _ => throw Fail.Field(at + ".values", ErrorCodes.ValidationFormat, at + ".values") };
+                var b = V(0).Trim().ToLowerInvariant() switch { "true" or "1" or "yes" => true, "false" or "0" or "no" => false, _ => throw Value() };
                 return op switch { "eq" => Expression.Equal(body, Expression.Constant(b)), "ne" => Expression.NotEqual(body, Expression.Constant(b)), _ => throw Bad() };
             }
             case FieldTypes.Date:
             {
                 DateOnly D(int i) => DateOnly.TryParseExact(V(i), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d
-                    : throw Fail.Field(at + ".values", ErrorCodes.ValidationFormat, at + ".values");
+                    : throw Value();
                 var e = Expression.Convert(body, typeof(DateOnly?));
                 Expression C(int i) => Expression.Constant((DateOnly?)D(i), typeof(DateOnly?));
                 return Compare(op, e, C, Bad);
@@ -638,7 +671,7 @@ public sealed class ReportBuilderService(IAppDbContext db, IRequestContext ctx, 
             default:
             {
                 decimal N(int i) => decimal.TryParse(V(i), NumberStyles.Number, CultureInfo.InvariantCulture, out var n) ? n
-                    : throw Fail.Field(at + ".values", ErrorCodes.ValidationFormat, at + ".values");
+                    : throw Value();
                 var e = Expression.Convert(body, typeof(decimal?));
                 Expression C(int i) => Expression.Constant((decimal?)N(i), typeof(decimal?));
                 return Compare(op, e, C, Bad);

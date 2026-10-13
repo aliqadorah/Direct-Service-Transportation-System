@@ -141,6 +141,68 @@ public sealed class ReportTests(ApiFactory f)
     private static ReportDefinition ByCustomer(params ReportMeasure[] measures) =>
         new([new ReportGrouping("customer", null)], null, measures, null, null, null, false, null);
 
+    /// <summary>
+    /// Owner feedback 13 Oct 2026 (SCR-52): Trips, a column grouping "Trip date by month" but no row grouping, measures Average of loaded
+    /// weight and Count → "value of field «definition.rows» is out of range". Every refusal of a definition now names the setting as the side
+    /// panel does and says what to change, in Arabic and English; the field path stays only for the screen to mark the setting.
+    /// </summary>
+    [Fact]
+    public async Task Report_builder_refusals_name_the_setting_and_the_fix_never_an_internal_path()
+    {
+        var o = await f.SignUpOwnerAsync();
+        async Task<(string Field, string Code, string Message)> Refused(ReportRunRequest body, string language)
+        {
+            // Signed-in requests speak the user's language (preferences).
+            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
+            var r = await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"), body);
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+            var error = (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")[0];
+            var message = error.GetProperty("message").GetString()!;
+            Assert.DoesNotContain("definition", message, StringComparison.Ordinal);
+            return (error.GetProperty("field").GetString()!, error.GetProperty("code").GetString()!, message);
+        }
+        ReportRunRequest Run(ReportDefinition d) => new("trips", d, null, null);
+
+        // The owner's report: a column grouping only.
+        var owners = Run(new ReportDefinition([], new ReportGrouping("tripDate", "month"), [new ReportMeasure("avg", "loadedWeight"), new ReportMeasure("count", null)],
+            null, null, null, false, null));
+        var en = await Refused(owners, "en");
+        Assert.Equal(("definition.rows", "report.rowsNone"), (en.Field, en.Code));
+        Assert.Equal("Choose a field under “Row grouping” (Grouping 1), or turn on “Detail mode”. A column grouping alone is not enough.", en.Message);
+        Assert.Equal("اختر حقلاً في «تجميع الصفوف» (التجميع 1)، أو شغّل «وضع التفاصيل». «تجميع الأعمدة» وحده لا يكفي.", (await Refused(owners, "ar")).Message);
+        // Detail mode with the same groupings and measures runs: they are ignored there, only the columns count.
+        var detail = await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"), Run(new ReportDefinition([new ReportGrouping("tripDate", "month")], null,
+            [new ReportMeasure("avg", "loadedWeight"), new ReportMeasure("count", null)], null, null, null, true, ["tripDate", "loadedWeight"])));
+        await detail.EnsureOkAsync();
+
+        // Limits say the limit and what to change; settings are named with their number.
+        var noColumns = await Refused(Run(new ReportDefinition(null, null, null, null, null, null, true, [])), "en");
+        Assert.Equal(("definition.columns", "In “Detail mode” tick between 1 and 30 columns, or turn “Detail mode” off."), (noColumns.Field, noColumns.Message));
+        Assert.Equal("Rows can be grouped by at most 2 fields. Remove the extra grouping.", (await Refused(Run(new ReportDefinition(
+            [new ReportGrouping("customer", null), new ReportGrouping("driver", null), new ReportGrouping("material", null)], null, [new ReportMeasure("count", null)],
+            null, null, null, false, null)), "en")).Message);
+        var measure = await Refused(Run(new ReportDefinition([new ReportGrouping("customer", null)], null, [new ReportMeasure("count", null), new ReportMeasure("sum", "customer")],
+            null, null, null, false, null)), "ar");
+        Assert.Equal(("definition.measures[1].field", "المقياس 2: اختر حقلاً رقمياً، أو استخدم «العدد»."), (measure.Field, measure.Message));
+        // A filter keeps its index as sent, also when the period replaces an earlier filter on the trip date.
+        var filter = await Refused(new ReportRunRequest("trips", new ReportDefinition([new ReportGrouping("customer", null)], null, [new ReportMeasure("count", null)],
+            [new ReportFilter("tripDate", "ge", ["2026-01-01"]), new ReportFilter("loadedWeight", "gt", ["heavy"])], null, null, false, null), Now, Now), "en");
+        Assert.Equal("definition.filters[1].values", filter.Field);
+        Assert.StartsWith("Filter 2: the value does not fit the field.", filter.Message, StringComparison.Ordinal);
+        Assert.Equal("Filter 1: enter the value.", (await Refused(Run(new ReportDefinition([new ReportGrouping("customer", null)], null, [new ReportMeasure("count", null)],
+            [new ReportFilter("loadedWeight", "gt", [""])], null, null, false, null)), "en")).Message);
+        Assert.Equal("“Top N” must be between 1 and 5000. Change it or clear it.", (await Refused(Run(new ReportDefinition([new ReportGrouping("customer", null)], null,
+            [new ReportMeasure("count", null)], null, null, 0, false, null)), "en")).Message);
+        Assert.Equal("Grouping 1: choose a field from the list.", (await Refused(Run(new ReportDefinition([new ReportGrouping("nope", null)], null,
+            [new ReportMeasure("count", null)], null, null, null, false, null)), "en")).Message);
+
+        // Saving checks the same definition, and its own name with the limit.
+        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest("en", null, o.Me.DateFormat))).EnsureOkAsync();
+        var saved = await (await o.Client.PostAsJsonAsync(U(o, "/reports/saved"), new SavedReportRequest(" ", "trips", owners.Definition, false, null))).Content.ReadAsStringAsync();
+        Assert.Contains("Enter the report name (at most 150 characters).", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("«name»", saved, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Report_builder_groups_pivots_filters_and_lists_details_FR143_FR144()
     {
