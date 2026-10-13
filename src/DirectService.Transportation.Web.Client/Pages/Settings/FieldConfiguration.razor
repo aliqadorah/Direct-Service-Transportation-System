@@ -19,7 +19,9 @@
 <TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="AskEntity" Label="@L["nav.fields"]" />
 <StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
     <ChildContent>
-        <div class="cols fill" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;min-height:0">
+        @* Both panels show all their rows at their natural height (the page scrolls), side by side and as tall as each other; inside a "fill" area
+           the form preview below squeezed them into a thin strip (owner feedback 13 Oct 2026, SCR-75). *@
+        <div class="cols" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:stretch;flex:none">
             <Box Title="@L["fld.standard"]" NoPad="true">
                 <table class="grid">
                     <caption class="sr-only">@L["fld.standard"]</caption>
