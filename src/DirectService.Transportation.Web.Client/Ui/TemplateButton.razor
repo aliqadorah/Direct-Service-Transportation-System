@@ -1,0 +1,20 @@
+@* "Download template" of an import screen (owner feedback 13 Oct 2026): the Excel file of the import's columns in the user's language. *@
+@inject Api Api
+@inject Downloads Downloads
+@inject Loc L
+
+<Btn Icon="export" Text="@L["imp.template"]" Title="@L["imp.templateHelp"]" Busy="_busy" OnClick="Save" />
+
+@code {
+    private bool _busy;
+
+    /// <summary>Company-relative path of the import (e.g. <c>trips/import</c>); the template is at <c>…/template</c>.</summary>
+    [Parameter, EditorRequired] public string ImportPath { get; set; } = "";
+
+    private async Task Save()
+    {
+        _busy = true;
+        try { await Downloads.SaveAsync(Api.C(ImportPath + "/template")); }
+        finally { _busy = false; }
+    }
+}

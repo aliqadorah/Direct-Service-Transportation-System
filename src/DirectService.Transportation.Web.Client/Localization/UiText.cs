@@ -468,6 +468,8 @@ public static partial class UiText
         ["imp.skipped"] = ("{0} صفاً فيها مشكلات لن تُستورد.", "{0} rows with problems will not be imported."),
         ["imp.flagged"] = ("{0} صفاً أخذت قيماً افتراضية وستُعلَّم «تحتاج مراجعة».", "{0} rows took default values and will be flagged “Needs review”."),
         ["imp.another"] = ("استيراد ملف آخر", "Import another file"),
+        ["imp.template"] = ("تنزيل القالب", "Download template"),
+        ["imp.templateHelp"] = ("ملف Excel بالأعمدة المطلوبة وصف مثال وورقة تشرح كل عمود", "Excel file with the expected columns, a sample row and a sheet explaining each column"),
 
         // ---- profile (SCR-08)
         ["profile.title"] = ("ملفي", "My profile"),

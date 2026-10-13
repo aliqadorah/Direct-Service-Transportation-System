@@ -40,6 +40,10 @@ public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService
         new("status", "الحالة", "Status"),
     ];
 
+    /// <summary>The columns a tariff import reads (key, Arabic and English header), in template order; status is export-only.</summary>
+    public static IReadOnlyList<(string Key, string Ar, string En)> ImportColumns =>
+        TariffColumns.Where(c => c.Key != "status").Select(c => (c.Key, c.Ar, c.En)).ToList();
+
     private bool En => ctx.Language == "en";
     private string AllText => En ? "All" : "الكل";
 

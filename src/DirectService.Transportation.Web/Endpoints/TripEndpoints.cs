@@ -42,6 +42,8 @@ internal static class TripEndpoints
             TypedResults.Ok(await svc.VoidAsync(trip, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsVoid);
         g.MapPost("/{trip}/clear-review", async (string trip, TripReviewRequest r, TripService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ClearReviewAsync(trip, r.RowVersion, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsEdit);
+        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+            File(await svc.TemplateAsync("trips", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.TripsEdit);
         g.MapPost("/import/preview", async (IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] string? mode, [Microsoft.AspNetCore.Mvc.FromForm] string? mapping,
             TripImportService svc, CancellationToken ct) =>
         {

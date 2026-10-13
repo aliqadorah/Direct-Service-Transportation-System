@@ -17,6 +17,7 @@
         </div>
         <Btn Icon="refresh" Text="@L["imp.preview"]" Disabled="_file is null" Busy="_busy" OnClick="Preview" />
         <Btn Primary="true" Icon="import" Text="@L["imp.import"]" Disabled="@(_preview is null || _preview.RejectedRows > 0)" Busy="_busy" OnClick="Import" />
+        <TemplateButton ImportPath="@ImportPath" />
     </div>
 </Box>
 @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}

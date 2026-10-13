@@ -82,6 +82,27 @@ public sealed class ImportPageTests : PageTestBase
         Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "trips/import" && r.Body!.Contains("\"notes\":\"Remarks\"", StringComparison.Ordinal));
     }
 
+    /// <summary>Owner feedback 13 Oct 2026: every import screen offers its Excel template.</summary>
+    [Theory]
+    [InlineData("trips")]
+    [InlineData("drivers")]
+    [InlineData("tariffs")]
+    [InlineData("accounting/accounts")]
+    [InlineData("accounting/journal-entries")]
+    public void Import_screens_download_their_template(string kind)
+    {
+        Respond(kind + "/import/template", new { });
+        IRenderedComponent<Microsoft.AspNetCore.Components.IComponent> cut = kind switch
+        {
+            "trips" => Render<TripImport>(p => p.Add(x => x.Company, Company)),
+            "drivers" or "tariffs" => Render<DirectService.Transportation.Web.Client.Pages.Masters.MasterImport>(p => p.Add(x => x.Company, Company).Add(x => x.Kind, kind)),
+            _ => Render<DirectService.Transportation.Web.Client.Pages.Accounting.ImportPanel>(p => p.Add(x => x.PreviewPath, kind + "/import/preview")
+                .Add(x => x.ImportPath, kind + "/import").Add(x => x.Done, "accounting")),
+        };
+        cut.FindAll("button").Single(b => b.TextContent.Trim() == L["imp.template"]).Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "GET" && r.Path == kind + "/import/template"));
+    }
+
     [Fact]
     public void Trip_import_asks_for_a_missing_required_column_and_takes_a_corrected_file_on_the_check_step()
     {

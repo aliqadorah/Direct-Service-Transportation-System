@@ -14,7 +14,17 @@ public interface ISpreadsheetService
     byte[] WriteXlsx(string sheetName, IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows);
 
     byte[] WriteCsv(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows);
+
+    /// <summary>An import template (.xlsx): the data sheet first (the one imports read), then the sheet explaining each column.</summary>
+    byte[] WriteTemplate(SpreadsheetTemplate template);
 }
+
+/// <summary>
+/// An import template: the data sheet (headers exactly as the import matches them, required ones highlighted, sample rows) and a
+/// notes sheet (an introduction, then one row per column: column, required, format, allowed values). Right to left for Arabic.
+/// </summary>
+public sealed record SpreadsheetTemplate(string DataSheet, string NotesSheet, bool RightToLeft, IReadOnlyList<string> Headers, IReadOnlyList<bool> Required,
+    IReadOnlyList<IReadOnlyList<object?>> SampleRows, string Intro, IReadOnlyList<string> NotesHeaders, IReadOnlyList<IReadOnlyList<string>> Notes);
 
 /// <summary>Tabular file contents; row numbers are those of the sheet (header = row 1).</summary>
 public sealed record SheetData(IReadOnlyList<string> Headers, IReadOnlyList<SheetRow> Rows)

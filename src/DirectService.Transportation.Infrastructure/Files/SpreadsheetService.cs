@@ -172,6 +172,76 @@ public sealed class SpreadsheetService : ISpreadsheetService
         return ms.ToArray();
     }
 
+    public byte[] WriteTemplate(SpreadsheetTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        using var workbook = new XLWorkbook();
+        var data = workbook.Worksheets.Add(template.DataSheet);
+        data.RightToLeft = template.RightToLeft;
+        for (var c = 0; c < template.Headers.Count; c++)
+        {
+            var cell = data.Cell(1, c + 1);
+            cell.SetValue(template.Headers[c]);
+            cell.Style.Font.Bold = true;
+            // Required columns stand out; the header text stays exactly what the import matches (no marks added to it).
+            cell.Style.Fill.BackgroundColor = template.Required.Count > c && template.Required[c] ? XLColor.FromHtml("#FCE8C3") : XLColor.FromHtml("#E8EEF4");
+            // Text columns are formatted as text so long numbers (national IDs, receipt numbers) keep their digits.
+            data.Column(c + 1).Style.NumberFormat.Format = "@";
+        }
+        var r = 2;
+        foreach (var row in template.SampleRows)
+        {
+            for (var c = 0; c < row.Count; c++)
+            {
+                var cell = data.Cell(r, c + 1);
+                switch (row[c])
+                {
+                    case null: break;
+                    case decimal d: cell.Value = d; cell.Style.NumberFormat.Format = "0.000"; break;
+                    case int i: cell.Value = i; cell.Style.NumberFormat.Format = "0"; break;
+                    case DateOnly date: cell.Value = date.ToDateTime(TimeOnly.MinValue); cell.Style.DateFormat.Format = "yyyy-mm-dd"; break;
+                    default: cell.SetValue(Convert.ToString(row[c], CultureInfo.InvariantCulture)); break;
+                }
+            }
+            r++;
+        }
+        data.SheetView.FreezeRows(1);
+        data.Columns(1, Math.Max(1, template.Headers.Count)).AdjustToContents(1, r);
+        foreach (var column in data.Columns(1, Math.Max(1, template.Headers.Count))) column.Width = Math.Max(column.Width, 14);
+
+        var notes = workbook.Worksheets.Add(template.NotesSheet);
+        notes.RightToLeft = template.RightToLeft;
+        notes.Cell(1, 1).SetValue(template.Intro);
+        notes.Cell(1, 1).Style.Alignment.WrapText = true;
+        notes.Range(1, 1, 1, Math.Max(1, template.NotesHeaders.Count)).Merge();
+        notes.Row(1).Height = 48;
+        for (var c = 0; c < template.NotesHeaders.Count; c++)
+        {
+            var cell = notes.Cell(3, c + 1);
+            cell.SetValue(template.NotesHeaders[c]);
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#E8EEF4");
+        }
+        for (var i = 0; i < template.Notes.Count; i++)
+        {
+            for (var c = 0; c < template.Notes[i].Count; c++)
+            {
+                var cell = notes.Cell(i + 4, c + 1);
+                cell.SetValue(template.Notes[i][c]);
+                cell.Style.Alignment.WrapText = true;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+            }
+        }
+        notes.Column(1).Width = 28;
+        notes.Column(2).Width = 12;
+        notes.Column(3).Width = 48;
+        notes.Column(4).Width = 60;
+        data.SetTabActive();
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        return ms.ToArray();
+    }
+
     public byte[] WriteCsv(IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<object?>> rows)
     {
         ArgumentNullException.ThrowIfNull(headers);

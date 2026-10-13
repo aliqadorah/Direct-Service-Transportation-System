@@ -113,6 +113,10 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
         new("fleetClass", "تصنيف الأسطول", "Fleet class", "الأسطول", "Fleet"),
     ];
 
+    /// <summary>The columns an import of the list reads (key, Arabic and English header), in template order; status is export-only.</summary>
+    public static IReadOnlyList<(string Key, string Ar, string En)> ImportColumns(string kind) =>
+        ColumnsOf(kind).Where(c => c.Key != "status").Select(c => (c.Key, c.Ar, c.En)).ToList();
+
     private static Column[] ColumnsOf(string kind) => kind switch
     {
         "drivers" => DriverColumns,

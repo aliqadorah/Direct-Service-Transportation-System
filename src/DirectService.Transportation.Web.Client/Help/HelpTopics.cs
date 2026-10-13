@@ -31,6 +31,7 @@ public static class HelpTopics
                     "المحاسبة ← دليل الحسابات: أنشئ الدليل من قالب النقل أو استورده، ثم أدخل الأرصدة الافتتاحية أو استوردها من «الأرصدة الافتتاحية».",
                     "الإعدادات ← ربط الحسابات: اربط كل مفتاح ترحيل بحساب. الفوترة تبقى معطّلة حتى يكتمل الربط.",
                     "البيانات الأساسية: السائقون والشاحنات، العملاء، الشركاء، المواد، مواقع التحميل والتنزيل — إدخالاً أو استيراداً.",
+                    "كل شاشة استيراد فيها «تنزيل القالب»: ملف Excel بلغتك بالأعمدة المطلوبة وصف مثال وورقة تشرح كل عمود (مطلوب أم لا، الصيغة، القيم المسموحة). استبدل الصف المثال ببياناتك ثم استورده.",
                     "الأسعار: تعرفة العملاء والشركاء، ثم أسعار السائقين للشهر الحالي لكل موقع تحميل (انظر «إدخال أسعار السائقين الشهرية»).",
                     "الإعدادات ← المستخدمون والأدوار: ادعُ الموظفين بالبريد مع دور لكل شركة.",
                     "بعد تحميل البيانات التاريخية: إعدادات الشركة ← التشغيل ← «إنهاء ترحيل البيانات».",
@@ -52,6 +53,7 @@ public static class HelpTopics
                     "Accounting → Chart of accounts: create the chart from the transport template or import it, then enter or import the opening balances.",
                     "Settings → Account mapping: map every posting key to an account. Invoicing stays off until the mapping is complete.",
                     "Master data: drivers and trucks, customers, partners, materials, loading and unloading sites — typed in or imported.",
+                    "Every import screen has “Download template”: an Excel file in your language with the expected columns, a sample row and a sheet explaining each column (required or not, format, allowed values). Replace the sample row with your data, then import it.",
                     "Prices: customer and partner tariffs, then this month's driver rates for every loading site (see “Enter monthly driver rates”).",
                     "Settings → Users & roles: invite your staff by e-mail with a role per company.",
                     "When the historical data is loaded: Company settings → Operations → “Finish data migration”.",
@@ -142,7 +144,7 @@ public static class HelpTopics
                 "إضافة رحلات كثيرة من ملف Excel أو CSV أو بلصقها.",
                 "من يملك صلاحية إنشاء الرحلات.",
                 [
-                    "العمليات ← استيراد الرحلات. الخطوة 1 «الملف»: ارفع ملف Excel أو CSV واختر الوضع: «صارم» (أي صف خاطئ يوقف الاستيراد) أو «متساهل» (القيم الاختيارية الخاطئة تأخذ الافتراضي ويُعلَّم الصف «تحتاج مراجعة»).",
+                    "العمليات ← استيراد الرحلات. الخطوة 1 «الملف»: «تنزيل القالب» يعطي ملف Excel بالأعمدة المطلوبة؛ ارفع ملف Excel أو CSV واختر الوضع: «صارم» (أي صف خاطئ يوقف الاستيراد) أو «متساهل» (القيم الاختيارية الخاطئة تأخذ الافتراضي ويُعلَّم الصف «تحتاج مراجعة»).",
                     "الخطوة 2 «مطابقة الأعمدة»: تُطابق الأعمدة تلقائياً بأسماء الحقول؛ اختر لكل حقل عموده في الملف. الحقول المعلَّمة بـ * يجب أن تكون في الملف.",
                     "الخطوة 3 «التحقق»: ملخص بعدد الصفوف الصالحة والمرفوضة والمكرّرة، ولكل صف مرفوض رقم الصف والعمود والمشكلة وطريقة التصحيح. صحّح الملف واضغط «رفع الملف المصحَّح»؛ تبقى المطابقة كما هي.",
                     "«التالي» و«السابق» تنقلان بين الخطوات دون فقد الملف أو المطابقة.",
@@ -158,7 +160,7 @@ public static class HelpTopics
                 "Adding many trips from an Excel or CSV file, or by pasting them.",
                 "Users who may create trips.",
                 [
-                    "Operations → Import trips. Step 1 “File”: upload an Excel or CSV file and choose the mode: Strict (any wrong row stops the import) or Tolerant (wrong optional values take their default and the row is flagged Needs review).",
+                    "Operations → Import trips. Step 1 “File”: “Download template” gives the Excel file with the expected columns; upload an Excel or CSV file and choose the mode: Strict (any wrong row stops the import) or Tolerant (wrong optional values take their default and the row is flagged Needs review).",
                     "Step 2 “Column matching”: columns are matched automatically by field name; choose the file's column for each field. Fields marked * must be in the file.",
                     "Step 3 “Check”: a summary of valid, rejected and duplicate rows, and for each rejected row its row number, column, problem and how to fix it. Correct the file and press “Upload the corrected file”; the matching is kept.",
                     "Next and Back move between the steps without losing the file or the matching.",

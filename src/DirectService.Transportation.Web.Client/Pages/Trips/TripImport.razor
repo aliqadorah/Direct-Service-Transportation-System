@@ -30,15 +30,18 @@
     case 1:
         <div class="cols" style="grid-template-columns:minmax(0,1fr) minmax(0,340px);align-items:start">
             <Box Title="@L["imp.file"]">
-                <div class="field">
-                    <label for="trip-file">@L[_fileName is null ? "imp.choose" : "imp.replaceFile"]</label>
-                    <InputFile id="trip-file" class="input" style="padding-top:4px" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
-                    <span class="help">@L["imp.help"]</span>
-                </div>
-                @if (_fileName is not null)
-                {
-                    <p style="margin:8px 0 0"><Icon Name="file" /> <bdi class="num">@_fileName</bdi>@if (_preview is not null) {<span class="muted"> · @L.F("imp.fileRead", _preview.TotalRows, _preview.Columns.Matched.Count)</span>}</p>
-                }
+                <Actions><TemplateButton ImportPath="trips/import" /></Actions>
+                <ChildContent>
+                    <div class="field">
+                        <label for="trip-file">@L[_fileName is null ? "imp.choose" : "imp.replaceFile"]</label>
+                        <InputFile id="trip-file" class="input" style="padding-top:4px" accept=".xlsx,.csv,.tsv,.txt" OnChange="Picked" />
+                        <span class="help">@L["imp.help"]</span>
+                    </div>
+                    @if (_fileName is not null)
+                    {
+                        <p style="margin:8px 0 0"><Icon Name="file" /> <bdi class="num">@_fileName</bdi>@if (_preview is not null) {<span class="muted"> · @L.F("imp.fileRead", _preview.TotalRows, _preview.Columns.Matched.Count)</span>}</p>
+                    }
+                </ChildContent>
             </Box>
             <Box Title="@L["trip.importMode"]">
                 <fieldset style="border:0;padding:0;margin:0" class="stack">

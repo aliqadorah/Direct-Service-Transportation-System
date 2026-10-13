@@ -59,6 +59,8 @@ internal static class AccountingEndpoints
         { await svc.DeleteAsync(account, r.Reason, ct).ConfigureAwait(false); return TypedResults.NoContent(); }).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPost("/template", async (ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ApplyTemplateAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
+        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+            File(await svc.TemplateAsync("accounts", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPost("/import/preview", async (IFormFile file, ChartImportService svc, CancellationToken ct) =>
         {
             await using var s = file.OpenReadStream();
@@ -179,6 +181,8 @@ internal static class AccountingEndpoints
             TypedResults.Ok(await svc.EditManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
         g.MapPost("/{entry}/void", async (string entry, VoidRequest r, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.VoidManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+            File(await svc.TemplateAsync("journal-entries", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
         g.MapPost("/import/preview", async (IFormFile file, JournalImportService svc, CancellationToken ct) =>
         {
             await using var s = file.OpenReadStream();
