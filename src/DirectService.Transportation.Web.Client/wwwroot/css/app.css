@@ -125,6 +125,9 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
 .stack { display: flex; flex-direction: column; gap: var(--sp-5); min-height: 0; }
 /* A group of fields never shrinks below its content (inside a scrolling form it would be squeezed until its rows overlap, SCR-74). */
 fieldset.stack, .stack > fieldset { flex-shrink: 0; }
+/* A scrolling column (form side panels, owner feedback 13 Oct 2026, SCR-52): its rows keep their height and the column scrolls, instead of being squeezed until they overlap. */
+.stack.scrolls { overflow: auto; }
+.stack.scrolls > * { flex-shrink: 0; }
 
 /* ============================================================ badges / status tags (icon + text, never colour alone — UX-05) */
 .badge { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); padding: 1px 7px; border-radius: var(--r); white-space: nowrap; line-height: 1.6; }

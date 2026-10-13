@@ -6,7 +6,7 @@ import { ROOT } from "./env";
 import { layoutProblems, type LayoutProblem } from "./layout";
 
 /** Window sizes of the check (desktop is the target, UX-14) and a laptop-like visible height. */
-export const WIDTHS = [1280, 1366] as const;
+export const WIDTHS: readonly number[] = process.env.VISUAL_WIDTHS ? process.env.VISUAL_WIDTHS.split(",").map(Number) : [1280, 1366];
 export const DENSITIES = ["compact", "comfortable"] as const;
 const HEIGHT = 680;
 
@@ -14,6 +14,15 @@ const HEIGHT = 680;
 export type Finding = Omit<LayoutProblem, "kind"> & { kind: LayoutProblem["kind"] | "not-shown"; screen: string; lang: Lang; width: number; density: string };
 
 export const VISUAL_DIR = path.join(ROOT, "TestResults", "visual");
+
+/**
+ * Only the screens, dialogs and states whose name or address contains one of the comma-separated parts of VISUAL_ONLY (e.g.
+ * `VISUAL_ONLY=reports/builder,builder#` with `VISUAL_WIDTHS=1366,1920`), to re-check the screens a change touched; unset = everything.
+ */
+export function wanted(...names: string[]): boolean {
+  const only = process.env.VISUAL_ONLY?.split(",").map((x) => x.trim()).filter(Boolean);
+  return !only || only.length === 0 || names.some((n) => only.some((o) => n.includes(o)));
+}
 
 /** Collects the problems of one run and writes them to TestResults/visual/problems-<part>.json as it goes. */
 export class VisualRun {

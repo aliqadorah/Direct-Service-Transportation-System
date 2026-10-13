@@ -8,7 +8,7 @@ import { totp } from "../support/totp";
 import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
 import { button } from "../support/ui";
-import { open, VisualRun } from "../support/visual";
+import { open, VisualRun, wanted } from "../support/visual";
 import { addTrip, buildWorld, today, type World } from "../support/world";
 
 /** The help topics (D-18), read from the client's Help/HelpTopics.cs so that every help page is checked. */
@@ -94,6 +94,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
 
 for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — account pages (${lang})`, async ({ page }) => {
+    test.skip(!wanted("account", "/sign-in", "/sign-up", "two-factor"), "not among VISUAL_ONLY");
     test.setTimeout(20 * 60_000);
     const run = new VisualRun(lang, "account");
     for (const route of ["/sign-in", "/sign-up", "/forgot-password"]) {
@@ -113,18 +114,27 @@ for (const lang of ["ar", "en"] as Lang[]) {
   });
 
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
+    const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
+    {
+      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a" };
+      const w = { driver: "d" } as World;
+      const any = companyRoutes("x", w, ids).some((r) => wanted(r.replace("/c/x", "") || "dashboard")) || companyStates(ids, w).some((x) => wanted(x.name, x.route));
+      test.skip(!any, "not among VISUAL_ONLY");
+    }
     test.setTimeout(90 * 60_000);
     const run = new VisualRun(lang, "screens");
     await enrol(page, lang, new VisualRun(lang, "screens-enrol", false));
     const company = companyOf(page);
     const { w, ids } = await documents(page, company);
     for (const route of companyRoutes(company, w, ids)) {
+      if (!wanted(route.replace(`/c/${company}`, "") || "dashboard")) continue;
       if (!(await open(page, route))) {
         run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, density: "" });
         continue;
       }
       await run.check(page, route.replace(`/c/${company}`, "") || "dashboard", { full: true });
     }
+    await sweepStates(page, run, lang, company, states(company, w, ids));
     run.assertClean();
   });
 }
@@ -183,9 +193,52 @@ function companyPopups(ids: Record<string, string | null>, w: World, roleName: s
   ];
 }
 
+/** A state of a screen reached by a few steps (sections opened, rows added): checked like a screen, no dialog expected. */
+type State = { name: string; route: string; act: (page: Page, t: Text) => Promise<void> };
+
+/** Report builder (owner feedback 13 Oct 2026, SCR-52): a data source with groupings, measures and filters added, and detail mode. */
+const builderSource = async (p: Page, t: Text) => { await p.getByLabel(t("rb.source")).selectOption({ index: 1 }); };
+const clickTimes = async (p: Page, text: string, times: number) => { for (let i = 0; i < times; i++) await button(p.locator("main"), text).click(); };
+
+function companyStates(ids: Record<string, string | null>, w: World): State[] {
+  void ids; void w;
+  return [
+    { name: "builder#groups-measures-filters", route: "reports/builder", act: async (p, t) => {
+      await builderSource(p, t); await clickTimes(p, t("rb.addGroup"), 2); await clickTimes(p, t("rb.addMeasure"), 2); await clickTimes(p, t("rb.addFilter"), 3); } },
+    { name: "builder#detail-filters", route: "reports/builder", act: async (p, t) => {
+      await builderSource(p, t); await p.getByRole("switch", { name: t("rb.detail") }).click(); await clickTimes(p, t("rb.addFilter"), 2); } },
+    // New journal entry (SCR-32): the account list of a line, open over the lines' scroll box.
+    { name: "journal-new#account-list", route: "accounting/journal/new", act: async (p) => {
+      const combo = p.locator("main table [role=combobox]").first(); await combo.click(); await combo.press("ArrowDown");
+      await expect(p.locator("[role=listbox]").first()).toBeVisible(); } },
+    // Field configuration (SCR-75): the Drivers tab (long form preview) and the Customers tab.
+    { name: "fields#drivers", route: "settings/fields", act: async (p, t) => { await p.getByRole("tab", { name: t("nav.drivers") }).click(); await expect(p.locator(".sk")).toHaveCount(0); } },
+    { name: "fields#customers", route: "settings/fields", act: async (p, t) => { await p.getByRole("tab", { name: t("nav.customers") }).click(); await expect(p.locator(".sk")).toHaveCount(0); } },
+    // Customer statement (RPT-12) shown without its required customer: the field marked, one message.
+    { name: "financial#customer-statement-required", route: "reports/financial?report=customer-statement", act: async (p, t) => {
+      await button(p.locator("main"), t("rep.run")).click(); await expect(p.locator("main [aria-invalid=true]").first()).toBeVisible(); } },
+  ];
+}
+
+async function sweepStates(page: Page, run: VisualRun, lang: Lang, company: string, states: State[]): Promise<void> {
+  const t = texts(lang);
+  page.setDefaultTimeout(15_000);   // a step that cannot be done fails the state quickly instead of waiting for the test's time limit
+  for (const s of states) {
+    const route = `/c/${company}/${s.route}`;
+    if (!(await open(page, route))) { run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: s.name, lang, width: 0, density: "" }); continue; }
+    try {
+      await s.act(page, t);
+    } catch (e) {
+      run.findings.push({ kind: "not-shown", text: `state not reached: ${String(e).split("\n")[0].slice(0, 160)}`, where: route, screen: s.name, lang, width: 0, density: "" });
+      continue;
+    }
+    await run.check(page, s.name, { full: true });
+  }
+}
+
 async function sweepPopups(page: Page, run: VisualRun, lang: Lang, company: string | null, popups: Popup[]): Promise<void> {
   const t = texts(lang);
-  for (const p of popups) {
+  for (const p of popups.filter((x) => wanted(x.name, x.route))) {
     const route = p.route.startsWith("/") ? p.route : `/c/${company}${p.route ? `/${p.route}` : ""}`;
     const fail = (why: string) => run.findings.push({ kind: "not-shown", text: `not opened: ${why}`, where: route, screen: p.name, lang, width: 0, density: "" });
     if (!(await open(page, route))) { fail("screen did not render"); continue; }
@@ -204,6 +257,7 @@ async function sweepPopups(page: Page, run: VisualRun, lang: Lang, company: stri
 
 for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — dialogs, panels and menus (${lang})`, async ({ page }) => {
+    test.skip(!companyPopups({}, {} as World, "").some((p) => wanted(p.name, p.route)), "not among VISUAL_ONLY");
     test.setTimeout(60 * 60_000);
     const run = new VisualRun(lang, "dialogs");
     await enrol(page, lang, new VisualRun(lang, "dialogs-enrol", false));
@@ -218,10 +272,12 @@ for (const lang of ["ar", "en"] as Lang[]) {
   });
 
   test(`Visual — provider console (${lang})`, async ({ page }) => {
+    test.skip(!wanted("/console", "console"), "not among VISUAL_ONLY");
     test.setTimeout(30 * 60_000);
     const run = new VisualRun(lang, "console");
     await staffSignIn(page, lang);
     for (const route of ["/console/tenants", "/console/plans", "/console/announcements", "/console/support-access", "/console/staff", "/console/health", "/console/help/console-staff"]) {
+      if (!wanted(route)) continue;
       if (await open(page, route)) await run.check(page, route.slice(1), { full: true });
       else run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, density: "" });
     }

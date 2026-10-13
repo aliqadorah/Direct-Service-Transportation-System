@@ -24,7 +24,7 @@
 </PageHeader>
 @if (_problem is not null) {<Banner Tone="Tone.Err" Text="@_problem" />}
 <div class="cols fill" style="grid-template-columns:340px 1fr;min-height:0">
-    <div class="box pad stack" style="overflow:auto;gap:10px">
+    <div class="box pad stack scrolls" style="gap:10px">
         <SelectField TValue="string?" Value="_source" ValueChanged="SourceChanged" ValueExpression="() => _source" Options="SourceOptions" Empty="@L["ui.choose"]" Label="@L["rb.source"]" Required="true" />
         @if (Fields.Count > 0)
         {
