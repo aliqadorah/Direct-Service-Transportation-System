@@ -16,4 +16,13 @@ builder.Services.AddScoped<Downloads>();
 builder.Services.AddScoped<MoneyAccounts>();
 builder.Services.AddScoped<AccountingLookups>();
 
-await builder.Build().RunAsync().ConfigureAwait(false);
+var host = builder.Build();
+// The first screen (the layout's loading state, before the profile arrives) is in the saved language: the server renders the profile's
+// language (or the browser's on anonymous pages) into <html lang>, read here before Blazor renders anything (owner feedback 13 Oct 2026).
+try
+{
+    if (host.Services.GetRequiredService<Microsoft.JSInterop.IJSRuntime>() is Microsoft.JSInterop.IJSInProcessRuntime js)
+        host.Services.GetRequiredService<Loc>().SetLanguage(js.Invoke<string?>("document.documentElement.getAttribute", "lang"));
+}
+catch (Microsoft.JSInterop.JSException) { /* the shell sets the language once the profile is loaded */ }
+await host.RunAsync().ConfigureAwait(false);

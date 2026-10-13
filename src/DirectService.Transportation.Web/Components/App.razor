@@ -18,6 +18,11 @@
     <HeadOutlet @rendermode="PageRenderMode" />
 </head>
 <body>
+    @* Shown while the WebAssembly runtime downloads, in the page's language; removed once it has started (Web.Client.lib.module.js). *@
+    @if (PageRenderMode is not null)
+    {
+        <div id="app-boot" class="empty" style="height:100vh" role="status"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@(Lang == "en" ? "Loading…" : "جارٍ التحميل…")</span></div>
+    }
     <Routes @rendermode="PageRenderMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
