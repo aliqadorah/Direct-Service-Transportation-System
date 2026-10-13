@@ -30,5 +30,7 @@
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public string? Help { get; set; }
 
-    private string? HelpHref => Help is not null && Shell.Company is { } c && HelpTopics.Find(Help) is not null ? $"/c/{c.Id}/help/{Help}" : null;
+    private string? HelpHref => Help is null || HelpTopics.Find(Help) is null ? null
+        : HelpTopics.IsConsole(Help) ? $"/console/help/{Help}"
+        : Shell.Company is { } c ? $"/c/{c.Id}/help/{Help}" : null;
 }

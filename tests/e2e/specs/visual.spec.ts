@@ -221,7 +221,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     test.setTimeout(30 * 60_000);
     const run = new VisualRun(lang, "console");
     await staffSignIn(page, lang);
-    for (const route of ["/console/tenants", "/console/plans", "/console/announcements", "/console/support-access", "/console/health"]) {
+    for (const route of ["/console/tenants", "/console/plans", "/console/announcements", "/console/support-access", "/console/staff", "/console/health", "/console/help/console-staff"]) {
       if (await open(page, route)) await run.check(page, route.slice(1), { full: true });
       else run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, density: "" });
     }

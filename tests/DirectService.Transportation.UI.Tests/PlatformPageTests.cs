@@ -181,6 +181,49 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Contains(Requests, r => r.Path == "/platform/tenants/t1");
     }
 
+    /// <summary>Owner feedback 13 Oct 2026, item 8b: the staff screen offers per state only the allowed actions, and invites by name and e-mail.</summary>
+    [Fact]
+    public void Console_staff_lists_states_with_their_actions_and_invites()
+    {
+        var now = DateTime.UtcNow;
+        Respond("/platform/staff", r => r.Method == HttpMethod.Post
+            ? new StaffResponse("s9", "سارة", "sara@platform.test", StaffStates.Invited, null, now, now.AddHours(48), false, false)
+            : new[]
+            {
+                new StaffResponse("s1", "أنا", "me@platform.test", StaffStates.Active, now, null, null, true, true),
+                new StaffResponse("s2", "عمر", "omar@platform.test", StaffStates.Active, now.AddDays(-1), null, null, true, false),
+                new StaffResponse("s3", "رنا", "rana@platform.test", StaffStates.Invited, null, now, now.AddHours(48), false, false),
+                new StaffResponse("s4", "خالد", "khaled@platform.test", StaffStates.Disabled, null, null, null, true, false),
+            });
+        var cut = Render<Staff>();
+        cut.WaitForAssertion(() => Assert.Contains("rana@platform.test", cut.Markup));
+        string Row(string email) => cut.FindAll("tbody tr").Single(r => r.TextContent.Contains(email, StringComparison.Ordinal)).TextContent;
+        Assert.DoesNotContain(L["staff.deactivate"], Row("me@platform.test"));      // never oneself
+        Assert.Contains(L["staff.you"], Row("me@platform.test"));
+        Assert.Contains(L["staff.deactivate"], Row("omar@platform.test"));
+        Assert.Contains(L["staff.resend"], Row("rana@platform.test"));
+        Assert.Contains(L["staff.cancelInvite"], Row("rana@platform.test"));
+        Assert.Contains(L["staff.reactivate"], Row("khaled@platform.test"));
+
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["staff.invite"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(L["staff.inviteHelp"], cut.Markup));
+        cut.FindAll(".dialog input")[0].Change("Sara");
+        cut.FindAll(".dialog input")[1].Change("sara@platform.test");
+        cut.Find("form#staff-invite").Submit();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "/platform/staff/invitations" && r.Body!.Contains("sara@platform.test", StringComparison.Ordinal)));
+        // The help link of the screen opens the console's help page.
+        Assert.Contains("href=\"/console/help/console-staff\"", cut.Markup);
+    }
+
+    [Fact]
+    public void Console_help_page_shows_the_staff_help_in_both_languages()
+    {
+        var cut = Render<ConsoleHelp>(p => p.Add(x => x.Topic, "console-staff"));
+        Assert.Contains("/provider/setup", Text(cut));
+        Assert.Contains("href=\"/console/staff\"", cut.Markup);
+        Assert.Single(Web.Client.Help.HelpTopics.ConsoleTopics, t => t.Key == "console-staff" && t.Ar.Steps.Count == t.En.Steps.Count && t.Ar.Problems.Count == t.En.Problems.Count);
+    }
+
     [Fact]
     public void Console_plans_open_the_editor_and_protect_used_plans()
     {

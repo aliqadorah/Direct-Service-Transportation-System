@@ -55,7 +55,9 @@ public static class DependencyInjection
             })
             .AddUserStore<UserStore>()
             .AddPasswordValidator<TenantPasswordValidator>()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddTokenProvider<StaffInvitationTokenProvider>(Application.Platform.StaffService.InvitationTokenProvider);
+        services.AddOptions<StaffInvitationTokenProviderOptions>();   // 48-hour staff invitation links (owner feedback 13 Oct 2026)
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(24)); // SEC-04
 
         services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section)).ValidateOnStart();

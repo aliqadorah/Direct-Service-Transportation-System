@@ -15,7 +15,53 @@ public sealed record HelpTopic(string Key, string Prd, HelpText Ar, HelpText En,
 /// </summary>
 public static class HelpTopics
 {
-    public static HelpTopic? Find(string? key) => All.FirstOrDefault(t => t.Key == key);
+    public static HelpTopic? Find(string? key) => All.Concat(ConsoleTopics).FirstOrDefault(t => t.Key == key);
+
+    /// <summary>A help page of the provider console (shown at /console/help/{key}; its screens are console addresses).</summary>
+    public static bool IsConsole(string? key) => ConsoleTopics.Any(t => t.Key == key);
+
+    /// <summary>Help pages of the provider console (owner feedback 13 Oct 2026, item 8).</summary>
+    public static readonly IReadOnlyList<HelpTopic> ConsoleTopics =
+    [
+        new("console-staff", "5.5",
+            new("موظفو المنصة",
+                "إنشاء أول موظف للمنصة، ودعوة الموظفين، وإيقافهم وإعادة تفعيلهم.",
+                "الإعداد الأول: من يملك رمز الإعداد (مشغّل الخادم). بعده: موظفو المنصة من لوحة مزوّد الخدمة.",
+                [
+                    "الإعداد الأول (مرة واحدة، حين لا يوجد أي موظف): افتح /provider/setup وأدخل رمز الإعداد. يُكتب الرمز في سجل التطبيق عند التشغيل، أو يُضبط مسبقاً في Platform:SetupCode (متغير البيئة Platform__SetupCode أو أسرار المستخدم).",
+                    "أدخل الاسم والبريد وكلمة المرور (8 أحرف على الأقل، حروف وأرقام)، ثم أعدّ التحقق بخطوتين واحفظ رموز الاسترداد. بعد إنشاء الحساب الأول تختفي صفحة الإعداد نهائياً.",
+                    "لوحة مزوّد الخدمة ← موظفو المنصة: القائمة بالاسم والبريد والحالة وآخر دخول.",
+                    "«دعوة موظف»: الاسم والبريد. يصل رابط يُستخدم مرة واحدة وصالح 48 ساعة؛ يعيّن به المدعو كلمة المرور ثم التحقق بخطوتين.",
+                    "للدعوة المعلّقة: «إعادة الإرسال» (يتوقف الرابط السابق) أو «إلغاء الدعوة».",
+                    "«إيقاف» مع السبب: تنتهي جلسات الموظف فوراً. «إعادة التفعيل» تعيده.",
+                ],
+                [
+                    "رمز الإعداد خاطئ خمس مرات خلال 15 دقيقة من الجهاز نفسه: يُوقف الإدخال منه 15 دقيقة. انسخ الرمز من السجل كما هو.",
+                    "انتهت مهلة الإعداد (20 دقيقة بعد الرمز): أدخل الرمز مرة أخرى.",
+                    "لا يمكن إيقاف حسابك ولا آخر موظف نشط.",
+                    "رابط الدعوة لا يعمل: استُخدم أو انتهت مدته أو أُلغي أو أُرسل رابط أحدث — أعد الإرسال.",
+                    "فقد جميع الموظفين الوصول: أمر التشغيل create-staff ما زال متاحاً للاسترداد (انظر دليل التشغيل).",
+                ]),
+            new("Platform staff",
+                "Creating the first platform staff account, inviting staff, deactivating and reactivating them.",
+                "First-run setup: whoever holds the setup code (the server operator). Afterwards: platform staff, in the provider console.",
+                [
+                    "First-run setup (once, while no staff account exists): open /provider/setup and enter the setup code. The code is written to the application log at start-up, or set beforehand in Platform:SetupCode (environment variable Platform__SetupCode or user secrets).",
+                    "Enter the name, e-mail and password (at least 8 characters, letters and digits), then set up two-step verification and keep the recovery codes. Once the first account exists the setup page is gone for good.",
+                    "Provider console → Platform staff: the list with name, e-mail, state and last sign-in.",
+                    "“Invite staff”: name and e-mail. A single-use link valid for 48 hours is e-mailed; with it the invitee sets a password, then two-step verification.",
+                    "For a pending invitation: “Resend” (the previous link stops working) or “Cancel invitation”.",
+                    "“Deactivate” with a reason: the staff member's sessions end at once. “Reactivate” brings them back.",
+                ],
+                [
+                    "Five wrong setup codes from the same address within 15 minutes: that address is blocked for 15 minutes. Copy the code from the log exactly.",
+                    "The setup session expired (20 minutes after the code): enter the code again.",
+                    "Your own account and the last active staff member cannot be deactivated.",
+                    "An invitation link does not work: it was used, expired, cancelled or replaced by a newer link — resend it.",
+                    "Every staff member has lost access: the create-staff operations command is still available for recovery (see the setup guide).",
+                ]),
+            [new("/console/staff", "nav.staff")]),
+    ];
 
     public static readonly IReadOnlyList<HelpTopic> All =
     [

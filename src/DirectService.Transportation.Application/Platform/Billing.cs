@@ -25,6 +25,12 @@ public sealed class PlatformOptions
     public int GraceDays { get; set; } = 7;
     public int SuspendedDaysBeforeCancel { get; set; } = 30;
     public int RetentionDays { get; set; } = 90;
+
+    /// <summary>
+    /// Setup code of the first-run provider setup (/provider/setup) while no platform staff exists; when empty a one-time code is generated at
+    /// start-up and written to the log. Set it through an environment variable (Platform__SetupCode) or user secrets, never in appsettings.
+    /// </summary>
+    public string? SetupCode { get; set; }
 }
 
 /// <summary>A payment page for an invoice (the card is entered only there, SEC-10).</summary>

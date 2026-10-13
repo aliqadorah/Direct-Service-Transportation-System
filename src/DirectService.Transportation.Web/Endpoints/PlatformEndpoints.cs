@@ -52,6 +52,18 @@ internal static class PlatformEndpoints
             return TypedResults.NoContent();
         });
         p.MapGet("/health", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.HealthAsync(ct).ConfigureAwait(false)));
+        // Platform staff (owner feedback 13 Oct 2026, item 8b): list, invitations, deactivation.
+        p.MapGet("/staff", async (StaffService s, CancellationToken ct) => TypedResults.Ok(await s.ListAsync(ct).ConfigureAwait(false)));
+        p.MapPost("/staff/invitations", async (StaffInviteRequest r, StaffService s, CancellationToken ct) => TypedResults.Ok(await s.InviteAsync(r, ct).ConfigureAwait(false)));
+        p.MapPost("/staff/{staff}/resend", async (string staff, StaffService s, CancellationToken ct) => TypedResults.Ok(await s.ResendAsync(staff, ct).ConfigureAwait(false)));
+        p.MapPost("/staff/{staff}/cancel", async (string staff, StaffService s, CancellationToken ct) =>
+        {
+            await s.CancelAsync(staff, ct).ConfigureAwait(false);
+            return TypedResults.NoContent();
+        });
+        p.MapPost("/staff/{staff}/deactivate", async (string staff, StaffStatusRequest r, StaffService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.DeactivateAsync(staff, r, ct).ConfigureAwait(false)));
+        p.MapPost("/staff/{staff}/reactivate", async (string staff, StaffService s, CancellationToken ct) => TypedResults.Ok(await s.ReactivateAsync(staff, ct).ConfigureAwait(false)));
 
         api.MapGet("/announcements", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.AnnouncementsAsync(true, ct).ConfigureAwait(false)))
             .WithTags("Announcements").RequireAuthorization();

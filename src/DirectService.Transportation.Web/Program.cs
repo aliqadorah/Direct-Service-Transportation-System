@@ -183,6 +183,22 @@ if (args is ["create-staff", var staffEmail, .. var staffName])
     return;
 }
 
+// First-run provider setup (owner feedback 13 Oct 2026, item 8a): while no platform staff account exists, a one-time setup code is
+// generated and written to the log (or Platform:SetupCode is used, never logged); /provider/setup then creates the first staff account.
+try
+{
+    using var setupScope = app.Services.CreateScope();
+    await setupScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Application.Platform.ProviderSetupService>()
+        .AnnounceAsync(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ProviderSetup"), CancellationToken.None).ConfigureAwait(false);
+}
+catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or InvalidOperationException)
+{
+    // The database is not reachable yet: the setup code is announced at the next start.
+#pragma warning disable CA1848
+    app.Logger.LogWarning(ex, "Provider first-run setup: the database could not be read; the setup code will be announced at the next start.");
+#pragma warning restore CA1848
+}
+
 await app.RunAsync().ConfigureAwait(false);
 
 /// <summary>Entry point (public for WebApplicationFactory in the API tests).</summary>

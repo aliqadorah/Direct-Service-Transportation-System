@@ -105,6 +105,7 @@ public static class NavModel
         ("nav.plans", "/console/plans", "layers"),
         ("nav.supportAccess", "/console/support-access", "shield"),
         ("nav.announcements", "/console/announcements", "megaphone"),
+        ("nav.staff", "/console/staff", "users"),
         ("nav.health", "/console/health", "activity"),
     ];
 

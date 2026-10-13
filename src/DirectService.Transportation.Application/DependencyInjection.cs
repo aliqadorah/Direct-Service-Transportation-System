@@ -90,6 +90,9 @@ public static class DependencyInjection
         services.AddScoped<TripService>();
         services.AddScoped<TripImportService>();
         services.AddScoped<Imports.ImportTemplateService>();
+        services.AddSingleton<Platform.ProviderSetupState>();
+        services.AddScoped<Platform.ProviderSetupService>();
+        services.AddScoped<Platform.StaffService>();
         services.AddScoped<TripExportService>();
         services.AddScoped<TripPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());

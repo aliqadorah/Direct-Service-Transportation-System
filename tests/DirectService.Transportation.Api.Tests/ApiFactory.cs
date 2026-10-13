@@ -26,6 +26,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public const string WebhookSecret = "test-webhook-secret";
 
+    /// <summary>Platform:SetupCode of the test host (first-run provider setup, owner feedback 13 Oct 2026).</summary>
+    public const string SetupCode = "TEST-SETUP-CODE-0077";
+
     public CapturingEmailSender Emails { get; } = new();
 
     /// <summary>Live messages the application published (record changes, locks, notifications), recorded instead of SignalR.</summary>
@@ -47,6 +50,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("EInvoicing:AllowSimulator", "true");
         builder.UseSetting("EInvoicing:MaxAttempts", "2");
         builder.UseSetting("Billing:WebhookSecret", WebhookSecret);
+        builder.UseSetting("Platform:SetupCode", SetupCode);
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<IEmailSender>();

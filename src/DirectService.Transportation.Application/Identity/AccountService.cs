@@ -121,7 +121,7 @@ public sealed class AccountService(
     public async Task ResendVerificationAsync(string? address, CancellationToken ct)
     {
         var user = string.IsNullOrWhiteSpace(address) ? null : await users.FindByEmailAsync(address.Trim()).ConfigureAwait(false);
-        if (user is { EmailConfirmedAt: null, Status: "Active" })
+        if (user is { EmailConfirmedAt: null, Status: "Active" } && !IsPendingStaff(user))
             await SendVerificationAsync(user, ct).ConfigureAwait(false);
     }
 
@@ -142,7 +142,7 @@ public sealed class AccountService(
     public async Task RequestPasswordResetAsync(string? address, CancellationToken ct)
     {
         var user = string.IsNullOrWhiteSpace(address) ? null : await users.FindByEmailAsync(address.Trim()).ConfigureAwait(false);
-        if (user is { Status: "Active" })
+        if (user is { Status: "Active" } && !IsPendingStaff(user))
             await SendPasswordResetAsync(user, ct).ConfigureAwait(false);
     }
 
@@ -174,6 +174,12 @@ public sealed class AccountService(
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>
+    /// An invited platform staff member who has not used the invitation yet: completed only through the 48-hour invitation link, never
+    /// through the anonymous reset or verification e-mails (security review 13 Oct 2026). The create-staff command sends its link itself.
+    /// </summary>
+    private static bool IsPendingStaff(User user) => user.IsPlatformStaff && string.IsNullOrEmpty(user.PasswordHash);
 
     private async Task<User?> FindByTokenAsync(string? userToken, CancellationToken ct)
     {

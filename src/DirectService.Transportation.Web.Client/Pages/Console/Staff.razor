@@ -1,0 +1,192 @@
+@page "/console/staff"
+@*
+  Provider console: platform staff (owner feedback 13 Oct 2026, item 8b): name, e-mail, state and last sign-in; Invite (name, e-mail) sends a
+  single-use link valid for 48 hours — the invitee sets a password and the two-step verification before the first sign-in; resend or cancel a
+  pending invitation; deactivate (with a reason) or reactivate — never one's own account nor the last active staff member. No public sign-up.
+  Every action is audited. A search hit (?staff=…) marks its row.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.staff"]" Help="console-staff" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.staff"])])">
+    <Actions><Btn Primary="true" Icon="send" Text="@L["staff.invite"]" OnClick="OpenInvite" /></Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        <ListFrame Label="@L["nav.staff"]">
+            <DataGrid TItem="StaffResponse" Items="_staff" Key="s => s.Id" Caption="@L["nav.staff"]" RowClass="@(s => s.Id == _marked ? "sel" : null)">
+                <Columns>
+                    <GridColumn TItem="StaffResponse" Title="@L["acct.fullName"]">
+                        <Template>@context.FullName @if (context.IsSelf) {<Badge Tone="Tone.Info" Text="@L["staff.you"]" />}</Template>
+                    </GridColumn>
+                    <GridColumn TItem="StaffResponse" Title="@L["acct.email"]" Value="s => s.Email" Ltr="true" />
+                    <GridColumn TItem="StaffResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@context.State.ToLowerInvariant()" /></Template></GridColumn>
+                    <GridColumn TItem="StaffResponse" Title="@L["staff.lastSignIn"]" Value="@(s => s.LastSignInAt is { } d ? Fmt.Date(DateOnly.FromDateTime(d.ToLocalTime()), Shell.DateFormat) + " " + d.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "—")" Ltr="true" />
+                    <GridColumn TItem="StaffResponse" Title="@L["staff.invitation"]" Value="@(s => s.InvitationExpiresAt is { } e ? L.F("staff.expiresOn", Fmt.Date(DateOnly.FromDateTime(e.ToLocalTime()), Shell.DateFormat) + " " + e.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)) : "")" />
+                    <GridColumn TItem="StaffResponse" Title="@L["profile.action"]" HideTitle="true">
+                        <Template>
+                            @if (context.State is StaffStates.Invited or StaffStates.Expired)
+                            {
+                                <Btn Small="true" Icon="send" Text="@L["staff.resend"]" AriaLabel="@L.F("staff.resendTo", context.Email)" Busy="@(_busyRow == context.Id)" OnClick="() => Resend(context)" />
+                                <Btn Small="true" Ghost="true" Icon="x" Text="@L["staff.cancelInvite"]" AriaLabel="@L.F("staff.cancelInviteTo", context.Email)" OnClick="() => Ask(context, CancelAction)" />
+                            }
+                            else if (context.State == StaffStates.Active && !context.IsSelf)
+                            {
+                                <Btn Small="true" Ghost="true" Icon="lock" Text="@L["staff.deactivate"]" AriaLabel="@L.F("staff.deactivateWho", context.FullName)" OnClick="() => Ask(context, DeactivateAction)" />
+                            }
+                            else if (context.State == StaffStates.Disabled)
+                            {
+                                <Btn Small="true" Icon="check" Text="@L["staff.reactivate"]" AriaLabel="@L.F("staff.reactivateWho", context.FullName)" Busy="@(_busyRow == context.Id)" OnClick="() => Reactivate(context)" />
+                            }
+                        </Template>
+                    </GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+        <p class="help" style="margin:0">@L["staff.help"]</p>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_inviting" Title="@L["staff.invite"]" Icon="send" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Invite" id="staff-invite" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <TextField @bind-Value="_m.FullName" Label="@L["acct.fullName"]" Required="true" MaxLength="150" />
+            <TextField @bind-Value="_m.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Required="true" MaxLength="150" />
+            <p class="help" style="margin:0">@L["staff.inviteHelp"]</p>
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _inviting = false" />
+        <Btn Type="submit" Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" form="staff-invite" />
+    </Footer>
+</Modal>
+
+<ConfirmDialog @bind-Open="_asking" Title="@AskTitle" Danger="@(_action == DeactivateAction)" AskReason="@(_action == DeactivateAction)" ConfirmText="@AskConfirm"
+               Message="@AskMessage" Busy="_busy" Error="@_error" OnConfirm="Confirm" />
+
+@code {
+    private const string CancelAction = "cancel";
+    private const string DeactivateAction = "deactivate";
+    private IReadOnlyList<StaffResponse> _staff = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error, _action, _busyRow, _marked;
+    private StaffResponse? _target;
+    private bool _inviting, _asking, _busy;
+    private InviteModel _m = new();
+    private EditContext _ctx = new(new InviteModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    private string AskTitle => _action == DeactivateAction ? L.F("staff.deactivateWho", _target?.FullName ?? "") : L.F("staff.cancelInviteTo", _target?.Email ?? "");
+    private string AskConfirm => L[_action == DeactivateAction ? "staff.deactivate" : "staff.cancelInvite"];
+    private string AskMessage => L[_action == DeactivateAction ? "staff.deactivateText" : "staff.cancelInviteText"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _marked = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["staff"];
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _staff = await Api.GetAsync<IReadOnlyList<StaffResponse>>("api/v1/platform/staff");
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void OpenInvite()
+    {
+        _m = new InviteModel();
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _inviting = true;
+    }
+
+    private async Task Invite()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var invited = await Api.PostAsync<StaffResponse>("api/v1/platform/staff/invitations", new StaffInviteRequest(_m.FullName?.Trim(), _m.Email?.Trim()));
+            _inviting = false;
+            Toasts.Success(L.F("staff.invited", invited.Email));
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Resend(StaffResponse s)
+    {
+        _busyRow = s.Id;
+        try
+        {
+            await Api.PostAsync<StaffResponse>($"api/v1/platform/staff/{Uri.EscapeDataString(s.Id)}/resend", new { });
+            Toasts.Success(L.F("staff.resent", s.Email));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busyRow = null; }
+    }
+
+    private async Task Reactivate(StaffResponse s)
+    {
+        _busyRow = s.Id;
+        try
+        {
+            await Api.PostAsync<StaffResponse>($"api/v1/platform/staff/{Uri.EscapeDataString(s.Id)}/reactivate", new { });
+            Toasts.Success(L.F("staff.reactivated", s.FullName));
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busyRow = null; }
+    }
+
+    private void Ask(StaffResponse s, string action)
+    {
+        _target = s;
+        _action = action;
+        _error = null;
+        _asking = true;
+    }
+
+    private async Task Confirm(string reason)
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var id = Uri.EscapeDataString(_target.Id);
+            if (_action == DeactivateAction)
+            {
+                await Api.PostAsync<StaffResponse>($"api/v1/platform/staff/{id}/deactivate", new StaffStatusRequest(reason));
+                Toasts.Success(L.F("staff.deactivated", _target.FullName));
+            }
+            else
+            {
+                await Api.PostAsync($"api/v1/platform/staff/{id}/cancel", new { });
+                Toasts.Success(L.F("staff.cancelled", _target.Email));
+            }
+            _asking = false;
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private sealed class InviteModel
+    {
+        public string? FullName { get; set; }
+        public string? Email { get; set; }
+    }
+}

@@ -101,3 +101,26 @@ public static class ConsoleSearchKinds
     public const string Invoice = "subscriptionInvoice";
     public const string Staff = "staff";
 }
+
+// ------------------------------------------------------------------ platform staff (owner feedback 13 Oct 2026, item 8b)
+
+/// <summary>States of a platform staff account on the staff screen.</summary>
+public static class StaffStates
+{
+    public const string Active = "Active";
+    public const string Disabled = "Disabled";
+    /// <summary>Invited; the link has not been used yet and is still valid.</summary>
+    public const string Invited = "Invited";
+    /// <summary>Invited; the 48-hour link has expired (resend or cancel).</summary>
+    public const string Expired = "Expired";
+}
+
+/// <summary>A platform staff member: state, last sign-in, the invitation's dates while pending, and whether it is the reader.</summary>
+public sealed record StaffResponse(string Id, string FullName, string Email, string State, DateTime? LastSignInAt, DateTime? InvitedAt, DateTime? InvitationExpiresAt,
+    bool TwoFactorEnabled, bool IsSelf);
+
+/// <summary>Invites a staff member by e-mail (a single-use link valid for 48 hours; no public sign-up).</summary>
+public sealed record StaffInviteRequest(string? FullName, string? Email);
+
+/// <summary>Deactivation needs a reason (audited); reactivation takes none.</summary>
+public sealed record StaffStatusRequest(string? Reason);

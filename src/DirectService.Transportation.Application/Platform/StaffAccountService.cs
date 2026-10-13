@@ -8,8 +8,9 @@ using Microsoft.AspNetCore.Identity;
 namespace DirectService.Transportation.Application.Platform;
 
 /// <summary>
-/// Platform staff accounts (D-13, DT-131): created by operations, never by sign-up — `DirectService.Transportation.Web create-staff
-/// &lt;email&gt; &lt;full name&gt;`. The account belongs to no tenant, has no password and gets a set-password link by e-mail; the first sign-in
+/// Platform staff accounts by the operations command (D-13, DT-131) — for recovery only since owner feedback 13 Oct 2026 (the first account
+/// comes from the first-run setup, later ones from invitations, see <see cref="ProviderSetupService"/> and <see cref="StaffService"/>):
+/// `DirectService.Transportation.Web create-staff &lt;email&gt; &lt;full name&gt;`. Never by sign-up. The account belongs to no tenant, has no password and gets a set-password link by e-mail; the first sign-in
 /// then requires setting up two-step verification like every user (SEC-03). Running it again for an existing staff account only sends a
 /// new link. Recorded in the audit log under the platform system account.
 /// </summary>

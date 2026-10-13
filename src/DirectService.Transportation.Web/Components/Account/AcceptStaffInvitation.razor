@@ -1,0 +1,89 @@
+@page "/accept-staff-invitation"
+@*
+  Staff invitation link (owner feedback 13 Oct 2026, item 8b): single use, valid for 48 hours. The invitee sets a password (platform policy)
+  and continues at once into the mandatory two-step set-up; only then can the console be reached. Used, expired, resent or cancelled links
+  say so.
+*@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Platform
+@using DirectService.Transportation.Web.Security
+@inject StaffService Staff
+@inject AuthFlow Flow
+
+<AuthCard Title="@L["staff.acceptTitle"]" Lead="@(_name is null ? null : L.F("staff.acceptLead", _name, _email ?? ""))">
+    <ChildContent>
+        @if (_name is null)
+        {
+            <Banner Tone="Tone.Err" Text="@L["staff.linkInvalid"]" />
+            <a href="@Href("/sign-in")" style="font-size:13px">@L["acct.backToSignIn"]</a>
+        }
+        else
+        {
+            <EditForm Model="Input" FormName="accept-staff" OnSubmit="Accept" class="stack" method="post">
+                <ProblemValidator @ref="_problems" />
+                @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+                <TextField @bind-Value="Input.Password" Label="@L["acct.password"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="64" Help="@L["acct.passwordHelp"]" />
+                <TextField @bind-Value="Input.ConfirmPassword" Label="@L["acct.confirmPassword"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="64" />
+                <Btn Type="submit" Primary="true" Text="@L["staff.acceptSubmit"]" Class="w100" />
+            </EditForm>
+        }
+    </ChildContent>
+    <Foot>@if (_name is not null) {@L["staff.acceptNote"]}</Foot>
+</AuthCard>
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Input ??= new(); }
+
+    private ProblemValidator? _problems;
+    private string? _banner, _name, _email;
+
+    [SupplyParameterFromQuery(Name = "u")] private string? UserToken { get; set; }
+    [SupplyParameterFromQuery(Name = "t")] private string? LinkToken { get; set; }
+    [SupplyParameterFromForm(FormName = "accept-staff")] private AcceptInput Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();   // before the first await: the page renders while waiting
+        if (await Staff.InvitationAsync(UserToken, LinkToken, Http.RequestAborted) is { } user)
+        {
+            _name = user.FullName;
+            _email = user.Email;
+        }
+    }
+
+    private async Task Accept()
+    {
+        if (_name is null) return;
+        var missing = AccountValidation.Required(L, ("password", Input.Password, "acct.password"), ("confirmPassword", Input.ConfirmPassword, "acct.confirmPassword"));
+        if (missing is null && Input.Password != Input.ConfirmPassword)
+            missing = new ApiProblem { Status = 400, Errors = [new ApiFieldError("confirmPassword", "validation.mismatch", L["acct.mismatch"])] };
+        if (missing is not null)
+        {
+            _problems?.Show(missing);
+            Input.Password = Input.ConfirmPassword = null;
+            return;
+        }
+        try
+        {
+            var user = await Staff.AcceptInvitationAsync(UserToken, LinkToken, Input.Password, Http.RequestAborted);
+            // The mandatory two-step set-up follows at once; the console opens only after it.
+            await Flow.PasswordAsync(Http, user.Email, Input.Password!, Http.RequestAborted);
+        }
+        catch (AppException e)
+        {
+            if (e.Code == DirectService.Transportation.Contracts.Errors.ErrorCodes.TokenInvalid) { _name = null; return; }
+            _banner = _problems?.Show(Problem(e)) ?? Problem(e).Detail;
+            Input.Password = Input.ConfirmPassword = null;
+            return;
+        }
+        Go(Href("/two-factor/setup", "/console/tenants"));
+    }
+
+    private sealed class AcceptInput
+    {
+        public string? Password { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
+}

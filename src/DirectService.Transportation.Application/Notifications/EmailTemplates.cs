@@ -12,21 +12,28 @@ public static class EmailTemplates
 {
     public static EmailMessage VerifyEmail(string to, string name, string link) => Build(to,
         "تأكيد البريد الإلكتروني — Verify your email",
-        $"مرحباً {name}،<br>يرجى تأكيد بريدك الإلكتروني لإكمال إنشاء حسابك في Direct Service Transportation.",
-        $"Hello {name},<br>Please verify your email address to finish creating your Direct Service Transportation account.",
+        $"مرحباً {E(name)}،<br>يرجى تأكيد بريدك الإلكتروني لإكمال إنشاء حسابك في Direct Service Transportation.",
+        $"Hello {E(name)},<br>Please verify your email address to finish creating your Direct Service Transportation account.",
         "تأكيد البريد", "Verify email", link, nameof(VerifyEmail));
 
     public static EmailMessage PasswordReset(string to, string name, string link) => Build(to,
         "إعادة تعيين كلمة المرور — Reset your password",
-        $"مرحباً {name}،<br>طُلبت إعادة تعيين كلمة المرور لحسابك. إن لم تطلب ذلك فتجاهل هذه الرسالة.",
-        $"Hello {name},<br>A password reset was requested for your account. If you did not ask for it, ignore this email.",
+        $"مرحباً {E(name)}،<br>طُلبت إعادة تعيين كلمة المرور لحسابك. إن لم تطلب ذلك فتجاهل هذه الرسالة.",
+        $"Hello {E(name)},<br>A password reset was requested for your account. If you did not ask for it, ignore this email.",
         "إعادة التعيين", "Reset password", link, nameof(PasswordReset));
 
     public static EmailMessage Invitation(string to, string companyName, string inviterName, int days, string link) => Build(to,
         $"دعوة للانضمام إلى {companyName} — Invitation to join {companyName}",
-        $"دعاك {inviterName} للانضمام إلى {companyName} في Direct Service Transportation. صلاحية الرابط {days} أيام.",
-        $"{inviterName} invited you to join {companyName} on Direct Service Transportation. The link is valid for {days} days.",
+        $"دعاك {E(inviterName)} للانضمام إلى {E(companyName)} في Direct Service Transportation. صلاحية الرابط {days} أيام.",
+        $"{E(inviterName)} invited you to join {E(companyName)} on Direct Service Transportation. The link is valid for {days} days.",
         "قبول الدعوة", "Accept invitation", link, nameof(Invitation));
+
+    /// <summary>Invitation of a platform staff member (owner feedback 13 Oct 2026): a single-use link valid for <paramref name="hours"/> hours.</summary>
+    public static EmailMessage StaffInvitation(string to, string name, string inviterName, int hours, string link) => Build(to,
+        "دعوة إلى لوحة مزوّد الخدمة — Invitation to the provider console",
+        $"مرحباً {E(name)}،<br>دعاك {E(inviterName)} للانضمام إلى فريق المنصة في Direct Service Transportation. اضغط الرابط لتعيين كلمة المرور ثم إعداد التحقق بخطوتين. الرابط يُستخدم مرة واحدة وصالح {hours} ساعة. إن لم تتوقع هذه الدعوة فتجاهلها.",
+        $"Hello {E(name)},<br>{E(inviterName)} invited you to join the platform team of Direct Service Transportation. Open the link to set your password, then set up two-step verification. The link works once and is valid for {hours} hours. If you did not expect this invitation, ignore it.",
+        "قبول الدعوة", "Accept invitation", link, nameof(StaffInvitation));
 
     private static EmailMessage Build(string to, string subject, string ar, string en, string buttonAr, string buttonEn, string link, string template)
     {
@@ -40,5 +47,8 @@ public static class EmailTemplates
         return new EmailMessage(to, subject, html, text, template);
     }
 
-    private static string StripTags(string s) => s.Replace("<br>", "\n", StringComparison.Ordinal);
+    private static string StripTags(string s) => WebUtility.HtmlDecode(s.Replace("<br>", "\n", StringComparison.Ordinal));
+
+    /// <summary>Names typed by users are encoded in the HTML body, so a name cannot add markup or links to an e-mail (security review 13 Oct 2026).</summary>
+    private static string E(string? s) => WebUtility.HtmlEncode(s ?? string.Empty);
 }

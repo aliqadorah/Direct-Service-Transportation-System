@@ -56,6 +56,7 @@ Settings come from `appsettings.json`, then `appsettings.<Environment>.json`, th
 | `RateLimits:AuthPerMinutePerIp`, `RateLimits:ApiPerMinutePerUser` | brute-force and API limits | 20 / 600 |
 | `Jobs:Enabled` | background workers (pending postings, e-invoicing queue, lock expiry, exports, tenant lifecycle) | true |
 | `Platform:*` | subscription invoices: `TaxRate` 16, `Currency` JOD, `SellerName`, `SellerTaxNumber`, `GraceDays` 7, `SuspendedDaysBeforeCancel` 30, `RetentionDays` 90 | provider's own data |
+| `Platform:SetupCode` | setup code of the **first-run provider setup** (`/provider/setup`) while no platform staff account exists | empty → a one-time code is generated at each start and written to the log; **secret** when set (environment variable or user secrets, never the files) |
 | `Billing:WebhookSecret`, `Billing:PaymentPageUrl` | payment gateway (development fake; no secret → every webhook refused) | provider to choose (DEF-02) |
 | `EInvoicing:JoFotara:TestUrl` / `ProductionUrl` / `TimeoutSeconds` | national e-invoicing endpoints | **to verify with the owner's test credentials (R-01)** |
 | `EInvoicing:AllowSimulator` | offers the e-invoicing simulator connector | development/tests only, never in production |
@@ -98,13 +99,31 @@ Signing in, signing out and the two-step pages move you to another page with Bla
 
 "Just My Code" (Tools → Options → Debugging → General) should stay on; with it off Visual Studio also stops inside framework code.
 
-## 6. Operations commands
+## 6. First platform staff account and staff invitations
+
+There is no public sign-up for platform staff. The **first** staff account is created in the browser; every later one is invited from the provider console.
+
+**First-run setup** (only while no platform staff account exists; afterwards `/provider/setup` answers 404 for good):
+
+1. Get the one-time setup code — either way works:
+   - **From the log (default).** When the host starts and finds no staff account, it generates a code such as `K7QPM-2XWRT-9HNAD` and writes it to the application log / console:
+     `Provider first-run setup is open: no platform staff account exists. Open /provider/setup and enter this one-time setup code: K7QPM-2XWRT-9HNAD`.
+     In development this is the `dotnet run` console (or the Visual Studio *Output → ASP.NET Core Web Server* window); on a server, the host's log (container logs, systemd journal, Azure log stream…). A new code is generated at every start until the first account exists. With several instances behind a load balancer each has its own code — use the configured code below instead.
+   - **From configuration.** Set `Platform:SetupCode` before starting: environment variable `Platform__SetupCode=<your code>`, or in development `dotnet user-secrets set "Platform:SetupCode" "<your code>" --project src/DirectService.Transportation.Web`. The code must have at least 16 characters (spaces and dashes not counted; a shorter one is ignored with a warning and a code is generated instead). The host then uses that code and **never logs it** (the log only says the setup is open). Remove the setting once the first account exists.
+2. Open `https://<host>/provider/setup`, enter the code (case, spaces and dashes do not matter). Five wrong codes from one address within 15 minutes block that address for 15 minutes (more than 100 wrong codes in an hour from all addresses block everyone for 15 minutes); the per-address sign-in rate limit also applies. Every attempt is recorded in the audit log (`CORE.ProviderSetup`) with the caller's address.
+3. Enter the name, e-mail and password (at least 8 characters with letters and digits) within 20 minutes of the code; the account is created and the mandatory two-step set-up follows at once (authenticator app + 10 recovery codes). The code can never be used again.
+
+**More staff:** provider console → **Platform staff** → *Invite staff* (name, e-mail). The invitee receives a single-use link valid for 48 hours, sets a password and then two-step verification before the first sign-in. Pending invitations can be resent (the old link stops working) or cancelled; staff can be deactivated (with a reason; their sessions end at once) and reactivated — never one's own account nor the last active staff member. All of it is audited.
+
+**Recovery:** the `create-staff` operations command below still works (for example when every staff member has lost access).
+
+## 7. Operations commands
 
 | Command | What it does |
 |---|---|
-| `dotnet DirectService.Transportation.Web.dll create-staff <email> <full name>` (or `dotnet run --project src/DirectService.Transportation.Web -- create-staff …`) | creates a **platform staff** account (provider console, D-13; no tenant, no password) and e-mails a set-password link; the first sign-in sets up two-step verification. Running it again for an existing staff account sends a new link. Sign-up never creates staff (DT-131) |
+| `dotnet DirectService.Transportation.Web.dll create-staff <email> <full name>` (or `dotnet run --project src/DirectService.Transportation.Web -- create-staff …`) | **recovery only** (the normal ways are the first-run setup and invitations, section 6): creates a **platform staff** account (provider console, D-13; no tenant, no password) and e-mails a set-password link; the first sign-in sets up two-step verification. Running it again for an existing staff account sends a new link. Sign-up never creates staff (DT-131) |
 
-## 7. Tests
+## 8. Tests
 
 | Suite | Command | Notes |
 |---|---|---|
@@ -116,7 +135,7 @@ Signing in, signing out and the two-step pages move you to another page with Bla
 | Accessibility | `npx playwright test accessibility` (in `tests/e2e`) | axe-core WCAG 2.1 AA on every screen, AR and EN; findings in `TestResults/a11y-*.json` |
 | Visual layout | `npx playwright test visual` (in `tests/e2e`) | every screen, dialog, side panel and menu, AR and EN, at 1280 and 1366 px wide, compact and comfortable density: fails on overlapping text (text over text, or a picture/field over text), text cut off by its box, and sideways page scroll (`support/layout.ts`). Screenshots of every combination in `TestResults/visual/<lang>/<width>-<density>/`, problems in `TestResults/visual/problems-*.json`; `VISUAL_SHOTS=0` skips the screenshots. `visual-checker.spec.ts` proves the checker catches the two layouts reported on 12 Oct 2026 and stays quiet on dialogs, scrolled lists, ellipses, unit adornments and sticky totals. ~45 min |
 
-## 8. Hosting notes (the provider and residency are deferred, DEF-01)
+## 9. Hosting notes (the provider and residency are deferred, DEF-01)
 
 - One stateless host image (ASP.NET Core) behind HTTPS (TLS 1.2+); the WebAssembly UI is served by the same host.
 - Include Chrome/Chromium in the image for PDFs (or set `Printing:ChromiumPath`).

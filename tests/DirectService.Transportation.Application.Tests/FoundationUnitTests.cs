@@ -95,6 +95,23 @@ public sealed class FoundationUnitTests
         Assert.Equal("Field «Phone» is required.", ErrorCatalog.Format(ErrorCodes.ValidationRequired, "en", "Phone"));
     }
 
+    /// <summary>Security review 13 Oct 2026: names typed by users cannot add markup to e-mails; the text part shows them as typed.</summary>
+    [Fact]
+    public void Email_templates_encode_names_in_html_and_keep_them_readable_in_text()
+    {
+        var m = Notifications.EmailTemplates.StaffInvitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "Rana & Co", 48,
+            "https://app.test/accept-staff-invitation?u=a&t=b");
+        Assert.DoesNotContain("<a href=\"https://evil.test\">", m.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("&lt;a href=", m.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("Rana &amp; Co", m.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("Rana & Co", m.TextBody, StringComparison.Ordinal);
+        Assert.Contains("48", m.TextBody, StringComparison.Ordinal);
+        Assert.Contains("<a href=\"https://evil.test\">Click</a>", Notifications.EmailTemplates.Invitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "R", 7, "https://app.test/x").TextBody,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("<a href=\"https://evil.test\">", Notifications.EmailTemplates.VerifyEmail("x@example.test", "<a href=\"https://evil.test\">", "https://app.test/v").HtmlBody,
+            StringComparison.Ordinal);
+    }
+
     /// <summary>Owner feedback 13 Oct 2026: every import fix exists in Arabic and English; a code without its own fix gets the general one.</summary>
     [Fact]
     public void Every_import_fix_has_both_languages_and_unknown_codes_get_the_default()

@@ -1,0 +1,151 @@
+@page "/provider/setup"
+@*
+  First-run provider setup (owner feedback 13 Oct 2026, item 8a): only while no platform staff account exists (otherwise 404). Step 1 the
+  one-time setup code (from the application log or Platform:SetupCode; wrong codes are counted and blocked, every attempt audited); step 2
+  name, e-mail and password under the platform policy; the account is created and the mandatory two-step set-up follows at once.
+*@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Platform
+@using DirectService.Transportation.Web.Security
+@inject ProviderSetupService Setup
+@inject AuthFlow Flow
+
+@if (_closed)
+{
+    <AuthCard Title="@L["psetup.notFound"]">
+        <ChildContent><p class="muted" style="margin:0">@L["psetup.notFoundText"]</p><a class="btn pri w100" href="@Href("/sign-in")">@L["acct.signIn"]</a></ChildContent>
+    </AuthCard>
+}
+else if (Details.Session is null)
+{
+    <AuthCard Title="@L["psetup.title"]" Lead="@L["psetup.lead"]">
+        <ChildContent>
+            <EditForm Model="Code" FormName="setup-code" OnSubmit="CheckCode" class="stack" method="post">
+                <ProblemValidator @ref="_codeProblems" />
+                @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+                <TextField @bind-Value="Code.Code" Label="@L["psetup.code"]" Required="true" Ltr="true" Autocomplete="off" Icon="key" MaxLength="64" Help="@L["psetup.codeHelp"]" />
+                <Btn Type="submit" Primary="true" Text="@L["ui.next"]" Class="w100" />
+            </EditForm>
+        </ChildContent>
+        <Foot>@L["psetup.step1"]</Foot>
+    </AuthCard>
+}
+else
+{
+    <AuthCard Title="@L["psetup.title"]" Lead="@L["psetup.accountLead"]">
+        <ChildContent>
+            <EditForm Model="Details" FormName="setup-account" OnSubmit="CreateAccount" class="stack" method="post">
+                <ProblemValidator @ref="_problems" />
+                @if (_banner is not null) {<Banner Tone="Tone.Err" Text="@_banner" />}
+                <InputText type="hidden" @bind-Value="Details.Session" />
+                <TextField @bind-Value="Details.FullName" Label="@L["acct.fullName"]" Required="true" Autocomplete="name" MaxLength="150" />
+                <TextField @bind-Value="Details.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Required="true" Autocomplete="username" Icon="mail" MaxLength="150" />
+                <TextField @bind-Value="Details.Password" Label="@L["acct.password"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="64" Help="@L["acct.passwordHelp"]" />
+                <TextField @bind-Value="Details.ConfirmPassword" Label="@L["acct.confirmPassword"]" Type="password" Required="true" Autocomplete="new-password" MaxLength="64" />
+                <Btn Type="submit" Primary="true" Text="@L["psetup.create"]" Class="w100" />
+            </EditForm>
+        </ChildContent>
+        <Foot>@L["psetup.step2"]</Foot>
+    </AuthCard>
+}
+
+@code {
+    // Form models: bound from the posted form, or new on a GET.
+    protected override void OnParametersSet() { Code ??= new(); Details ??= new(); }
+
+    private ProblemValidator? _codeProblems, _problems;
+    private string? _banner;
+    private bool _closed;
+
+    [SupplyParameterFromForm(FormName = "setup-code")] private CodeInput Code { get; set; } = default!;
+    [SupplyParameterFromForm(FormName = "setup-account")] private DetailsInput Details { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Code ??= new(); Details ??= new();   // before the first await: the page renders while waiting
+        // Closed for good once any platform staff account exists (404); an expired or foreign setup session starts again at the code.
+        if (!await Setup.IsOpenAsync(Http.RequestAborted))
+        {
+            _closed = true;
+            Http.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        if (Details.Session is not null && !Setup.SessionValid(Details.Session))
+        {
+            Details = new();
+            _banner = L["psetup.sessionExpired"];
+        }
+    }
+
+    private async Task CheckCode()
+    {
+        if (_closed) return;
+        if (AccountValidation.Required(L, ("code", Code.Code, "psetup.code")) is { } missing)
+        {
+            _codeProblems?.Show(missing);
+            return;
+        }
+        try
+        {
+            Details = new() { Session = await Setup.VerifyCodeAsync(Code.Code, Http.RequestAborted) };
+            _banner = null;
+        }
+        catch (AppException e)
+        {
+            if (e.Status == StatusCodes.Status404NotFound) { _closed = true; Http.Response.StatusCode = e.Status; return; }
+            _banner = _codeProblems?.Show(Problem(e)) ?? Problem(e).Detail;
+            Code.Code = null;
+        }
+    }
+
+    private async Task CreateAccount()
+    {
+        if (_closed || Details.Session is null) return;
+        var missing = AccountValidation.Required(L, ("fullName", Details.FullName, "acct.fullName"), ("email", Details.Email, "acct.email"),
+            ("password", Details.Password, "acct.password"), ("confirmPassword", Details.ConfirmPassword, "acct.confirmPassword"));
+        if (missing is null && Details.Password != Details.ConfirmPassword)
+            missing = new ApiProblem { Status = 400, Errors = [new ApiFieldError("confirmPassword", "validation.mismatch", L["acct.mismatch"])] };
+        if (missing is not null)
+        {
+            _problems?.Show(missing);
+            ClearPasswords();
+            return;
+        }
+        try
+        {
+            var user = await Setup.CreateFirstStaffAsync(Details.Session, Details.FullName, Details.Email, Details.Password, Http.RequestAborted);
+            // The mandatory two-step set-up follows at once (the same step every user takes at the first sign-in).
+            await Flow.PasswordAsync(Http, user.Email, Details.Password!, Http.RequestAborted);
+        }
+        catch (AppException e)
+        {
+            if (e.Status == StatusCodes.Status404NotFound) { _closed = true; Http.Response.StatusCode = e.Status; return; }
+            if (e.Code == DirectService.Transportation.Contracts.Errors.ErrorCodes.SetupSessionExpired) { Details = new(); _banner = L["psetup.sessionExpired"]; return; }
+            _banner = _problems?.Show(Problem(e)) ?? Problem(e).Detail;
+            ClearPasswords();
+            return;
+        }
+        Go(Href("/two-factor/setup", "/console/tenants"));
+    }
+
+    private void ClearPasswords()
+    {
+        Details.Password = null;
+        Details.ConfirmPassword = null;
+    }
+
+    private sealed class CodeInput
+    {
+        public string? Code { get; set; }
+    }
+
+    private sealed class DetailsInput
+    {
+        public string? Session { get; set; }
+        public string? FullName { get; set; }
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
+}

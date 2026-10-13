@@ -1,0 +1,41 @@
+@page "/console/help/{Topic}"
+@* A help page of the provider console (owner feedback 13 Oct 2026): same layout as the company help pages; its screens are console addresses. *@
+@using DirectService.Transportation.Web.Client.Help
+@inject Loc L
+
+@if (_topic is null)
+{
+    <NotFoundView />
+}
+else
+{
+    var text = L.En ? _topic.En : _topic.Ar;
+    <PageHeader Title="@text.Title" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["help.title"])])" />
+    <article class="helpdoc">
+        <p class="hd-lead"><Tx Value="@text.Summary" /></p>
+        <p><b>@L["help.who"]</b> <Tx Value="@text.Who" /></p>
+        <section aria-labelledby="help-steps">
+            <h2 id="help-steps">@L["help.steps"]</h2>
+            <ol>@foreach (var s in text.Steps) {<li><Tx Value="@s" /></li>}</ol>
+        </section>
+        @if (text.Problems.Count > 0)
+        {
+            <section aria-labelledby="help-problems">
+                <h2 id="help-problems">@L["help.problems"]</h2>
+                <ul>@foreach (var p in text.Problems) {<li><Tx Value="@p" /></li>}</ul>
+            </section>
+        }
+        <section aria-labelledby="help-screens">
+            <h2 id="help-screens">@L["help.screens"]</h2>
+            <ul class="hd-links">@foreach (var s in _topic.Screens) {<li><a href="@s.Route">@L[s.LabelKey]</a></li>}</ul>
+        </section>
+    </article>
+}
+
+@code {
+    [Parameter] public string Topic { get; set; } = "";
+
+    private HelpTopic? _topic;
+
+    protected override void OnParametersSet() => _topic = HelpTopics.ConsoleTopics.FirstOrDefault(t => t.Key == Topic);
+}

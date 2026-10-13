@@ -34,7 +34,10 @@ public sealed class PlatformTests(ApiFactory f)
     }
 
     /// <summary>A provider staff member: a signed-up user turned into platform staff without a tenant.</summary>
-    private async Task<SignedInUser> StaffAsync()
+    private Task<SignedInUser> StaffAsync() => StaffAsync(f);
+
+    /// <summary>A provider staff member (also used by the staff tests).</summary>
+    internal static async Task<SignedInUser> StaffAsync(ApiFactory f)
     {
         var u = await f.SignUpOwnerAsync();
         var email = u.Email;
