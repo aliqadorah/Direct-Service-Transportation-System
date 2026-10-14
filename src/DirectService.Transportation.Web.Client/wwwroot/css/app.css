@@ -270,6 +270,9 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 /* An earlier result kept on screen after a refused run: dimmed and not interactive, under a "not up to date" banner. */
 .stale { opacity: .4; filter: grayscale(1); }
 .banner ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; }
+/* Field order arrows (SCR-75, DT-186): a narrow column of two icon buttons. */
+th.ord, td.ord { width: 72px; white-space: nowrap; text-align: center; }
+.ord-btns { display: inline-flex; gap: 2px; }
 .banner ul.refunds li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
 details.refunded > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); }
 details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-size: var(--fs-sm); }

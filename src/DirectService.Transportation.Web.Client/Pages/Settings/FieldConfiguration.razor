@@ -3,8 +3,10 @@
   SCR-75 field configuration (FR-179…184, DT-41…43): for trips, drivers and customers — standard fields with their label, hidden and required
   flags and order (core and business-required fields are locked by the API), and custom fields (text, number, date, list, checkbox, long text)
   with label in both languages, options, default, help, required, shown as a list column, order and hidden; a custom field with data cannot be
-  deleted — hide it instead.
+  deleted — hide it instead. Order: ↑/↓ on every row of both lists, renumbered 10, 20, 30… after each move and saved with "Save" (owner request
+  14 Oct 2026, DT-186); the forms show standard and custom fields as separate groups, so each list keeps its own order.
 *@
+@inject UiJs Js
 @inject Api Api
 @inject Loc L
 @inject ToastService Toasts
@@ -13,7 +15,7 @@
 <PageHeader Help="fields" Title="@L["nav.fields"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.fields"])])">
     <Actions>
         <Btn Icon="plus" Text="@L["fld.newCustom"]" OnClick="() => EditCustom(null)" />
-        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="SaveStandard" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="Save" />
     </Actions>
 </PageHeader>
 <TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="AskEntity" Label="@L["nav.fields"]" />
@@ -25,11 +27,12 @@
             <Box Title="@L["fld.standard"]" NoPad="true">
                 <table class="grid">
                     <caption class="sr-only">@L["fld.standard"]</caption>
-                    <thead><tr><th scope="col">@L["fld.field"]</th><th scope="col">@L["fld.label"]</th><th scope="col">@L["fld.hidden"]</th><th scope="col">@L["ui.required"]</th><th scope="col" class="n">@L["fld.order"]</th></tr></thead>
+                    <thead><tr><th scope="col">@L["fld.field"]</th><th scope="col">@L["fld.label"]</th><th scope="col">@L["fld.hidden"]</th><th scope="col">@L["ui.required"]</th><th scope="col" class="ord">@L["fld.order"]</th></tr></thead>
                     <tbody>
-                        @foreach (var f in _standard)
+                        @for (var i = 0; i < _standard.Count; i++)
                         {
-                            var row = f;
+                            var row = _standard[i];
+                            var at = i;
                             var name = L.Pick(row.DefaultLabelAr, row.DefaultLabelEn);
                             <tr @key="row.FieldKey">
                                 <td>@name @if (row.IsCore) {<Badge Tone="Tone.Mute" Icon="lock" Text="@L["fld.core"]" />}</td>
@@ -39,8 +42,7 @@
                                            @onchange="e => { row.IsHidden = e.Value is true; _dirty = true; }" /></td>
                                 <td><input type="checkbox" aria-label="@L.F("fld.requiredOf", name)" checked="@(row.IsRequired || row.AlwaysRequired)" disabled="@(row.IsCore || row.AlwaysRequired)"
                                            @onchange="e => { row.IsRequired = e.Value is true; _dirty = true; }" /></td>
-                                <td class="n" style="width:90px"><input class="input num" style="height:26px;width:70px" inputmode="numeric" aria-label="@L.F("fld.orderOf", name)" value="@row.SortOrder"
-                                           @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var n)) { row.SortOrder = n; _dirty = true; } }" /></td>
+                                <td class="ord">@Arrows("s", row.FieldKey, name, at, _standard.Count, d => MoveStandard(at, d))</td>
                             </tr>
                         }
                     </tbody>
@@ -55,6 +57,9 @@
                             <GridColumn TItem="CustomFieldResponse" Title="@L["fld.label"]" Value="c => L.Pick(c.LabelAr, c.LabelEn)" />
                             <GridColumn TItem="CustomFieldResponse" Title="@L["fld.key"]" Value="c => c.FieldKey" Ltr="true" />
                             <GridColumn TItem="CustomFieldResponse" Title="@L["fld.type"]" Value="@(c => L["fld.t." + c.FieldType])" />
+                            <GridColumn TItem="CustomFieldResponse" Title="@L["fld.order"]" Width="72px">
+                                <Template>@Arrows("c", context.Id, L.Pick(context.LabelAr, context.LabelEn ?? context.LabelAr), _custom.FindIndex(c => c.Id == context.Id), _custom.Count, d => MoveCustom(context, d))</Template>
+                            </GridColumn>
                             <GridColumn TItem="CustomFieldResponse" Title="@L["ml.status"]">
                                 <Template>
                                     @if (context.IsRequired) {<Badge Tone="Tone.Info" Text="@L["ui.required"]" />}
@@ -97,7 +102,6 @@
                 <SelectField TValue="string?" @bind-Value="_c.FieldType" Options="Types" Label="@L["fld.type"]" Required="true" Disabled="@(_c.Id is not null)" />
                 @if (_c.FieldType == CustomFieldTypes.List) {<TextAreaField @bind-Value="_c.Options" Label="@L["fld.options"]" Rows="3" Span="2" Help="@L["fld.optionsHelp"]" />}
                 <TextField @bind-Value="_c.DefaultValue" Label="@L["fld.default"]" MaxLength="200" />
-                <IntField @bind-Value="_c.SortOrder" Label="@L["fld.order"]" Min="0" Max="999" />
                 <TextField @bind-Value="_c.HelpText" Label="@L["fld.help"]" MaxLength="200" Span="2" />
                 <CheckField @bind-Value="_c.IsRequired" Label="@L["ui.required"]" />
                 <CheckField @bind-Value="_c.ShowAsColumn" Label="@L["fld.column"]" />
@@ -125,7 +129,9 @@
 @code {
     private string _entity = "TRN.Trip";
     private List<StandardRow> _standard = [];
-    private IReadOnlyList<CustomFieldResponse> _custom = [];
+    private List<CustomFieldResponse> _custom = [];
+    // The custom fields' order as loaded: a field whose number differs is saved with "Save".
+    private Dictionary<string, int> _customSaved = [];
     private LoadState _state = LoadState.Loading;
     private string? _reference, _deleteError, _pendingEntity;
     private bool _busy, _dirty, _editing, _deleting, _confirmSwitch;
@@ -168,14 +174,49 @@
             var custom = await Api.GetAsync<IReadOnlyList<CustomFieldResponse>>(Api.C($"custom-fields/{entity}"));
             if (version != _version) return;   // both lists of the entity on screen, never a late answer of another (review M3)
             _standard = standard.OrderBy(s => s.SortOrder).Select(s => new StandardRow(s)).ToList();
-            _custom = custom;
+            _custom = custom.OrderBy(c => c.SortOrder).ToList();
+            _customSaved = _custom.ToDictionary(c => c.Id, c => c.SortOrder);
             _dirty = false;
             _state = LoadState.Ready;
         }
         catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
-    private async Task SaveStandard()
+    /// <summary>A narrow ↑/↓ pair: named and titled "Move up: field"; ↑ disabled on the first row, ↓ on the last; keyboard focus follows the row.</summary>
+    private RenderFragment Arrows(string list, string key, string name, int index, int count, Func<int, Task> move) => __builder =>
+    {
+        var up = L.F("fld.moveUp", name);
+        var down = L.F("fld.moveDown", name);
+        <span class="ord-btns">
+            <button type="button" class="btn ghost sm icon-only" id="@($"ord-{list}-{key}-up")" title="@up" aria-label="@up" disabled="@(index <= 0)"
+                    @onclick="() => move(-1)" @onclick:stopPropagation="true"><Icon Name="up" /></button>
+            <button type="button" class="btn ghost sm icon-only" id="@($"ord-{list}-{key}-down")" title="@down" aria-label="@down" disabled="@(index >= count - 1)"
+                    @onclick="() => move(1)" @onclick:stopPropagation="true"><Icon Name="down" /></button>
+        </span>
+    };
+
+    /// <summary>Moves a row one place, renumbers the list 10, 20, 30… (the API stores numbers) and keeps the keyboard on the moved row.</summary>
+    private async Task Move<T>(List<T> list, int index, int delta, Func<T, int, T> number, string id)
+    {
+        var to = index + delta;
+        if (index < 0 || to < 0 || to >= list.Count) return;
+        (list[index], list[to]) = (list[to], list[index]);
+        for (var i = 0; i < list.Count; i++) list[i] = number(list[i], (i + 1) * 10);
+        _dirty = true;
+        StateHasChanged();
+        // The same button, or the other one when the row reached the end of the list.
+        var atEdge = delta < 0 ? to == 0 : to == list.Count - 1;
+        await Js.FocusById(id + (atEdge ? (delta < 0 ? "-down" : "-up") : (delta < 0 ? "-up" : "-down")));
+    }
+
+    private Task MoveStandard(int index, int delta) => Move(_standard, index, delta, (r, n) => { r.SortOrder = n; return r; }, $"ord-s-{_standard[index].FieldKey}");
+
+    // Custom fields are records: each is replaced with its new number.
+    private Task MoveCustom(CustomFieldResponse field, int delta) =>
+        Move(_custom, _custom.FindIndex(c => c.Id == field.Id), delta, (c, n) => c with { SortOrder = n }, $"ord-c-{field.Id}");
+
+    /// <summary>Saves the standard fields (as before) and the custom fields whose order changed (each with its current values and version).</summary>
+    private async Task Save()
     {
         if (_state != LoadState.Ready) return;
         _busy = true;
@@ -183,6 +224,10 @@
         {
             await Api.PutAsync(Api.C($"standard-fields/{_entity}"), new StandardFieldsRequest(_standard.Select(s =>
                 new StandardFieldChange(s.FieldKey, string.IsNullOrWhiteSpace(s.Label) ? null : s.Label.Trim(), s.IsHidden, s.IsRequired, s.SortOrder)).ToList()));
+            foreach (var c in _custom.Where(c => !_customSaved.TryGetValue(c.Id, out var was) || was != c.SortOrder))
+                await Api.PutAsync<CustomFieldResponse>(Api.C($"custom-fields/field/{Uri.EscapeDataString(c.Id)}"), new CustomFieldRequest(c.FieldKey, c.LabelAr, c.LabelEn,
+                    c.FieldType, c.FieldType == CustomFieldTypes.List ? c.Options : null, c.DefaultValue, c.HelpText, c.IsRequired, c.ShowAsColumn, c.SortOrder, c.IsHidden, null,
+                    c.RowVersion));
             Forms.Invalidate();
             Toasts.Success(L["set.saved"]);
             await Load();
