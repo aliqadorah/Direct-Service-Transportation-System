@@ -54304,7 +54304,7 @@
         "tags": [
           "Provider console"
         ],
-        "summary": "Provider console: payments received but not applied, for staff to refund (DT-184, read-only)",
+        "summary": "Provider console: payments received but not applied — to refund, and marked refunded (DT-184, DT-185)",
         "operationId": "getPlatformRefunds",
         "responses": {
           "200": {
@@ -54312,10 +54312,123 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/RefundDueResponse"
-                  }
+                  "$ref": "#/components/schemas/RefundsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/refunds/{invoice}/refunded": {
+      "post": {
+        "tags": [
+          "Provider console"
+        ],
+        "summary": "Provider console: mark a payment to refund as refunded outside the platform, with date and reference (DT-185, audited)",
+        "operationId": "postPlatformRefundsRefunded",
+        "parameters": [
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRefundedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundedResponse"
                 }
               }
             }
@@ -59008,6 +59121,15 @@
             ],
             "items": {
               "$ref": "#/components/schemas/RefundDueResponse"
+            }
+          },
+          "refunded": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RefundedResponse"
             }
           }
         }
@@ -64158,6 +64280,28 @@
           }
         }
       },
+      "MarkRefundedRequest": {
+        "required": [
+          "refundedOn",
+          "reference"
+        ],
+        "type": "object",
+        "properties": {
+          "refundedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "MasterImportPreview": {
         "required": [
           "totalRows",
@@ -67896,6 +68040,59 @@
           },
           "kind": {
             "type": "string"
+          }
+        }
+      },
+      "RefundedResponse": {
+        "required": [
+          "payment",
+          "refundedOn",
+          "reference",
+          "markedBy",
+          "markedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/RefundDueResponse"
+          },
+          "refundedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "markedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "markedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RefundsResponse": {
+        "required": [
+          "due",
+          "refunded"
+        ],
+        "type": "object",
+        "properties": {
+          "due": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundDueResponse"
+            }
+          },
+          "refunded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundedResponse"
+            }
           }
         }
       },
