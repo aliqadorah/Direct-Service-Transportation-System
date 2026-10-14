@@ -62,9 +62,35 @@ public abstract class PageTestBase : UiTestBase
 
     protected void Respond(string path, Func<HttpRequestMessage, object?> body) => _routes[path] = body;
 
+    private readonly Dictionary<string, Dictionary<string, Func<HttpRequestMessage, object?>>> _companyRoutes = new(StringComparer.Ordinal);
+
+    /// <summary>Requests to any company path: company token and company-relative path (company switch tests, DT-187).</summary>
+    protected List<(string Company, string Path)> CompanyRequests { get; } = [];
+
+    /// <summary>
+    /// A delay for one company's answers only ("c1"), or for some of its paths ("c1/invoices"): an old company's answer that arrives after
+    /// the switch.
+    /// </summary>
+    protected Dictionary<string, TimeSpan> CompanyDelay { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Answers a path of another company than c1.</summary>
+    protected void RespondFor(string company, string path, object? body)
+    {
+        if (!_companyRoutes.TryGetValue(company, out var routes)) _companyRoutes[company] = routes = new(StringComparer.Ordinal);
+        routes[path] = _ => body;
+    }
+
+    /// <summary>Gives the user a second company (same permissions as c1) they can switch to.</summary>
+    protected void AddCompany(string company, string name)
+    {
+        var me = Shell.Me!;
+        Shell.SetMe(me with { Companies = [.. me.Companies, me.Companies[0] with { Id = company, Name = name, NameEn = name }] });
+    }
+
     private sealed class FakeHandler(PageTestBase test) : HttpMessageHandler
     {
         private const string Prefix = "/api/v1/companies/" + Company + "/";
+        private const string AnyCompany = "/api/v1/companies/";
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -73,15 +99,25 @@ public abstract class PageTestBase : UiTestBase
             if (path.StartsWith("/api/v1/auth/antiforgery", StringComparison.Ordinal))
                 return Json(new { headerName = "X-XSRF-TOKEN", token = "t" });
             // Company paths are relative to the company ("trips?…"); tenant, platform and other API paths keep a leading slash ("/tenant/…").
+            // Another company's paths ("c2") are answered from its own routes (RespondFor) and recorded in CompanyRequests.
             string relative;
-            if (path.StartsWith(Prefix, StringComparison.Ordinal)) relative = path[Prefix.Length..];
+            string? company = null;
+            if (path.StartsWith(Prefix, StringComparison.Ordinal)) (relative, company) = (path[Prefix.Length..], Company);
+            else if (path.StartsWith(AnyCompany, StringComparison.Ordinal) && path.IndexOf('/', AnyCompany.Length) is var end and > 0)
+                (relative, company) = (path[(end + 1)..], path[AnyCompany.Length..end]);
             else if (path.StartsWith("/api/v1/", StringComparison.Ordinal)) relative = path["/api/v1".Length..];
             else return NotFound();
-            test.Requests.Add((request.Method.Method, relative, body));
-            if (test.ResponseDelay > TimeSpan.Zero) await Task.Delay(test.ResponseDelay, cancellationToken).ConfigureAwait(false);
-            var match = test._routes.Keys.Where(k => relative.StartsWith(k, StringComparison.Ordinal)).OrderByDescending(k => k.Length).FirstOrDefault();
+            if (company is null || company == Company) test.Requests.Add((request.Method.Method, relative, body));
+            if (company is not null) test.CompanyRequests.Add((company, relative));
+            var delay = company is null ? test.ResponseDelay
+                : test.CompanyDelay.Where(k => (company + "/" + relative).StartsWith(k.Key, StringComparison.Ordinal) && (k.Key == company || k.Key.StartsWith(company + "/", StringComparison.Ordinal)))
+                    .Select(k => k.Value).DefaultIfEmpty(test.ResponseDelay).Max();
+            if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            var routes = company is null || company == Company ? test._routes
+                : test._companyRoutes.TryGetValue(company, out var own) ? own : new Dictionary<string, Func<HttpRequestMessage, object?>>();
+            var match = routes.Keys.Where(k => relative.StartsWith(k, StringComparison.Ordinal)).OrderByDescending(k => k.Length).FirstOrDefault();
             if (match is null) return NotFound();
-            var value = test._routes[match](request);
+            var value = routes[match](request);
             return value is HttpResponseMessage m ? m : Json(value);
         }
 

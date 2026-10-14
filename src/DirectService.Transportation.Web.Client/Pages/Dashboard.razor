@@ -99,19 +99,32 @@
 
     [Parameter] public string Company { get; set; } = "";
 
-    protected override Task OnParametersSetAsync() => Load();
+    private string? _loadedFor;
+    private int _load;
 
+    /// <summary>Loads for the company of the address; a re-render with the same company does not load again.</summary>
+    protected override Task OnParametersSetAsync() => _loadedFor == Company ? Task.CompletedTask : Load();
+
+    /// <summary>
+    /// Only the latest load is shown (DT-187): an earlier answer that arrives late (another period, a live refresh, the company before a
+    /// switch) is ignored; an answer of a company left meanwhile never arrives (Api drops it).
+    /// </summary>
     private async Task Load()
     {
+        _loadedFor = Company;
+        var load = ++_load;
         _state = LoadState.Loading;
         try
         {
-            _data = await Api.GetAsync<DashboardResponse>(Api.C("dashboard?period=" + _period));
-            var f = _data.Figures;
-            _state = (f.Trips ?? 0) == 0 && _data.Alerts.Count == 0 && _period == "mtd" && (_data.CashAndBanks?.Count ?? 0) == 0 ? LoadState.Empty : LoadState.Ready;
+            var data = await Api.GetAsync<DashboardResponse>(Api.C("dashboard?period=" + _period));
+            if (load != _load) return;
+            _data = data;
+            var f = data.Figures;
+            _state = (f.Trips ?? 0) == 0 && data.Alerts.Count == 0 && _period == "mtd" && (data.CashAndBanks?.Count ?? 0) == 0 ? LoadState.Empty : LoadState.Ready;
         }
         catch (ApiException e)
         {
+            if (load != _load) return;
             _reference = e.Problem.Reference;
             _state = LoadState.Error;
         }

@@ -177,6 +177,9 @@ internal sealed class SecurityHeadersMiddleware(RequestDelegate next)
         h.ContentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
             + "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
         h["Cross-Origin-Opener-Policy"] = "same-origin";
+        // API answers carry one company's data: never kept by the browser or a proxy, so a later request (another company, another user
+        // on the same computer) is always answered by the server (DT-187). An endpoint may still set its own policy.
+        if (http.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)) h.CacheControl = "no-store";
         return next(http);
     }
 }

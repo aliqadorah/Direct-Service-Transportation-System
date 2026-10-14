@@ -23,17 +23,24 @@ public sealed class TripLookups(Api api, ShellState shell)
 
     public Task EnsureAsync()
     {
-        if (_company != shell.Company?.Id) { _company = shell.Company?.Id; _loading = null; Drivers.Clear(); }
+        if (_company != shell.Company?.Id)
+        {
+            _company = shell.Company?.Id;
+            _loading = null;
+            Drivers.Clear();
+            Customers = Materials = LoadingSites = UnloadingSites = Partners = [];   // never the previous company's lists (DT-187)
+        }
         return _loading ??= LoadOnceAsync();
     }
 
     /// <summary>A failed load is tried again by the next screen (review M3 of step 8).</summary>
     private async Task LoadOnceAsync()
     {
-        try { await LoadAsync().ConfigureAwait(false); }
+        var company = _company;
+        try { await LoadAsync(company).ConfigureAwait(false); }
         catch
         {
-            _loading = null;
+            if (company == _company) _loading = null;   // not the new company's load (DT-187)
             throw;
         }
     }
@@ -41,21 +48,23 @@ public sealed class TripLookups(Api api, ShellState shell)
     /// <summary>Reloads after master data changed in another screen.</summary>
     public void Invalidate() => _loading = null;
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(string? company)
     {
         static IReadOnlyList<Option<string?>> Opt(IReadOnlyList<MasterOption> o) => o.Select(x => new Option<string?>(x.Id, x.Name)).ToList();
-        Customers = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("customers/options")).ConfigureAwait(false));
-        Materials = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("materials/options")).ConfigureAwait(false));
-        LoadingSites = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("loading-sites/options")).ConfigureAwait(false));
-        UnloadingSites = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("unloading-sites/options")).ConfigureAwait(false));
-        Partners = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("partners/options")).ConfigureAwait(false));
+        var customers = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("customers/options")).ConfigureAwait(false));
+        var materials = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("materials/options")).ConfigureAwait(false));
+        var loading = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("loading-sites/options")).ConfigureAwait(false));
+        var unloading = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("unloading-sites/options")).ConfigureAwait(false));
+        var partners = Opt(await api.GetAsync<IReadOnlyList<MasterOption>>(api.C("partners/options")).ConfigureAwait(false));
+        if (company != _company) return;   // the company changed meanwhile: its lists are loaded by its own screens
+        (Customers, Materials, LoadingSites, UnloadingSites, Partners) = (customers, materials, loading, unloading, partners);
     }
 
     /// <summary>Driver search for a combo box: "name" with "plate · capacity t" as the secondary text.</summary>
     public async Task<IReadOnlyList<Option<string?>>> SearchDriversAsync(string text, CancellationToken ct)
     {
         var list = await api.GetAsync<IReadOnlyList<DriverOption>>(api.C("drivers/options?q=" + Uri.EscapeDataString(text ?? "")), ct).ConfigureAwait(false);
-        foreach (var d in list) Drivers[d.Id] = d;
+        if (_company == shell.Company?.Id) foreach (var d in list) Drivers[d.Id] = d;
         return list.Select(d => new Option<string?>(d.Id, d.Name, $"{d.PlateNumber} · {Fmt.Qty(d.CapacityTons, 0)} t")).ToList();
     }
 

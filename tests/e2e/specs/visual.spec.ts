@@ -284,6 +284,26 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
     // Customer statement (RPT-12) shown without its required customer: the field marked, one message.
     { name: "financial#customer-statement-required", route: "reports/financial?report=customer-statement", act: async (p, t) => {
       await button(p.locator("main"), t("rep.run")).click(); await expect(p.locator("main [aria-invalid=true]").first()).toBeVisible(); } },
+    // Company switch (owner feedback 14 Oct 2026, DT-187): from the dashboard of the company with documents to a second, empty company of
+    // the tenant through the company menu — the dashboard shows the new company's figures, never the old one's, without a reload. Last:
+    // it adds a company to the tenant.
+    { name: "dashboard#company-switch", route: "", act: async (p, t) => {
+      const first = companyOf(p);
+      const name = `Switch ${Date.now() % 100000}`;
+      const second = await api<{ id: string }>(p, "POST", "/api/v1/tenant/companies", { name, nameEn: name });
+      await p.reload(); await waitForApp(p);   // the company menu lists the new company
+      await expect(p.locator("main .sk")).toHaveCount(0);
+      const before = await p.locator("main").innerText();
+      const collections = before.match(/\d[\d,]*\.\d{3}/g) ?? [];
+      expect(collections.length).toBeGreaterThan(0);   // the first company shows its figures
+      await p.getByRole("button", { name: t("shell.switchCompany") }).click();
+      await p.getByRole("menuitemradio", { name }).click();
+      await expect(p).toHaveURL(new RegExp(`/c/${second.id}/?$`));
+      await expect(p.locator("main .sk")).toHaveCount(0);
+      await expect(p.locator("main")).toContainText(name);   // the crumb: the new company
+      const after = await p.locator("main").innerText();
+      for (const figure of collections.filter((f) => f !== "0.000")) expect(after, `figure ${figure} of ${first} after the switch`).not.toContain(figure);
+    } },
   ];
 }
 
@@ -291,7 +311,7 @@ async function sweepStates(page: Page, run: VisualRun, lang: Lang, company: stri
   const t = texts(lang);
   page.setDefaultTimeout(15_000);   // a step that cannot be done fails the state quickly instead of waiting for the test's time limit
   for (const s of states) {
-    const route = `/c/${company}/${s.route}`;
+    const route = s.route ? `/c/${company}/${s.route}` : `/c/${company}`;
     if (!(await open(page, route))) { run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: s.name, lang, width: 0, density: "" }); continue; }
     try {
       await s.act(page, t);

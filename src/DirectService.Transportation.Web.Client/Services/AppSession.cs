@@ -15,6 +15,7 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
 {
     private Task? _loading;
     private string? _companyLoaded;
+    private string? _entering;
 
     public Task EnsureLoadedAsync() => _loading ??= LoadAsync();
 
@@ -35,13 +36,19 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
     /// <summary>Selects the company of the URL and loads its shell figures; false when the user has no access (shown as not found).</summary>
     public async Task<bool> EnterCompanyAsync(string company)
     {
+        _entering = company;
         await EnsureLoadedAsync().ConfigureAwait(false);
         // Staff: the window list is read again on every company change, so an ended window shows "not found" (review L3).
         var staff = shell.Me?.IsPlatformStaff == true;
         if (staff && company != _companyLoaded && !await LoadSupportCompaniesAsync().ConfigureAwait(false)) return false;
+        // A newer switch started meanwhile (DT-187): this one must not select its company after it.
+        if (_entering != company) throw new OperationCanceledException("Another company is being opened.");
         if (!shell.SelectCompany(company)) return false;
         if (_companyLoaded == company) return true;
         _companyLoaded = company;
+        // The old company's figures never stay on the shell of the new one.
+        shell.SetNotifications(0);
+        shell.SetSetup(false, shell.PlanText);
         try
         {
             var setup = await api.GetAsync<SetupChecklistResponse>(api.C("setup-checklist")).ConfigureAwait(false);
@@ -52,6 +59,12 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
         catch (ApiException)
         {
             // The shell still works without the figures (e.g. a read-only or suspended company).
+        }
+        catch (OperationCanceledException)
+        {
+            // Left for another company before the figures came (Api drops them): read them again when this company is opened next.
+            if (_companyLoaded == company) _companyLoaded = null;
+            throw;
         }
         return true;
     }

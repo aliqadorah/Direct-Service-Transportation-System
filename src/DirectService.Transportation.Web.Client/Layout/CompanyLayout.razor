@@ -22,11 +22,16 @@ else
               OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
         <Banners><TenantBanners /></Banners>
         <ChildContent>
-            @if (_state == LoadState.Error)
+            @if (_switching)
+            {
+                @* Switching company (DT-187): no page is built until the new company is selected, so none asks for the old one's data. *@
+                <div class="empty" role="status"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@L["ui.loading"]</span></div>
+            }
+            else if (_state == LoadState.Error)
             {
                 <ErrorState Reference="@_reference" OnRetry="Load" />
             }
-            else if (_state == LoadState.Empty)
+            else if (_state == LoadState.Empty || !OnUrlCompany)
             {
                 <NotFoundView />
             }
@@ -49,30 +54,70 @@ else
     private string? _reference;
     private bool _notes;
     private string? _company;
+    private bool _started;
+    private bool _switching;
 
     protected override async Task OnInitializedAsync()
     {
         _lastUri = Nav.Uri;
         Nav.LocationChanged += Moved;
         Live.Notification += Notified;
+        _company = CompanyOfUrl() ?? Shell.Company?.Id;
+        _started = true;
         await Load();
+    }
+
+    /// <summary>
+    /// A new address (the router passes a new body before <see cref="Moved"/> runs): when it names another company, the switch starts here,
+    /// before the new page could be built against the old company (DT-187).
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (_started && CompanyOfUrl() is { } company && company != _company) StartSwitch(company);
+    }
+
+    /// <summary>
+    /// Leaves the current company at once: its reads in flight are cancelled (their answers are dropped by <see cref="Api"/>), the
+    /// notifications panel closes, and the page area waits until the new company is selected; then every page is built afresh for it.
+    /// </summary>
+    private void StartSwitch(string company)
+    {
+        _company = company;
+        _switching = true;
+        _notes = false;
+        Shell.LeaveCompany();
+        _ = InvokeAsync(async () => { await Load(); StateHasChanged(); });
     }
 
     private async Task Load()
     {
+        var target = _company;
         try
         {
             await Session.EnsureLoadedAsync();
-            _company = CompanyOfUrl() ?? Shell.Company?.Id ?? Session.HomeCompany;
-            _state = _company is not null && await Session.EnterCompanyAsync(_company) ? LoadState.Ready : LoadState.Empty;
-            if (_state == LoadState.Ready) _ = Live.EnterCompanyAsync(_company!);   // live updates of this company (FR-185)
+            if (target is null) _company = target = Shell.Company?.Id ?? Session.HomeCompany;
+            if (target != _company) return;   // a newer switch is under way: it loads its company
+            var ok = target is not null && await Session.EnterCompanyAsync(target);
+            if (target != _company) return;
+            _state = ok ? LoadState.Ready : LoadState.Empty;
+            _switching = false;
+            if (_state == LoadState.Ready) _ = Live.EnterCompanyAsync(target!);   // live updates of this company (FR-185)
+        }
+        catch (OperationCanceledException)
+        {
+            // Left for another company while loading: that switch loads it.
         }
         catch (ApiException e)
         {
+            if (target != _company) return;
             _reference = e.Problem.Reference;
             _state = LoadState.Error;
+            _switching = false;
         }
     }
+
+    /// <summary>The shell's company is the company of the address (tenant pages have none and use the current one).</summary>
+    private bool OnUrlCompany => (CompanyOfUrl() ?? _company) == Shell.Company?.Id;
 
     private int _visit;
     private string? _lastUri;
@@ -91,8 +136,11 @@ else
             _ = InvokeAsync(StateHasChanged);
         }
         var company = CompanyOfUrl();
-        if (company is null || company == _company) return;
-        _ = InvokeAsync(async () => { await Load(); StateHasChanged(); });
+        if (company is null) return;
+        _ = InvokeAsync(() =>
+        {
+            if (company == CompanyOfUrl() && company != _company) { StartSwitch(company); StateHasChanged(); }
+        });
     }
 
     /// <summary>The company token of /c/{company}/… addresses.</summary>

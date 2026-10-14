@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Web.Client.Services;
 /// current company, density (per device, DT-69), unread notifications and whether the setup checklist is still open. Filled from
 /// <c>GET /api/v1/me</c> and the company endpoints (step 8); components re-render on <see cref="Changed"/>.
 /// </summary>
-public sealed class ShellState
+public sealed class ShellState : IDisposable
 {
     public MeResponse? Me { get; private set; }
 
@@ -27,6 +27,24 @@ public sealed class ShellState
 
     public event Action? Changed;
 
+    private CancellationTokenSource _companyScope = new();
+
+    /// <summary>
+    /// Cancelled when the user leaves the company (switch, DT-187): <see cref="Api"/> links every request of the current company to it, so
+    /// the old company's in-flight requests stop and their answers are never rendered.
+    /// </summary>
+    public CancellationToken CompanyToken => _companyScope.Token;
+
+    /// <summary>Ends the current company's requests (the start of a company switch); a new scope begins at once.</summary>
+    public void LeaveCompany()
+    {
+        var old = _companyScope;
+        _companyScope = new CancellationTokenSource();
+        old.Cancel();   // not disposed: requests may still hold its token
+    }
+
+    public void Dispose() => _companyScope.Dispose();
+
     public void SetMe(MeResponse? me)
     {
         Me = me;
@@ -39,7 +57,12 @@ public sealed class ShellState
     {
         var c = Me?.Companies.FirstOrDefault(x => x.Id == token);
         if (c is null) return false;
-        if (!ReferenceEquals(c, Company)) { Company = c; Changed?.Invoke(); }
+        if (!ReferenceEquals(c, Company))
+        {
+            if (Company?.Id != c.Id) LeaveCompany();
+            Company = c;
+            Changed?.Invoke();
+        }
         return true;
     }
 

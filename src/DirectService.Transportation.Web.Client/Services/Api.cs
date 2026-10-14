@@ -22,7 +22,10 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
     private (string Header, string Token)? _xsrf;
 
     /// <summary><c>api/v1/companies/{company}/{path}</c> for the current company.</summary>
-    public string C(string path) => $"api/v1/companies/{Uri.EscapeDataString(shell.Company?.Id ?? throw new InvalidOperationException("No company selected."))}/{path.TrimStart('/')}";
+    public string C(string path) => C(shell.Company?.Id ?? throw new InvalidOperationException("No company selected."), path);
+
+    /// <summary><c>api/v1/companies/{company}/{path}</c> for a company named on purpose (e.g. releasing a lock after a company switch).</summary>
+    public static string C(string company, string path) => $"api/v1/companies/{Uri.EscapeDataString(company)}/{path.TrimStart('/')}";
 
     public Task<T> GetAsync<T>(string path, CancellationToken ct = default) => SendAsync<T>(HttpMethod.Get, path, null, ct);
 
@@ -39,8 +42,10 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
     /// <summary>A file (export, PDF, print HTML) with its name and type; GET, or POST when a body is given.</summary>
     public async Task<ApiFile> FileAsync(string path, object? body = null, CancellationToken ct = default)
     {
-        using var res = await RawAsync(body is null ? HttpMethod.Get : HttpMethod.Post, path, body, ct).ConfigureAwait(false);
-        var bytes = await res.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        using var scope = Scope(body is null ? HttpMethod.Get : HttpMethod.Post, path, ct);
+        using var res = await RawAsync(body is null ? HttpMethod.Get : HttpMethod.Post, path, body, scope.Token).ConfigureAwait(false);
+        var bytes = await res.Content.ReadAsByteArrayAsync(scope.Token).ConfigureAwait(false);
+        scope.EnsureCurrent();
         var name = res.Content.Headers.ContentDisposition?.FileNameStar ?? res.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "download";
         return new ApiFile(name, res.Content.Headers.ContentType?.ToString() ?? "application/octet-stream", bytes);
     }
@@ -74,9 +79,53 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
     {
-        using var res = await RawAsync(method, path, body, ct).ConfigureAwait(false);
-        if (res.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.Accepted || res.Content.Headers.ContentLength == 0) return default!;
-        return (await res.Content.ReadFromJsonAsync<T>(Json, ct).ConfigureAwait(false))!;
+        using var scope = Scope(method, path, ct);
+        using var res = await RawAsync(method, path, body, scope.Token).ConfigureAwait(false);
+        var value = res.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.Accepted || res.Content.Headers.ContentLength == 0
+            ? default! : (await res.Content.ReadFromJsonAsync<T>(Json, scope.Token).ConfigureAwait(false))!;
+        scope.EnsureCurrent();
+        return value;
+    }
+
+    /// <summary>
+    /// A read of the company on screen belongs to it (DT-187): it is cancelled when the user leaves the company
+    /// (<see cref="ShellState.CompanyToken"/>), and an answer that arrives after a switch is dropped with an
+    /// <see cref="OperationCanceledException"/> (which Blazor ignores in lifecycle methods and event handlers), so no page or shared state
+    /// ever shows another company's data. A change the user started is let finish and answers the component that sent it (a save, a lock
+    /// it took and must give back). A request for another company named on purpose (the tenant's data export, a lock released after the
+    /// switch) and tenant or platform paths are not scoped.
+    /// </summary>
+    private RequestScope Scope(HttpMethod method, string path, CancellationToken ct)
+    {
+        var company = CompanyOf(path);
+        if (company is null || company != shell.Company?.Id || (method != HttpMethod.Get && method != HttpMethod.Head))
+            return new RequestScope(null, null, null, ct);
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, shell.CompanyToken);
+        return new RequestScope(shell, company, linked, linked.Token);
+    }
+
+    /// <summary>The company token of an <c>api/v1/companies/{company}/…</c> path, else null.</summary>
+    public static string? CompanyOf(string path)
+    {
+        const string prefix = "api/v1/companies/";
+        var p = (path ?? "").TrimStart('/');
+        if (!p.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        var end = p.IndexOfAny(['/', '?'], prefix.Length);
+        return Uri.UnescapeDataString(end < 0 ? p[prefix.Length..] : p[prefix.Length..end]);
+    }
+
+    private sealed class RequestScope(ShellState? shell, string? company, CancellationTokenSource? linked, CancellationToken token) : IDisposable
+    {
+        public CancellationToken Token => token;
+
+        /// <summary>Drops the answer when the company changed while it was on its way.</summary>
+        public void EnsureCurrent()
+        {
+            if (shell is not null && shell.Company?.Id != company) throw new OperationCanceledException("The company changed; the answer is discarded.");
+            token.ThrowIfCancellationRequested();
+        }
+
+        public void Dispose() => linked?.Dispose();
     }
 
     private async Task<HttpResponseMessage> RawAsync(HttpMethod method, string path, object? body, CancellationToken ct, bool retried = false)

@@ -7,6 +7,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Contracts.MasterData;
+using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
@@ -335,5 +336,70 @@ public sealed class ReportTests(ApiFactory f)
         Assert.Empty(await ReadAsync<List<DashboardPinResponse>>(await o.Client.GetAsync(U(o, "/dashboard/pins"))));
         var other = await f.SignUpOwnerAsync();
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/reports/saved/{priv.Id}"))).StatusCode);
+    }
+
+    /// <summary>
+    /// Company switch (DT-187): two companies of one tenant, the same user and session, asked in turn and at the same time — each answer
+    /// carries only its own company's figures, alerts, cash and bank cards, pins and reports, and no API answer may be stored by the browser
+    /// (no-store), so a later request can never be served another company's copy.
+    /// </summary>
+    [Fact]
+    public async Task Two_companies_of_one_tenant_never_get_each_others_dashboard_DT187()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var report = await ReadAsync<SavedReportResponse>(await o.Client.PostAsJsonAsync(U(o, "/reports/saved"),
+            new SavedReportRequest("Revenue", "trips", ByCustomer(new ReportMeasure("sum", "revenue")), true, null)));
+        await (await o.Client.PostAsJsonAsync(U(o, "/dashboard/pins"), new DashboardPinRequest(report.Id, 0, null, null))).EnsureOkAsync();
+        var b = await ReadAsync<CompanyResponse>(await o.Client.PostAsJsonAsync("/api/v1/tenant/companies", new CreateCompanyRequest("Second Co", "Second Co")));
+        string UB(string path) => $"/api/v1/companies/{b.Id}{path}";
+        await (await o.Client.PostAsJsonAsync(UB("/accounting/accounts/template"), new { })).EnsureOkAsync();   // its own "main cash box"
+
+        var a1 = await o.Client.GetAsync(U(o, "/dashboard?period=today"));
+        var b1 = await o.Client.GetAsync(UB("/dashboard?period=today"));
+        var a2 = await o.Client.GetAsync(U(o, "/dashboard?period=today"));
+        foreach (var r in new[] { a1, b1, a2 })
+        {
+            Assert.True(r.Headers.CacheControl?.NoStore, "API answers are never stored by the browser");
+            Assert.Null(r.Headers.ETag);
+            Assert.Null(r.Content.Headers.LastModified);
+        }
+        var da = await ReadAsync<DashboardResponse>(a1);
+        var db = await ReadAsync<DashboardResponse>(b1);
+        Assert.Equal(3, da.Figures.Trips);
+        Assert.Equal(574.850m, da.Figures.Revenue);
+        Assert.Equal(0, db.Figures.Trips);
+        Assert.Equal(0m, db.Figures.Revenue);
+        Assert.Equal(0m, db.Figures.Collections);
+        Assert.DoesNotContain(db.Alerts, a => a.Key is "unbilled-trips" or "shortage" or "tariff-breach" or "driver-documents");
+        Assert.Empty(db.Pins);
+        Assert.Single(da.Pins);
+        var aCash = da.CashAndBanks!.Select(c => c.Id).ToHashSet();
+        Assert.NotEmpty(db.CashAndBanks!);
+        Assert.DoesNotContain(db.CashAndBanks!, c => aCash.Contains(c.Id));
+        Assert.All(db.CashAndBanks!, c => Assert.Equal(0m, c.Balance));
+        // Asking the other company in between changes nothing (no shared cache entry).
+        Assert.Equal(JsonSerializer.Serialize(da with { GeneratedAt = default }), JsonSerializer.Serialize((await ReadAsync<DashboardResponse>(a2)) with { GeneratedAt = default }));
+
+        // At the same time, many times over: every answer is its own company's.
+        var calls = Enumerable.Range(0, 12).Select(async i =>
+        {
+            var forB = i % 2 == 1;
+            var d = await ReadAsync<DashboardResponse>(await o.Client.GetAsync(forB ? UB("/dashboard?period=today") : U(o, "/dashboard?period=today")));
+            return (forB, d);
+        });
+        foreach (var (forB, d) in await Task.WhenAll(calls))
+        {
+            Assert.Equal(forB ? 0 : 3, d.Figures.Trips);
+            Assert.Equal(forB ? 0 : 1, d.Pins.Count);
+            Assert.All(d.CashAndBanks!, c => Assert.Equal(!forB, aCash.Contains(c.Id)));
+        }
+
+        // Reports and cash balances follow the company of the address too.
+        var prodA = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/driver-productivity")));
+        var prodB = await ReadAsync<ReportResult>(await o.Client.GetAsync(UB("/reports/standard/driver-productivity")));
+        Assert.NotEmpty(prodA.Rows);
+        Assert.Empty(prodB.Rows);
+        Assert.Equal(HttpStatusCode.NotFound, (await o.Client.GetAsync(UB($"/reports/saved/{report.Id}"))).StatusCode);
     }
 }

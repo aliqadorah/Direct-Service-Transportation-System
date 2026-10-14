@@ -8,6 +8,7 @@
 @implements IAsyncDisposable
 @using DirectService.Transportation.Contracts.Platform
 @inject Api Api
+@inject ShellState Shell
 @inject Loc L
 @inject UiJs Js
 @inject LiveUpdates Live
@@ -16,6 +17,7 @@
 @code {
     private const int ActiveWithinSeconds = 60;   // a beat every 30 s keeps the lock; 60 s without activity lets the server's 90 s expire it
     private string? _lockId;
+    private string _company = "";   // the company the lock was taken in: released there even after a company switch (DT-187)
     private string? _holder;
     private string? _message;
     private PeriodicTimer? _timer;
@@ -30,6 +32,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _company = Shell.Company?.Id ?? "";
         Live.LockChanged += LockChanged;
         await AcquireAsync();
         Beat();
@@ -41,7 +44,7 @@
         string? holder = null;
         try
         {
-            var l = await Api.PostAsync<LockResponse>(Api.C("locks"), new AcquireLockRequest(EntityType, Id));
+            var l = await Api.PostAsync<LockResponse>(Api.C(_company, "locks"), new AcquireLockRequest(EntityType, Id));
             if (l.HeldByMe && _disposed)
             {
                 // The form closed while the lock was being taken: give it back at once instead of holding it until it expires.
@@ -98,7 +101,7 @@
     {
         if (await Js.IdleSeconds() >= ActiveWithinSeconds) return;   // inactive: no beat, the server lets the lock go (BR-039)
         if (_lockId is null) { await AcquireAsync(); StateHasChanged(); return; }   // read-only view: try again (also without live updates)
-        try { await Api.PutAsync(Api.C($"locks/{Uri.EscapeDataString(_lockId)}/heartbeat"), null, token); }
+        try { await Api.PutAsync(Api.C(_company, $"locks/{Uri.EscapeDataString(_lockId)}/heartbeat"), null, token); }
         catch (ApiException)
         {
             // The lock expired while the user was away: take it back, unless someone else has it now.
@@ -111,9 +114,10 @@
 
     private async Task ReleaseAsync(string lockId)
     {
-        try { await Api.DeleteAsync(Api.C($"locks/{Uri.EscapeDataString(lockId)}")); }
+        try { await Api.DeleteAsync(Api.C(_company, $"locks/{Uri.EscapeDataString(lockId)}")); }
         catch (ApiException) { }
         catch (HttpRequestException) { }   // the server's expiry releases it
+        catch (OperationCanceledException) { }   // released; the answer came after a company switch (DT-187)
     }
 
     public async ValueTask DisposeAsync()

@@ -36,6 +36,22 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
     /// <summary>Connects (once) and joins the company's group, leaving the previous one.</summary>
     public async Task EnterCompanyAsync(string company)
     {
+        // One switch at a time (DT-187): a quick A → B → C must not leave the tab in two companies' groups.
+        await _switch.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await JoinAsync(company).ConfigureAwait(false);
+        }
+        finally
+        {
+            _switch.Release();
+        }
+    }
+
+    private readonly SemaphoreSlim _switch = new(1, 1);
+
+    private async Task JoinAsync(string company)
+    {
         try
         {
             if (_hub is null)

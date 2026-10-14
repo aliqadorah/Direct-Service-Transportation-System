@@ -21,7 +21,13 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
 
     public Task EnsureAsync()
     {
-        if (_company != shell.Company?.Id) { _company = shell.Company?.Id; _loading = null; _parties.Clear(); }
+        if (_company != shell.Company?.Id)
+        {
+            _company = shell.Company?.Id;
+            _loading = null;
+            _parties.Clear();
+            (Accounts, CostCentres) = ([], []);   // never the previous company's lists (DT-187)
+        }
         return _loading ??= LoadAsync();
     }
 
@@ -39,7 +45,7 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
         try { accounts = await api.GetAsync<IReadOnlyList<AccountOption>>(api.C("accounting/accounts/options")).ConfigureAwait(false); }
         catch
         {
-            _loading = null;   // tried again by the next screen
+            if (company == _company) _loading = null;   // tried again by the next screen (not the new company's load, DT-187)
             throw;
         }
         IReadOnlyList<Option<string?>> centres;
