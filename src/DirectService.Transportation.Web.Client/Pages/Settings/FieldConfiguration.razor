@@ -15,7 +15,7 @@
 <PageHeader Help="fields" Title="@L["nav.fields"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.fields"])])">
     <Actions>
         <Btn Icon="plus" Text="@L["fld.newCustom"]" OnClick="() => EditCustom(null)" />
-        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!_dirty" OnClick="Save" />
+        <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" Disabled="!Dirty" OnClick="Save" />
     </Actions>
 </PageHeader>
 <TabStrip Items="Tabs" Selected="@_entity" SelectedChanged="AskEntity" Label="@L["nav.fields"]" />
@@ -37,11 +37,11 @@
                             <tr @key="row.FieldKey">
                                 <td>@name @if (row.IsCore) {<Badge Tone="Tone.Mute" Icon="lock" Text="@L["fld.core"]" />}</td>
                                 <td><input class="input" style="height:26px" maxlength="60" aria-label="@L.F("fld.labelOf", name)" placeholder="@name" value="@row.Label" disabled="@row.IsCore"
-                                           @onchange="e => { row.Label = e.Value?.ToString(); _dirty = true; }" /></td>
+                                           @onchange="e => { row.Label = e.Value?.ToString(); _standardDirty = true; }" /></td>
                                 <td><input type="checkbox" aria-label="@L.F("fld.hiddenOf", name)" checked="@row.IsHidden" disabled="@(row.IsCore || row.AlwaysRequired)"
-                                           @onchange="e => { row.IsHidden = e.Value is true; _dirty = true; }" /></td>
+                                           @onchange="e => { row.IsHidden = e.Value is true; _standardDirty = true; }" /></td>
                                 <td><input type="checkbox" aria-label="@L.F("fld.requiredOf", name)" checked="@(row.IsRequired || row.AlwaysRequired)" disabled="@(row.IsCore || row.AlwaysRequired)"
-                                           @onchange="e => { row.IsRequired = e.Value is true; _dirty = true; }" /></td>
+                                           @onchange="e => { row.IsRequired = e.Value is true; _standardDirty = true; }" /></td>
                                 <td class="ord">@Arrows("s", row.FieldKey, name, at, _standard.Count, d => MoveStandard(at, d))</td>
                             </tr>
                         }
@@ -74,7 +74,7 @@
         </div>
         @* FR-184: the form as it will look with the changes on screen (not yet saved): order, labels, required marks; hidden fields left out. *@
         <Box Title="@L["fld.preview"]" Style="flex:none">
-            <p class="help" style="margin:0 0 8px">@L[_dirty ? "fld.previewUnsaved" : "fld.previewSaved"]</p>
+            <p class="help" style="margin:0 0 8px">@L[Dirty ? "fld.previewUnsaved" : "fld.previewSaved"]</p>
             <div class="fg" style="grid-template-columns:repeat(4,minmax(0,1fr))" aria-label="@L["fld.preview"]" role="group">
                 @foreach (var f in _standard.Where(f => !f.IsHidden).OrderBy(f => f.SortOrder))
                 {
@@ -122,7 +122,7 @@
 </Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _c.LabelAr ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
                Message="@L["fld.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="DeleteCustom" />
-<UnsavedGuard Dirty="_dirty" />
+<UnsavedGuard Dirty="Dirty" />
 <ConfirmDialog @bind-Open="_confirmSwitch" Title="@L["lay.unsavedTitle"]" ConfirmText="@L["lay.discard"]" Danger="true" Message="@L["fld.unsavedText"]"
                OnConfirm="_ => SetEntity(_pendingEntity!)" />
 
@@ -134,7 +134,13 @@
     private Dictionary<string, int> _customSaved = [];
     private LoadState _state = LoadState.Loading;
     private string? _reference, _deleteError, _pendingEntity;
-    private bool _busy, _dirty, _editing, _deleting, _confirmSwitch;
+    private bool _busy, _standardDirty, _editing, _deleting, _confirmSwitch;
+
+    /// <summary>
+    /// Unsaved changes on screen: edits or moves in the standard list, or custom fields whose order differs from the saved one. Kept apart so
+    /// that saving a custom field from its dialog never drops them (owner request 14 Oct 2026).
+    /// </summary>
+    private bool Dirty => _standardDirty || _custom.Any(c => !_customSaved.TryGetValue(c.Id, out var was) || was != c.SortOrder);
     private int _version;
     private CustomModel _c = new();
     private EditContext _ctx = new(new CustomModel());
@@ -155,7 +161,7 @@
     private Task AskEntity(string e)
     {
         if (e == _entity) return Task.CompletedTask;
-        if (!_dirty) return SetEntity(e);
+        if (!Dirty) return SetEntity(e);
         _pendingEntity = e;
         _confirmSwitch = true;
         return Task.CompletedTask;
@@ -176,10 +182,33 @@
             _standard = standard.OrderBy(s => s.SortOrder).Select(s => new StandardRow(s)).ToList();
             _custom = custom.OrderBy(c => c.SortOrder).ToList();
             _customSaved = _custom.ToDictionary(c => c.Id, c => c.SortOrder);
-            _dirty = false;
+            _standardDirty = false;
             _state = LoadState.Ready;
         }
         catch (ApiException e) when (version == _version) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    /// <summary>
+    /// Reloads only the custom fields (after the dialog saved or deleted one): the standard list and its unsaved changes stay as they are. An
+    /// unsaved custom order on screen is kept — known fields in their screen order, a new field last — and saved later with "Save".
+    /// </summary>
+    private async Task LoadCustom()
+    {
+        var entity = _entity;
+        List<CustomFieldResponse> fresh;
+        try { fresh = (await Api.GetAsync<IReadOnlyList<CustomFieldResponse>>(Api.C($"custom-fields/{entity}"))).OrderBy(c => c.SortOrder).ToList(); }
+        catch (ApiException) { Toasts.Error(L["ui.loadFailed"]); return; }
+        if (entity != _entity) return;
+        var moved = _custom.Any(c => _customSaved.TryGetValue(c.Id, out var was) && was != c.SortOrder);
+        var screen = _custom.Select(c => c.Id).ToList();
+        _customSaved = fresh.ToDictionary(c => c.Id, c => c.SortOrder);
+        if (!moved)
+        {
+            _custom = fresh;
+            return;
+        }
+        _custom = fresh.OrderBy(c => screen.IndexOf(c.Id) is var i and >= 0 ? i : int.MaxValue).ThenBy(c => c.SortOrder)
+            .Select((c, i) => c with { SortOrder = (i + 1) * 10 }).ToList();
     }
 
     /// <summary>A narrow ↑/↓ pair: named and titled "Move up: field"; ↑ disabled on the first row, ↓ on the last; keyboard focus follows the row.</summary>
@@ -202,7 +231,7 @@
         if (index < 0 || to < 0 || to >= list.Count) return;
         (list[index], list[to]) = (list[to], list[index]);
         for (var i = 0; i < list.Count; i++) list[i] = number(list[i], (i + 1) * 10);
-        _dirty = true;
+        if (ReferenceEquals(list, _standard)) _standardDirty = true;   // a custom move shows as a number that differs from the saved one
         StateHasChanged();
         // The same button, or the other one when the row reached the end of the list.
         var atEdge = delta < 0 ? to == 0 : to == list.Count - 1;
@@ -262,7 +291,7 @@
             _editing = false;
             Forms.Invalidate();
             Toasts.Success(L.F("ml.saved", _c.LabelAr ?? ""));
-            await Load();
+            await LoadCustom();
         }
         catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
         finally { _busy = false; }
@@ -278,7 +307,7 @@
             _deleting = false;
             Forms.Invalidate();
             Toasts.Success(L.F("ml.deleted", _c.LabelAr ?? ""));
-            await Load();
+            await LoadCustom();
         }
         catch (ApiException e) { _deleteError = e.Problem.Detail; }
         finally { _busy = false; }

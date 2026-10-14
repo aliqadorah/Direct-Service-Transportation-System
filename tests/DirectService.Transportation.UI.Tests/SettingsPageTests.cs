@@ -186,6 +186,90 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Assert.DoesNotContain(cut.FindAll(".dialog label"), l => l.TextContent.Trim() == L["fld.order"]);
     }
 
+    // ------------------------------------------------------------ unsaved list changes survive the custom-field dialog (owner request 14 Oct 2026)
+
+    private static void SaveDialog(IRenderedComponent<FieldConfiguration> cut, string label)
+    {
+        cut.FindAll("table.grid")[1].QuerySelectorAll("tbody tr").First(r => r.TextContent.Contains(label, StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("form#cf-form")));
+        cut.Find("form#cf-form").Submit();
+    }
+
+    private int Gets(string path) => Requests.Count(r => r.Method == "GET" && r.Path == path);
+
+    [Fact]
+    public void Saving_a_custom_field_keeps_the_unsaved_standard_list()
+    {
+        var cut = Fields(Custom("c1", "customsNo", "الكشف", 10));
+        Arrow(cut, L.F("fld.moveDown", "رقم السند")).Click();
+        cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق");
+        cut.Find($"input[aria-label='{L.F("fld.hiddenOf", "ملاحظات")}']").Change(true);
+
+        SaveDialog(cut, "الكشف");
+        cut.WaitForAssertion(() => Assert.Equal(2, Gets("custom-fields/TRN.Trip")));       // only the custom list again
+        Assert.Equal(1, Gets("standard-fields/TRN.Trip"));
+        Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "custom-fields/field/c1");
+        Assert.Equal(["تاريخ", "رقم", "ملاحظات"], StandardOrder(cut));                       // the move is still on screen…
+        Assert.Equal("ملاحظات السائق", cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").GetAttribute("value"));
+        Assert.True(cut.Find($"input[aria-label='{L.F("fld.hiddenOf", "ملاحظات")}']").HasAttribute("checked"));
+        Assert.False(cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).HasAttribute("disabled"));   // …and unsaved
+        Assert.DoesNotContain(Requests, r => r.Method == "PUT" && r.Path == "standard-fields/TRN.Trip");
+    }
+
+    [Fact]
+    public void Saving_a_custom_field_keeps_unsaved_custom_moves_which_save_later()
+    {
+        var cut = Fields(Custom("c1", "customsNo", "الكشف", 10), Custom("c2", "tolls", "الرسوم", 20), Custom("c3", "seal", "الختم", 30));
+        Arrow(cut, L.F("fld.moveUp", "الختم")).Click();
+        SaveDialog(cut, "الكشف");                                                          // the server still has c1, c2, c3
+        cut.WaitForAssertion(() => Assert.Equal(2, Gets("custom-fields/TRN.Trip")));
+        string[] Order() => cut.FindAll("table.grid")[1].QuerySelectorAll("tbody tr").Select(r => r.QuerySelector("td")!.TextContent.Trim()).ToArray();
+        cut.WaitForAssertion(() => Assert.Equal(["الكشف", "الختم", "الرسوم"], Order()));     // the screen order is kept
+        var save = cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
+        Assert.False(save.HasAttribute("disabled"));
+        save.Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "custom-fields/field/c3"));
+        using var c3 = System.Text.Json.JsonDocument.Parse(Requests.Last(r => r.Path == "custom-fields/field/c3").Body!);
+        Assert.Equal(20, c3.RootElement.GetProperty("sortOrder").GetInt32());
+        using var c2 = System.Text.Json.JsonDocument.Parse(Requests.Last(r => r.Path == "custom-fields/field/c2").Body!);
+        Assert.Equal(30, c2.RootElement.GetProperty("sortOrder").GetInt32());
+    }
+
+    [Fact]
+    public void A_field_added_from_the_dialog_appears_without_losing_the_standard_edits()
+    {
+        var calls = 0;
+        Respond("standard-fields/TRN.Trip", TripFields);
+        Respond("custom-fields/TRN.Trip", r => r.Method == HttpMethod.Get && ++calls > 1
+            ? new[] { Custom("c1", "customsNo", "الكشف", 10), Custom("c9", "seal", "الختم", 20) }
+            : r.Method == HttpMethod.Get ? new[] { Custom("c1", "customsNo", "الكشف", 10) } : Custom("c9", "seal", "الختم", 20));
+        var cut = Render<FieldConfiguration>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("رقم السند", cut.Markup));
+        cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق");
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["fld.newCustom"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("form#cf-form")));
+        cut.Find("form#cf-form input").Change("الختم");
+        cut.Find("form#cf-form").Submit();
+        cut.WaitForAssertion(() => Assert.Contains("الختم", cut.FindAll("table.grid")[1].TextContent));
+        Assert.Equal("ملاحظات السائق", cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").GetAttribute("value"));
+    }
+
+    [Fact]
+    public void Leaving_the_page_with_unsaved_changes_asks_first()
+    {
+        var cut = Fields(Custom("c1", "customsNo", "الكشف", 10));
+        var nav = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>(Services);
+        var here = nav.Uri;
+        nav.NavigateTo($"/c/{Company}/trips");                                              // nothing unsaved: leaves
+        Assert.EndsWith("/trips", nav.Uri, StringComparison.Ordinal);
+        nav.NavigateTo(here);
+
+        Arrow(cut, L.F("fld.moveUp", "تاريخ الرحلة")).Click();
+        nav.NavigateTo($"/c/{Company}/trips");
+        cut.WaitForAssertion(() => Assert.Contains(L["ui.unsavedText"], cut.Markup));
+        Assert.Equal(here, nav.Uri);                                                        // stayed until the user decides
+    }
+
     [Fact]
     public void Invoice_layout_designer_tab_shows_the_other_layout_after_one_click()
     {
