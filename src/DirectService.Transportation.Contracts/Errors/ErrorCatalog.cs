@@ -194,6 +194,11 @@ public static class ErrorCatalog
         [ErrorCodes.SubscriptionDowngradeExceeds] = ("لا يمكن التخفيض: الاستخدام الحالي يتجاوز حدود الباقة ({0}).", "The downgrade is refused: current usage exceeds the plan's limits ({0})."),
         [ErrorCodes.SubscriptionClosed] = ("الاشتراك ملغى؛ البيانات متاحة للتصدير فقط حتى نهاية فترة الاحتفاظ.", "The subscription is cancelled; data is available for export only until the end of the retention period."),
         [ErrorCodes.SubscriptionInvoiceNotDue] = ("الفاتورة {0} ليست مستحقة.", "Invoice {0} is not due."),
+        [ErrorCodes.RefundNotDue] = ("لا دفعة للاسترداد على الفاتورة {0}.", "Invoice {0} has no payment to refund."),
+        [ErrorCodes.RefundAlreadyMarked] = ("دفعة الفاتورة {0} مسجّلة كمستردة من قبل.", "The payment of invoice {0} is already marked refunded."),
+        [ErrorCodes.RefundBusy] = ("موظف آخر يسجّل استرداداً الآن. حاول بعد قليل.", "Another staff member is marking a refund. Try again shortly."),
+        [ErrorCodes.RefundDate] = ("تاريخ الاسترداد مطلوب، ويقع بين تاريخ الدفع ({0}) واليوم.", "Enter the refund date, between the payment date ({0}) and today."),
+        [ErrorCodes.RefundReference] = ("أدخل مرجع الاسترداد، مثل رقم الحوالة ({0} حرفاً على الأكثر).", "Enter the refund reference, such as the transfer number (at most {0} characters)."),
         [ErrorCodes.SubscriptionNotAwaitingPayment] = ("الفاتورة {0} ليست بانتظار الدفع؛ يُلغى فقط ما أُنشئ عند اختيار خطة ولم يُدفع.", "Invoice {0} is not awaiting payment; only an unpaid invoice created when a plan was chosen can be cancelled."),
         [ErrorCodes.SupportWindow] = ("نافذة الدعم يجب أن تبدأ قبل نهايتها وألا تتجاوز 7 أيام.", "The support window must start before it ends and last at most 7 days."),
         [ErrorCodes.SupportNotRequested] = ("طلب الدعم {0} ليس بانتظار القرار.", "Support request {0} is not waiting for a decision."),
@@ -424,6 +429,11 @@ public static class ErrorCodes
     public const string SubscriptionClosed = "subscription.closed";
     public const string SubscriptionInvoiceNotDue = "subscription.invoiceNotDue";
     public const string SubscriptionNotAwaitingPayment = "subscription.notAwaitingPayment";
+    public const string RefundNotDue = "refund.notDue";
+    public const string RefundAlreadyMarked = "refund.alreadyMarked";
+    public const string RefundBusy = "refund.busy";
+    public const string RefundDate = "refund.date";
+    public const string RefundReference = "refund.reference";
     public const string SupportWindow = "support.window";
     public const string SupportNotRequested = "support.notRequested";
     public const string ReportSource = "report.source";

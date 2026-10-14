@@ -152,17 +152,24 @@ async function planChosen(page: Page, lang: Lang): Promise<void> {
     const plan = await api<{ id: string }>(staff, "POST", "/api/v1/platform/plans", {
       code: `V${lang.toUpperCase()}${Date.now() % 100000}`, nameAr: "الخطة المهنية", nameEn: "Professional", price: 232, billingCycle: "Monthly",
       maxCompanies: 5, maxActiveUsers: 25, maxTripsPerMonth: 20000, maxStorageMb: 10240, isActive: true, rowVersion: null });
-    // A first checkout cancelled by staff and then paid from its old page: a payment to refund (DT-183, DT-184)…
+    // Two checkouts cancelled by staff and then paid from their old page: payments to refund (DT-183, DT-184); the first one is marked
+    // refunded (DT-185), the second stays to refund…
     type Checkout = { invoice: { id: string; number: string; total: number; gatewayReference: string } };
-    const first = await api<Checkout>(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
-    const hit = (await api<{ hits: { type: string; id: string }[] }>(staff, "GET", `/api/v1/platform/search?q=${first.invoice.number}`)).hits.find((h) => h.type === "subscriptionInvoice")!;
-    await api(staff, "POST", `/api/v1/platform/tenants/${hit.id}/invoices/${first.invoice.id}/cancel`, { reason: "Visual check" });
-    const body = JSON.stringify({ reference: first.invoice.gatewayReference, status: "succeeded", metadata: {}, amount: first.invoice.total, currency: "JOD" });
-    const gateway = await page.context().browser()!.newContext({ baseURL: BASE_URL, ignoreHTTPSErrors: true });   // as the gateway: no session
-    const paid = await gateway.request.post("/api/v1/billing/webhook", { data: body, headers: { "Content-Type": "application/json",
-      "X-Signature": createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex").toUpperCase() } });
-    await gateway.close();
-    if (!paid.ok()) throw new Error(`webhook → ${paid.status()}`);
+    const latePayment = async () => {
+      const c = await api<Checkout>(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
+      const hit = (await api<{ hits: { type: string; id: string }[] }>(staff, "GET", `/api/v1/platform/search?q=${c.invoice.number}`)).hits.find((h) => h.type === "subscriptionInvoice")!;
+      await api(staff, "POST", `/api/v1/platform/tenants/${hit.id}/invoices/${c.invoice.id}/cancel`, { reason: "Visual check" });
+      const body = JSON.stringify({ reference: c.invoice.gatewayReference, status: "succeeded", metadata: {}, amount: c.invoice.total, currency: "JOD" });
+      const gateway = await page.context().browser()!.newContext({ baseURL: BASE_URL, ignoreHTTPSErrors: true });   // as the gateway: no session
+      const paid = await gateway.request.post("/api/v1/billing/webhook", { data: body, headers: { "Content-Type": "application/json",
+        "X-Signature": createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex").toUpperCase() } });
+      await gateway.close();
+      if (!paid.ok()) throw new Error(`webhook → ${paid.status()}`);
+      return c;
+    };
+    const refunded = await latePayment();
+    await api(staff, "POST", `/api/v1/platform/refunds/${refunded.invoice.id}/refunded`, { refundedOn: today(), reference: "TRX-778" });
+    await latePayment();
     // …and the current checkout, awaiting payment.
     await api(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
   } finally {
@@ -350,6 +357,9 @@ for (const lang of ["ar", "en"] as Lang[]) {
       { name: "console-tenants#awaiting-invoice", route: "/console/tenants", open: async (p, t) => { await awaitingPanel(p, t); } },
       { name: "console-tenants#cancel-invoice", route: "/console/tenants", open: async (p, t) => { await (await awaitingPanel(p, t)).click(); } },
       { name: "console-plans#new", route: "/console/plans", open: header("con.newPlan") },
+      // DT-185: "Mark as refunded" on Platform health.
+      { name: "console-health#mark-refunded", route: "/console/health", open: async (p, t) => {
+        await p.locator("main table button").filter({ hasText: t("con.markRefunded") }).first().click(); } },
       { name: "console-announcements#new", route: "/console/announcements", open: header("con.newAnnouncement") },
       { name: "console-support#request", route: "/console/support-access", open: header("con.requestSupport") },
     ]);

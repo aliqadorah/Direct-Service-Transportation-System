@@ -55,6 +55,8 @@ internal static class PlatformEndpoints
         });
         p.MapGet("/health", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.HealthAsync(ct).ConfigureAwait(false)));
         p.MapGet("/refunds", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.RefundsAsync(ct).ConfigureAwait(false)));
+        p.MapPost("/refunds/{invoice}/refunded", async (string invoice, MarkRefundedRequest r, ConsoleService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.MarkRefundedAsync(invoice, r, ct).ConfigureAwait(false)));
         // Platform staff (owner feedback 13 Oct 2026, item 8b): list, invitations, deactivation.
         p.MapGet("/staff", async (StaffService s, CancellationToken ct) => TypedResults.Ok(await s.ListAsync(ct).ConfigureAwait(false)));
         p.MapPost("/staff/invitations", async (StaffInviteRequest r, StaffService s, CancellationToken ct) => TypedResults.Ok(await s.InviteAsync(r, ct).ConfigureAwait(false)));

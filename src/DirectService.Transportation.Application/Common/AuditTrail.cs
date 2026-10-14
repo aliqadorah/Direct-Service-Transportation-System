@@ -12,7 +12,8 @@ public sealed class AuditTrail(IAppDbContext db, IRequestContext ctx, PrintMode 
 {
     private static readonly JsonSerializerOptions Readable = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    public void Record(string entityType, long entityId, string action, string? reason = null, IReadOnlyDictionary<string, object?>? values = null)
+    /// <param name="tenantId">The tenant the row belongs to when the actor has none (platform staff, e.g. marking a refund, DT-185).</param>
+    public void Record(string entityType, long entityId, string action, string? reason = null, IReadOnlyDictionary<string, object?>? values = null, long? tenantId = null)
     {
         // A screen preview is not a print: the printout or PDF that follows is logged (and marked Copy) as the print (FR-058, FR-090).
         if (print.Preview && action == "Print") return;
@@ -20,7 +21,7 @@ public sealed class AuditTrail(IAppDbContext db, IRequestContext ctx, PrintMode 
         if (reason is not null) newValues["_reason"] = reason;
         db.Set<AuditLog>().Add(new AuditLog
         {
-            TenantId = ctx.TenantId,
+            TenantId = tenantId ?? ctx.TenantId,
             CompanyId = ctx.CompanyId,
             UserId = ctx.UserId,
             OccurredAt = DateTime.UtcNow,

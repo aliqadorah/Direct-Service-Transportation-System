@@ -53,16 +53,8 @@
                 @if (t.Status != LifecycleCodes.Deleted) {<Btn Icon="shield" Text="@L["con.requestSupport"]" OnClick="@(() => Ask("support"))" />}
             </div>
             <h3 class="lbl" style="margin:8px 0 0">@L["ten.invoices"]</h3>
-            @if (d.Refunds is { Count: > 0 } refunds)
-            {
-                @* Payments received but not applied, to refund outside the platform (DT-184); a replaced invoice is not in the list below. *@
-                <Banner Tone="Tone.Warn" Icon="cash">
-                    <strong>@L["con.refunds"]</strong>
-                    <ul class="refunds">
-                        @foreach (var r in refunds) {<li><Tx Value="@RefundLine(r)" /></li>}
-                    </ul>
-                </Banner>
-            }
+            @* Payments to refund with "Mark as refunded", and the refunded ones collapsed (DT-184, DT-185). *@
+            <RefundList Due="@(d.Refunds ?? [])" Refunded="@(d.Refunded ?? [])" OnChanged="ReloadDetails" />
             @if (d.Invoices.Count == 0) {<p class="muted" style="margin:0">@L["ten.noInvoices"]</p>}
             else
             {
@@ -237,11 +229,11 @@
         _acting = true;
     }
 
-    /// <summary>"SUB-000002 · 232.000 · paid 14/10/2026 · invoice cancelled by a credit" (shared with the health page).</summary>
-    internal static string RefundLine(Loc l, RefundDueResponse r, string dateFormat) => l.F("con.refundLine", r.Number, Fmt.Money(r.Amount),
-        r.PaidAt is { } p ? Fmt.Date(p.ToLocalTime(), dateFormat) : "—", l["con.refund." + r.Kind]);
-
-    private string RefundLine(RefundDueResponse r) => RefundLine(L, r, Shell.DateFormat);
+    private async Task ReloadDetails()
+    {
+        if (_details is null) return;
+        _details = await Api.GetAsync<ConsoleTenantDetails>($"api/v1/platform/tenants/{Uri.EscapeDataString(_details.Tenant.Id)}");
+    }
 
     private void AskCancel(SubscriptionInvoiceResponse i)
     {

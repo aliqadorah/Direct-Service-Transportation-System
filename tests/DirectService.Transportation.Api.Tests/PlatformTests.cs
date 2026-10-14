@@ -223,11 +223,36 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal(before.CurrentPeriodEnd, (await TenantOfAsync(owner)).CurrentPeriodEnd);
 
         // Staff see it as a payment to refund (DT-184): on the platform list and in the tenant's panel, once; tenants cannot read the list.
-        var refund = Assert.Single(await ReadAsync<List<RefundDueResponse>>(await staff.Client.GetAsync("/api/v1/platform/refunds")), x => x.TenantId == tenant);
+        var refund = Assert.Single((await ReadAsync<RefundsResponse>(await staff.Client.GetAsync("/api/v1/platform/refunds"))).Due, x => x.TenantId == tenant);
         Assert.Equal((checkout.Invoice.Id, checkout.Invoice.Number, 232.000m, RefundKinds.Credited, true), (refund.InvoiceId, refund.Number, refund.Amount, refund.Kind, refund.PaidAt is not null));
         var details = await ReadAsync<ConsoleTenantDetails>(await staff.Client.GetAsync($"/api/v1/platform/tenants/{tenant}"));
         Assert.Equal(checkout.Invoice.Id, Assert.Single(details.Refunds!).InvoiceId);
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/refunds")).StatusCode);
+
+        // Marked refunded (DT-185): date between the payment and today, a reference; then it leaves both lists for "Refunded", once.
+        string Mark(string invoice) => $"/api/v1/platform/refunds/{invoice}/refunded";
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Amman")));
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.PostAsJsonAsync(Mark(checkout.Invoice.Id), new MarkRefundedRequest(today, "TRX-1"))).StatusCode);
+        var bad = await (await staff.Client.PostAsJsonAsync(Mark(checkout.Invoice.Id), new MarkRefundedRequest(today.AddDays(1), " "))).Content.ReadAsStringAsync();
+        Assert.Contains("\"refundedOn\"", bad, StringComparison.Ordinal);
+        Assert.Contains("\"reference\"", bad, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.BadRequest, (await staff.Client.PostAsJsonAsync(Mark(checkout.Invoice.Id), new MarkRefundedRequest(today.AddDays(-30), "TRX-1"))).StatusCode);
+        Assert.Equal("refund.notDue", await (await staff.Client.PostAsJsonAsync(Mark(paid.Invoice.Id), new MarkRefundedRequest(today, "TRX-1"))).ProblemCodeAsync());
+        var marked = await ReadAsync<RefundedResponse>(await staff.Client.PostAsJsonAsync(Mark(checkout.Invoice.Id), new MarkRefundedRequest(today, " TRX-778 ")));
+        Assert.Equal((checkout.Invoice.Number, today, "TRX-778", staff.Me.FullName), (marked.Payment.Number, marked.RefundedOn, marked.Reference, marked.MarkedBy));
+        Assert.Equal("refund.alreadyMarked", await (await staff.Client.PostAsJsonAsync(Mark(checkout.Invoice.Id), new MarkRefundedRequest(today, "TRX-779"))).ProblemCodeAsync());
+        var lists = await ReadAsync<RefundsResponse>(await staff.Client.GetAsync("/api/v1/platform/refunds"));
+        Assert.DoesNotContain(lists.Due, x => x.TenantId == tenant);
+        Assert.Equal("TRX-778", Assert.Single(lists.Refunded, x => x.Payment.TenantId == tenant).Reference);
+        details = await ReadAsync<ConsoleTenantDetails>(await staff.Client.GetAsync($"/api/v1/platform/tenants/{tenant}"));
+        Assert.Empty(details.Refunds!);
+        Assert.Equal(today, Assert.Single(details.Refunded!).RefundedOn);
+        // The audit entry is on the invoice, for its tenant, linked to the payment it settles.
+        var paymentEntry = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().SingleAsync(a => a.Action == "PaidNotApplied" && a.EntityId == stored.Id));
+        var refundEntry = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().SingleAsync(a => a.Action == "Refunded" && a.EntityId == stored.Id));
+        Assert.Equal(stored.TenantId, refundEntry.TenantId);
+        Assert.Contains($"\"payment\":{paymentEntry.Id}", refundEntry.NewValues!, StringComparison.Ordinal);
+        Assert.Contains("\"reference\":\"TRX-778\"", refundEntry.NewValues!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -263,7 +288,7 @@ public sealed class PlatformTests(ApiFactory f)
         await (await WebhookAsync(stale.Invoice, "succeeded", basic.Code)).EnsureOkAsync();
         Assert.Equal("Trial", (await ReadAsync<SubscriptionResponse>(await owner.Client.GetAsync("/api/v1/tenant/subscription"))).Status);
         // …but staff see that payment to refund, although the replaced invoice is no longer listed (DT-184).
-        Assert.Contains(await ReadAsync<List<RefundDueResponse>>(await staff.Client.GetAsync("/api/v1/platform/refunds")),
+        Assert.Contains((await ReadAsync<RefundsResponse>(await staff.Client.GetAsync("/api/v1/platform/refunds"))).Due,
             x => x.Number == stale.Invoice.Number && x.Kind == RefundKinds.Replaced && x.Amount == stale.Invoice.Total);
         // A payment of another amount is not applied; the invoice is Failed and can still be paid in full (review F3).
         await (await WebhookAsync(checkout.Invoice, "succeeded", basic.Code, amount: 1.000m)).EnsureOkAsync();

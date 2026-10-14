@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// read tenant business data here.
 /// </summary>
 public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PlanLimits limits, SubscriptionService subscriptions,
-    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock)
+    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, AuditTrail audit, IPlatformLock locks)
 {
     private static readonly DateTime Started = DateTime.UtcNow;
 
@@ -177,41 +177,108 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var invoices = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().Where(i => i.TenantId == t.Id && !i.IsDeleted).OrderByDescending(i => i.Id)
             .ToListAsync(ct).ConfigureAwait(false);
         var grants = await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.TenantId == t.Id && !g.IsDeleted), ct).ConfigureAwait(false);
-        return new ConsoleTenantDetails(await TenantAsync(t, ct).ConfigureAwait(false), invoices.Select(subscriptions.Invoice).ToList(), grants,
-            await RefundsDueAsync(t.Id, ct).ConfigureAwait(false));
+        var (due, refunded) = await RefundStateAsync(t.Id, ct).ConfigureAwait(false);
+        return new ConsoleTenantDetails(await TenantAsync(t, ct).ConfigureAwait(false), invoices.Select(subscriptions.Invoice).ToList(), grants, due, refunded);
     }
 
-    /// <summary>Payments to refund across the platform, newest first (console health page, DT-184).</summary>
-    public Task<IReadOnlyList<RefundDueResponse>> RefundsAsync(CancellationToken ct)
+    /// <summary>Payments to refund and payments marked refunded across the platform, newest first (console health page, DT-184, DT-185).</summary>
+    public async Task<RefundsResponse> RefundsAsync(CancellationToken ct)
     {
         _ = StaffId;
-        return RefundsDueAsync(null, ct);
+        var (due, refunded) = await RefundStateAsync(null, ct).ConfigureAwait(false);
+        return new RefundsResponse(due, refunded);
+    }
+
+    /// <summary>
+    /// Marks a payment to refund as refunded (owner request 14 Oct 2026, DT-185): the refund itself is made outside the platform; staff record
+    /// its date and reference as a "Refunded" audit entry on the invoice, linked to the "PaidNotApplied" entry of the payment (no schema
+    /// change). Refused when the invoice has no payment to refund or it is already marked; the date lies between the payment (Amman date) and
+    /// today. One marking at a time platform-wide, so a payment is never marked twice.
+    /// </summary>
+    public async Task<RefundedResponse> MarkRefundedAsync(string invoiceToken, MarkRefundedRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        _ = StaffId;
+        var pid = support.Decode<SubscriptionInvoice>(invoiceToken) ?? throw Fail.NotFound();
+        var invoice = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false)
+            ?? throw Fail.NotFound();
+        await using var held = await locks.TryAcquireAsync("platform-refunds", ct).ConfigureAwait(false) ?? throw Fail.Conflict(ErrorCodes.RefundBusy);
+        var payment = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
+            .Where(a => a.Action == PaidNotApplied && a.EntityType == InvoiceEntity && a.EntityId == invoice.Id).OrderBy(a => a.Id).Select(a => (long?)a.Id)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.RefundNotDue, invoice.Number);
+        if (await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters().AnyAsync(a => a.Action == Refunded && a.EntityType == InvoiceEntity && a.EntityId == invoice.Id, ct)
+                .ConfigureAwait(false))
+            throw Fail.Rule(ErrorCodes.RefundAlreadyMarked, invoice.Number);
+        var reference = TextNormalizer.CleanText(r.Reference);
+        var paidOn = invoice.PaidAt is DateTime paid ? AmmanDate(paid) : (DateOnly?)null;
+        var today = AmmanDate(Now);
+        var errors = new List<FieldError>();
+        if (r.RefundedOn is not DateOnly on || on > today || (paidOn is DateOnly first && on < first))
+            errors.Add(new FieldError("refundedOn", ErrorCodes.RefundDate, [paidOn?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "—"]));
+        if (string.IsNullOrEmpty(reference) || reference.Length > 100) errors.Add(new FieldError("reference", ErrorCodes.RefundReference, [100]));
+        if (errors.Count > 0) throw Fail.Fields(errors);
+        audit.Record(InvoiceEntity, invoice.Id, Refunded, tenantId: invoice.TenantId, values: new Dictionary<string, object?>
+        {
+            ["refundedOn"] = r.RefundedOn!.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            ["reference"] = reference,
+            ["payment"] = payment,
+            ["gatewayReference"] = invoice.GatewayReference,
+        });
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        var (_, refunded) = await RefundStateAsync(invoice.TenantId, ct).ConfigureAwait(false);
+        return refunded.First(x => x.Payment.Number == invoice.Number);
+    }
+
+    private const string InvoiceEntity = "CORE.SubscriptionInvoice";
+    private const string PaidNotApplied = "PaidNotApplied";
+    private const string Refunded = "Refunded";
+
+    private static DateOnly AmmanDate(DateTime utc)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Amman");
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone));
     }
 
     /// <summary>
     /// Payments received but not applied (DT-184): every subscription invoice with a "PaidNotApplied" audit entry — the only record of such a
-    /// payment, written by the billing code for a credited checkout, a replaced checkout or a payment that could not be applied. Read-only:
-    /// a refund is made outside the platform, so an entry stays listed (no schema change, owner 14 Oct 2026).
+    /// payment, written by the billing code for a credited checkout, a replaced checkout or a payment that could not be applied. One with a
+    /// "Refunded" entry (DT-185) is listed as refunded with its date, reference and who marked it; the others are due.
     /// </summary>
-    private async Task<IReadOnlyList<RefundDueResponse>> RefundsDueAsync(long? tenantId, CancellationToken ct)
+    private async Task<(IReadOnlyList<RefundDueResponse> Due, IReadOnlyList<RefundedResponse> Refunded)> RefundStateAsync(long? tenantId, CancellationToken ct)
     {
         var entries = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
-            .Where(a => a.Action == "PaidNotApplied" && a.EntityType == "CORE.SubscriptionInvoice" && a.EntityId != null && (tenantId == null || a.TenantId == tenantId))
-            .Select(a => new { a.EntityId, a.NewValues }).ToListAsync(ct).ConfigureAwait(false);
-        if (entries.Count == 0) return [];
-        var ids = entries.Select(e => e.EntityId!.Value).Distinct().ToList();
+            .Where(a => (a.Action == PaidNotApplied || a.Action == Refunded) && a.EntityType == InvoiceEntity && a.EntityId != null && (tenantId == null || a.TenantId == tenantId))
+            .OrderBy(a => a.Id)
+            .Select(a => new { a.Action, EntityId = a.EntityId!.Value, a.NewValues, a.OccurredAt, MarkedBy = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == a.UserId).Select(u => u.FullName).FirstOrDefault() })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var ids = entries.Where(e => e.Action == PaidNotApplied).Select(e => e.EntityId).Distinct().ToList();
+        if (ids.Count == 0) return ([], []);
         var invoices = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().Where(i => ids.Contains(i.Id))
             .Join(db.Set<Tenant>().IgnoreQueryFilters(), i => i.TenantId, t => t.Id, (i, t) => new { Invoice = i, t.PublicId, t.Name }).ToListAsync(ct).ConfigureAwait(false);
         string Kind(long id)
         {
-            var reason = entries.Where(e => e.EntityId == id).Select(e => e.NewValues ?? "").FirstOrDefault() ?? "";
+            var reason = entries.First(e => e.Action == PaidNotApplied && e.EntityId == id).NewValues ?? "";
             return reason.Contains("Invoice credited", StringComparison.Ordinal) ? RefundKinds.Credited
                 : reason.Contains("Invoice replaced", StringComparison.Ordinal) ? RefundKinds.Replaced : RefundKinds.NotApplied;
         }
-        return invoices.OrderByDescending(x => x.Invoice.PaidAt).ThenByDescending(x => x.Invoice.Id)
-            .Select(x => new RefundDueResponse(support.Token<SubscriptionInvoice>(x.Invoice.PublicId), x.Invoice.Number, support.Token<Tenant>(x.PublicId), x.Name, x.Invoice.Total,
-                x.Invoice.PaidAt is DateTime p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : null, Kind(x.Invoice.Id)))
-            .ToList();
+        var due = new List<RefundDueResponse>();
+        var refunded = new List<RefundedResponse>();
+        foreach (var x in invoices.OrderByDescending(x => x.Invoice.PaidAt).ThenByDescending(x => x.Invoice.Id))
+        {
+            var row = new RefundDueResponse(support.Token<SubscriptionInvoice>(x.Invoice.PublicId), x.Invoice.Number, support.Token<Tenant>(x.PublicId), x.Name, x.Invoice.Total,
+                x.Invoice.PaidAt is DateTime p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : null, Kind(x.Invoice.Id));
+            var mark = entries.FirstOrDefault(e => e.Action == Refunded && e.EntityId == x.Invoice.Id);
+            if (mark is null)
+            {
+                due.Add(row);
+                continue;
+            }
+            using var values = System.Text.Json.JsonDocument.Parse(mark.NewValues ?? "{}");
+            string? Value(string name) => values.RootElement.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+            refunded.Add(new RefundedResponse(row, DateOnly.ParseExact(Value("refundedOn") ?? "0001-01-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                Value("reference") ?? "", mark.MarkedBy, DateTime.SpecifyKind(mark.OccurredAt, DateTimeKind.Utc)));
+        }
+        return (due, refunded.OrderByDescending(r => r.MarkedAt).ToList());
     }
 
     /// <summary>Extends a trial (days 1–90); a tenant suspended at the end of its trial returns to Trial.</summary>

@@ -46,7 +46,16 @@ public sealed record PlanSummary(string Id, string Code, string Name);
 public sealed record ConsoleTenantQuery(string? Status, string? Q, int Page = 1, int PageSize = 50);
 
 public sealed record ConsoleTenantDetails(ConsoleTenantResponse Tenant, IReadOnlyList<SubscriptionInvoiceResponse> Invoices, IReadOnlyList<SupportAccessResponse> SupportAccess,
-    IReadOnlyList<RefundDueResponse>? Refunds = null);
+    IReadOnlyList<RefundDueResponse>? Refunds = null, IReadOnlyList<RefundedResponse>? Refunded = null);
+
+/// <summary>Payments to refund and those marked refunded (DT-184, DT-185).</summary>
+public sealed record RefundsResponse(IReadOnlyList<RefundDueResponse> Due, IReadOnlyList<RefundedResponse> Refunded);
+
+/// <summary>A payment marked refunded by staff (DT-185): the refund date and reference they entered, who marked it and when.</summary>
+public sealed record RefundedResponse(RefundDueResponse Payment, DateOnly RefundedOn, string Reference, string? MarkedBy, DateTime MarkedAt);
+
+/// <summary>Marks a payment to refund as refunded outside the platform (DT-185).</summary>
+public sealed record MarkRefundedRequest(DateOnly? RefundedOn, string? Reference);
 
 /// <summary>
 /// A payment received but not applied, for staff to refund (DT-184): read from the invoice's "PaidNotApplied" audit entry — no refund is

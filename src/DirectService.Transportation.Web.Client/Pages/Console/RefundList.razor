@@ -1,0 +1,133 @@
+@*
+  Payments received but not applied (DT-184) with "Mark as refunded" (DT-185): staff refund outside the platform, then record the refund date
+  and reference; the payment leaves the list and appears under the collapsed "Refunded" section with who marked it. Used on Platform health
+  (a table) and in the tenant panel (a compact list).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+@if (Table)
+{
+    @if (Due.Count == 0)
+    {
+        <p class="pad muted" style="margin:0">@L["con.noRefunds"]</p>
+    }
+    else
+    {
+        <DataGrid TItem="RefundDueResponse" Items="Due" Key="r => r.InvoiceId" Caption="@L["con.refunds"]">
+            <Columns>
+                <GridColumn TItem="RefundDueResponse" Title="@L["ten.number"]" Value="r => r.Number" Ltr="true" />
+                <GridColumn TItem="RefundDueResponse" Title="@L["con.tenant"]">
+                    <Template><a href="@($"/console/tenants?tenant={Uri.EscapeDataString(context.TenantId)}")">@context.TenantName</a></Template>
+                </GridColumn>
+                <GridColumn TItem="RefundDueResponse" Title="@L["ten.amount"]" Value="r => Fmt.Money(r.Amount)" Numeric="true" />
+                <GridColumn TItem="RefundDueResponse" Title="@L["con.paidAt"]" Value="@(r => Date(r.PaidAt))" Ltr="true" />
+                <GridColumn TItem="RefundDueResponse" Title="@L["con.refundWhy"]" Value="@(r => L["con.refund." + r.Kind])" />
+                <GridColumn TItem="RefundDueResponse" Title="@L["profile.action"]" HideTitle="true">
+                    <Template><Btn Small="true" Icon="check" Text="@L["con.markRefunded"]" AriaLabel="@L.F("con.markRefundedOf", context.Number)" OnClick="() => Ask(context)" /></Template>
+                </GridColumn>
+            </Columns>
+        </DataGrid>
+        <p class="pad help" style="margin:0">@L["con.refundsHelp"]</p>
+    }
+}
+else if (Due.Count > 0)
+{
+    @* A replaced invoice is not a row of the panel's invoice list, so every payment to refund is listed here. *@
+    <Banner Tone="Tone.Warn" Icon="cash">
+        <strong>@L["con.refunds"]</strong>
+        <ul class="refunds">
+            @foreach (var r in Due)
+            {
+                var row = r;
+                <li>
+                    @* One element for the text: its isolated numbers must not become separate flex items of the line. *@
+                    <span><Tx Value="@Line(row)" /></span>
+                    <Btn Small="true" Ghost="true" Icon="check" Text="@L["con.markRefunded"]" AriaLabel="@L.F("con.markRefundedOf", row.Number)" OnClick="() => Ask(row)" />
+                </li>
+            }
+        </ul>
+    </Banner>
+}
+@if (Refunded.Count > 0)
+{
+    <details class="refunded @(Table ? "pad" : null)">
+        <summary>@L.F("con.refundedN", Refunded.Count)</summary>
+        <ul class="refunds">
+            @foreach (var r in Refunded)
+            {
+                <li><Tx Value="@L.F("con.refundedLine", Line(r.Payment), Fmt.Date(r.RefundedOn, Shell.DateFormat), r.Reference, r.MarkedBy ?? "—", Fmt.DateTime(r.MarkedAt.ToLocalTime(), Shell.DateFormat))" /></li>
+            }
+        </ul>
+    </details>
+}
+
+<Modal @bind-Open="_open" Title="@L.F("con.markRefundedOf", _target?.Number ?? "")" Busy="_busy">
+    <ChildContent>
+        @if (_target is { } t)
+        {
+            <p style="margin:0"><Tx Value="@L.F("con.markRefundedText", Line(t))" /></p>
+            <DateField @bind-Value="_on" Label="@L["con.refundedOn"]" Required="true" Min="@(t.PaidAt is { } p ? DateOnly.FromDateTime(p.ToLocalTime()) : null)"
+                       Max="@DateOnly.FromDateTime(DateTime.Now)" Error="@_dateError" />
+            <TextField @bind-Value="_reference" Label="@L["con.refundReference"]" Required="true" MaxLength="100" BindOnInput="true" Help="@L["con.refundReferenceHelp"]"
+                       Error="@_referenceError" />
+        }
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _open = false" />
+        <Btn Primary="true" Text="@L["con.markRefunded"]" Busy="_busy" Disabled="@(_on is null || string.IsNullOrWhiteSpace(_reference))" OnClick="Mark" />
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<RefundDueResponse> Due { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<RefundedResponse> Refunded { get; set; } = [];
+    /// <summary>Platform health: a table with the tenant; the tenant panel: a compact list.</summary>
+    [Parameter] public bool Table { get; set; }
+    /// <summary>Called after a payment was marked, to load the lists again.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private RefundDueResponse? _target;
+    private DateOnly? _on;
+    private string? _reference, _error, _dateError, _referenceError;
+    private bool _open, _busy;
+
+    private string Date(DateTime? d) => d is { } v ? Fmt.Date(v.ToLocalTime(), Shell.DateFormat) : "—";
+
+    /// <summary>"SUB-000002 · 232.000 · paid 14/10/2026 · invoice cancelled by a credit".</summary>
+    private string Line(RefundDueResponse r) => L.F("con.refundLine", r.Number, Fmt.Money(r.Amount), Date(r.PaidAt), L["con.refund." + r.Kind]);
+
+    private void Ask(RefundDueResponse r)
+    {
+        _target = r;
+        _on = DateOnly.FromDateTime(DateTime.Now);
+        _reference = null;
+        _error = _dateError = _referenceError = null;
+        _open = true;
+    }
+
+    private async Task Mark()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = _dateError = _referenceError = null;
+        try
+        {
+            await Api.PostAsync<RefundedResponse>($"api/v1/platform/refunds/{Uri.EscapeDataString(_target.InvoiceId)}/refunded", new MarkRefundedRequest(_on, _reference?.Trim()));
+            _open = false;
+            Toasts.Success(L.F("con.markedRefunded", _target.Number));
+            await OnChanged.InvokeAsync();
+        }
+        catch (ApiException e)
+        {
+            // Field problems on their fields; anything else (already marked, busy) as one message.
+            _dateError = e.Problem.Errors?.FirstOrDefault(x => x.Field == "refundedOn")?.Message;
+            _referenceError = e.Problem.Errors?.FirstOrDefault(x => x.Field == "reference")?.Message;
+            _error = _dateError is null && _referenceError is null ? e.Problem.Detail ?? L["ui.loadFailed"] : null;
+        }
+        finally { _busy = false; }
+    }
+}

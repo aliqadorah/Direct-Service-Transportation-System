@@ -335,7 +335,9 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.DoesNotContain(L["con.refundDue"], Row("SUB-000005"));   // credited without a payment: nothing to refund
         var banner = Text(cut);
         Assert.Contains(L["con.refunds"], banner);
-        Assert.Contains(Tenants.RefundLine(L, LatePayment, Shell.DateFormat), banner);
+        Assert.Contains(L.F("con.refundLine", "SUB-000002", "232.000", Web.Client.Ui.Fmt.Date(LatePayment.PaidAt!.Value.ToLocalTime(), Shell.DateFormat), L["con.refund.credited"]), banner);
+        Assert.Equal(2, cut.FindAll(".panel-side .banner button").Count(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)));
+        Assert.Empty(cut.FindAll(".panel-side details.refunded"));        // nothing refunded yet
         Assert.Contains(L["con.refund.replaced"], banner);                // the replaced invoice is not a row, but it is listed
     }
 
@@ -343,7 +345,7 @@ public sealed class PlatformPageTests : PageTestBase
     public void Console_health_lists_payments_to_refund_with_a_link_to_the_tenant()
     {
         Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
-        Respond("/platform/refunds", new[] { LatePayment });
+        Respond("/platform/refunds", new RefundsResponse([LatePayment], []));
         var cut = Render<Health>();
         cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
         Assert.Contains(L["con.refund.credited"], Text(cut));
@@ -364,9 +366,74 @@ public sealed class PlatformPageTests : PageTestBase
     public void Console_health_without_payments_to_refund_says_so()
     {
         Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
-        Respond("/platform/refunds", Array.Empty<RefundDueResponse>());
+        Respond("/platform/refunds", new RefundsResponse([], []));
         var cut = Render<Health>();
         cut.WaitForAssertion(() => Assert.Contains(L["con.noRefunds"], cut.Markup));
+    }
+
+    private static readonly RefundedResponse Marked = new(LatePayment, new DateOnly(2026, 10, 14), "TRX-778", "E2E Support", new DateTime(2026, 10, 14, 10, 0, 0, DateTimeKind.Utc));
+
+    /// <summary>Owner request 14 Oct 2026 (DT-185): "Mark as refunded" asks the date and reference; the payment then moves to the collapsed "Refunded".</summary>
+    [Fact]
+    public void Console_health_marks_a_payment_refunded_and_shows_it_under_refunded()
+    {
+        Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
+        var marked = false;
+        Respond("/platform/refunds/si2/refunded", _ => { marked = true; return Marked; });
+        Respond("/platform/refunds", _ => marked ? new RefundsResponse([], [Marked]) : new RefundsResponse([LatePayment], []));
+        var cut = Render<Health>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+
+        cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click();
+        cut.WaitForAssertion(() => Assert.Contains(L["con.refundReference"], cut.Markup));
+        var confirm = cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal));
+        Assert.True(confirm.HasAttribute("disabled"));                          // the date is filled in (today); the reference is not
+        cut.Find(".dialog input[maxlength='100']").Input("TRX-778");
+        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => Assert.Contains(L.F("con.refundedN", 1), cut.Markup));
+        var body = Requests.Single(r => r.Path == "/platform/refunds/si2/refunded").Body!;
+        Assert.Contains("\"reference\":\"TRX-778\"", body, StringComparison.Ordinal);
+        Assert.Contains($"\"refundedOn\":\"{DateTime.Now:yyyy-MM-dd}\"", body, StringComparison.Ordinal);
+        Assert.Contains(L["con.noRefunds"], cut.Markup);                     // left the list
+        var refunded = cut.Find("details.refunded");
+        Assert.False(refunded.HasAttribute("open"));                           // collapsed
+        Assert.Contains("TRX-778", refunded.TextContent);
+        Assert.Contains("E2E Support", refunded.TextContent);
+    }
+
+    [Fact]
+    public void Mark_refunded_shows_a_refused_date_on_its_field()
+    {
+        Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
+        Respond("/platform/refunds", new RefundsResponse([LatePayment], []));
+        Respond("/platform/refunds/si2/refunded", _ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("{\"status\":400,\"code\":\"validation.failed\",\"detail\":\"Please correct the highlighted fields.\",\"errors\":[{\"field\":\"refundedOn\",\"code\":\"refund.date\",\"message\":\"Enter the refund date, between the payment date (2026-10-14) and today.\"}]}",
+                Encoding.UTF8, "application/problem+json"),
+        });
+        var cut = Render<Health>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+        cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click();
+        cut.WaitForAssertion(() => Assert.Contains(L["con.refundReference"], cut.Markup));
+        cut.Find(".dialog input[maxlength='100']").Input("TRX-1");
+        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains("between the payment date", Text(cut)));
+        Assert.Contains(cut.FindAll(".dialog [aria-invalid=true]"), e => e.TagName == "INPUT");
+    }
+
+    [Fact]
+    public void Console_panel_shows_refunded_payments_collapsed()
+    {
+        var t = new ConsoleTenantResponse("t1", "نقليات الجنوب", "Trial", new PlanSummary("pl0", "TRIAL", "Trial"), "Monthly", Usage, DateTime.UtcNow.AddDays(-10),
+            DateTime.UtcNow.AddDays(4), null, null, null, null, "owner@example.test", "A");
+        Respond("/platform/tenants/t1", new ConsoleTenantDetails(t, [], [], [], [Marked]));
+        Respond("/platform/tenants", new PagedResult<ConsoleTenantResponse>([t], 1, 50, 1));
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/console/tenants?tenant=t1");
+        var cut = Render<Tenants>();
+        cut.WaitForAssertion(() => Assert.Contains(L.F("con.refundedN", 1), cut.Markup));
+        Assert.Empty(cut.FindAll(".panel-side .banner.warn"));                // nothing left to refund
+        Assert.Contains("TRX-778", cut.Find(".panel-side details.refunded").TextContent);
     }
 
     /// <summary>Owner feedback 13 Oct 2026, item 8b: the staff screen offers per state only the allowed actions, and invites by name and e-mail.</summary>
