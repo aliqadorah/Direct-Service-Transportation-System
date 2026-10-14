@@ -16,9 +16,35 @@
     <ChildContent>
         @if (_h is { } h)
         {
-            <Figures Items="@([new Figure(L["con.tripsMonth"], Fmt.Count(h.TripsThisMonth)), new Figure(L["con.pendingPostings"], Fmt.Count(h.PendingPostings)),
+            <Figures Items="@([new Figure(L["con.refunds"], _refundsFailed ? "—" : Fmt.Count(_refunds.Count)), new Figure(L["con.tripsMonth"], Fmt.Count(h.TripsThisMonth)), new Figure(L["con.pendingPostings"], Fmt.Count(h.PendingPostings)),
                 new Figure(L["con.einvoicesWaiting"], Fmt.Count(h.EInvoicesWaiting)), new Figure(L["con.users"], Fmt.Count(h.Users)),
                 new Figure(L["ten.companies"], Fmt.Count(h.Companies))])" />
+            @* Payments received but not applied, for staff to refund outside the platform (DT-184): each opens its tenant's panel. *@
+            <Box Title="@L["con.refunds"]" NoPad="true" Style="flex:none">
+                @if (_refundsFailed)
+                {
+                    <p class="pad muted" style="margin:0">@L["ui.loadFailed"]</p>
+                }
+                else if (_refunds.Count == 0)
+                {
+                    <p class="pad muted" style="margin:0">@L["con.noRefunds"]</p>
+                }
+                else
+                {
+                    <DataGrid TItem="RefundDueResponse" Items="_refunds" Key="r => r.InvoiceId" Caption="@L["con.refunds"]">
+                        <Columns>
+                            <GridColumn TItem="RefundDueResponse" Title="@L["ten.number"]" Value="r => r.Number" Ltr="true" />
+                            <GridColumn TItem="RefundDueResponse" Title="@L["con.tenant"]">
+                                <Template><a href="@($"/console/tenants?tenant={Uri.EscapeDataString(context.TenantId)}")">@context.TenantName</a></Template>
+                            </GridColumn>
+                            <GridColumn TItem="RefundDueResponse" Title="@L["ten.amount"]" Value="r => Fmt.Money(r.Amount)" Numeric="true" />
+                            <GridColumn TItem="RefundDueResponse" Title="@L["con.paidAt"]" Value="@(r => r.PaidAt is { } p ? Fmt.Date(p.ToLocalTime(), Shell.DateFormat) : "—")" Ltr="true" />
+                            <GridColumn TItem="RefundDueResponse" Title="@L["con.refundWhy"]" Value="@(r => L["con.refund." + r.Kind])" />
+                        </Columns>
+                    </DataGrid>
+                    <p class="pad help" style="margin:0">@L["con.refundsHelp"]</p>
+                }
+            </Box>
             <div class="cols" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
                 <Box Title="@L["con.services"]">
                     <KeyValues Columns="1" Items="@Services(h)" />
@@ -33,6 +59,8 @@
 
 @code {
     private HealthResponse? _h;
+    private IReadOnlyList<RefundDueResponse> _refunds = [];
+    private bool _refundsFailed;
     private LoadState _state = LoadState.Loading;
     private string? _reference;
     private bool _busy;
@@ -50,10 +78,20 @@
         _busy = true;
         try
         {
-            _h = await Api.GetAsync<HealthResponse>("api/v1/platform/health");
-            _state = LoadState.Ready;
+            try
+            {
+                _h = await Api.GetAsync<HealthResponse>("api/v1/platform/health");
+                _state = LoadState.Ready;
+            }
+            catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+            // The refund list is its own request: when it fails, its box says so and the health figures stay.
+            try
+            {
+                _refunds = await Api.GetAsync<IReadOnlyList<RefundDueResponse>>("api/v1/platform/refunds");
+                _refundsFailed = false;
+            }
+            catch (ApiException) { _refundsFailed = true; }
         }
-        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
         finally { _busy = false; }
     }
 

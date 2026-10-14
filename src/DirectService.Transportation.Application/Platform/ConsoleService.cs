@@ -177,7 +177,41 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var invoices = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().Where(i => i.TenantId == t.Id && !i.IsDeleted).OrderByDescending(i => i.Id)
             .ToListAsync(ct).ConfigureAwait(false);
         var grants = await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.TenantId == t.Id && !g.IsDeleted), ct).ConfigureAwait(false);
-        return new ConsoleTenantDetails(await TenantAsync(t, ct).ConfigureAwait(false), invoices.Select(subscriptions.Invoice).ToList(), grants);
+        return new ConsoleTenantDetails(await TenantAsync(t, ct).ConfigureAwait(false), invoices.Select(subscriptions.Invoice).ToList(), grants,
+            await RefundsDueAsync(t.Id, ct).ConfigureAwait(false));
+    }
+
+    /// <summary>Payments to refund across the platform, newest first (console health page, DT-184).</summary>
+    public Task<IReadOnlyList<RefundDueResponse>> RefundsAsync(CancellationToken ct)
+    {
+        _ = StaffId;
+        return RefundsDueAsync(null, ct);
+    }
+
+    /// <summary>
+    /// Payments received but not applied (DT-184): every subscription invoice with a "PaidNotApplied" audit entry — the only record of such a
+    /// payment, written by the billing code for a credited checkout, a replaced checkout or a payment that could not be applied. Read-only:
+    /// a refund is made outside the platform, so an entry stays listed (no schema change, owner 14 Oct 2026).
+    /// </summary>
+    private async Task<IReadOnlyList<RefundDueResponse>> RefundsDueAsync(long? tenantId, CancellationToken ct)
+    {
+        var entries = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
+            .Where(a => a.Action == "PaidNotApplied" && a.EntityType == "CORE.SubscriptionInvoice" && a.EntityId != null && (tenantId == null || a.TenantId == tenantId))
+            .Select(a => new { a.EntityId, a.NewValues }).ToListAsync(ct).ConfigureAwait(false);
+        if (entries.Count == 0) return [];
+        var ids = entries.Select(e => e.EntityId!.Value).Distinct().ToList();
+        var invoices = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().Where(i => ids.Contains(i.Id))
+            .Join(db.Set<Tenant>().IgnoreQueryFilters(), i => i.TenantId, t => t.Id, (i, t) => new { Invoice = i, t.PublicId, t.Name }).ToListAsync(ct).ConfigureAwait(false);
+        string Kind(long id)
+        {
+            var reason = entries.Where(e => e.EntityId == id).Select(e => e.NewValues ?? "").FirstOrDefault() ?? "";
+            return reason.Contains("Invoice credited", StringComparison.Ordinal) ? RefundKinds.Credited
+                : reason.Contains("Invoice replaced", StringComparison.Ordinal) ? RefundKinds.Replaced : RefundKinds.NotApplied;
+        }
+        return invoices.OrderByDescending(x => x.Invoice.PaidAt).ThenByDescending(x => x.Invoice.Id)
+            .Select(x => new RefundDueResponse(support.Token<SubscriptionInvoice>(x.Invoice.PublicId), x.Invoice.Number, support.Token<Tenant>(x.PublicId), x.Name, x.Invoice.Total,
+                x.Invoice.PaidAt is DateTime p ? DateTime.SpecifyKind(p, DateTimeKind.Utc) : null, Kind(x.Invoice.Id)))
+            .ToList();
     }
 
     /// <summary>Extends a trial (days 1–90); a tenant suspended at the end of its trial returns to Trial.</summary>

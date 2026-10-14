@@ -269,6 +269,7 @@ table.grid tr.flt .input { border-color: var(--border-control); }
 .banner .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); flex: none; }
 /* An earlier result kept on screen after a refused run: dimmed and not interactive, under a "not up to date" banner. */
 .stale { opacity: .4; filter: grayscale(1); }
+.banner ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; }
 .banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
 .banner.err { background: var(--err-bg); color: var(--err); border: 1px solid var(--err-line); }
 .banner.info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-line); }

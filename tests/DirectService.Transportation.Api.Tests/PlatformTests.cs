@@ -221,6 +221,13 @@ public sealed class PlatformTests(ApiFactory f)
         Assert.Equal(("Credited", true), (stored.Status, stored.PaidAt is not null));
         Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.Action == "PaidNotApplied" && a.EntityId == stored.Id)));
         Assert.Equal(before.CurrentPeriodEnd, (await TenantOfAsync(owner)).CurrentPeriodEnd);
+
+        // Staff see it as a payment to refund (DT-184): on the platform list and in the tenant's panel, once; tenants cannot read the list.
+        var refund = Assert.Single(await ReadAsync<List<RefundDueResponse>>(await staff.Client.GetAsync("/api/v1/platform/refunds")), x => x.TenantId == tenant);
+        Assert.Equal((checkout.Invoice.Id, checkout.Invoice.Number, 232.000m, RefundKinds.Credited, true), (refund.InvoiceId, refund.Number, refund.Amount, refund.Kind, refund.PaidAt is not null));
+        var details = await ReadAsync<ConsoleTenantDetails>(await staff.Client.GetAsync($"/api/v1/platform/tenants/{tenant}"));
+        Assert.Equal(checkout.Invoice.Id, Assert.Single(details.Refunds!).InvoiceId);
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/refunds")).StatusCode);
     }
 
     [Fact]
@@ -255,6 +262,9 @@ public sealed class PlatformTests(ApiFactory f)
         checkout = await ReadAsync<CheckoutResponse>(await owner.Client.PostAsJsonAsync("/api/v1/tenant/subscription/checkout", new CheckoutRequest(basic.Id)));
         await (await WebhookAsync(stale.Invoice, "succeeded", basic.Code)).EnsureOkAsync();
         Assert.Equal("Trial", (await ReadAsync<SubscriptionResponse>(await owner.Client.GetAsync("/api/v1/tenant/subscription"))).Status);
+        // …but staff see that payment to refund, although the replaced invoice is no longer listed (DT-184).
+        Assert.Contains(await ReadAsync<List<RefundDueResponse>>(await staff.Client.GetAsync("/api/v1/platform/refunds")),
+            x => x.Number == stale.Invoice.Number && x.Kind == RefundKinds.Replaced && x.Amount == stale.Invoice.Total);
         // A payment of another amount is not applied; the invoice is Failed and can still be paid in full (review F3).
         await (await WebhookAsync(checkout.Invoice, "succeeded", basic.Code, amount: 1.000m)).EnsureOkAsync();
         Assert.Equal("Failed", Assert.Single(await ReadAsync<List<SubscriptionInvoiceResponse>>(await owner.Client.GetAsync("/api/v1/tenant/subscription/invoices"))).Status);

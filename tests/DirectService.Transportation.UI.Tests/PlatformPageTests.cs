@@ -313,6 +313,62 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.DoesNotContain(Requests, r => r.Path == "/platform/tenants/t1/credit");
     }
 
+    private static readonly RefundDueResponse LatePayment = new("si2", "SUB-000002", "t1", "نقليات الجنوب", 232m, new DateTime(2026, 10, 14, 9, 0, 0, DateTimeKind.Utc), RefundKinds.Credited);
+
+    /// <summary>Owner request 14 Oct 2026 (DT-184): a late payment of a credited checkout is marked on its row, listed in the panel with a replaced one.</summary>
+    [Fact]
+    public void Console_panel_marks_payments_to_refund()
+    {
+        var t = new ConsoleTenantResponse("t1", "نقليات الجنوب", "Trial", new PlanSummary("pl0", "TRIAL", "Trial"), "Monthly", Usage, DateTime.UtcNow.AddDays(-10),
+            DateTime.UtcNow.AddDays(4), null, null, null, null, "owner@example.test", "A");
+        var credited = new SubscriptionInvoiceResponse("si2", "SUB-000002", new(2026, 10, 13), new(2026, 11, 12), 200m, 32m, 232m, "Credited", DateTime.UtcNow, "chk_0186", DateTime.UtcNow);
+        var other = new SubscriptionInvoiceResponse("si5", "SUB-000005", new(2026, 10, 13), new(2026, 11, 12), 200m, 32m, 232m, "Credited", null, "chk_5", DateTime.UtcNow);
+        Respond("/platform/tenants/t1", new ConsoleTenantDetails(t, [credited, other], [],
+            [LatePayment, LatePayment with { InvoiceId = "si1", Number = "SUB-000001", Kind = RefundKinds.Replaced }]));
+        Respond("/platform/tenants", new PagedResult<ConsoleTenantResponse>([t], 1, 50, 1));
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/console/tenants?tenant=t1");
+        var cut = Render<Tenants>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+
+        string Row(string number) => cut.FindAll(".panel-side tbody tr").Single(r => r.TextContent.Contains(number, StringComparison.Ordinal)).TextContent;
+        Assert.Contains(L["con.refundDue"], Row("SUB-000002"));
+        Assert.DoesNotContain(L["con.refundDue"], Row("SUB-000005"));   // credited without a payment: nothing to refund
+        var banner = Text(cut);
+        Assert.Contains(L["con.refunds"], banner);
+        Assert.Contains(Tenants.RefundLine(L, LatePayment, Shell.DateFormat), banner);
+        Assert.Contains(L["con.refund.replaced"], banner);                // the replaced invoice is not a row, but it is listed
+    }
+
+    [Fact]
+    public void Console_health_lists_payments_to_refund_with_a_link_to_the_tenant()
+    {
+        Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
+        Respond("/platform/refunds", new[] { LatePayment });
+        var cut = Render<Health>();
+        cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
+        Assert.Contains(L["con.refund.credited"], Text(cut));
+        Assert.Equal("/console/tenants?tenant=t1", cut.Find("table a").GetAttribute("href"));
+        Assert.Contains(L["con.refundsHelp"], Text(cut));
+    }
+
+    [Fact]
+    public void Console_health_keeps_its_figures_when_the_refund_list_fails()
+    {
+        Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
+        var cut = Render<Health>();   // /platform/refunds answers 404
+        cut.WaitForAssertion(() => Assert.Contains(L["con.services"], cut.Markup));
+        Assert.Contains(L["ui.loadFailed"], Text(cut));
+    }
+
+    [Fact]
+    public void Console_health_without_payments_to_refund_says_so()
+    {
+        Respond("/platform/health", new HealthResponse(true, new Dictionary<string, int> { ["Trial"] = 3 }, 5, 3, 9, 0, 0, 300, TimeSpan.FromHours(2), DateTime.UtcNow));
+        Respond("/platform/refunds", Array.Empty<RefundDueResponse>());
+        var cut = Render<Health>();
+        cut.WaitForAssertion(() => Assert.Contains(L["con.noRefunds"], cut.Markup));
+    }
+
     /// <summary>Owner feedback 13 Oct 2026, item 8b: the staff screen offers per state only the allowed actions, and invites by name and e-mail.</summary>
     [Fact]
     public void Console_staff_lists_states_with_their_actions_and_invites()

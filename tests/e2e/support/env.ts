@@ -10,6 +10,9 @@ export const MAIL_DIR = path.join(ROOT, ".local", "e2e", "mail");
 export const STATE_FILE = path.join(ROOT, ".local", "e2e", "state.json");
 export const WEB_PROJECT = path.join(ROOT, "src", "DirectService.Transportation.Web");
 
+/** Signing key of the development payment gateway's notifications on the E2E host (test value, local only). */
+export const WEBHOOK_SECRET = "e2e-webhook-secret";
+
 /** Test password for every E2E account (local test database only). */
 export const PASSWORD = "E2e-Passw0rd!";
 
@@ -25,5 +28,6 @@ export function hostEnv(): NodeJS.ProcessEnv {
     RateLimits__AuthPerMinutePerIp: "1000",
     RateLimits__ApiPerMinutePerUser: "5000",
     EInvoicing__AllowSimulator: "true",   // the national e-invoicing simulator (never in Production)
+    Billing__WebhookSecret: WEBHOOK_SECRET,   // the development payment gateway's notifications (test value)
   };
 }

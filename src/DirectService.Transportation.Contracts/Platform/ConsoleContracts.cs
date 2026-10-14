@@ -45,7 +45,24 @@ public sealed record PlanSummary(string Id, string Code, string Name);
 
 public sealed record ConsoleTenantQuery(string? Status, string? Q, int Page = 1, int PageSize = 50);
 
-public sealed record ConsoleTenantDetails(ConsoleTenantResponse Tenant, IReadOnlyList<SubscriptionInvoiceResponse> Invoices, IReadOnlyList<SupportAccessResponse> SupportAccess);
+public sealed record ConsoleTenantDetails(ConsoleTenantResponse Tenant, IReadOnlyList<SubscriptionInvoiceResponse> Invoices, IReadOnlyList<SupportAccessResponse> SupportAccess,
+    IReadOnlyList<RefundDueResponse>? Refunds = null);
+
+/// <summary>
+/// A payment received but not applied, for staff to refund (DT-184): read from the invoice's "PaidNotApplied" audit entry — no refund is
+/// processed or recorded here. Kind: <see cref="RefundKinds"/>. The invoice may be hidden from lists (a replaced checkout).
+/// </summary>
+public sealed record RefundDueResponse(string InvoiceId, string Number, string TenantId, string TenantName, decimal Amount, DateTime? PaidAt, string Kind);
+
+public static class RefundKinds
+{
+    /// <summary>A checkout staff cancelled by a full credit (DT-183), paid later from its old payment page.</summary>
+    public const string Credited = "credited";
+    /// <summary>A checkout replaced by a newer one, paid later from its old payment page.</summary>
+    public const string Replaced = "replaced";
+    /// <summary>Paid but not applied for another reason (tenant cancelled or deleted, stale upgrade, suspended by staff).</summary>
+    public const string NotApplied = "notApplied";
+}
 
 /// <summary>Account actions (P-12): extend a trial by days, apply a credit to an invoice (D-11), suspend or reactivate with a reason.</summary>
 public sealed record ExtendTrialRequest(int? Days, string? Reason);

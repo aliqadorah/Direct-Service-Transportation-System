@@ -3,7 +3,8 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { api, c } from "../support/api";
 import { companyOf, signUp, submitForm, useLanguage, waitForApp, type Account, type Lang } from "../support/auth";
-import { BASE_URL, ROOT } from "../support/env";
+import { createHmac } from "node:crypto";
+import { BASE_URL, ROOT, WEBHOOK_SECRET } from "../support/env";
 import { totp } from "../support/totp";
 import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
@@ -151,6 +152,18 @@ async function planChosen(page: Page, lang: Lang): Promise<void> {
     const plan = await api<{ id: string }>(staff, "POST", "/api/v1/platform/plans", {
       code: `V${lang.toUpperCase()}${Date.now() % 100000}`, nameAr: "الخطة المهنية", nameEn: "Professional", price: 232, billingCycle: "Monthly",
       maxCompanies: 5, maxActiveUsers: 25, maxTripsPerMonth: 20000, maxStorageMb: 10240, isActive: true, rowVersion: null });
+    // A first checkout cancelled by staff and then paid from its old page: a payment to refund (DT-183, DT-184)…
+    type Checkout = { invoice: { id: string; number: string; total: number; gatewayReference: string } };
+    const first = await api<Checkout>(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
+    const hit = (await api<{ hits: { type: string; id: string }[] }>(staff, "GET", `/api/v1/platform/search?q=${first.invoice.number}`)).hits.find((h) => h.type === "subscriptionInvoice")!;
+    await api(staff, "POST", `/api/v1/platform/tenants/${hit.id}/invoices/${first.invoice.id}/cancel`, { reason: "Visual check" });
+    const body = JSON.stringify({ reference: first.invoice.gatewayReference, status: "succeeded", metadata: {}, amount: first.invoice.total, currency: "JOD" });
+    const gateway = await page.context().browser()!.newContext({ baseURL: BASE_URL, ignoreHTTPSErrors: true });   // as the gateway: no session
+    const paid = await gateway.request.post("/api/v1/billing/webhook", { data: body, headers: { "Content-Type": "application/json",
+      "X-Signature": createHmac("sha256", WEBHOOK_SECRET).update(body).digest("hex").toUpperCase() } });
+    await gateway.close();
+    if (!paid.ok()) throw new Error(`webhook → ${paid.status()}`);
+    // …and the current checkout, awaiting payment.
     await api(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
   } finally {
     await staff.close();
