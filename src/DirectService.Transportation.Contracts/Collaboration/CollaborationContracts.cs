@@ -16,14 +16,21 @@ public sealed record NotificationPage(IReadOnlyList<NotificationResponse> Items,
 
 // ------------------------------------------------------------------ audit log (FR-188, FR-189)
 
-public sealed record AuditLogQuery(string? User, string? Action, string? EntityType, DateOnly? From, DateOnly? To, string? Q, int Page = 1, int PageSize = 50);
+/// <param name="Technical">Adds the stored values as they are (administrators with settings.manage only, DT-188).</param>
+public sealed record AuditLogQuery(string? User, string? Action, string? EntityType, DateOnly? From, DateOnly? To, string? Q, int Page = 1, int PageSize = 50,
+    bool Technical = false);
 
 /// <summary>A field change old → new.</summary>
 public sealed record AuditChange(string Field, string? Old, string? New);
 
-/// <summary>An audit row: time, user, action, record type and reference, reason, changes, IP address.</summary>
+/// <summary>
+/// An audit row: time, user, action, record type and reference, reason, changes, IP address. Readable (DT-188): the action and record type
+/// in words, the event as a sentence, changes with labels and formatted values, a journal entry's lines and the documents it names;
+/// <paramref name="Technical"/> holds the stored values as they are, only when an administrator asks for the technical details.
+/// </summary>
 public sealed record AuditLogEntry(DateTime OccurredAt, string? User, string Action, string? EntityType, string? Record, string? Reason, IReadOnlyList<AuditChange> Changes,
-    string? IpAddress);
+    string? IpAddress, string? ActionLabel = null, string? EntityLabel = null, string? Text = null,
+    IReadOnlyList<MasterData.HistoryLine>? Lines = null, IReadOnlyList<MasterData.HistoryLink>? Links = null, IReadOnlyList<AuditChange>? Technical = null);
 
 // ------------------------------------------------------------------ background exports (FR-151)
 

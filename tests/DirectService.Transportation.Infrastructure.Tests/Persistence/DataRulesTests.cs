@@ -428,6 +428,45 @@ public sealed class DataRulesTests(DatabaseFixture db)
         }
     }
 
+    /// <summary>
+    /// DT-188: a key of a row inserted in the same save (a journal entry and its lines, an account moved under a new parent) is written
+    /// to the audit log as the real saved id, never EF's temporary negative key ("JournalEntryId: — → -9223372036854774806").
+    /// </summary>
+    [Fact]
+    public async Task Audit_records_the_saved_ids_of_rows_inserted_in_the_same_save()
+    {
+        var t = await db.CreateTenantAsync();
+        var (ctx, _) = db.ContextFor(t);
+        await using (ctx)
+        {
+            var cash = new Domain.Acc.Account { Code = "1101", NameAr = "الصندوق", AccountType = "Asset" };
+            ctx.Add(cash);
+            await ctx.SaveChangesAsync(Ct);
+
+            var parent = new Domain.Acc.Account { Code = "11", NameAr = "النقدية", AccountType = "Asset", IsPostable = false };
+            ctx.Add(parent);
+            cash.Parent = parent;   // an existing row now points at a row inserted in this save
+            var entry = new Domain.Acc.JournalEntry
+            {
+                Number = "JV-00001", EntryDate = new DateOnly(2026, 10, 14), PeriodMonth = "2026-10", Description = "Test", SourceModule = "ACC",
+                IsManual = true, TotalDebit = 5, TotalCredit = 5,
+            };
+            entry.Lines.Add(new Domain.Acc.EntryLine { LineNo = 1, Account = cash, Debit = 5 });
+            entry.Lines.Add(new Domain.Acc.EntryLine { LineNo = 2, Account = cash, Credit = 5 });
+            ctx.Add(entry);
+            await ctx.SaveChangesAsync(Ct);
+
+            var lines = await ctx.Set<AuditLog>().AsNoTracking().Where(a => a.EntityType == "ACC.EntryLine" && a.TenantId == t.TenantId).Select(a => a.NewValues!).ToListAsync(Ct);
+            Assert.Equal(2, lines.Count);
+            Assert.All(lines, json => Assert.Contains($"\"JournalEntryId\":{entry.Id},", json, StringComparison.Ordinal));
+            var moved = await ctx.Set<AuditLog>().AsNoTracking().Where(a => a.EntityType == "ACC.Account" && a.EntityId == cash.Id && a.Action == "Update")
+                .Select(a => a.NewValues!).SingleAsync(Ct);
+            Assert.Contains($"\"ParentId\":{parent.Id}", moved, StringComparison.Ordinal);
+            Assert.True(parent.Id > 0 && entry.Id > 0);
+            Assert.DoesNotContain(":-", string.Concat(lines) + moved, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task Customer_name_is_unique_among_active_customers_only()
     {

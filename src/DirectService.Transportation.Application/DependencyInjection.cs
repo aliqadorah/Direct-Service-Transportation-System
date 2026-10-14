@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<StandardFieldService>();
         services.AddScoped<ColumnViewService>();
         services.AddScoped<MasterDataSupport>();
+        services.AddScoped<Audit.AuditDescriber>();
         services.AddScoped<DriverService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<PartnerService>();

@@ -1,4 +1,7 @@
-@* History of a master record from the API (FR-166): action, user, time, reason and each field's old → new value. *@
+@*
+  History of a record from the API (FR-166), readable (owner feedback 14 Oct 2026, DT-188): newest first, each event as the API's sentence in
+  the reader's language with links to the documents it names, the reason, the labelled changes and a journal entry's lines; the time below.
+*@
 @using Md = DirectService.Transportation.Contracts.MasterData
 @inject Loc L
 @inject ShellState Shell
@@ -8,21 +11,27 @@
 }
 else
 {
-    <HistoryList Items="Entries" />
+    <ol class="hist">
+        @foreach (var h in Items)
+        {
+            <li class="@(h.Action is "Delete" or "Void" or "Archive" ? "v" : null)">
+                <div class="ev">
+                    <AuditEvent Text="@(h.Text ?? Fallback(h))" Links="h.Links" Lines="h.Lines" Reason="@h.Reason"
+                                Changes="@(h.Changes.Select(c => new AuditEvent.Change(c.Field, c.OldValue, c.NewValue)).ToList())" />
+                    <div class="w"><Tx Value="@Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat)" /></div>
+                </div>
+            </li>
+        }
+    </ol>
 }
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<Md.HistoryEntry> Items { get; set; } = [];
 
-    private IReadOnlyList<HistoryEntry> Entries => Items.SelectMany(h =>
+    /// <summary>An entry without the API's sentence (an older server): "action — user".</summary>
+    private string Fallback(Md.HistoryEntry h)
     {
-        var what = L["hist." + h.Action] is var t && t.StartsWith("hist.", StringComparison.Ordinal) ? h.Action : t;
-        if (h.Reason is not null) what += " — " + h.Reason;
-        var when = Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat);
-        var who = h.User ?? L["hist.system"];
-        var isVoid = h.Action is "Delete" or "Void" or "Archive";
-        return h.Changes.Count == 0
-            ? [new HistoryEntry(who, what, when, IsVoid: isVoid)]
-            : h.Changes.Select(c => new HistoryEntry(who, $"{what} · {c.Field}", when, c.OldValue ?? "—", c.NewValue ?? "—", isVoid));
-    }).ToList();
+        var action = h.ActionLabel ?? (L["hist." + h.Action] is var t && !t.StartsWith("hist.", StringComparison.Ordinal) ? t : h.Action);
+        return $"{action} — {h.User ?? L["hist.system"]}";
+    }
 }

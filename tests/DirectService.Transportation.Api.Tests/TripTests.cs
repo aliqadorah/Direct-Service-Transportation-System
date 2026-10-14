@@ -235,7 +235,7 @@ public sealed class TripTests(ApiFactory f)
         Assert.Equal(entries[0].Id, entries[1].ReversesEntryId);
         Assert.Equal(111.650m, entries[2].TotalDebit);
         var history = await ReadAsync<List<HistoryEntry>>(await o.Client.GetAsync(U(o, $"/trips/{t.Id}/history")));
-        Assert.Contains(history.First(h => h.Action == "Update").Changes, c => c.Field == "unloadedWeight" && c.OldValue == "31.850" && c.NewValue == "31.900");
+        Assert.Contains(history.First(h => h.Action == "Update").Changes, c => c.Field == "Unloaded weight (t)" && c.OldValue == "31.850" && c.NewValue == "31.900");
 
         // Changes need the row version last seen (DT-73): missing → 400, stale → 409.
         Assert.Equal(HttpStatusCode.BadRequest, (await o.Client.PutAsJsonAsync(U(o, $"/trips/{t.Id}"), Trip(w, "TRP-40001", unloaded: 31.950m))).StatusCode);

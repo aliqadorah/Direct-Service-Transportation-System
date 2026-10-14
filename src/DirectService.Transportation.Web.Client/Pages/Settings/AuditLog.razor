@@ -13,7 +13,13 @@
 <PageHeader Title="@L["nav.audit"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.audit"])])" />
 <ListShell Label="@L["nav.audit"]" Search="@_q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="history" EmptyTitle="@L["aud.none"]" Filtered="Filtered" OnClear="ClearAll" Page="_page" PageSize="50" Total="_result?.TotalCount" OnPage="Go">
-    <Tools><Btn Small="true" Icon="clock" Text="@L["rep.background"]" OnClick="Background" /></Tools>
+    <Tools>
+        @if (Shell.Can(PermissionKeys.SettingsManage))
+        {
+            <Btn Small="true" Ghost="@(!_technical)" Icon="eye" Text="@L["aud.technical"]" Pressed="@(_technical ? "true" : "false")" OnClick="ToggleTechnical" />
+        }
+        <Btn Small="true" Icon="clock" Text="@L["rep.background"]" OnClick="Background" />
+    </Tools>
     <Filters>
         <SelectField TValue="string?" @bind-Value="_action" Options="Actions" Empty="@L["tar.all"]" Label="@L["aud.action"]" FieldClass="w200" />
         <SelectField TValue="string?" @bind-Value="_type" Options="Types" Empty="@L["tar.all"]" Label="@L["aud.type"]" FieldClass="w200" />
@@ -28,17 +34,28 @@
             <Columns>
                 <GridColumn TItem="AuditLogEntry" Title="@L["aud.time"]" Value="a => Fmt.DateTime(a.OccurredAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                 <GridColumn TItem="AuditLogEntry" Title="@L["mnt.user"]" Value="@(a => a.User ?? L["hist.system"])" />
-                <GridColumn TItem="AuditLogEntry" Title="@L["aud.action"]" Value="a => ActionName(a.Action)" />
-                <GridColumn TItem="AuditLogEntry" Title="@L["aud.type"]" Value="a => a.EntityType" Ltr="true" />
-                <GridColumn TItem="AuditLogEntry" Title="@L["aud.record"]" Value="a => a.Record" Ltr="true" />
-                <GridColumn TItem="AuditLogEntry" Title="@L["ui.reason"]" Value="a => a.Reason" Clip="true" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.action"]" Value="a => a.ActionLabel ?? ActionName(a.Action)" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.type"]" Value="a => a.EntityLabel ?? a.EntityType" />
+                <GridColumn TItem="AuditLogEntry" Title="@L["aud.record"]" Value="a => a.Record" />
                 <GridColumn TItem="AuditLogEntry" Title="@L["aud.changes"]" Wrap="true">
                     <Template>
-                        @foreach (var c in context.Changes.Take(6)) {<div><Tx Value="@($"{c.Field}: {c.Old ?? "—"} → {c.New ?? "—"}")" /></div>}
-                        @if (context.Changes.Count > 6) {<div class="muted">@L.F("aud.more", context.Changes.Count - 6)</div>}
+                        <div class="ev">
+                            <AuditEvent Text="@(context.Text ?? ActionName(context.Action))" Links="context.Links" Lines="context.Lines" Max="6"
+                                        Changes="@(context.Changes.Select(c => new AuditEvent.Change(c.Field, c.Old, c.New)).ToList())" />
+                        </div>
                     </Template>
                 </GridColumn>
+                <GridColumn TItem="AuditLogEntry" Title="@L["ui.reason"]" Value="a => a.Reason" Clip="true" />
                 <GridColumn TItem="AuditLogEntry" Title="IP" Value="a => a.IpAddress" Ltr="true" />
+                @if (_technical)
+                {
+                    <GridColumn TItem="AuditLogEntry" Title="@L["aud.technical"]" Wrap="true">
+                        <Template>
+                            <div class="tech">@context.Action · @context.EntityType</div>
+                            @foreach (var c in context.Technical ?? []) {<div class="tech">@c.Field: @(c.Old ?? "null") → @(c.New ?? "null")</div>}
+                        </Template>
+                    </GridColumn>
+                }
             </Columns>
         </DataGrid>
     </ChildContent>
@@ -59,8 +76,16 @@
     private sealed record Filter(string? Action, string? Type, string? User, DateOnly? From, DateOnly? To);
 
     private bool Filtered => _q is not null || _applied != new Filter(null, null, null, null, null);
-    private IReadOnlyList<Option<string?>> Actions => (_facets?.Actions ?? []).Select(a => new Option<string?>(a, ActionName(a))).ToList();
-    private IReadOnlyList<Option<string?>> Types => (_facets?.EntityTypes ?? []).Select(t => new Option<string?>(t, t)).ToList();
+    private IReadOnlyList<Option<string?>> Actions => (_facets?.Actions ?? []).Select(a => new Option<string?>(a.Id, a.Name)).ToList();
+    private IReadOnlyList<Option<string?>> Types => (_facets?.EntityTypes ?? []).Select(t => new Option<string?>(t.Id, t.Name)).ToList();
+    private bool _technical;
+
+    /// <summary>The stored values beside the readable ones (DT-188): administrators with settings.manage; the API checks it too.</summary>
+    private Task ToggleTechnical()
+    {
+        _technical = !_technical;
+        return Load();
+    }
     private IReadOnlyList<Option<string?>> Users => (_facets?.Users ?? []).Select(u => new Option<string?>(u.Id, u.Name)).ToList();
 
     private string ActionName(string a) => L["hist." + a] is var t && !t.StartsWith("hist.", StringComparison.Ordinal) ? t : a;
@@ -75,6 +100,7 @@
         Add("from", _applied.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         Add("to", _applied.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         if (paged) Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (_technical) Add("technical", "true");
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
     }
 
@@ -108,14 +134,14 @@
         {
             await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new
             {
-                Kind = "audit-log", Audit = new AuditLogQuery(_applied.User, _applied.Action, _applied.Type, _applied.From, _applied.To, _q), From = _applied.From, To = _applied.To, Format = "xlsx",
+                Kind = "audit-log", Audit = new AuditLogQuery(_applied.User, _applied.Action, _applied.Type, _applied.From, _applied.To, _q, Technical: _technical), From = _applied.From, To = _applied.To, Format = "xlsx",
             });
             Toasts.Success(L["rep.backgroundQueued"]);
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }
 
-    private sealed record Facets(IReadOnlyList<string> EntityTypes, IReadOnlyList<string> Actions, IReadOnlyList<FacetUser>? Users);
+    private sealed record Facets(IReadOnlyList<FacetUser> EntityTypes, IReadOnlyList<FacetUser> Actions, IReadOnlyList<FacetUser>? Users);
 
     private sealed record FacetUser(string Id, string Name);
 }

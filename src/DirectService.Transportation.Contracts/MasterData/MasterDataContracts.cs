@@ -24,11 +24,23 @@ public sealed record ReferenceCount(string Type, string Label, int Count);
 /// <summary>What refers to a record; <see cref="CanDelete"/> is false while anything does (FR-162).</summary>
 public sealed record ReferencesResponse(bool CanDelete, IReadOnlyList<ReferenceCount> References);
 
-/// <summary>One change of a field in a history entry (old → new, FR-166).</summary>
+/// <summary>One change of a field in a history entry (old → new, FR-166): the field's label and both values in the reader's language (DT-188).</summary>
 public sealed record FieldChange(string Field, string? OldValue, string? NewValue);
 
-/// <summary>A history entry of a record: created, edited, archived, restored, deleted (FR-166).</summary>
-public sealed record HistoryEntry(DateTime At, string? User, string Action, string? Reason, IReadOnlyList<FieldChange> Changes);
+/// <summary>
+/// A history entry of a record (FR-166), readable (owner feedback 14 Oct 2026, DT-188): <paramref name="Text"/> is the event as a sentence in
+/// the reader's language ("Ali Ali added the trip to draft invoice INV-00001"), <paramref name="ActionLabel"/> the action in words, the
+/// changes with field labels and formatted values (technical columns left out), <paramref name="Lines"/> the lines of a journal entry posted
+/// with it and <paramref name="Links"/> the documents it names (the screen opens them when the reader may see them).
+/// </summary>
+public sealed record HistoryEntry(DateTime At, string? User, string Action, string? Reason, IReadOnlyList<FieldChange> Changes,
+    string? Text = null, string? ActionLabel = null, IReadOnlyList<HistoryLine>? Lines = null, IReadOnlyList<HistoryLink>? Links = null);
+
+/// <summary>A journal line shown with its entry's event: account "code · name", debit and credit formatted (empty when zero).</summary>
+public sealed record HistoryLine(string Account, string? Debit, string? Credit);
+
+/// <summary>A document named by a history event: its screen kind ("Invoice", "Settlement", "JournalEntry"…), token and number.</summary>
+public sealed record HistoryLink(string Kind, string Id, string Text);
 
 // ---------------------------------------------------------------- drivers with truck (FR-152 … FR-156)
 

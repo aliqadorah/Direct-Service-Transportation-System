@@ -33,6 +33,17 @@ public static class Links
         _ => null,
     };
 
+    /// <summary>
+    /// The screen of a record named by a history event (DT-188): a document as <see cref="ForSource"/>, a journal entry or a driver's profile;
+    /// customers and partners open in their list's panel, which has no address of its own, so they are not linked.
+    /// </summary>
+    public static string? ForRecord(string company, string kind, string id) => kind switch
+    {
+        "JournalEntry" => NavModel.Href(company, $"accounting/journal/{id}"),
+        "Driver" => NavModel.Href(company, $"masters/drivers/{id}"),
+        _ => ForSource(company, kind, id),
+    };
+
     /// <summary>The screen of a setup-checklist step (the API names the area by its API path).</summary>
     public static string ForSetupStep(string company, string link) => NavModel.Href(company, link.TrimStart('/') switch
     {

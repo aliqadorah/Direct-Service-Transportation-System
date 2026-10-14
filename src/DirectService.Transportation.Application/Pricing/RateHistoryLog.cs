@@ -64,6 +64,8 @@ public sealed class RateHistoryLog(IAppDbContext db, IRequestContext ctx, TimePr
         // Names of the users who changed this company's rates (support staff have no tenant, hence no filter).
         var users = await db.Set<User>().IgnoreQueryFilters().AsNoTracking().Where(u => userIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct).ConfigureAwait(false);
+        var en = ctx.Language == "en";
+        var entity = Audit.AuditVocabulary.Entity(sourceType == Tariff ? "TRN.Tariff" : "TRN.MonthlySiteRate");
         return rows.Select(r =>
         {
             var before = Parse(r.OldValues);
@@ -73,12 +75,43 @@ public sealed class RateHistoryLog(IAppDbContext db, IRequestContext ctx, TimePr
             var changes = new List<FieldChange>();
             foreach (var key in after.Keys.Where(k => !k.StartsWith('_')))
             {
-                var o = before.TryGetValue(key, out var ov) ? CustomFieldService.Text(ov) : null;
-                var n = CustomFieldService.Text(after[key]);
-                if (o != n) changes.Add(new FieldChange(Camel(key), o, n));
+                // A new line lists what it was created with (a tariff line has no name of its own): "—" before.
+                var o = r.OldValues is null ? "—" : Readable(key, before.TryGetValue(key, out var ov) ? ov : null, en);
+                var n = Readable(key, after[key], en);
+                if (r.OldValues is null && n == "—") continue;
+                if (o != n) changes.Add(new FieldChange(Label(key, en), o, n));
             }
-            return new RateHistoryEntry(DateTime.SpecifyKind(r.ChangedAt, DateTimeKind.Utc), users.GetValueOrDefault(r.ChangedBy), action, subject, changes);
+            // DT-188: the event as a sentence in the reader's words ("Ali Ali edited the monthly rate Ghor Al-Safi").
+            var user = users.GetValueOrDefault(r.ChangedBy);
+            var record = subject is null ? entity.Noun.In(en) : $"{entity.Noun.In(en)} {subject}";
+            var predicate = Audit.AuditVocabulary.Action(action).Sentence.In(en).Replace("{r}", record, StringComparison.Ordinal);
+            return new RateHistoryEntry(DateTime.SpecifyKind(r.ChangedAt, DateTimeKind.Utc), user, action, subject, changes, Audit.AuditVocabulary.Sentence(user, predicate, en));
         }).ToList();
+    }
+
+    /// <summary>Labels of the snapshot's keys: the tariff and monthly-rate screens' words.</summary>
+    private static string Label(string key, bool en) => key switch
+    {
+        "Party" => en ? "Party" : "الطرف",
+        "Material" => en ? "Material" : "المادة",
+        "LoadingSite" => en ? "Loading site" : "موقع التحميل",
+        "UnloadingSite" => en ? "Unloading site" : "موقع التنزيل",
+        "RateMonth" => en ? "Month" : "الشهر",
+        _ => Audit.AuditVocabulary.Field("TRN.Tariff", key)?.Label.In(en) ?? Audit.AuditVocabulary.Humanize(key),
+    };
+
+    /// <summary>A snapshot value in the reader's words: amounts with 3 decimals, dates DD/MM/YYYY, codes in words, "All" for an empty scope.</summary>
+    private static string Readable(string key, JsonElement? value, bool en)
+    {
+        var text = value is { } v ? CustomFieldService.Text(v) : null;
+        if (string.IsNullOrWhiteSpace(text))
+            return key is "Party" or "Material" or "LoadingSite" or "UnloadingSite" ? (en ? "All" : "الكل") : "—";
+        if (key is "Price" or "OwnFleetRate" or "ExternalFleetRate" && decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
+            return amount.ToString("#,##0.000", CultureInfo.InvariantCulture);
+        if (key is "ValidFrom" or "ValidTo" && DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            return day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        if (key is "Status" or "PartyType") return Audit.AuditVocabulary.Code(text, en);
+        return text;
     }
 
     private static Dictionary<string, JsonElement> Parse(string? json)
@@ -94,5 +127,4 @@ public sealed class RateHistoryLog(IAppDbContext db, IRequestContext ctx, TimePr
         }
     }
 
-    private static string Camel(string name) => name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 }

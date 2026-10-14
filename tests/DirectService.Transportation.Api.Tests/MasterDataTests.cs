@@ -162,10 +162,14 @@ public sealed class MasterDataTests(ApiFactory f)
 
         var history = await owner.Client.GetFromJsonAsync<List<HistoryEntry>>(U(owner, $"/drivers/{d.Id}/history"));
         var edit = history!.First(h => h.Action == "Update");
-        Assert.Contains(edit.Changes, c => c.Field == "plateNumber" && c.OldValue == "12-34567" && c.NewValue == "55-12345");
-        Assert.Contains(edit.Changes, c => c.Field == "ownershipTypeId" && c.OldValue == "Company" && c.NewValue == "Rented");
-        Assert.Contains(edit.Changes, c => c.Field == "partnerId" && c.OldValue == null && c.NewValue == partner.Name);
+        // Readable (DT-188): the form's labels, names for links, "—" for nothing.
+        Assert.Contains(edit.Changes, c => c.Field == "Plate number" && c.OldValue == "12-34567" && c.NewValue == "55-12345");
+        Assert.Contains(edit.Changes, c => c.Field == "Ownership type" && c.OldValue == "Company" && c.NewValue == "Rented");
+        Assert.Contains(edit.Changes, c => c.Field == "Partner company" && c.OldValue == "—" && c.NewValue == partner.Name);
+        Assert.DoesNotContain(edit.Changes, c => c.Field.EndsWith("Id", StringComparison.Ordinal) || c.Field.Contains("Fleet", StringComparison.Ordinal) && c.NewValue == "External");
         Assert.Equal("Test Owner", edit.User);
+        Assert.StartsWith("Test Owner edited driver ", edit.Text, StringComparison.Ordinal);
+        Assert.Equal("Edited", edit.ActionLabel);
         Assert.Equal("Create", history!.Last().Action);
 
         // A stale row version is refused.
@@ -376,7 +380,8 @@ public sealed class MasterDataTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.NoContent, (await owner.Client.PostAsJsonAsync(U(owner, $"/custom-fields/field/{limit.Id}/delete"), new DeleteRequest("not used"))).StatusCode);
 
         var history = await owner.Client.GetFromJsonAsync<List<HistoryEntry>>(U(owner, $"/customers/{c.Id}/history"));
-        Assert.Contains(history![0].Changes, ch => ch.Field == "custom.creditLimit" && ch.OldValue == "1000" && ch.NewValue == null);
+        // A custom field by its label — kept after the field was deleted (DT-188).
+        Assert.Contains(history![0].Changes, ch => ch.Field == "Credit limit" && ch.OldValue == "1,000" && ch.NewValue == "—");
     }
 
     [Fact]

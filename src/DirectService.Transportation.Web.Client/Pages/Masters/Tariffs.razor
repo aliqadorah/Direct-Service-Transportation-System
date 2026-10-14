@@ -85,11 +85,11 @@
         {
             <h3 style="font-size:13px;margin-top:8px">@L["ui.history"]</h3>
     @if (_history is null) {<div role="status" class="muted">@L["ui.loading"]</div>}
-    else if (_history.Count == 0) {<p class="muted">@L["hist.none"]</p>}
     else
     {
-        <HistoryList Items="@(_history.SelectMany(h => h.Changes.Count == 0 ? [new Ui.HistoryEntry(h.User ?? L["hist.system"], HistAction(h.Action), Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat))]
-            : h.Changes.Select(c => new Ui.HistoryEntry(h.User ?? L["hist.system"], $"{HistAction(h.Action)} · {c.Field}", Fmt.DateTime(h.At.ToLocalTime(), Shell.DateFormat), c.OldValue ?? "—", c.NewValue ?? "—"))).ToList())" />
+        @* Readable like every record's history (DT-188): the API's sentence and labelled changes. *@
+        <RecordHistory Items="@(_history.Select(h => new DirectService.Transportation.Contracts.MasterData.HistoryEntry(h.At, h.User, h.Action, null, h.Changes,
+            h.Text ?? $"{HistAction(h.Action)} — {h.User ?? L["hist.system"]}")).ToList())" />
     }
         }
     </ChildContent>

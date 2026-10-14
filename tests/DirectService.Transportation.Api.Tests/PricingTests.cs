@@ -161,10 +161,13 @@ public sealed class PricingTests(ApiFactory f)
         Assert.Equal(["Update", "Restore", "Archive", "Create"], history.Select(h => h.Action));
         Assert.All(history, h => Assert.Equal("Test Owner", h.User));
         var update = history[0];
-        Assert.Contains(update.Changes, c => c.Field == "price" && c.OldValue == "3.25" && c.NewValue == "3.5");
-        Assert.Contains(update.Changes, c => c.Field == "loadingSite" && c.OldValue == null && c.NewValue == "Ghor Al-Safi");
-        Assert.Contains(history[2].Changes, c => c.Field == "status" && c.OldValue == "Active" && c.NewValue == "Archived");
-        Assert.Contains(history[3].Changes, c => c.Field == "party" && c.NewValue == "Al-Noor Transport");
+        // Readable (DT-188): labels, amounts with 3 decimals, "All" for an open scope, statuses in words, the event as a sentence.
+        Assert.Contains(update.Changes, c => c.Field == "Price (per ton)" && c.OldValue == "3.250" && c.NewValue == "3.500");
+        Assert.Contains(update.Changes, c => c.Field == "Loading site" && c.OldValue == "All" && c.NewValue == "Ghor Al-Safi");
+        Assert.Contains(history[2].Changes, c => c.Field == "Status" && c.OldValue == "Active" && c.NewValue == "Archived");
+        Assert.Contains(history[3].Changes, c => c.Field == "Party" && c.OldValue == "—" && c.NewValue == "Al-Noor Transport");
+        Assert.Equal("Test Owner edited the tariff", update.Text);
+        Assert.Equal("Test Owner archived the tariff", history[2].Text);
 
         // History rows are insert-only and are not duplicated into core.AuditLogs; the tariff itself is audited.
         var (rateRows, auditOfHistory) = await f.DbAsync(async db => (
@@ -294,7 +297,8 @@ public sealed class PricingTests(ApiFactory f)
         var history = await ReadAsync<List<RateHistoryEntry>>(await o.Client.GetAsync(U(o, $"/monthly-rates/{month}/history")));
         Assert.Equal(["Clear", "Update", "Create", "Create"], history.Select(h => h.Action));
         Assert.Equal("Eshidiya", history[0].Subject);
-        Assert.Contains(history[1].Changes, c => c.Field == "ownFleetRate" && c.OldValue == "3.5" && c.NewValue == "3.75");
+        Assert.Contains(history[1].Changes, c => c.Field == "Own fleet rate" && c.OldValue == "3.500" && c.NewValue == "3.750");
+        Assert.Equal("Test Owner cleared the monthly rate Eshidiya", history[0].Text);
         Assert.Equal(2, (await ReadAsync<List<RateHistoryEntry>>(await o.Client.GetAsync(U(o, $"/monthly-rates/{month}/history?loadingSite={w.Loading.Id}")))).Count);
 
         // A cleared site can get rates again (the cleared row is soft-deleted, outside the unique index).

@@ -11,8 +11,9 @@ namespace DirectService.Transportation.UI.Tests;
 /// <summary>Settings screens (SCR-70 … SCR-77) after the independent review: an Administrator without core.tenant.manage.</summary>
 public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManage, PermissionKeys.SettingsManage, PermissionKeys.TripsView)
 {
-    private static readonly string[] EntityTypes = ["TRN.Trip"];
-    private static readonly string[] Actions = ["Create", "Update"];
+    // Filter choices with their words (DT-188).
+    private static readonly object[] EntityTypes = [new { id = "TRN.Trip", name = "رحلة" }];
+    private static readonly object[] Actions = [new { id = "Create", name = "إنشاء" }, new { id = "Update", name = "تعديل" }];
 
     [Fact]
     public void Audit_log_pages_with_the_applied_filters_only()

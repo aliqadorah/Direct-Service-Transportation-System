@@ -242,5 +242,6 @@ public static partial class UiText
         ["aud.record"] = ("السجل", "Record"),
         ["aud.changes"] = ("التغييرات", "Changes"),
         ["aud.more"] = ("و{0} تغييرات أخرى", "and {0} more changes"),
+        ["aud.technical"] = ("التفاصيل التقنية", "Technical details"),
     };
 }

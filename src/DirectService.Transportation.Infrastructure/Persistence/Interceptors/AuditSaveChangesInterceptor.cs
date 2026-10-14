@@ -363,9 +363,13 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
     {
         if (state.Pending.Count == 0) return false;
         var now = clock.GetUtcNow().UtcDateTime;
-        foreach (var (entry, action, oldValues, newValues) in state.Pending)
+        foreach (var (entry, action, oldValues, captured) in state.Pending)
         {
             var entity = entry.Entity;
+            // The values were captured before the save, when keys of rows inserted in the same save (a journal entry posted with its
+            // document, its lines) were still EF's temporary negative numbers; after the save they hold the real ids (DT-188).
+            var newValues = captured?.ToDictionary(kv => kv.Key, kv => kv.Key.StartsWith('_') || entry.Metadata.FindProperty(kv.Key) is null
+                ? kv.Value : Mask(kv.Key, entry.Property(kv.Key).CurrentValue));
             long? tenantId = entity switch
             {
                 ITenantScoped t => t.TenantId,

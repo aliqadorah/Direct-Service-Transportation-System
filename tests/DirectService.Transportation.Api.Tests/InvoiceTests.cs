@@ -106,8 +106,15 @@ public sealed class InvoiceTests(ApiFactory f)
         Assert.Contains(e.Lines, l => l.Debit == 817.800m && l.PartyType == "Customer");
         Assert.Contains(e.Lines, l => l.Credit == 112.800m);
         var history = await ReadAsync<List<HistoryEntry>>(await o.Client.GetAsync(U(o, $"/trips/{w.Trips[0].Id}/history")));
-        Assert.Contains(history, h => h.Action == "Invoiced" && h.Reason == "INV-00001");
-        Assert.Contains(history, h => h.Action == "AddedToInvoice");
+        // One readable line per event with the document as a link (DT-188); the invoice number is no longer a "reason".
+        var invoiced = Assert.Single(history, h => h.Action == "Invoiced");
+        Assert.Equal($"Test Owner invoiced the trip {w.Trips[0].ReceiptNo} on invoice INV-00001", invoiced.Text);
+        Assert.Null(invoiced.Reason);
+        Assert.Equal("Invoice", Assert.Single(invoiced.Links!).Kind);
+        Assert.Equal("INV-00001", invoiced.Links![0].Text);
+        var added = Assert.Single(history, h => h.Action == "AddedToInvoice");
+        Assert.Equal($"Test Owner added the trip {w.Trips[0].ReceiptNo} to draft invoice INV-00001", added.Text);   // a draft then, numbered since
+        Assert.Empty(added.Changes);   // the invoice is told by the sentence, not as "InvoiceId: — → 91"
 
         // A draft cannot be approved twice; an approved invoice is not edited.
         Assert.Equal("invoice.notDraft", await (await o.Client.PutAsJsonAsync(U(o, $"/invoices/{draft.Invoice.Id}"), TripInvoice(w, w.Trips.Take(4), rowVersion: approved.Invoice.RowVersion))).ProblemCodeAsync());

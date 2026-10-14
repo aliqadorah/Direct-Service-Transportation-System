@@ -49,7 +49,8 @@ public sealed record TariffListQuery(
     string? Status, string? Sort, int Page = 1, int PageSize = 50);
 
 /// <summary>One change-history entry of a tariff line or a monthly site rate (FR-026, FR-036): who, when, what, old → new.</summary>
-public sealed record RateHistoryEntry(DateTime At, string? User, string Action, string? Subject, IReadOnlyList<FieldChange> Changes);
+/// <summary>A change of a tariff line or monthly rate (FR-026, FR-036); readable (DT-188): the event as a sentence and labelled, formatted changes.</summary>
+public sealed record RateHistoryEntry(DateTime At, string? User, string Action, string? Subject, IReadOnlyList<FieldChange> Changes, string? Text = null);
 
 /// <summary>A tariff line with its history.</summary>
 public sealed record TariffDetails(TariffResponse Record, IReadOnlyList<RateHistoryEntry> History);

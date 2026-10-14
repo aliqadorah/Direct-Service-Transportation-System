@@ -1,0 +1,80 @@
+@*
+  One readable audit event (owner feedback 14 Oct 2026, DT-188), shared by every History panel and the audit log: the sentence from the API
+  with the documents it names as links (only to screens the reader may open), the reason, each change as "label: old ← new" in the page's
+  direction with every value isolated (numbers and codes never scrambled in RTL), and the lines of a journal entry posted with it.
+*@
+@using Md = DirectService.Transportation.Contracts.MasterData
+@inject Loc L
+@inject ShellState Shell
+
+<div class="ev-t">
+    @foreach (var (text, href) in Segments)
+    {
+        if (href is null) {<Tx Value="@text" />}
+        else {<a href="@href"><Tx Value="@text" /></a>}
+    }
+</div>
+@if (!string.IsNullOrWhiteSpace(Reason))
+{
+    <div class="ev-r">@L["ui.reason"]: <Tx Value="@Reason" /></div>
+}
+@if (Changes.Count > 0)
+{
+    <ul class="ev-c">
+        @foreach (var c in Changes.Take(Max))
+        {
+            <li><span class="lbl"><Tx Value="@c.Field" />:</span> <span class="o"><Tx Value="@(c.Old ?? "—")" /></span><span class="arr" aria-hidden="true">@Arrow</span><span class="n"><Tx Value="@(c.New ?? "—")" /></span></li>
+        }
+        @if (Changes.Count > Max) {<li class="muted">@L.F("aud.more", Changes.Count - Max)</li>}
+    </ul>
+}
+@if (Lines is { Count: > 0 })
+{
+    <table class="ev-lines">
+        <thead><tr><th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th></tr></thead>
+        <tbody>
+            @foreach (var line in Lines)
+            {
+                <tr><td><Tx Value="@line.Account" /></td><td class="n"><bdi class="num">@line.Debit</bdi></td><td class="n"><bdi class="num">@line.Credit</bdi></td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    /// <summary>A change: field label, old and new value (already in the reader's words).</summary>
+    public sealed record Change(string Field, string? Old, string? New);
+
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public IReadOnlyList<Md.HistoryLink>? Links { get; set; }
+    [Parameter] public IReadOnlyList<Change> Changes { get; set; } = [];
+    [Parameter] public IReadOnlyList<Md.HistoryLine>? Lines { get; set; }
+    [Parameter] public string? Reason { get; set; }
+    /// <summary>At most this many changes are listed (the audit log keeps rows short).</summary>
+    [Parameter] public int Max { get; set; } = 50;
+
+    /// <summary>From old to new in the reading direction.</summary>
+    private string Arrow => L.Language == "en" ? " → " : " ← ";
+
+    /// <summary>The sentence cut at the documents it names; each document a link when its screen is open to the reader.</summary>
+    private IEnumerable<(string Text, string? Href)> Segments
+    {
+        get
+        {
+            var company = Shell.Company?.Id;
+            var marks = (Links ?? [])
+                .Select(l => (Link: l, At: Text.IndexOf(l.Text, StringComparison.Ordinal), Href: company is null ? null : Layout.Links.ForRecord(company, l.Kind, l.Id)))
+                .Where(m => m.At >= 0 && m.Href is not null && NavModel.RouteAllowed(Shell.Permissions, m.Href))
+                .OrderBy(m => m.At).ToList();
+            var at = 0;
+            foreach (var m in marks)
+            {
+                if (m.At < at) continue;   // overlapping names: the first wins
+                if (m.At > at) yield return (Text[at..m.At], null);
+                yield return (m.Link.Text, m.Href);
+                at = m.At + m.Link.Text.Length;
+            }
+            if (at < Text.Length) yield return (Text[at..], null);
+        }
+    }
+}

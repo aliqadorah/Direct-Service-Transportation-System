@@ -61,7 +61,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
   return {
     w,
     ids: {
-      trip: t3, invoice: inv.invoice.id,
+      trip: t3, invoice: inv.invoice.id, invoicedTrip: t1,
       receipt: await first("receipts", (j) => j.page.items),
       journal: await first("accounting/journal-entries", (j) => j.items),
       advance: await first("advances", (j) => j.page.items),
@@ -284,6 +284,15 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
     // Customer statement (RPT-12) shown without its required customer: the field marked, one message.
     { name: "financial#customer-statement-required", route: "reports/financial?report=customer-statement", act: async (p, t) => {
       await button(p.locator("main"), t("rep.run")).click(); await expect(p.locator("main [aria-invalid=true]").first()).toBeVisible(); } },
+    // Readable history and audit log (owner feedback 14 Oct 2026, DT-188): a trip's history (created, added to an invoice, invoiced), a
+    // journal entry's history (posted with its lines), the audit log as read by everyone and with an administrator's technical details.
+    { name: "history#trip", route: `trips/${ids.invoicedTrip ?? ids.trip}`, act: async (p) => {
+      await expect(p.locator(".hist .ev-t").first()).toBeVisible(); await p.locator(".hist").first().scrollIntoViewIfNeeded(); } },
+    ...(ids.journal ? [{ name: "history#journal-entry", route: `accounting/journal/${ids.journal}`, act: async (p: Page) => {
+      await expect(p.locator(".hist .ev-t").first()).toBeVisible(); await p.locator(".hist").first().scrollIntoViewIfNeeded(); } }] : []),
+    { name: "audit-log#readable", route: "settings/audit-log", act: async (p) => { await expect(p.locator("main .ev-t").first()).toBeVisible(); } },
+    { name: "audit-log#technical", route: "settings/audit-log", act: async (p, t) => {
+      await button(p.locator("main"), t("aud.technical")).click(); await expect(p.locator("main .tech").first()).toBeVisible(); } },
     // Company switch (owner feedback 14 Oct 2026, DT-187): from the dashboard of the company with documents to a second, empty company of
     // the tenant through the company menu — the dashboard shows the new company's figures, never the old one's, without a reload. Last:
     // it adds a company to the tenant.
