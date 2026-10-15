@@ -42,7 +42,13 @@ public enum EInvoiceOutcomeKind
 }
 
 /// <summary>The national system's answer: identifiers and QR when accepted, the reason otherwise, and the raw response for audit.</summary>
-public sealed record EInvoiceOutcome(EInvoiceOutcomeKind Kind, Guid? UniqueId, string? SystemNumber, string? QrCode, string? Message, string? ResponsePayload);
+/// <remarks><see cref="CredentialsRefused"/>: the system refused the company's credentials (HTTP 401/403) — a set-up problem, not the document's (DT-189).</remarks>
+public sealed record EInvoiceOutcome(EInvoiceOutcomeKind Kind, Guid? UniqueId, string? SystemNumber, string? QrCode, string? Message, string? ResponsePayload,
+    bool CredentialsRefused = false)
+{
+    /// <summary>How a refusal of the credentials starts (stored as the submission's last error; counted by the set-up notification).</summary>
+    public const string CredentialsRefusedText = "JoFotara refused the credentials";
+}
 
 /// <summary>
 /// A national e-invoicing connector (FR-066, INT-01): market rules, the document in the national format (stored as the request

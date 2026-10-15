@@ -1,4 +1,9 @@
-@* Notifications (FR-190): newest first, unread marked; opening one marks it read and goes to its record; "mark all read". *@
+@*
+  Notifications (FR-190, DT-189): newest first, each one a readable block (title, short message, date) across the panel's width, unread
+  marked. The API gives the text in the reader's language and the screen to open, with the company's URL token. Opening one marks it
+  read, closes the panel and goes to its screen; when the record no longer exists or the reader may not open it, the reason is shown
+  under the notification instead. Technical details (codes, raw answers) stay behind "Details". "Mark all as read" is always offered.
+*@
 @using DirectService.Transportation.Contracts.Collaboration
 @inject Api Api
 @inject ShellState Shell
@@ -15,16 +20,27 @@
     }
     else
     {
-        @if (_page.Unread > 0) {<div style="display:flex;justify-content:flex-end"><Btn Small="true" Ghost="true" Icon="check" Text="@L["shell.markAllRead"]" OnClick="ReadAll" /></div>}
-        <ul class="hist">
+        <div class="notes-bar"><Btn Small="true" Ghost="true" Icon="check" Class="read-all" Text="@L["shell.markAllRead"]" Disabled="_page.Unread == 0" OnClick="ReadAll" /></div>
+        <ul class="notes">
             @foreach (var n in _page.Items)
             {
                 var note = n;
-                <li class="@(note.Type.Contains("Rejected", StringComparison.Ordinal) || note.Type.Contains("Failed", StringComparison.Ordinal) ? "v" : null)">
-                    <button type="button" class="btn ghost" style="height:auto;padding:0;justify-content:flex-start;text-align:start;white-space:normal;color:var(--text)" @onclick="() => OpenNote(note)">
-                        @if (note.ReadAt is null) {<b><Tx Value="@note.Message" /></b>} else {<Tx Value="@note.Message" />}
+                <li class="@Css(note)">
+                    <button type="button" class="note-open" @onclick="() => OpenNote(note)">
+                        <span class="note-t"><Tx Value="@note.Title" /></span>
+                        <span class="note-m"><Tx Value="@note.Message" /></span>
+                        <span class="note-w"><bdi class="num">@Fmt.DateTime(note.CreatedAt.ToLocalTime(), Shell.DateFormat)</bdi>@if (note.ReadAt is null) {<text> · </text><Badge Tone="Tone.Info" Text="@L["shell.unread"]" />}</span>
                     </button>
-                    <span class="w"><bdi class="num">@Fmt.DateTime(note.CreatedAt.ToLocalTime(), Shell.DateFormat)</bdi>@if (note.ReadAt is null) {<text> · </text><Badge Tone="Tone.Info" Text="@L["shell.unread"]" />}</span>
+                    @if (_problem.TryGetValue(note.Id, out var problem))
+                    {
+                        <div class="note-p" role="alert">@problem</div>
+                    }
+                    @if (note.Details is { Length: > 0 } details)
+                    {
+                        var open = _details.Contains(note.Id);
+                        <button type="button" class="note-dt" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(note.Id)">@L[open ? "notif.hideDetails" : "notif.details"]</button>
+                        @if (open) {<div class="note-x" dir="ltr">@details</div>}
+                    }
                 </li>
             }
         </ul>
@@ -33,27 +49,56 @@
 
 @code {
     private NotificationPage? _page;
+    private readonly HashSet<string> _details = [];
+    private readonly Dictionary<string, string> _problem = [];
 
     [Parameter] public bool Open { get; set; }
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (!Open) { _page = null; return; }
+        if (!Open) { _page = null; _details.Clear(); _problem.Clear(); return; }
         if (_page is not null || Shell.Company is null) return;
         try { _page = await Api.GetAsync<NotificationPage>(Api.C("notifications")); }
         catch (ApiException) { _page = new NotificationPage([], 0); }
     }
 
+    private static string Css(NotificationResponse n) => string.Join(' ', new[]
+    {
+        "note",
+        n.ReadAt is null ? "unread" : null,
+        n.Type.Contains("Rejected", StringComparison.Ordinal) || n.Type.Contains("Failed", StringComparison.Ordinal) || n.Type.Contains("Error", StringComparison.Ordinal) ? "v" : null,
+    }.Where(c => c is not null));
+
+    /// <summary>The screen of a notification: tenant screens are absolute, the others belong to the notification's company (its URL token).</summary>
+    public static string? Href(NotificationResponse n, string? currentCompany) =>
+        n.Link is not { Length: > 0 } link ? null
+        : link.StartsWith('/') ? link
+        : (n.Company ?? currentCompany) is { } company ? NavModel.Href(company, link) : null;
+
     private async Task OpenNote(NotificationResponse n)
     {
-        if (n.ReadAt is null)
+        if (n.ReadAt is null) await MarkRead(n);
+        if (n.LinkProblem is { } problem)
         {
-            try { await Api.PostAsync(Api.C($"notifications/{n.Id}/read"), null); } catch (ApiException) { }
-            Shell.SetNotifications(Shell.UnreadNotifications - 1);
+            _problem[n.Id] = L[problem == "forbidden" ? "notif.forbidden" : "notif.missing"];
+            return;
         }
         await OpenChanged.InvokeAsync(false);
-        if (Links.ForNotification(n.Company ?? Shell.Company?.Id, n.Link) is { } href) Nav.NavigateTo(href);
+        if (Href(n, Shell.Company?.Id) is { } href) Nav.NavigateTo(href);
+    }
+
+    private async Task MarkRead(NotificationResponse n)
+    {
+        try { await Api.PostAsync(Api.C($"notifications/{n.Id}/read"), null); } catch (ApiException) { }
+        Shell.SetNotifications(Shell.UnreadNotifications - 1);
+        if (_page is { } p)
+            _page = new NotificationPage(p.Items.Select(i => i.Id == n.Id ? i with { ReadAt = DateTime.UtcNow } : i).ToList(), Math.Max(0, p.Unread - 1));
+    }
+
+    private void ToggleDetails(string id)
+    {
+        if (!_details.Remove(id)) _details.Add(id);
     }
 
     private async Task ReadAll()

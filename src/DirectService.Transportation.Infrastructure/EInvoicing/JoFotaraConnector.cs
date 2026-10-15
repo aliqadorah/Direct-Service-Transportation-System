@@ -196,7 +196,7 @@ public sealed class JoFotaraConnector(IHttpClientFactory http, IOptions<JoFotara
                 Guid.TryParse(Text(r, "EINV_INV_UUID"), out var uuid) ? uuid : null, Text(r, "EINV_NUM"), Text(r, "EINV_QR"), einvStatus, body);
         }
         if (status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            return new EInvoiceOutcome(EInvoiceOutcomeKind.Rejected, null, null, null, $"JoFotara refused the credentials (HTTP {code}). {Reasons(json)}".Trim(), body);
+            return new EInvoiceOutcome(EInvoiceOutcomeKind.Rejected, null, null, null, $"{EInvoiceOutcome.CredentialsRefusedText} (HTTP {code}). {Reasons(json)}".Trim(), body, true);
         if (einvStatus == "NOT_SUBMITTED" || (code is >= 400 and < 500 and not 408 and not 429 && json is not null))
             return new EInvoiceOutcome(EInvoiceOutcomeKind.Rejected, null, null, null, Reasons(json) is { Length: > 0 } why ? why : $"HTTP {code}", body);
         return new EInvoiceOutcome(EInvoiceOutcomeKind.Failed, null, null, null, $"JoFotara technical error (HTTP {code}). {Reasons(json)}".Trim(), body);
@@ -227,7 +227,8 @@ public sealed class JoFotaraConnector(IHttpClientFactory http, IOptions<JoFotara
 
 /// <summary>
 /// Development and test connector (A-15): builds the same JoFotara UBL, checks that it adds up, and answers like JoFotara. Customer
-/// names containing "[reject]" are refused and "[fail]" simulates a technical failure, so every path can be exercised. Offered only
+/// names containing "[reject]" are refused and "[fail]" simulates a technical failure, and a client id containing "[refuse]" has its
+/// credentials refused (HTTP 401), so every path can be exercised. Offered only
 /// where EInvoicing:AllowSimulator is set, and never in the Production environment.
 /// </summary>
 public sealed class SimulatorConnector : IEInvoiceConnector
@@ -258,7 +259,12 @@ public sealed class SimulatorConnector : IEInvoiceConnector
         var expected = D(totals.Element(Cbc + "TaxExclusiveAmount")) - D(totals.Element(Cbc + "AllowanceTotalAmount")) + headerTax;
 
         EInvoiceOutcome outcome;
-        if (buyer.Contains("[fail]", StringComparison.OrdinalIgnoreCase))
+        if (credentials.ClientId.Contains("[refuse]", StringComparison.OrdinalIgnoreCase))
+            outcome = JoFotaraConnector.Interpret(HttpStatusCode.Unauthorized, JsonSerializer.Serialize(new Dictionary<string, object?>
+            {
+                ["EINV_RESULTS"] = new { status = "ERROR", ERRORS = new[] { new Dictionary<string, string> { ["EINV_CODE"] = "CORE-401-001", ["EINV_MESSAGE"] = "Invalid client credentials" } } },
+            }));
+        else if (buyer.Contains("[fail]", StringComparison.OrdinalIgnoreCase))
             outcome = new(EInvoiceOutcomeKind.Failed, null, null, null, "Simulated technical failure (HTTP 503).", null);
         else if (buyer.Contains("[reject]", StringComparison.OrdinalIgnoreCase))
             outcome = Rejected("E-INV-BUYER", "Simulated rejection: buyer data refused.");

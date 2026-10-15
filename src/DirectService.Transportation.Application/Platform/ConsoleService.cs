@@ -434,8 +434,8 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             .Where(x => x.TenantId == t.Id && !x.IsDeleted && x.User.Status == "Active"
                 && db.Set<RolePermission>().IgnoreQueryFilters().Any(p => p.RoleId == x.RoleId && !p.IsDeleted && p.Permission.PermissionKey == PermissionKeys.TenantManage))
             .Select(x => x.UserId).Distinct().ToListAsync(ct).ConfigureAwait(false);
-        await notifications.NotifyAsync(owners, null, "CORE.SupportRequested", "طلب دعم فني للوصول إلى بياناتكم: " + reason,
-            "Provider support requests access to your data: " + reason, "/tenant/support-access", ct, t.Id).ConfigureAwait(false);
+        await notifications.NotifyAsync(owners, null, NotificationService.SupportRequested, new Dictionary<string, string?> { ["reason"] = reason },
+            "/tenant/support-access", ct, t.Id).ConfigureAwait(false);
         return (await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.Id == grant.Id), ct).ConfigureAwait(false))[0];
     }
 

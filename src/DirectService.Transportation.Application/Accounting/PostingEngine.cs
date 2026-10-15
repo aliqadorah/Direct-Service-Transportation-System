@@ -249,8 +249,8 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             {
                 // FR-190: the users who retry postings (je.export) learn that an entry waits.
                 await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, Contracts.Security.PermissionKeys.JeExport, ct).ConfigureAwait(false), companyId,
-                    Collaboration.NotificationService.PostingFailed, "تعذّر ترحيل قيد وينتظر في الترحيلات المعلّقة: " + request.Description,
-                    "An entry could not be posted and waits in pending postings: " + request.Description, "/ledger/pending-postings", ct).ConfigureAwait(false);
+                    Collaboration.NotificationService.PostingFailed, new Dictionary<string, string?> { ["description"] = request.Description }, "/ledger/pending-postings", ct)
+                    .ConfigureAwait(false);
             }
             return null;
         }

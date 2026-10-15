@@ -199,11 +199,12 @@ export async function layoutProblems(page: Page): Promise<LayoutProblem[]> {
       }
     }
 
-    // ---- a one-line control (button, tab, badge) whose label wraps onto a second line: misaligned toolbars and bars
+    // ---- a one-line control (button, tab, badge) whose label wraps onto a second line: misaligned toolbars and bars (a notification is
+    // a block-sized button whose title and message wrap by design, DT-189)
     const lines = new Map<Element, number[]>();
     for (const a of pieces) {
       const c = a.el.closest("button, a.btn, .btn, .badge, [role=tab]");
-      if (!c || c.closest("[role=listbox], [role=menu], .steps")) continue;
+      if (!c || c.closest("[role=listbox], [role=menu], .steps, .note-open")) continue;
       const tops = lines.get(c) ?? [];
       tops.push((a.box.t + a.box.b) / 2);
       lines.set(c, tops);

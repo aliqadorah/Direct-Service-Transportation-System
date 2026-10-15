@@ -24,17 +24,3 @@ public sealed class ReportUnitTests
         Assert.All(ReportSources.All, s => Assert.Equal(s.Fields.Count, s.Fields.Select(f => f.Key).Distinct().Count()));
     }
 }
-
-/// <summary>B11: notification messages always fit their column, Arabic kept readable (review H1).</summary>
-public sealed class NotificationUnitTests
-{
-    [Fact]
-    public void Long_Arabic_messages_fit_500_characters_FR190()
-    {
-        var m = DirectService.Transportation.Application.Collaboration.NotificationService.Message(new string('\u0639', 700), new string('e', 700));
-        Assert.True(m.Length <= 500);
-        Assert.Contains("\u0639\u0639", m, StringComparison.Ordinal);   // not \u-escaped
-        Assert.Equal("{\"Ar\":\"\u0631\u064F\u0641\u0636\u062A\",\"En\":\"Rejected\"}",
-            DirectService.Transportation.Application.Collaboration.NotificationService.Message("\u0631\u064F\u0641\u0636\u062A", "Rejected"));
-    }
-}

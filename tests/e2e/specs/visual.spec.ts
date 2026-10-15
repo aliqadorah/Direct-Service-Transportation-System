@@ -293,6 +293,18 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
     { name: "audit-log#readable", route: "settings/audit-log", act: async (p) => { await expect(p.locator("main .ev-t").first()).toBeVisible(); } },
     { name: "audit-log#technical", route: "settings/audit-log", act: async (p, t) => {
       await button(p.locator("main"), t("aud.technical")).click(); await expect(p.locator("main .tech").first()).toBeVisible(); } },
+    // Notifications (owner feedback 15 Oct 2026, DT-189): a rejected e-invoice and the single "not set up correctly" notification for
+    // refused credentials in the panel; then the page a notification opens (the invoice, in the company named by its URL token).
+    { name: "notifications#panel", route: "", act: async (p, t) => { await notificationsWorld(p, companyOf(p)); await openNotifications(p, t); } },
+    { name: "notifications#opened", route: "", act: async (p, t) => {
+      await notificationsWorld(p, companyOf(p));
+      await openNotifications(p, t);
+      await p.locator(".notes .note-open").filter({ hasText: /INV-\d/ }).first().click();
+      await expect(p).toHaveURL(new RegExp(`/c/${companyOf(p)}/invoices/[A-Za-z0-9_-]+$`));
+      await expect(p.locator(".panel-side")).toHaveCount(0);
+      await expect(p.locator("main .sk")).toHaveCount(0);
+      await expect(p.locator("main h1")).toContainText(/INV-\d/);
+    } },
     // Company switch (owner feedback 14 Oct 2026, DT-187): from the dashboard of the company with documents to a second, empty company of
     // the tenant through the company menu — the dashboard shows the new company's figures, never the old one's, without a reload. Last:
     // it adds a company to the tenant.
@@ -314,6 +326,42 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
       for (const figure of collections.filter((f) => f !== "0.000")) expect(after, `figure ${figure} of ${first} after the switch`).not.toContain(figure);
     } },
   ];
+}
+
+const notified = new Set<string>();
+
+/**
+ * Notifications of the company (DT-189), once: the simulator refuses an invoice of a "[reject]" customer (one notification per document),
+ * then refuses the credentials of two invoices (one notification for the company, two affected invoices).
+ */
+async function notificationsWorld(page: Page, company: string): Promise<void> {
+  if (notified.has(company)) return;
+  notified.add(company);
+  const settings = async (clientId: string) => {
+    const s = await api<{ rowVersion: string | null }>(page, "GET", c(company, "settings/e-invoicing"));
+    await api(page, "PUT", c(company, "settings/e-invoicing"), { isEnabled: true, connector: "Simulator", sellerTaxNumber: "12345678",
+      registrationType: "Sales", incomeSourceSequence: "4569874", clientId, secretKey: "secret-1", environment: "Test", rowVersion: s.rowVersion });
+  };
+  const customer = (name: string) => api<{ id: string }>(page, "POST", c(company, "customers"),
+    { name: `${name} ${Date.now() % 100000}`, taxNumber: "200014587", phone: "0781234567", paymentTermsDays: 30 });
+  const invoice = (customerId: string) => api(page, "POST", c(company, "invoices"), { customerId, invoiceType: "Manual", invoiceDate: today(),
+    lines: [{ description: "Equipment move", quantity: 1, unitPrice: 100 }], discount: 0, extraFees: 0, approve: true });
+  type Note = { type: string; message: string };
+  const until = (ok: (items: Note[]) => boolean) => expect.poll(async () =>
+    ok((await api<{ items: Note[] }>(page, "GET", c(company, "notifications"))).items), { timeout: 90_000, intervals: [1_000] }).toBe(true);
+  await settings("client-1");
+  await invoice((await customer("شركة الرفض [reject]")).id);
+  await until((items) => items.some((n) => n.type === "EINV.Rejected"));
+  await settings("client-[refuse]");
+  const normal = await customer("شركة الأمانة");
+  await invoice(normal.id);
+  await invoice(normal.id);
+  await until((items) => items.some((n) => n.type === "EINV.SetupError" && /\b2\b/.test(n.message)));
+}
+
+async function openNotifications(page: Page, t: Text): Promise<void> {
+  await page.getByRole("button", { name: new RegExp(`^${t("shell.notifications", "").replace(/\s*\(\)$/, "")}`) }).click();
+  await expect(page.locator(".notes .note").first()).toBeVisible();
 }
 
 async function sweepStates(page: Page, run: VisualRun, lang: Lang, company: string, states: State[]): Promise<void> {

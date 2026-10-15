@@ -10,7 +10,13 @@ public sealed record SearchResponse(string Query, IReadOnlyList<SearchHit> Hits)
 
 // ------------------------------------------------------------------ notifications (FR-190)
 
-public sealed record NotificationResponse(string Id, string Type, string Message, string? Link, string? Company, DateTime CreatedAt, DateTime? ReadAt);
+/// <summary>
+/// A notification in the reader's language (DT-189): title, one readable sentence, technical details apart (shown on request). Link is the
+/// screen to open — relative to the company named by Company (its URL token), or absolute for tenant screens; LinkProblem says why there
+/// is none ("missing": the record no longer exists; "forbidden": the reader may not open it). CompanyName is for display only.
+/// </summary>
+public sealed record NotificationResponse(string Id, string Type, string Title, string Message, string? Details, string? Link, string? LinkProblem, string? Company,
+    string? CompanyName, DateTime CreatedAt, DateTime? ReadAt);
 
 public sealed record NotificationPage(IReadOnlyList<NotificationResponse> Items, int Unread);
 

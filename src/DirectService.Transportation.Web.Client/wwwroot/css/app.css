@@ -332,6 +332,24 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
 .hist > li::before { content: ""; grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); margin-top: 6px; }
 .hist > li.v::before { background: var(--err); }
 .hist .w { color: var(--muted); font-size: var(--fs-sm); }
+/* Notifications panel (DT-189): one block per notification across the panel's width — title, message, date; long codes wrap, never scroll sideways. */
+.notes-bar { display: flex; justify-content: flex-end; margin-bottom: var(--sp-3); }
+.notes { margin: 0; padding: 0; list-style: none; min-width: 0; }
+.notes > .note { position: relative; padding: var(--sp-4) 0; padding-inline-start: var(--sp-6); border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.notes > .note::before { content: ""; position: absolute; inset-inline-start: 2px; top: calc(var(--sp-4) + 6px); width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.notes > .note.unread::before { background: var(--primary); }
+.notes > .note.v.unread::before { background: var(--err); }
+.note-open { display: block; width: 100%; padding: 0; border: 0; background: none; color: var(--text); font: inherit; text-align: start; cursor: pointer; white-space: normal; }
+.note-open:hover .note-t { text-decoration: underline; }
+.note-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r); }
+.note-t { display: block; font-size: 13px; font-weight: var(--fw-medium); }
+.note.unread .note-t { font-weight: var(--fw-bold); }
+.note-m { display: block; margin-top: 2px; font-size: 13px; color: var(--text); }
+.note-w { display: block; margin-top: var(--sp-2); color: var(--muted); font-size: var(--fs-sm); }
+.note-dt { margin-top: var(--sp-2); padding: 0; border: 0; background: none; color: var(--primary); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.note-dt:hover { text-decoration: underline; }
+.note-x { margin-top: var(--sp-2); padding: var(--sp-3); border-radius: var(--r); background: var(--surface-sunk); font-family: var(--font-en); font-size: var(--fs-sm); white-space: pre-wrap; text-align: left; unicode-bidi: isolate; }
+.note-p { margin-top: var(--sp-2); color: var(--err); font-size: var(--fs-sm); }
 .chg { font-family: var(--font-en); font-size: var(--fs-sm); direction: ltr; unicode-bidi: isolate; }
 /* Readable audit event (DT-188): sentence, reason, "label: old ← new" in the page's direction, journal lines. */
 .ev { min-width: 0; }

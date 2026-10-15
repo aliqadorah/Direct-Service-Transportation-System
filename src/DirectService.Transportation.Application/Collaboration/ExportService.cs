@@ -57,7 +57,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);
 
-    private static string Folder(long tenantId, long companyId, Guid userPid) => $"exports/{tenantId}/{companyId}/{userPid:N}/";
+    internal static string Folder(long tenantId, long companyId, Guid userPid) => $"exports/{tenantId}/{companyId}/{userPid:N}/";
 
     public async Task<ExportJobResponse> EnqueueAsync(ExportRequest r, CancellationToken ct)
     {
@@ -119,7 +119,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
         };
         var key = Folder(job.TenantId, job.CompanyId, job.UserPublicId) + job.Id.ToString("N") + "/" + file.FileName;
         await files.SaveAsync(key, file.Content, ct).ConfigureAwait(false);
-        await notifications.NotifyAsync([job.UserId], job.CompanyId, NotificationService.ExportReady, "التصدير جاهز: " + file.FileName, "Export ready: " + file.FileName,
+        await notifications.NotifyAsync([job.UserId], job.CompanyId, NotificationService.ExportReady, new Dictionary<string, string?> { ["file"] = file.FileName },
             "/exports/" + job.Id.ToString("N"), ct).ConfigureAwait(false);
     }
 
@@ -127,8 +127,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
     public Task FailedAsync(ExportJob job, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(job);
-        return notifications.NotifyAsync([job.UserId], job.CompanyId, NotificationService.ExportFailed, "تعذّر إعداد التصدير. أعد المحاولة أو ضيّق الفترة.",
-            "The export could not be prepared. Try again or narrow the period.", null, ct);
+        return notifications.NotifyAsync([job.UserId], job.CompanyId, NotificationService.ExportFailed, new Dictionary<string, string?>(), null, ct);
     }
 
     /// <summary>The caller's finished export in the current company.</summary>

@@ -167,6 +167,7 @@ public static class DependencyInjection
 
         // Collaboration (B11)
         services.AddScoped<NotificationService>();
+        services.AddScoped<NotificationLinks>();
         services.AddScoped<GlobalSearchService>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<ExportLimits>();

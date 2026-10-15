@@ -1,6 +1,6 @@
 namespace DirectService.Transportation.Web.Client.Layout;
 
-/// <summary>Screen addresses of records referenced by the API (search hits, notification links), relative to the company.</summary>
+/// <summary>Screen addresses of records referenced by the API (search hits, sources, drill-downs), relative to the company.</summary>
 public static class Links
 {
     public static string? ForSearchHit(string company, string type, string id) => type switch
@@ -84,18 +84,5 @@ public static class Links
         if (filters is { Count: > 0 })
             href += (href.Contains('?', StringComparison.Ordinal) ? "&" : "?") + string.Join('&', filters.Select(f => Uri.EscapeDataString(f.Key) + "=" + Uri.EscapeDataString(f.Value)));
         return href;
-    }
-
-    /// <summary>A notification link (API-style path) as a screen address; tenant links are absolute.</summary>
-    public static string? ForNotification(string? company, string? link)
-    {
-        if (string.IsNullOrEmpty(link) || link[0] != '/' || link.StartsWith("//", StringComparison.Ordinal)) return null;
-        if (link.StartsWith("/tenant/", StringComparison.Ordinal) || link.StartsWith("/console/", StringComparison.Ordinal)) return link;
-        if (company is null) return null;
-        if (link.StartsWith("/ledger/pending-postings", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/automatic?tab=pending");
-        if (link.StartsWith("/exports/", StringComparison.Ordinal)) return NavModel.Href(company, "exports/" + link["/exports/".Length..]);
-        if (link.StartsWith("/apar/receivables/", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/receivables/" + link["/apar/receivables/".Length..]);
-        if (link.StartsWith("/apar/returns/", StringComparison.Ordinal)) return NavModel.Href(company, "accounting/apar-returns/" + link["/apar/returns/".Length..]);
-        return NavModel.Href(company, link.TrimStart('/'));
     }
 }

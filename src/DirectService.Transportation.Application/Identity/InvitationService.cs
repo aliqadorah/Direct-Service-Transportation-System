@@ -158,8 +158,8 @@ public sealed class InvitationService(
         // FR-190: the inviter is notified that the invitation was accepted.
         db.Set<Notification>().Add(new Notification
         {
-            TenantId = inv.TenantId, UserId = inv.InvitedBy, CompanyId = inv.CompanyId, NotificationType = "CORE.InvitationAccepted",
-            Message = $"{user.FullName} قبل الدعوة / accepted the invitation",
+            TenantId = inv.TenantId, UserId = inv.InvitedBy, CompanyId = inv.CompanyId, NotificationType = Collaboration.NotificationService.InvitationAccepted,
+            Message = Collaboration.NotificationService.Message(new Dictionary<string, string?> { ["name"] = user.FullName }),
         });
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         access.Invalidate(user.Id);

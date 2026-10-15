@@ -228,8 +228,8 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         changes.SetAction(t, "PaymentFailed", invoice.Number);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var owners = await OwnersAsync(t.Id, ct).ConfigureAwait(false);
-        await notifications.NotifyAsync(owners.Select(o => o.Id), null, "CORE.PaymentFailed", "تعذّر تحصيل قيمة التجديد؛ لديكم 7 أيام لتحديث وسيلة الدفع.",
-            "The renewal payment failed; you have 7 days to update the payment method.", "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
+        await notifications.NotifyAsync(owners.Select(o => o.Id), null, NotificationService.PaymentFailed,
+            new Dictionary<string, string?> { ["days"] = NotificationTexts.Number(O.GraceDays) }, "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
     }
 
     private async Task<List<(long Id, string Email, string Name)>> OwnersAsync(long tenantId, CancellationToken ct) =>
