@@ -27,7 +27,7 @@ public static class ErrorCatalog
         [ErrorCodes.LockHeld] = ("{0} يعدّل هذا السجل الآن.", "{0} is editing this record."),
         [ErrorCodes.PeriodClosed] = ("التاريخ {0} يقع في فترة مغلقة ({1}).", "{0} is in the closed period {1}."),
         [ErrorCodes.RateLimited] = ("طلبات كثيرة. حاول مرة أخرى بعد قليل.", "Too many requests. Try again shortly."),
-        [ErrorCodes.SignInFailed] = ("البريد الإلكتروني أو كلمة المرور غير صحيحة.", "The email or password is incorrect."),
+        [ErrorCodes.SignInFailed] = ("البريد الإلكتروني أو اسم المستخدم أو كلمة المرور غير صحيحة.", "The email or username, or the password, is incorrect."),
         [ErrorCodes.SignInLocked] = ("تم قفل الحساب مؤقتاً بسبب محاولات فاشلة. حاول بعد {0} دقيقة.", "The account is locked after failed attempts. Try again in {0} minutes."),
         [ErrorCodes.EmailNotConfirmed] = ("يرجى تأكيد بريدك الإلكتروني أولاً.", "Please verify your email address first."),
         [ErrorCodes.TwoFactorInvalid] = ("رمز التحقق غير صحيح.", "The verification code is incorrect."),
@@ -35,6 +35,12 @@ public static class ErrorCatalog
         [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} أحرف على الأقل، مع الحروف والأرقام المطلوبة.", "The password does not meet your organisation's policy: at least {0} characters, with the required letters and digits."),
         [ErrorCodes.TokenInvalid] = ("الرابط غير صالح أو منتهي الصلاحية.", "The link is invalid or has expired."),
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
+        [ErrorCodes.UserNameInUse] = ("اسم المستخدم هذا مستخدم لحساب آخر.", "This username is already used by another account."),
+        [ErrorCodes.UserNameFormat] = ("اسم المستخدم من 3 إلى 50 خانة: حروف إنجليزية وأرقام و . _ - فقط.", "The username must be 3 to 50 characters: English letters, digits and . _ - only."),
+        [ErrorCodes.UserHasNoEmail] = ("ليس لهذا المستخدم بريد إلكتروني. عيّن له كلمة مرور جديدة بدلاً من ذلك.", "This user has no email address. Set a new password for them instead."),
+        [ErrorCodes.PasswordUnchanged] = ("اختر كلمة مرور مختلفة عن الحالية.", "Choose a password different from the current one."),
+        [ErrorCodes.PasswordSetNotAllowed] = ("تعيين كلمة المرور متاح فقط للمستخدمين الذين أُنشئوا باسم مستخدم. أرسل رابط إعادة التعيين بدلاً من ذلك.", "Setting a password is available only for users created with a username. Send a reset link instead."),
+        [ErrorCodes.PasswordWrong] = ("كلمة المرور الحالية غير صحيحة.", "The current password is incorrect."),
         [ErrorCodes.SetupCodeInvalid] = ("رمز الإعداد غير صحيح. انسخه من سجل التطبيق أو من الإعدادات (Platform:SetupCode).", "The setup code is not correct. Copy it from the application log or from the configuration (Platform:SetupCode)."),
         [ErrorCodes.SetupLocked] = ("محاولات خاطئة كثيرة. أُوقف إدخال رمز الإعداد {0} دقيقة.", "Too many wrong attempts. Entering the setup code is blocked for {0} minutes."),
         [ErrorCodes.SetupSessionExpired] = ("انتهت مهلة الإعداد. أدخل رمز الإعداد مرة أخرى.", "The setup session has expired. Enter the setup code again."),
@@ -270,6 +276,12 @@ public static class ErrorCodes
     public const string PasswordPolicy = "auth.passwordPolicy";
     public const string TokenInvalid = "auth.tokenInvalid";
     public const string EmailInUse = "user.emailInUse";
+    public const string UserNameInUse = "user.userNameInUse";
+    public const string UserNameFormat = "user.userNameFormat";
+    public const string UserHasNoEmail = "user.noEmail";
+    public const string PasswordUnchanged = "auth.passwordUnchanged";
+    public const string PasswordSetNotAllowed = "user.passwordSetNotAllowed";
+    public const string PasswordWrong = "auth.passwordWrong";
     public const string SetupCodeInvalid = "setup.codeInvalid";
     public const string SetupLocked = "setup.locked";
     public const string SetupSessionExpired = "setup.sessionExpired";

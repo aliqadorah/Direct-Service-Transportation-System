@@ -81,7 +81,8 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
         var s = row.Session;
         var idle = TimeSpan.FromMinutes(row.IdleMinutes ?? options.Value.PlatformStaffIdleMinutes);
         if (s.RevokedAt is not null || s.ExpiresAt <= now || s.LastSeenAt + idle <= now) return null;
-        if (row.User.Status != "Active" || row.User.TwoFactorEnabledAt is null) return null;
+        // Revision 6: 2FA is no longer required of every tenant user (the sign-in flow decides); platform staff always need it.
+        if (row.User.Status != "Active" || (row.User.IsPlatformStaff && row.User.TwoFactorEnabledAt is null)) return null;
         if (!string.Equals(row.User.SecurityStamp, securityStampFromCookie, StringComparison.Ordinal)) return null;
 
         if (now - s.LastSeenAt >= TouchInterval)

@@ -4,6 +4,8 @@
   lock and last sign-in — change role, disable / enable, unlock, send a password reset, reset two-step verification, sign out everywhere,
   remove from the company, archive, erase personal data of an archived user (SEC-19); roles — the five presets (read-only) and custom roles
   with permissions by group (a user can grant only what they hold); invitations — invite by email with a role, resend, cancel.
+  "Add user" (revision 6): invite by email, or create with a username and password (no 2FA required, optional email, must change the password
+  at first sign-in by default); an administrator sets a new password for such a user (users without email have no reset link).
 *@
 @inject Api Api
 @inject Loc L
@@ -12,7 +14,7 @@
 
 <PageHeader Help="setup" Title="@L["nav.users"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.users"])])">
     <Actions>
-        <Btn Icon="mail" Text="@L["usr.invite"]" OnClick="() => { _inviteEmail = null; _inviteRole = null; _inviteError = null; _inviting = true; }" />
+        <Btn Icon="plus" Text="@L["usr.addUser"]" OnClick="OpenAdd" />
         <Btn Primary="true" Icon="plus" Text="@L["usr.newRole"]" OnClick="() => EditRole(null)" />
     </Actions>
 </PageHeader>
@@ -63,7 +65,8 @@
                     <DataGrid TItem="UserListItem" Items="_users!.Items" Key="u => u.Id" Caption="@L["usr.users"]" OnRowClick="OpenUser" RowClass="@(u => u.Status == "Active" ? null : "void")">
                         <Columns>
                             <GridColumn TItem="UserListItem" Title="@L["acct.fullName"]" Value="u => u.FullName" />
-                            <GridColumn TItem="UserListItem" Title="@L["acct.email"]" Value="u => u.Email" Ltr="true" />
+                            <GridColumn TItem="UserListItem" Title="@L["acct.email"]" Value="@(u => u.Email ?? "—")" Ltr="true" />
+                            <GridColumn TItem="UserListItem" Title="@L["usr.userName"]" Value="@(u => u.UserName ?? "—")" Ltr="true" />
                             <GridColumn TItem="UserListItem" Title="@L["usr.role"]" Value="@(u => u.Role is null ? "—" : RoleName(u.Role.Name))" />
                             <GridColumn TItem="UserListItem" Title="@L["usr.lastSignIn"]" Value="u => Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                             <GridColumn TItem="UserListItem" Title="@L["ml.status"]">
@@ -71,6 +74,7 @@
                                     <StatusTag Status="@(context.Status == "Active" ? "active" : context.Status == "Disabled" ? "disabled" : "archived")" />
                                     @if (context.IsLocked) {<Badge Tone="Tone.Warn" Icon="lock" Text="@L["usr.locked"]" />}
                                     @if (!context.TwoFactorEnabled) {<Badge Tone="Tone.Warn" Icon="shield" Text="@L["usr.no2fa"]" />}
+                                    @if (context.MustChangePassword) {<Badge Tone="Tone.Info" Icon="lock" Text="@L["usr.mustChangeBadge"]" />}
                                 </Template>
                             </GridColumn>
                         </Columns>
@@ -85,13 +89,14 @@
     @if (_user is { } u)
     {
         <div class="stack">
-            <KeyValues Columns="1" Items="@([new KeyValue(L["acct.email"], u.Email), new KeyValue(L["usr.lastSignIn"], Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)),
+            <KeyValues Columns="1" Items="@([new KeyValue(L["acct.email"], u.Email ?? "—"), new KeyValue(L["usr.userName"], u.UserName ?? "—"), new KeyValue(L["usr.lastSignIn"], Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)),
                 new KeyValue(L["usr.2fa"], L[u.TwoFactorEnabled ? "ui.on" : "ui.off"]), new KeyValue(L["usr.emailConfirmed"], L[u.EmailConfirmed ? "ui.yes" : "ui.no"])])" />
             @if (Protected(u)) {<Banner Tone="Tone.Lock" Icon="lock" Text="@L["usr.ownerProtected"]" />}
             <SelectField @key="_roleSelectKey" TValue="string?" Value="u.Role?.Id" ValueChanged="ChangeRole" ValueExpression="() => _dummy" Options="RoleOptions" Label="@L["usr.role"]" Disabled="@(u.Status != "Active" || _busy || Protected(u))" />
             <div class="stack" style="gap:6px" hidden="@Protected(u)">
                 @if (u.IsLocked) {<Btn Icon="lock" Text="@L["usr.unlock"]" Disabled="_busy" OnClick="@(() => Act("unlock", null))" />}
-                <Btn Icon="mail" Text="@L["usr.passwordReset"]" Disabled="_busy" OnClick="@(() => Act("password-reset", null))" />
+                @if (u.Email is not null) {<Btn Icon="mail" Text="@L["usr.passwordReset"]" Disabled="_busy" OnClick="@(() => Act("password-reset", null))" />}
+                @if (u.UserName is not null) {<Btn Icon="lock" Text="@L["usr.setPassword"]" Disabled="_busy" OnClick="OpenSetPassword" />}
                 <Btn Icon="shield" Text="@L["usr.reset2fa"]" OnClick="@(() => Ask("reset-2fa"))" />
                 <Btn Icon="logout" Text="@L["usr.signOut"]" Disabled="_busy" OnClick="@(() => Act("sign-out", null))" />
                 @if (u.Status == "Active") {<Btn Icon="lock" Text="@L["usr.disable"]" OnClick="@(() => Ask("disable"))" />}
@@ -148,18 +153,71 @@
 <ConfirmDialog @bind-Open="_deletingRole" Title="@L.F("ml.deleteTitle", _role.Name ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]" Message="@L["usr.deleteRoleText"]"
                Busy="_busy" Error="@_roleError" OnConfirm="DeleteRole" />
 
-<Modal @bind-Open="_inviting" Title="@L["usr.invite"]" Busy="_busy" Icon="mail">
+<Modal @bind-Open="_inviting" Title="@L["usr.addUser"]" Busy="_busy" Icon="plus">
     <ChildContent>
-        <div class="field">
-            <label for="inv-email">@L["acct.email"] <span class="req" aria-hidden="true">*</span></label>
-            <input id="inv-email" class="input" type="email" dir="ltr" maxlength="200" @bind="_inviteEmail" @bind:event="oninput" />
-        </div>
-        <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+        <TabStrip Items="AddModes" Selected="@_addMode" SelectedChanged="SetAddMode" Label="@L["usr.addUser"]" />
+        @if (_addMode == "create")
+        {
+            <div class="field">
+                <label for="new-name">@L["acct.fullName"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="new-name" class="input" maxlength="150" @bind="_new.FullName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-username">@L["usr.userName"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="new-username" class="input" dir="ltr" maxlength="50" autocomplete="off" @bind="_new.UserName" @bind:event="oninput" />
+                <div class="help">@L["usr.userNameHelp"]</div>
+            </div>
+            <div class="field">
+                <label for="new-email">@L["usr.emailOptional"]</label>
+                <input id="new-email" class="input" type="email" dir="ltr" maxlength="150" @bind="_new.Email" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-password">@L["acct.password"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="new-password" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_new.Password" @bind:event="oninput" />
+                <div class="help">@L["usr.passwordPolicyHelp"]</div>
+            </div>
+            <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+            <CheckField @bind-Value="_new.MustChangePassword" Label="@L["usr.mustChange"]" />
+            <Banner Tone="Tone.Info" Text="@L["usr.createNote"]" />
+        }
+        else
+        {
+            <div class="field">
+                <label for="inv-email">@L["acct.email"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="inv-email" class="input" type="email" dir="ltr" maxlength="200" @bind="_inviteEmail" @bind:event="oninput" />
+            </div>
+            <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+        }
         @if (_inviteError is not null) {<Banner Tone="Tone.Err" Text="@_inviteError" />}
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _inviting = false" />
-        <Btn Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" Disabled="@(string.IsNullOrWhiteSpace(_inviteEmail) || _inviteRole is null)" OnClick="Invite" />
+        @if (_addMode == "create")
+        {
+            <Btn Primary="true" Icon="check" Text="@L["usr.create"]" Busy="_busy" OnClick="CreateUser"
+                 Disabled="@(string.IsNullOrWhiteSpace(_new.FullName) || string.IsNullOrWhiteSpace(_new.UserName) || string.IsNullOrEmpty(_new.Password) || _inviteRole is null)" />
+        }
+        else
+        {
+            <Btn Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" Disabled="@(string.IsNullOrWhiteSpace(_inviteEmail) || _inviteRole is null)" OnClick="Invite" />
+        }
+    </Footer>
+</Modal>
+
+<Modal @bind-Open="_settingPassword" Title="@L.F("usr.setPasswordFor", _user?.FullName ?? "")" Busy="_busy" Icon="lock">
+    <ChildContent>
+        <div class="field">
+            <label for="set-password">@L["acct.newPassword"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="set-password" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_setPassword" @bind:event="oninput" />
+            <div class="help">@L["usr.passwordPolicyHelp"]</div>
+        </div>
+        <CheckField @bind-Value="_setMustChange" Label="@L["usr.mustChange"]" />
+        <Banner Tone="Tone.Info" Text="@L["usr.setPasswordNote"]" />
+        @if (_setError is not null) {<Banner Tone="Tone.Err" Text="@_setError" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _settingPassword = false" />
+        <Btn Primary="true" Icon="lock" Text="@L["usr.setPassword"]" Busy="_busy" Disabled="@string.IsNullOrEmpty(_setPassword)" OnClick="SetPassword" />
     </Footer>
 </Modal>
 
@@ -174,11 +232,15 @@
     private string? _reference, _q, _action, _actError, _roleError, _inviteEmail, _inviteRole, _inviteError;
     private int _page = 1, _version, _roleSelectKey;
     private UserListItem? _user;
-    private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting;
+    private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting, _settingPassword, _setMustChange = true;
+    private string _addMode = "invite";
+    private string? _setPassword, _setError;
+    private NewUserModel _new = new();
     private RoleModel _role = new();
 
     [Parameter] public string Company { get; set; } = "";
 
+    private IReadOnlyList<TabItem> AddModes => [new("invite", L["usr.modeInvite"]), new("create", L["usr.modeCreate"])];
     private IReadOnlyList<TabItem> Tabs => [new("users", L["usr.users"]), new("roles", L["usr.roles"]), new("invitations", L["usr.invitations"])];
     private IReadOnlyList<Option<string?>> RoleOptions => _roles.Select(r => new Option<string?>(r.Id, RoleName(r), Grantable(r) ? null : L["usr.roleNotHeld"], !Grantable(r))).ToList();
 
@@ -333,6 +395,72 @@
         }
         catch (ApiException e) { _roleError = e.Problem.Detail; }
         finally { _busy = false; }
+    }
+
+    private void OpenAdd()
+    {
+        _inviteEmail = null;
+        _inviteRole = null;
+        _inviteError = null;
+        _new = new NewUserModel();
+        _inviting = true;
+    }
+
+    private Task SetAddMode(string mode)
+    {
+        _addMode = mode;
+        _inviteError = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateUser()
+    {
+        _busy = true;
+        _inviteError = null;
+        try
+        {
+            await Api.PostAsync<UserListItem>(Api.C("users"), new CreateUserRequest(_new.FullName!.Trim(), _new.UserName!.Trim(),
+                string.IsNullOrWhiteSpace(_new.Email) ? null : _new.Email.Trim(), _new.Password!, _inviteRole!, _new.MustChangePassword));
+            _inviting = false;
+            Toasts.Success(L.F("usr.created", _new.UserName ?? ""));
+            _tab = "users";
+            await Load();
+        }
+        catch (ApiException e) { _inviteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private void OpenSetPassword()
+    {
+        _setPassword = null;
+        _setError = null;
+        _setMustChange = true;
+        _settingPassword = true;
+    }
+
+    private async Task SetPassword()
+    {
+        if (_user is null) return;
+        _busy = true;
+        _setError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/set-password"), new SetPasswordRequest(_setPassword!, _setMustChange));
+            _settingPassword = false;
+            Toasts.Success(L.F("usr.passwordSet", _user.FullName));
+            await Refresh();
+        }
+        catch (ApiException e) { _setError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class NewUserModel
+    {
+        public string? FullName { get; set; }
+        public string? UserName { get; set; }
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public bool MustChangePassword { get; set; } = true;
     }
 
     private async Task Invite()

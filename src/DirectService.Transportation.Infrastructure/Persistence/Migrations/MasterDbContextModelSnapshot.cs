@@ -6132,7 +6132,6 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnOrder(25);
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .IsUnicode(true)
                         .HasColumnType("nvarchar(150)")
@@ -6190,13 +6189,25 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("LockedUntil")
                         .HasColumnOrder(17);
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit")
+                        .HasColumnName("MustChangePassword")
+                        .HasColumnOrder(30)
+                        .HasDefaultValueSql("0", "DF_Users_MustChangePassword");
+
                     b.Property<string>("NormalizedEmail")
-                        .IsRequired()
                         .HasMaxLength(150)
                         .IsUnicode(true)
                         .HasColumnType("nvarchar(150)")
                         .HasColumnName("NormalizedEmail")
                         .HasColumnOrder(5);
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(50)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("NormalizedUserName")
+                        .HasColumnOrder(29);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -6263,6 +6274,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("UpdatedBy")
                         .HasColumnOrder(22);
 
+                    b.Property<string>("UserName")
+                        .HasMaxLength(50)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("UserName")
+                        .HasColumnOrder(28);
+
                     b.HasKey("Id")
                         .HasName("PK_Users");
 
@@ -6270,11 +6288,15 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "Email" }, "UX_Users_Email")
                         .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
+                        .HasFilter("[IsDeleted] = 0 AND [Email] IS NOT NULL");
 
                     b.HasIndex(new[] { "NormalizedEmail" }, "UX_Users_NormalizedEmail")
                         .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
+                        .HasFilter("[IsDeleted] = 0 AND [NormalizedEmail] IS NOT NULL");
+
+                    b.HasIndex(new[] { "NormalizedUserName" }, "UX_Users_NormalizedUserName")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0 AND [NormalizedUserName] IS NOT NULL");
 
                     b.HasIndex(new[] { "PublicId" }, "UX_Users_PublicId")
                         .IsUnique();
@@ -6282,6 +6304,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.ToTable("Users", "core", t =>
                         {
                             t.HasCheckConstraint("CK_Users_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Users_Email_UserName", "[Email] IS NOT NULL OR [UserName] IS NOT NULL");
 
                             t.HasCheckConstraint("CK_Users_IsPlatformStaff_TenantId", "([IsPlatformStaff] = 1 AND [TenantId] IS NULL) OR ([IsPlatformStaff] = 0 AND [TenantId] IS NOT NULL)");
 

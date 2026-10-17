@@ -6159,3 +6159,116 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    DROP INDEX [UX_Users_Email] ON [core].[Users];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    DROP INDEX [UX_Users_NormalizedEmail] ON [core].[Users];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    DECLARE @var nvarchar(max);
+    SELECT @var = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[core].[Users]') AND [c].[name] = N'NormalizedEmail');
+    IF @var IS NOT NULL EXEC(N'ALTER TABLE [core].[Users] DROP CONSTRAINT ' + @var + ';');
+    ALTER TABLE [core].[Users] ALTER COLUMN [NormalizedEmail] nvarchar(150) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    DECLARE @var1 nvarchar(max);
+    SELECT @var1 = QUOTENAME([d].[name])
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[core].[Users]') AND [c].[name] = N'Email');
+    IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [core].[Users] DROP CONSTRAINT ' + @var1 + ';');
+    ALTER TABLE [core].[Users] ALTER COLUMN [Email] nvarchar(150) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [MustChangePassword] bit NOT NULL CONSTRAINT [DF_Users_MustChangePassword] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [NormalizedUserName] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [UserName] nvarchar(50) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_Users_Email] ON [core].[Users] ([Email]) WHERE [IsDeleted] = 0 AND [Email] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_Users_NormalizedEmail] ON [core].[Users] ([NormalizedEmail]) WHERE [IsDeleted] = 0 AND [NormalizedEmail] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_Users_NormalizedUserName] ON [core].[Users] ([NormalizedUserName]) WHERE [IsDeleted] = 0 AND [NormalizedUserName] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [core].[Users] ADD CONSTRAINT [CK_Users_Email_UserName] CHECK ([Email] IS NOT NULL OR [UserName] IS NOT NULL)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017111652_Rev6_UserNameSignIn'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017111652_Rev6_UserNameSignIn', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

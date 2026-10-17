@@ -18,7 +18,7 @@ public static class ErasedRecords
     private static readonly Dictionary<string, HashSet<string>> Personal = new(StringComparer.Ordinal)
     {
         ["TRN.Driver"] = ["FullName", "NationalId", "Phone1", "Phone2", "Address", "LicenceNo", "BankName", "Iban", "CliqAlias", "Notes", "CustomValues"],
-        ["CORE.User"] = ["FullName", "Email", "NormalizedEmail"],
+        ["CORE.User"] = ["FullName", "Email", "NormalizedEmail", "UserName", "NormalizedUserName"],
         ["CORE.Invitation"] = ["Email"],
     };
 

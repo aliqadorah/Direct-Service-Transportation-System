@@ -16,6 +16,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             t.HasCheckConstraint("CK_Users_LanguageCode", "[LanguageCode] IN ('ar','en')");
             t.HasCheckConstraint("CK_Users_Status", "[Status] IN ('Active','Disabled','Archived')");
             t.HasCheckConstraint("CK_Users_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+            t.HasCheckConstraint("CK_Users_Email_UserName", "[Email] IS NOT NULL OR [UserName] IS NOT NULL");
             t.HasCheckConstraint("CK_Users_IsPlatformStaff_TenantId", "([IsPlatformStaff] = 1 AND [TenantId] IS NULL) OR ([IsPlatformStaff] = 0 AND [TenantId] IS NOT NULL)");
         });
 
@@ -52,14 +53,14 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnOrder(4)
             .IsUnicode(true)
             .HasMaxLength(150)
-            .IsRequired(true);
+            .IsRequired(false);
         builder.Property(e => e.NormalizedEmail)
             .HasColumnName("NormalizedEmail")
             .HasColumnType("nvarchar(150)")
             .HasColumnOrder(5)
             .IsUnicode(true)
             .HasMaxLength(150)
-            .IsRequired(true);
+            .IsRequired(false);
         builder.Property(e => e.EmailConfirmedAt)
             .HasColumnName("EmailConfirmedAt")
             .HasColumnType("datetime2")
@@ -199,16 +200,41 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnOrder(27)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6: username sign-in and forced password change (owner change request 15 Oct 2026).
+        builder.Property(e => e.UserName)
+            .HasColumnName("UserName")
+            .HasColumnType("nvarchar(50)")
+            .HasColumnOrder(28)
+            .IsUnicode(true)
+            .HasMaxLength(50)
+            .IsRequired(false);
+        builder.Property(e => e.NormalizedUserName)
+            .HasColumnName("NormalizedUserName")
+            .HasColumnType("nvarchar(50)")
+            .HasColumnOrder(29)
+            .IsUnicode(true)
+            .HasMaxLength(50)
+            .IsRequired(false);
+        builder.Property(e => e.MustChangePassword)
+            .HasColumnName("MustChangePassword")
+            .HasColumnType("bit")
+            .HasColumnOrder(30)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
 
         builder.HasIndex(new[] { "PublicId" }, "UX_Users_PublicId")
             .IsUnique()
             .HasFilter(null);
         builder.HasIndex(new[] { "Email" }, "UX_Users_Email")
             .IsUnique()
-            .HasFilter("[IsDeleted] = 0");
+            .HasFilter("[IsDeleted] = 0 AND [Email] IS NOT NULL");
         builder.HasIndex(new[] { "NormalizedEmail" }, "UX_Users_NormalizedEmail")
             .IsUnique()
-            .HasFilter("[IsDeleted] = 0");
+            .HasFilter("[IsDeleted] = 0 AND [NormalizedEmail] IS NOT NULL");
+        builder.HasIndex(new[] { "NormalizedUserName" }, "UX_Users_NormalizedUserName")
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0 AND [NormalizedUserName] IS NOT NULL");
         builder.HasIndex(new[] { "DefaultCompanyId" }, "IX_Users_DefaultCompanyId");
 
         builder.HasOne(e => e.DefaultCompany)

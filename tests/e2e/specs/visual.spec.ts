@@ -95,7 +95,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
 
 for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — account pages (${lang})`, async ({ page }) => {
-    test.skip(!wanted("account", "/sign-in", "/sign-up", "two-factor"), "not among VISUAL_ONLY");
+    test.skip(!wanted("account", "/sign-in", "/sign-up", "two-factor", "change-password"), "not among VISUAL_ONLY");
     test.setTimeout(20 * 60_000);
     const run = new VisualRun(lang, "account");
     for (const route of ["/sign-in", "/sign-up", "/forgot-password"]) {
@@ -111,6 +111,22 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await submitForm(page, "sign-in");
     await expect(page).toHaveURL(/two-factor/);
     await run.check(page, "two-factor");
+    // Revision 6: a user created with a username and "must change password" → the forced password change page.
+    await page.locator('[name="Input.Code"]').fill(totp(account.key!));
+    await submitForm(page, "two-factor");
+    await waitForApp(page);
+    const company = companyOf(page);
+    const roles = await api<{ id: string; name: string }[]>(page, "GET", c(company, "roles"));
+    const userName = `vis.${Date.now().toString(36)}`;
+    await api(page, "POST", c(company, "users"), { fullName: "Visual user", userName, email: null, password: account.password,
+      role: roles.find((r) => r.name === "Viewer")!.id, mustChangePassword: true });
+    await page.context().clearCookies();
+    await page.goto(`/sign-in?lang=${lang}`);
+    await page.locator('[name="Input.Email"]').fill(userName);
+    await page.locator('[name="Input.Password"]').fill(account.password);
+    await submitForm(page, "sign-in");
+    await expect(page).toHaveURL(/change-password/);
+    await run.check(page, "change-password");
     run.assertClean();
   });
 
@@ -199,7 +215,8 @@ const rolesTab = async (page: Page, t: Text) => { await page.getByRole("tab", { 
 function companyPopups(ids: Record<string, string | null>, w: World, roleName: string): Popup[] {
   const customRole = async (p: Page, t: Text) => { await rolesTab(p, t); await p.locator("main table tbody tr").filter({ hasText: roleName }).click(); };
   return [
-    { name: "users#invite", route: "settings/users", open: header("usr.invite") },
+    { name: "users#add-invite", route: "settings/users", open: header("usr.addUser") },
+    { name: "users#add-create", route: "settings/users", open: async (p, t) => { await header("usr.addUser")(p, t); await p.locator(".dialog").getByRole("tab", { name: t("usr.modeCreate") }).click(); } },
     { name: "users#role-new", route: "settings/users", open: header("usr.newRole") },
     { name: "users#role-preset", route: "settings/users", open: async (p, t) => { await rolesTab(p, t); await firstRow(p); } },
     { name: "users#role-custom", route: "settings/users", open: customRole },

@@ -18,16 +18,56 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
 {
     public const string StageVerify = "verify";
     public const string StageSetup = "setup";
+    public const string StagePassword = "password";
 
-    /// <summary>Checks the password and issues the partial sign-in; returns the next step.</summary>
-    public async Task<SignInNextStep> PasswordAsync(HttpContext http, string email, string password, CancellationToken ct)
+    /// <summary>
+    /// Checks the password (<paramref name="login"/> = email or username) and issues the partial sign-in for the next step; with no
+    /// next step (revision 6: no 2FA required, no password change) the user is signed in at once.
+    /// </summary>
+    public async Task<SignInNextStep> PasswordAsync(HttpContext http, string login, string password, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(http);
-        var (user, next) = await auth.CheckPasswordAsync(email, password, ct).ConfigureAwait(false);
-        var stage = next == SignInNextStep.TwoFactorSetup ? StageSetup : StageVerify;
+        var (user, next) = await auth.CheckPasswordAsync(login, password, ct).ConfigureAwait(false);
         await http.SignOutAsync(AuthSchemes.App).ConfigureAwait(false);
-        await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, stage, user.SecurityStamp)).ConfigureAwait(false);
+        await ContinueAsync(http, user, next, ct).ConfigureAwait(false);
         return next;
+    }
+
+    /// <summary>The forced password change (stage "password"); returns the step after it.</summary>
+    public async Task<SignInNextStep> ChangePasswordAsync(HttpContext http, string? newPassword, CancellationToken ct)
+    {
+        var user = await MfaUserAsync(http, StagePassword).ConfigureAwait(false);
+        await auth.ChangeRequiredPasswordAsync(user, newPassword, ct).ConfigureAwait(false);
+        var next = await AuthService.SecondStepAsync(user, ct).ConfigureAwait(false);
+        await ContinueAsync(http, user, next, ct).ConfigureAwait(false);
+        return next;
+    }
+
+    /// <summary>Partial cookie at the stage of <paramref name="next"/>, or the full sign-in when nothing is left.</summary>
+    private async Task ContinueAsync(HttpContext http, User user, SignInNextStep next, CancellationToken ct)
+    {
+        if (next == SignInNextStep.None)
+        {
+            await CompleteAsync(http, user, ct).ConfigureAwait(false);
+            return;
+        }
+        var stage = next switch { SignInNextStep.TwoFactorSetup => StageSetup, SignInNextStep.ChangePassword => StagePassword, _ => StageVerify };
+        await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, stage, user.SecurityStamp)).ConfigureAwait(false);
+    }
+
+    /// <summary>The profile after a sign-in that needed no second step (JSON door).</summary>
+    public Task<MeResponse> ProfileAsync(CancellationToken ct) => me.GetAsync(ct);
+
+    /// <summary>
+    /// Re-issues the application cookie of the current session after the user's own security stamp changed (2FA turned on, password
+    /// changed from the profile), so this session stays signed in while every other session ends.
+    /// </summary>
+    public async Task RefreshAppCookieAsync(HttpContext http, User user)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(user);
+        var token = http.User.FindFirstValue(AppClaims.SessionToken) ?? throw new AppException(ErrorCodes.Forbidden, StatusCodes.Status403Forbidden);
+        await http.SignInAsync(AuthSchemes.App, AuthSetup.AppPrincipal(user.PublicId, user.FullName, token, user.SecurityStamp)).ConfigureAwait(false);
     }
 
     /// <summary>The stage of the current partial sign-in, or null.</summary>

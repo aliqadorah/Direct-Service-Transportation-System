@@ -164,6 +164,9 @@ public static class AuditVocabulary
         ["SignInFailed"] = A("محاولة دخول فاشلة", "Failed sign-in", "محاولة دخول فاشلة لـ{r}", "failed sign-in for {r}"),
         ["EmailVerified"] = A("تأكيد البريد", "Email verified", "تأكيد البريد الإلكتروني لـ{r}", "verified the email of {r}"),
         ["PasswordReset"] = A("إعادة تعيين كلمة المرور", "Password reset", "إعادة تعيين كلمة المرور لـ{r}", "reset the password of {r}"),
+        ["CreatedWithPassword"] = A("إنشاء مستخدم باسم مستخدم", "User created with a username", "إنشاء {r} باسم مستخدم وكلمة مرور", "created {r} with a username and password"),
+        ["PasswordSetByAdmin"] = A("تعيين كلمة المرور من المسؤول", "Password set by an administrator", "تعيين كلمة مرور جديدة لـ{r}", "set a new password for {r}"),
+        ["PasswordChanged"] = A("تغيير كلمة المرور", "Password changed", "تغيير كلمة المرور لـ{r}", "changed the password of {r}"),
         ["TwoFactorEnabled"] = A("تفعيل التحقق بخطوتين", "Two-step enabled", "تفعيل التحقق بخطوتين لـ{r}", "enabled two-step verification for {r}"),
         ["TwoFactorReset"] = A("إعادة تعيين التحقق بخطوتين", "Two-step reset", "إعادة تعيين التحقق بخطوتين لـ{r}", "reset two-step verification of {r}"),
         ["Unlock"] = A("فك القفل", "Unlocked", "فك قفل {r}", "unlocked {r}"),
@@ -234,7 +237,7 @@ public static class AuditVocabulary
     public static readonly IReadOnlySet<string> Hidden = new HashSet<string>(StringComparer.Ordinal)
     {
         "Id", "TenantId", "CompanyId", "PublicId", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "RowVersion", "IsDeleted", "DeletedAt",
-        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "NormalizedEmail", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
+        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
         "VoidedBy", "VoidedAt", "ApprovedAt", "ClosedBy", "ClosedAt", "ExportedBy", "ExportedAt", "ImportedBy", "ImportedAt", "ImportBatchId",
         "ExportBatchId", "JournalEntryId", "PeriodMonth", "SourceModule", "SourceType", "SourceId", "IsManual", "IcvCounter", "Icv", "UniqueId",
         "DocumentVersion", "Attempts", "LastAttemptAt", "LastSignInAt", "LastSeenAt", "LastActivityAt", "FailedSignInCount", "RequestPayload",
@@ -469,6 +472,8 @@ public static class AuditVocabulary
         ["CancelledAt"] = F("أُلغي في", "Cancelled", Kind.DateTime),
         ["RetentionEndsAt"] = F("نهاية الاحتفاظ", "Retention ends", Kind.DateTime),
         ["PasswordMinLength"] = F("أقل طول لكلمة المرور", "Minimum password length", Kind.Number),
+        ["UserName"] = F("اسم المستخدم", "Username"),
+        ["MustChangePassword"] = F("تغيير كلمة المرور عند الدخول التالي", "Must change password at next sign-in"),
         ["PasswordRequireLetter"] = F("كلمة المرور تتطلب حرفاً", "Password needs a letter"),
         ["PasswordRequireDigit"] = F("كلمة المرور تتطلب رقماً", "Password needs a digit"),
         ["SessionIdleTimeoutMinutes"] = F("مهلة الخمول (دقائق)", "Idle timeout (minutes)", Kind.Number),

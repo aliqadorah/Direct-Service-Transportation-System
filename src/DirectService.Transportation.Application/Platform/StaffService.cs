@@ -47,7 +47,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var pending = Pending(u);
         var expires = pending ? InvitedAt(u).AddHours(InvitationHours) : (DateTime?)null;
         var state = pending ? (expires > Now ? StaffStates.Invited : StaffStates.Expired) : u.Status == "Active" ? StaffStates.Active : StaffStates.Disabled;
-        return new StaffResponse(support.Token<User>(u.PublicId), u.FullName, u.Email, state, Utc(u.LastSignInAt), pending ? Utc(InvitedAt(u)) : null, Utc(expires),
+        return new StaffResponse(support.Token<User>(u.PublicId), u.FullName, u.Email ?? string.Empty, state, Utc(u.LastSignInAt), pending ? Utc(InvitedAt(u)) : null, Utc(expires),
             u.TwoFactorEnabledAt is not null, u.Id == self);
     }
 
@@ -216,7 +216,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var inviter = await db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == ctx.UserId).Select(u => u.FullName).SingleAsync(ct).ConfigureAwait(false);
         var token = await users.GenerateUserTokenAsync(user, InvitationTokenProvider, InvitationPurpose).ConfigureAwait(false);
         var link = $"{options.Value.PublicBaseUrl.TrimEnd('/')}/accept-staff-invitation?u={Uri.EscapeDataString(urlTokens.Encode<User>(user.PublicId))}&t={Uri.EscapeDataString(token)}";
-        await email.SendAsync(EmailTemplates.StaffInvitation(user.Email, user.FullName, inviter, InvitationHours, link), ct).ConfigureAwait(false);
+        await email.SendAsync(EmailTemplates.StaffInvitation(user.Email!, user.FullName, inviter, InvitationHours, link), ct).ConfigureAwait(false);
     }
 
     private async Task<User> FindAsync(string token, CancellationToken ct)

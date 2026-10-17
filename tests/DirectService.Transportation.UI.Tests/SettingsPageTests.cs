@@ -50,6 +50,53 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Assert.DoesNotContain(cut.FindAll(".dialog button"), b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
     }
 
+    /// <summary>Revision 6 item 1: "Add user" → "Create with username and password", must-change ON by default, posted with the role.</summary>
+    [Fact]
+    public void Add_user_creates_a_username_user_with_must_change_password_on_by_default()
+    {
+        var viewer = new RoleResponse("r3", "Viewer", true, [PermissionKeys.TripsView], 0, "A");
+        Respond("roles/permissions", Array.Empty<PermissionItem>());
+        Respond("roles", new[] { viewer });
+        Respond("users", new PagedResult<UserListItem>([], 1, 50, 0));
+        var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)));
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click();
+        cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click();
+        Assert.Contains(L["usr.createNote"], cut.Markup);
+        Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)cut.Find(".dialog input[type=checkbox]")).IsChecked);
+        cut.Find("#new-name").Input("سامر");
+        cut.Find("#new-username").Input("samer.k");
+        cut.Find("#new-password").Input("Passw0rd-1");
+        cut.FindAll(".dialog select").Single().Change("0");   // options are posted by index
+        var create = cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal));
+        Assert.False(create.HasAttribute("disabled"));
+        create.Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "users"));
+        var body = Requests.Single(r => r.Method == "POST" && r.Path == "users").Body!;
+        Assert.Contains("\"userName\":\"samer.k\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"mustChangePassword\":true", body, StringComparison.Ordinal);
+        Assert.Contains("\"email\":null", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>Revision 6: a user without email gets "Set a new password" and no reset-link button.</summary>
+    [Fact]
+    public void A_username_user_without_email_offers_set_password_not_the_reset_link()
+    {
+        Respond("roles/permissions", Array.Empty<PermissionItem>());
+        Respond("roles", new[] { new RoleResponse("r3", "Viewer", true, [PermissionKeys.TripsView], 1, "A") });
+        Respond("users", new PagedResult<UserListItem>([new UserListItem("u2", "سامر", null, "Active", new Ref("r3", "Viewer"), false, false, false, null, "A", "samer.k", true)], 1, 50, 1));
+        var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("samer.k", cut.Markup));
+        Assert.Contains(L["usr.mustChangeBadge"], cut.Markup);
+        cut.Find("tbody tr").Click();
+        cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)));
+        Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.passwordReset"], StringComparison.Ordinal));
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click();
+        cut.Find("#set-password").Input("N3w-Password-1");
+        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "users/u2/set-password"));
+    }
+
     [Fact]
     public void Role_editor_lists_each_permission_as_its_own_row_under_a_translated_group()
     {

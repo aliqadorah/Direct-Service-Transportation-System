@@ -13,7 +13,8 @@ internal static class ApiSummaries
         ["POST /api/v1/auth/sign-up"] = "Sign up: create the tenant, Owner account and first company (US-31)",
         ["POST /api/v1/auth/resend-verification"] = "Resend the email verification link",
         ["POST /api/v1/auth/verify-email"] = "Verify the email address with the link token",
-        ["POST /api/v1/auth/sign-in"] = "Sign in with email and password; returns the required second-factor step",
+        ["POST /api/v1/auth/sign-in"] = "Sign in with email or username and password; returns the next step (second factor, password change) or signs in",
+        ["POST /api/v1/auth/change-password"] = "Choose the new password an administrator asked for, then continue the sign-in",
         ["GET /api/v1/auth/2fa/setup"] = "Get the authenticator key for mandatory two-factor set-up (FR-177)",
         ["POST /api/v1/auth/2fa/setup"] = "Complete two-factor set-up; returns the one-time recovery codes",
         ["POST /api/v1/auth/2fa/verify"] = "Verify the authenticator code or a recovery code and start the session",
@@ -29,6 +30,9 @@ internal static class ApiSummaries
         ["GET /api/v1/me/sessions"] = "List the user's active sessions (FR-176)",
         ["DELETE /api/v1/me/sessions/{session}"] = "Sign out one session",
         ["POST /api/v1/me/sessions/sign-out-others"] = "Sign out all other sessions",
+        ["POST /api/v1/me/password"] = "Change my password with the current one (revision 6)",
+        ["GET /api/v1/me/2fa/setup"] = "Get an authenticator key to turn two-step verification on",
+        ["POST /api/v1/me/2fa/setup"] = "Turn two-step verification on with a first code; returns the one-time recovery codes",
         ["POST /api/v1/me/invitations/accept"] = "Accept an invitation as an existing user of the tenant",
 
         // Tenant (core.tenant.manage)
@@ -41,6 +45,8 @@ internal static class ApiSummaries
 
         // Users, roles, invitations (core.users.manage)
         ["GET /api/v1/companies/{company}/users/"] = "List the company's users with their role",
+        ["POST /api/v1/companies/{company}/users/"] = "Create a user with a username and password, without 2FA (revision 6)",
+        ["POST /api/v1/companies/{company}/users/{user}/set-password"] = "Set a new password for a user created with a username (audited)",
         ["PUT /api/v1/companies/{company}/users/{user}/role"] = "Assign the user's role in this company",
         ["POST /api/v1/companies/{company}/users/{user}/remove"] = "Remove the user's access to this company",
         ["POST /api/v1/companies/{company}/users/{user}/disable"] = "Disable a user",

@@ -39,7 +39,9 @@ public static class DependencyInjection
 
         services.AddIdentityCore<User>(o =>
             {
-                o.User.RequireUniqueEmail = true;
+                // Revision 6: a user created with a username may have no email. Email and username stay unique platform-wide
+                // (UX_Users_NormalizedEmail / UX_Users_NormalizedUserName, checked first by the services; the user name check covers both).
+                o.User.RequireUniqueEmail = false;
                 o.SignIn.RequireConfirmedEmail = true;
                 // Password rules come from the tenant policy (TenantPasswordValidator); keep the built-in ones neutral.
                 o.Password.RequiredLength = 8;

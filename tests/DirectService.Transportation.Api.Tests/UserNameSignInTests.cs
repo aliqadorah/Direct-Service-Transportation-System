@@ -1,0 +1,265 @@
+using System.Net;
+using System.Net.Http.Json;
+using DirectService.Transportation.Contracts.Common;
+using DirectService.Transportation.Contracts.Identity;
+using DirectService.Transportation.Contracts.Security;
+using DirectService.Transportation.Domain.Core;
+using Microsoft.EntityFrameworkCore;
+
+namespace DirectService.Transportation.Api.Tests;
+
+/// <summary>
+/// Revision 6 item 1 (owner change request 15 Oct 2026): users created by an administrator with a username and password — sign-in with
+/// username or email, no 2FA required, forced password change, no self-service reset without email, administrator reset (audited), same lockout.
+/// </summary>
+[Collection(ApiCollection.Name)]
+public sealed class UserNameSignInTests(ApiFactory f)
+{
+    private const string NewPassword = "N3w-Password-1";
+
+    private static string U(SignedInUser o, string path) => $"/api/v1/companies/{o.CompanyId}{path}";
+
+    private static async Task<string> RoleAsync(SignedInUser owner, string name) =>
+        (await owner.Client.GetFromJsonAsync<List<RoleResponse>>(U(owner, "/roles")))!.Single(r => r.Name == name).Id;
+
+    private static string NewUserName() => "u." + Guid.NewGuid().ToString("N")[..10];
+
+    private static async Task<(string UserName, UserListItem User)> CreateAsync(SignedInUser owner, bool mustChange, string? email = null, string role = PresetRoles.Accountant)
+    {
+        var userName = NewUserName();
+        var r = await owner.Client.PostAsJsonAsync(U(owner, "/users"),
+            new CreateUserRequest("Username User", userName, email, ApiHelpers.Password, await RoleAsync(owner, role), mustChange));
+        await r.EnsureOkAsync();
+        return (userName, (await r.Content.ReadFromJsonAsync<UserListItem>())!);
+    }
+
+    private async Task<(HttpClient Client, SignInResponse Response)> PasswordStepAsync(string login, string password)
+    {
+        var client = f.NewClient();
+        await client.UseAntiforgeryAsync();
+        var r = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, password, login));
+        await r.EnsureOkAsync();
+        return (client, (await r.Content.ReadFromJsonAsync<SignInResponse>())!);
+    }
+
+    [Fact]
+    public async Task Created_user_signs_in_with_the_username_without_2FA_and_is_audited()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, user) = await CreateAsync(owner, mustChange: false);
+        Assert.Null(user.Email);
+        Assert.Equal(userName, user.UserName);
+
+        // Case-insensitive username; no second step, the response carries the profile and the session works.
+        var (client, response) = await PasswordStepAsync(userName.ToUpperInvariant(), ApiHelpers.Password);
+        Assert.Equal("done", response.Next);
+        Assert.NotNull(response.Me);
+        Assert.Equal(userName, response.Me!.UserName);
+        Assert.False(response.Me.TwoFactorEnabled);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
+
+        var audit = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
+            .Where(a => a.EntityType == "CORE.User" && a.Action == "CreatedWithPassword" && a.NewValues!.Contains(userName)).CountAsync());
+        Assert.Equal(1, audit);
+    }
+
+    [Fact]
+    public async Task Created_user_with_email_signs_in_with_either_name()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var email = $"staff-{Guid.NewGuid():N}@example.test";
+        var (userName, _) = await CreateAsync(owner, mustChange: false, email: email);
+        Assert.Equal("done", (await PasswordStepAsync(email, ApiHelpers.Password)).Response.Next);
+        Assert.Equal("done", (await PasswordStepAsync(userName, ApiHelpers.Password)).Response.Next);
+    }
+
+    [Fact]
+    public async Task Must_change_password_blocks_the_session_until_a_new_password_is_chosen()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, user) = await CreateAsync(owner, mustChange: true);
+        Assert.True(user.MustChangePassword);
+
+        var (client, response) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        Assert.Equal("changePassword", response.Next);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/me/")).StatusCode);   // no session yet
+
+        // Policy and "different from the current one" apply.
+        var weak = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest("short"));
+        Assert.Equal("auth.passwordPolicy", await weak.ErrorCodeAsync());
+        var same = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest(ApiHelpers.Password));
+        Assert.Equal("auth.passwordUnchanged", await same.ErrorCodeAsync());
+
+        var changed = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest(NewPassword));
+        await changed.EnsureOkAsync();
+        Assert.Equal("done", (await changed.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+        await client.UseAntiforgeryAsync();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
+
+        // The old password no longer works; the new one signs straight in.
+        var old = f.NewClient();
+        await old.UseAntiforgeryAsync();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await old.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, userName))).StatusCode);
+        Assert.Equal("done", (await PasswordStepAsync(userName, NewPassword)).Response.Next);
+        Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
+            .Join(db.Set<User>().IgnoreQueryFilters(), a => a.EntityId, u => u.Id, (a, u) => new { a, u })
+            .CountAsync(x => x.a.EntityType == "CORE.User" && x.a.Action == "PasswordChanged" && x.u.UserName == userName)));
+    }
+
+    [Fact]
+    public async Task Change_password_endpoint_needs_the_password_stage()
+    {
+        var client = f.NewClient();
+        await client.UseAntiforgeryAsync();
+        var r = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest(NewPassword));
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+    }
+
+    [Fact]
+    public async Task Username_rules_and_uniqueness_are_enforced()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var role = await RoleAsync(owner, PresetRoles.Viewer);
+        foreach (var bad in new[] { "ab", "has space", "name@domain", "عربي", new string('a', 51) })
+        {
+            var r = await owner.Client.PostAsJsonAsync(U(owner, "/users"), new CreateUserRequest("X", bad, null, ApiHelpers.Password, role));
+            Assert.Equal("user.userNameFormat", await r.ErrorCodeAsync());
+        }
+        var (userName, _) = await CreateAsync(owner, mustChange: false);
+
+        // Unique platform-wide, case-insensitively — also from another tenant.
+        var other = await f.SignUpOwnerAsync();
+        var dup = await other.Client.PostAsJsonAsync(U(other, "/users"),
+            new CreateUserRequest("X", userName.ToUpperInvariant(), null, ApiHelpers.Password, await RoleAsync(other, PresetRoles.Viewer)));
+        Assert.Equal("user.userNameInUse", await dup.ErrorCodeAsync());
+        var usedEmail = await other.Client.PostAsJsonAsync(U(other, "/users"),
+            new CreateUserRequest("X", NewUserName(), owner.Email, ApiHelpers.Password, await RoleAsync(other, PresetRoles.Viewer)));
+        Assert.Equal("user.emailInUse", await usedEmail.ErrorCodeAsync());
+        var weak = await other.Client.PostAsJsonAsync(U(other, "/users"),
+            new CreateUserRequest("X", NewUserName(), null, "weak", await RoleAsync(other, PresetRoles.Viewer)));
+        Assert.Equal("auth.passwordPolicy", await weak.ErrorCodeAsync());
+    }
+
+    [Fact]
+    public async Task Only_users_managers_create_users_and_never_with_a_role_beyond_their_own()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (accountantName, _) = await CreateAsync(owner, mustChange: false);
+        var (accountant, _) = await PasswordStepAsync(accountantName, ApiHelpers.Password);
+        await accountant.UseAntiforgeryAsync();
+        var r = await accountant.PostAsJsonAsync($"/api/v1/companies/{owner.CompanyId}/users",
+            new CreateUserRequest("X", NewUserName(), null, ApiHelpers.Password, await RoleAsync(owner, PresetRoles.Viewer)));
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+
+        var (adminName, _) = await CreateAsync(owner, mustChange: false, role: PresetRoles.Administrator);
+        var (admin, _) = await PasswordStepAsync(adminName, ApiHelpers.Password);
+        await admin.UseAntiforgeryAsync();
+        var escalate = await admin.PostAsJsonAsync($"/api/v1/companies/{owner.CompanyId}/users",
+            new CreateUserRequest("X", NewUserName(), null, ApiHelpers.Password, await RoleAsync(owner, PresetRoles.Owner)));
+        Assert.Equal(HttpStatusCode.Forbidden, escalate.StatusCode);   // DT-18
+    }
+
+    [Fact]
+    public async Task A_user_without_email_gets_no_reset_link_only_an_admin_reset_which_is_audited()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, user) = await CreateAsync(owner, mustChange: false);
+
+        // Anonymous "forgot password" with the username sends nothing (and says nothing).
+        var anon = f.NewClient();
+        await anon.UseAntiforgeryAsync();
+        var before = f.Emails.Count;
+        Assert.Equal(HttpStatusCode.Accepted, (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(userName))).StatusCode);
+        Assert.Equal(before, f.Emails.Count);
+
+        // The administrator cannot email a link to a user without email…
+        var link = await owner.Client.PostAsync(U(owner, $"/users/{user.Id}/password-reset"), null);
+        Assert.Equal("user.noEmail", await link.ErrorCodeAsync());
+
+        // …but sets a new password: sessions end, the user must change it at the next sign-in, and it is audited.
+        var (session, _) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        var set = await owner.Client.PostAsJsonAsync(U(owner, $"/users/{user.Id}/set-password"), new SetPasswordRequest(NewPassword));
+        await set.EnsureOkAsync();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await session.GetAsync("/api/v1/me/")).StatusCode);
+        Assert.Equal("changePassword", (await PasswordStepAsync(userName, NewPassword)).Response.Next);
+        Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
+            .Join(db.Set<User>().IgnoreQueryFilters(), a => a.EntityId, u => u.Id, (a, u) => new { a, u })
+            .CountAsync(x => x.a.EntityType == "CORE.User" && x.a.Action == "PasswordSetByAdmin" && x.u.UserName == userName)));
+    }
+
+    [Fact]
+    public async Task Set_password_is_refused_for_users_who_sign_in_with_their_email()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var list = await owner.Client.GetFromJsonAsync<PagedResult<UserListItem>>(U(owner, "/users"));
+        var self = list!.Items.Single(u => u.Email == owner.Email);
+        var r = await owner.Client.PostAsJsonAsync(U(owner, $"/users/{self.Id}/set-password"), new SetPasswordRequest(NewPassword));
+        Assert.Equal("user.passwordSetNotAllowed", await r.ErrorCodeAsync());
+    }
+
+    [Fact]
+    public async Task Username_users_get_the_same_lockout()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, _) = await CreateAsync(owner, mustChange: false);
+        var client = f.NewClient();
+        await client.UseAntiforgeryAsync();
+        for (var i = 0; i < 5; i++)
+            await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, "Wrong-pass-1", userName));
+        var locked = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, userName));
+        Assert.Equal((HttpStatusCode)423, locked.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_username_user_can_turn_2FA_on_later_and_then_needs_it()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, _) = await CreateAsync(owner, mustChange: false);
+        var (client, _) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        await client.UseAntiforgeryAsync();
+
+        var setup = await client.GetFromJsonAsync<TwoFactorSetupResponse>("/api/v1/me/2fa/setup");
+        Assert.NotNull(setup!.QrSvg);
+        await client.UseAntiforgeryAsync();   // the cookie was re-issued (new security stamp)
+        var done = await client.PostAsJsonAsync("/api/v1/me/2fa/setup", new TwoFactorCodeRequest(Totp.Code(setup.SharedKey), null));
+        await done.EnsureOkAsync();
+        var codes = (await done.Content.ReadFromJsonAsync<RecoveryCodesResponse>())!;
+        Assert.Equal(10, codes.RecoveryCodes.Count);
+        Assert.True(codes.Me.TwoFactorEnabled);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);   // this session stays signed in
+
+        Assert.Equal("twoFactor", (await PasswordStepAsync(userName, ApiHelpers.Password)).Response.Next);
+        Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
+            .Join(db.Set<User>().IgnoreQueryFilters(), a => a.EntityId, u => u.Id, (a, u) => new { a, u })
+            .CountAsync(x => x.a.EntityType == "CORE.User" && x.a.Action == "TwoFactorEnabled" && x.u.UserName == userName)));
+    }
+
+    [Fact]
+    public async Task A_user_without_email_changes_the_password_in_the_profile()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, _) = await CreateAsync(owner, mustChange: false);
+        var (client, _) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        await client.UseAntiforgeryAsync();
+        var wrong = await client.PostAsJsonAsync("/api/v1/me/password", new ChangePasswordRequest("Wrong-pass-1", NewPassword));
+        Assert.Equal("auth.passwordWrong", await wrong.ErrorCodeAsync());
+        await (await client.PostAsJsonAsync("/api/v1/me/password", new ChangePasswordRequest(ApiHelpers.Password, NewPassword))).EnsureOkAsync();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
+        Assert.Equal("done", (await PasswordStepAsync(userName, NewPassword)).Response.Next);
+    }
+
+    [Fact]
+    public async Task Email_users_still_need_2FA_and_staff_always_do()
+    {
+        // An Owner who signed up with an email is asked to set up 2FA at the first sign-in (helper asserts "twoFactorSetup").
+        var owner = await f.SignUpOwnerAsync();
+        Assert.False(string.IsNullOrEmpty(owner.AuthenticatorKey));
+        await f.DbAsync(async db =>
+        {
+            var u = await db.Set<User>().IgnoreQueryFilters().SingleAsync(x => x.Email == owner.Email);
+            Assert.True(Application.Identity.AuthService.RequiresTwoFactor(u));
+            Assert.True(Application.Identity.AuthService.RequiresTwoFactor(new User { IsPlatformStaff = true, UserName = "staff" }));
+            return true;
+        });
+    }
+}

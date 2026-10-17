@@ -48,8 +48,15 @@ internal static class AuthEndpoints
 
         auth.MapPost("/sign-in", async (SignInRequest r, HttpContext http, AuthFlow flow, CancellationToken ct) =>
         {
-            var next = await flow.PasswordAsync(http, r.Email, r.Password, ct).ConfigureAwait(false);
-            return TypedResults.Ok(new SignInResponse(next == SignInNextStep.TwoFactorSetup ? "twoFactorSetup" : "twoFactor"));
+            var next = await flow.PasswordAsync(http, r.Login ?? r.Email ?? string.Empty, r.Password, ct).ConfigureAwait(false);
+            return TypedResults.Ok(await ResponseAsync(next, flow, ct).ConfigureAwait(false));
+        });
+
+        // Revision 6: the forced password change after the password step (user created or reset by an administrator).
+        auth.MapPost("/change-password", async (NewPasswordRequest r, HttpContext http, AuthFlow flow, CancellationToken ct) =>
+        {
+            var next = await flow.ChangePasswordAsync(http, r.NewPassword, ct).ConfigureAwait(false);
+            return TypedResults.Ok(await ResponseAsync(next, flow, ct).ConfigureAwait(false));
         });
 
         auth.MapGet("/2fa/setup", async (HttpContext http, AuthFlow flow) => TypedResults.Ok(await flow.SetupAsync(http).ConfigureAwait(false)));
@@ -87,4 +94,12 @@ internal static class AuthEndpoints
             return TypedResults.NoContent();
         });
     }
+
+    private static async Task<SignInResponse> ResponseAsync(SignInNextStep next, AuthFlow flow, CancellationToken ct) => next switch
+    {
+        SignInNextStep.TwoFactorSetup => new SignInResponse("twoFactorSetup"),
+        SignInNextStep.ChangePassword => new SignInResponse("changePassword"),
+        SignInNextStep.None => new SignInResponse("done", await flow.ProfileAsync(ct).ConfigureAwait(false)),
+        _ => new SignInResponse("twoFactor"),
+    };
 }

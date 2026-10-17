@@ -4,7 +4,11 @@ using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
+using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Web.Pipeline;
+using DirectService.Transportation.Web.Security;
+using Microsoft.AspNetCore.Identity;
 
 namespace DirectService.Transportation.Web.Endpoints;
 
@@ -34,12 +38,38 @@ internal static class AccountEndpoints
         });
         me.MapPost("/sessions/sign-out-others", async (MeService s, CancellationToken ct) =>
             TypedResults.Ok(new { revoked = await s.SignOutOthersAsync(ct).ConfigureAwait(false) }));
+        // Revision 6: own password change (users without email have no reset link) and turning 2FA on later. Each changes the security
+        // stamp: this session's cookie is re-issued, every other session ends.
+        me.MapPost("/password", async (ChangePasswordRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, CancellationToken ct) =>
+        {
+            var user = await SelfAsync(users, ctx).ConfigureAwait(false);
+            await auth.ChangePasswordAsync(user, r.CurrentPassword, r.NewPassword, ct).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            return TypedResults.NoContent();
+        });
+        me.MapGet("/2fa/setup", async (HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, IQrCodeRenderer qr) =>
+        {
+            var user = await SelfAsync(users, ctx).ConfigureAwait(false);
+            var setup = await auth.GetAuthenticatorSetupAsync(user).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            return TypedResults.Ok(new TwoFactorSetupResponse(setup.SharedKey, setup.AuthenticatorUri, qr.Svg(setup.AuthenticatorUri)));
+        });
+        me.MapPost("/2fa/setup", async (TwoFactorCodeRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, MeService s, CancellationToken ct) =>
+        {
+            var user = await SelfAsync(users, ctx).ConfigureAwait(false);
+            var codes = await auth.CompleteAuthenticatorSetupAsync(user, r.Code ?? string.Empty, ct).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            return TypedResults.Ok(new RecoveryCodesResponse(codes, await s.GetAsync(ct).ConfigureAwait(false)));
+        });
         me.MapPost("/invitations/accept", async (InvitationAcceptRequest r, InvitationService s, CancellationToken ct) =>
         {
             await s.AcceptExistingAsync(r.Token, ct).ConfigureAwait(false);
             return TypedResults.NoContent();
         });
     }
+
+    private static async Task<User> SelfAsync(UserManager<User> users, IRequestContext ctx) =>
+        await users.FindByIdAsync((ctx.UserPublicId ?? throw Fail.Forbidden()).ToString("N")).ConfigureAwait(false) ?? throw Fail.Forbidden();
 
     /// <summary>Tenant administration (core.tenant.manage): security settings and companies (5.1, US-34, D-08/D-09).</summary>
     public static void MapTenantEndpoints(this RouteGroupBuilder api)
@@ -73,6 +103,10 @@ internal static class AccountEndpoints
         var users = company.MapGroup("/users").WithTags("Users").RequirePermission(PermissionKeys.UsersManage);
         users.MapGet("/", async ([AsParameters] ListQuery q, UserAdminService s, CancellationToken ct) =>
             TypedResults.Ok(await s.ListAsync(q.Search, q.ToPage(), ct).ConfigureAwait(false)));
+        users.MapPost("/", async (CreateUserRequest r, UserAdminService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.CreateWithPasswordAsync(r, ct).ConfigureAwait(false)));
+        users.MapPost("/{user}/set-password", async (string user, SetPasswordRequest r, UserAdminService s, CancellationToken ct) =>
+        { await s.SetPasswordAsync(user, r, ct).ConfigureAwait(false); return TypedResults.NoContent(); });
         users.MapPut("/{user}/role", async (string user, AssignRoleRequest r, UserAdminService s, CancellationToken ct) =>
         { await s.AssignRoleAsync(user, r.Role, ct).ConfigureAwait(false); return TypedResults.NoContent(); });
         users.MapPost("/{user}/remove", async (string user, ReasonRequest r, UserAdminService s, CancellationToken ct) =>

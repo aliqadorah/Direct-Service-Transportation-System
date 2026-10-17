@@ -1,6 +1,7 @@
 @page "/c/{Company}/profile"
 @* SCR-08 my profile (FR-176, FR-178): language, default company and date format; density on this device (DT-69); active sessions with
-   sign-out of one or all others; password change by an emailed link (the reset flow of SCR-04, DT-143). *@
+   sign-out of one or all others; password change by an emailed link (the reset flow of SCR-04, DT-143), or here with the current password for a
+   user without email (revision 6); two-step verification: state, and turning it on (QR code, first code, recovery codes). *@
 @using DirectService.Transportation.Contracts.Identity
 @inject Api Api
 @inject Loc L
@@ -17,16 +18,25 @@
             <ProblemValidator @ref="_problems" />
             <ErrorSummary />
             <TextField Value="@Shell.Me?.FullName" ValueExpression="() => _nameShown" Label="@L["profile.name"]" ReadOnly="true" Help="@L["profile.nameHelp"]" />
-            <TextField Value="@Shell.Me?.Email" ValueExpression="() => _emailShown" Label="@L["acct.email"]" ReadOnly="true" Ltr="true" />
+            <TextField Value="@(Shell.Me?.Email ?? "—")" ValueExpression="() => _emailShown" Label="@L["acct.email"]" ReadOnly="true" Ltr="true" />
+            @if (Shell.Me?.UserName is { } userName) {<TextField Value="@userName" ValueExpression="() => _emailShown" Label="@L["usr.userName"]" ReadOnly="true" Ltr="true" />}
             <SelectField TValue="string" @bind-Value="_form.LanguageCode" Options="Languages" Label="@L["shell.language"]" />
             <SelectField TValue="string?" @bind-Value="_form.DefaultCompany" Options="Companies" Label="@L["profile.defaultCompany"]" />
             <SelectField TValue="string" @bind-Value="_form.DateFormat" Options="DateFormats" Label="@L["profile.dateFormat"]" />
             <SelectField TValue="string" Value="@Shell.Density" ValueChanged="Density" ValueExpression="() => _densityShown" Options="Densities" Label="@L["shell.density"]" Help="@L["shell.densityNote"]" />
             <div class="formbar">
-                <Btn Icon="lock" Text="@L["profile.changePassword"]" Busy="_sendingLink" OnClick="SendPasswordLink" />
+                <Btn Icon="lock" Text="@L["profile.changePassword"]" Busy="_sendingLink" OnClick="ChangePassword" />
                 <Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" />
             </div>
         </EditForm>
+        <div class="stack" style="margin-top:16px;gap:8px">
+            <KeyValues Columns="1" Items="@([new KeyValue(L["usr.2fa"], L[Shell.Me?.TwoFactorEnabled == true ? "ui.on" : "ui.off"])])" />
+            @if (Shell.Me?.TwoFactorEnabled != true)
+            {
+                <Banner Tone="Tone.Warn" Icon="shield" Text="@L["profile.twoFactorRecommend"]" />
+                <Btn Icon="shield" Text="@L["profile.enable2fa"]" Busy="_tfaBusy" OnClick="StartTwoFactor" />
+            }
+        </div>
     </Box>
     <Box Title="@L["profile.sessions"]" NoPad="true">
         <Actions>@if (_sessions is { Count: > 1 }) {<Btn Small="true" Danger="true" Icon="logout" FlipIcon="true" Text="@L["profile.signOutOthers"]" OnClick="SignOutOthers" />}</Actions>
@@ -50,7 +60,72 @@
     </Box>
 </div>
 
+<Modal @bind-Open="_pwOpen" Title="@L["profile.changePassword"]" Busy="_pwBusy" Icon="lock">
+    <ChildContent>
+        <div class="field">
+            <label for="pw-current">@L["profile.currentPassword"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="pw-current" class="input" type="password" dir="ltr" maxlength="128" autocomplete="current-password" @bind="_pwCurrent" @bind:event="oninput" />
+        </div>
+        <div class="field">
+            <label for="pw-new">@L["acct.newPassword"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="pw-new" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_pwNew" @bind:event="oninput" />
+            <div class="help">@L["usr.passwordPolicyHelp"]</div>
+        </div>
+        <div class="field">
+            <label for="pw-confirm">@L["acct.confirmPassword"] <span class="req" aria-hidden="true">*</span></label>
+            <input id="pw-confirm" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_pwConfirm" @bind:event="oninput" />
+        </div>
+        @if (_pwError is not null) {<Banner Tone="Tone.Err" Text="@_pwError" />}
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _pwOpen = false" />
+        <Btn Primary="true" Text="@L["profile.changePassword"]" Busy="_pwBusy" Disabled="@(string.IsNullOrEmpty(_pwCurrent) || string.IsNullOrEmpty(_pwNew) || string.IsNullOrEmpty(_pwConfirm))" OnClick="SavePassword" />
+    </Footer>
+</Modal>
+
+<Modal @bind-Open="_tfaOpen" Title="@L["acct.setupTitle"]" Busy="_tfaBusy" Icon="shield">
+    <ChildContent>
+        @if (_codes is not null)
+        {
+            <Banner Tone="Tone.Ok" Text="@L["profile.enable2faDone"]" />
+            <p>@L["acct.codesLead"]</p>
+            <ul class="num" dir="ltr" aria-label="@L["acct.codesTitle"]"
+                style="list-style:none;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--page);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;font-size:15px;letter-spacing:.04em">
+                @foreach (var c in _codes) {<li>@c</li>}
+            </ul>
+        }
+        else if (_setup is not null)
+        {
+            <div class="tfa-setup">
+                <p>@L["acct.setupStep1"]</p>
+                <p>@L["acct.setupStep2"]</p>
+                @if (_setup.QrSvg is { } svg) {<div class="tfa-qr" role="img" aria-label="@L["acct.setupQr"]">@((MarkupString)svg)</div>}
+                <div class="tfa-key num" dir="ltr">@_setup.SharedKey</div>
+                <p>@L["acct.setupStep3"]</p>
+            </div>
+            <div class="field">
+                <label for="tfa-code">@L["acct.codeField"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="tfa-code" class="input num" dir="ltr" inputmode="numeric" maxlength="7" autocomplete="one-time-code" @bind="_tfaCode" @bind:event="oninput" />
+            </div>
+        }
+        @if (_tfaError is not null) {<Banner Tone="Tone.Err" Text="@_tfaError" />}
+    </ChildContent>
+    <Footer>
+        @if (_codes is not null) {<Btn Primary="true" Text="@L["ui.close"]" OnClick="() => _tfaOpen = false" />}
+        else
+        {
+            <Btn Text="@L["ui.cancel"]" OnClick="() => _tfaOpen = false" />
+            <Btn Primary="true" Text="@L["acct.setupSubmit"]" Busy="_tfaBusy" Disabled="@string.IsNullOrWhiteSpace(_tfaCode)" OnClick="CompleteTwoFactor" />
+        }
+    </Footer>
+</Modal>
+
 @code {
+    private bool _pwOpen, _pwBusy, _tfaOpen, _tfaBusy;
+    private string? _pwCurrent, _pwNew, _pwConfirm, _pwError, _tfaCode, _tfaError;
+    private TwoFactorSetupResponse? _setup;
+    private IReadOnlyList<string>? _codes;
+
     private readonly PreferencesForm _form = new();
     private ProblemValidator? _problems;
     private IReadOnlyList<SessionResponse>? _sessions;
@@ -111,12 +186,67 @@
         await Js.ApplyRoot(Shell.Density, L.Language);
     }
 
+    /// <summary>An emailed link for users with an email (DT-143); here with the current password for a user without one (revision 6).</summary>
+    private Task ChangePassword()
+    {
+        if (Shell.Me?.Email is not null) return SendPasswordLink();
+        _pwCurrent = _pwNew = _pwConfirm = _pwError = null;
+        _pwOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task SavePassword()
+    {
+        if (_pwNew != _pwConfirm) { _pwError = L["acct.mismatch"]; return; }
+        _pwBusy = true;
+        _pwError = null;
+        try
+        {
+            await Api.PostAsync("api/v1/me/password", new ChangePasswordRequest(_pwCurrent!, _pwNew!));
+            _pwOpen = false;
+            Toasts.Success(L["profile.passwordChanged"]);
+            await LoadSessions();
+        }
+        catch (ApiException e) { _pwError = e.Problem.Detail; }
+        finally { _pwBusy = false; }
+    }
+
+    private async Task StartTwoFactor()
+    {
+        _tfaBusy = true;
+        _tfaError = null;
+        _codes = null;
+        _tfaCode = null;
+        try
+        {
+            _setup = await Api.GetAsync<TwoFactorSetupResponse>("api/v1/me/2fa/setup");
+            _tfaOpen = true;
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _tfaBusy = false; }
+    }
+
+    private async Task CompleteTwoFactor()
+    {
+        _tfaBusy = true;
+        _tfaError = null;
+        try
+        {
+            var result = await Api.PostAsync<RecoveryCodesResponse>("api/v1/me/2fa/setup", new TwoFactorCodeRequest(_tfaCode!.Replace(" ", "", StringComparison.Ordinal), null));
+            _codes = result.RecoveryCodes;
+            Shell.SetMe(result.Me);
+            await LoadSessions();
+        }
+        catch (ApiException e) { _tfaError = e.Problem.Detail; }
+        finally { _tfaBusy = false; }
+    }
+
     private async Task SendPasswordLink()
     {
         _sendingLink = true;
         try
         {
-            await Api.PostAsync("api/v1/auth/password-reset/request", new EmailRequest(Shell.Me!.Email));
+            await Api.PostAsync("api/v1/auth/password-reset/request", new EmailRequest(Shell.Me!.Email!));
             Toasts.Success(L["profile.linkSent"]);
         }
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }

@@ -29,7 +29,7 @@ public sealed class UserAdminService(
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
-            q = q.Where(r => r.User.FullName.Contains(s) || r.User.Email.Contains(s));
+            q = q.Where(r => r.User.FullName.Contains(s) || r.User.Email!.Contains(s) || r.User.UserName!.Contains(s));
         }
         var total = await q.CountAsync(ct).ConfigureAwait(false);
         var rows = await q.OrderBy(r => r.User.FullName).Skip(page.Skip).Take(page.SafePageSize)
@@ -37,14 +37,92 @@ public sealed class UserAdminService(
             {
                 r.User.PublicId, r.User.FullName, r.User.Email, r.User.Status, r.User.LockedUntil, r.User.TwoFactorEnabledAt,
                 r.User.EmailConfirmedAt, r.User.LastSignInAt, r.User.RowVersion, RolePublicId = r.Role.PublicId, RoleName = r.Role.Name,
+                r.User.UserName, r.User.MustChangePassword,
             })
             .ToListAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var items = rows.Select(u => new UserListItem(tokens.Encode<User>(u.PublicId), u.FullName, u.Email, u.Status,
             new Ref(tokens.Encode<Role>(u.RolePublicId), u.RoleName), u.LockedUntil > now, u.TwoFactorEnabledAt is not null,
-            u.EmailConfirmedAt is not null, u.LastSignInAt, Convert.ToBase64String(u.RowVersion))).ToList();
+            u.EmailConfirmedAt is not null, u.LastSignInAt, Convert.ToBase64String(u.RowVersion), u.UserName, u.MustChangePassword)).ToList();
         return new PagedResult<UserListItem>(items, page.SafePage, page.SafePageSize, total);
     }
+
+    /// <summary>
+    /// "Create with username and password" (revision 6, owner change request 15 Oct 2026): the administrator sets the username (unique
+    /// platform-wide), an optional email and a password under the tenant policy; no invitation, no email verification, no 2FA required.
+    /// The role follows DT-18 (only keys the caller holds) and the plan's user limit applies. Audited as "CreatedWithPassword".
+    /// </summary>
+    public async Task<UserListItem> CreateWithPasswordAsync(CreateUserRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var fullName = Common.TextNormalizer.CleanText(r.FullName);
+        var userName = r.UserName?.Trim();
+        var mail = string.IsNullOrWhiteSpace(r.Email) ? null : r.Email.Trim();
+        new Validator()
+            .Require("fullName", fullName).MaxLength("fullName", fullName, 150)
+            .Require("userName", userName)
+            .Check(mail is null || AccountService.IsEmail(mail), "email").MaxLength("email", mail, 150)
+            .Require("password", r.Password)
+            .Require("role", r.Role)
+            .ThrowIfInvalid();
+        if (!IsValidUserName(userName)) throw Fail.Field("userName", ErrorCodes.UserNameFormat);
+        var role = await RoleByTokenAsync(r.Role, ct).ConfigureAwait(false);
+        guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // no escalation (SR-01)
+        var tenantId = ctx.TenantId ?? throw Fail.Forbidden();
+        var policy = await TenantPasswordValidator.GetPolicyAsync(db, tenantId, ct).ConfigureAwait(false);
+        if (!policy.IsSatisfiedBy(r.Password)) throw AccountService.PolicyError(policy);
+        if (await users.FindByNameAsync(userName!).ConfigureAwait(false) is not null) throw Fail.Field("userName", ErrorCodes.UserNameInUse);
+        if (mail is not null && await users.FindByEmailAsync(mail).ConfigureAwait(false) is not null) throw Fail.Field("email", ErrorCodes.EmailInUse);
+        if (limits is not null) await limits.EnsureUserAsync(tenantId, ct).ConfigureAwait(false);   // P-07
+
+        var user = await db.InTransactionAsync(async c =>
+        {
+            // UserManager fills NormalizedUserName / NormalizedEmail on create (Set* would persist an unsaved user).
+            var u = new User
+            {
+                FullName = fullName!, UserName = userName, Email = mail, TenantId = tenantId, LanguageCode = ctx.Language is "en" ? "en" : "ar",
+                DefaultCompanyId = ctx.CompanyId, MustChangePassword = r.MustChangePassword,
+            };
+            changes.SetAction(u, "CreatedWithPassword");
+            var created = await users.CreateAsync(u, r.Password).ConfigureAwait(false);
+            if (!created.Succeeded)
+            {
+                if (created.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode)) throw AccountService.PolicyError(policy);
+                if (created.Errors.Any(e => e.Code is "DuplicateUserName")) throw Fail.Field("userName", ErrorCodes.UserNameInUse);
+                throw Fail.Rule(ErrorCodes.ValidationFailed);
+            }
+            db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = u.Id, CompanyId = ctx.CompanyId!.Value, RoleId = role.Id });
+            await db.SaveChangesAsync(c).ConfigureAwait(false);
+            return u;
+        }, ct).ConfigureAwait(false);
+        return new UserListItem(tokens.Encode<User>(user.PublicId), user.FullName, user.Email, user.Status, new Ref(tokens.Encode<Role>(role.PublicId), role.Name),
+            false, false, false, null, Convert.ToBase64String(user.RowVersion ?? []), user.UserName, user.MustChangePassword);
+    }
+
+    /// <summary>
+    /// The administrator's password reset for a user created with a username — the only reset for a user without email (revision 6).
+    /// Unlocks the account, ends every session; audited as "PasswordSetByAdmin". Users who sign in with their email keep the emailed link.
+    /// </summary>
+    public async Task SetPasswordAsync(string userToken, SetPasswordRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        if (user.UserName is null) throw Fail.Rule(ErrorCodes.PasswordSetNotAllowed);
+        var policy = await TenantPasswordValidator.GetPolicyAsync(db, user.TenantId, ct).ConfigureAwait(false);
+        if (!policy.IsSatisfiedBy(r.Password)) throw AccountService.PolicyError(policy);
+        changes.SetAction(user, "PasswordSetByAdmin");
+        user.MustChangePassword = r.MustChangePassword;
+        user.LockedUntil = null;
+        user.FailedSignInCount = 0;
+        var token = await users.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
+        var result = await users.ResetPasswordAsync(user, token, r.Password).ConfigureAwait(false);   // new security stamp
+        if (!result.Succeeded) throw AccountService.PolicyError(policy);
+        await AfterAccessChangeAsync(user.Id, "Password set by an administrator", ct).ConfigureAwait(false);
+    }
+
+    /// <summary>3–50 characters: ASCII letters, digits, dot, underscore, hyphen (never "@", so a username is never taken for an email).</summary>
+    public static bool IsValidUserName(string? value) =>
+        value is { Length: >= 3 and <= 50 } && value.All(ch => ch is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '.' or '_' or '-');
 
     public async Task AssignRoleAsync(string userToken, string roleToken, CancellationToken ct)
     {
@@ -92,6 +170,7 @@ public sealed class UserAdminService(
     public async Task SendPasswordResetAsync(string userToken, CancellationToken ct)
     {
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        if (user.Email is null) throw Fail.Rule(ErrorCodes.UserHasNoEmail);
         await accounts.SendPasswordResetAsync(user, ct).ConfigureAwait(false);
     }
 

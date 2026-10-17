@@ -232,7 +232,7 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
             new Dictionary<string, string?> { ["days"] = NotificationTexts.Number(O.GraceDays) }, "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
     }
 
-    private async Task<List<(long Id, string Email, string Name)>> OwnersAsync(long tenantId, CancellationToken ct) =>
+    private async Task<List<(long Id, string? Email, string Name)>> OwnersAsync(long tenantId, CancellationToken ct) =>
         (await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.User.Status == "Active" && x.Role.IsPreset && x.Role.Name == PresetRoles.Owner)
             .Select(x => new { x.UserId, x.User.Email, x.User.FullName }).Distinct().ToListAsync(ct).ConfigureAwait(false))
@@ -261,6 +261,7 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         var encoded = System.Net.WebUtility.HtmlEncode(tenantName);
         foreach (var (_, address, name) in owners)
         {
+            if (address is null) continue;   // an Owner created with a username and no email (revision 6)
             await email.SendAsync(new EmailMessage(address, "Your data has been deleted / تم حذف بياناتكم",
                 $"<p>Dear {System.Net.WebUtility.HtmlEncode(name)}, the retention period of {encoded} has ended; its data is no longer accessible.</p><p dir=\"rtl\">انتهت فترة الاحتفاظ ببيانات {encoded} ولم تعد متاحة.</p>",
                 $"The retention period of {tenantName} has ended; its data is no longer accessible. / انتهت فترة الاحتفاظ ببيانات {tenantName} ولم تعد متاحة.", "TenantDeleted"), ct).ConfigureAwait(false);
@@ -284,6 +285,7 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         string[] none = ["Tenant", "Company", "SoftDelete"];
         await db.Set<User>().IgnoreQueryFilters(none).Where(u => u.TenantId == tenantId)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.FullName, "Deleted user").SetProperty(x => x.Email, x => "deleted-" + x.PublicId + "@anonymised.invalid")
+                .SetProperty(x => x.UserName, (string?)null).SetProperty(x => x.NormalizedUserName, (string?)null)
                 .SetProperty(x => x.NormalizedEmail, x => "DELETED-" + x.PublicId + "@ANONYMISED.INVALID")
                 .SetProperty(x => x.PasswordHash, string.Empty).SetProperty(x => x.SecurityStamp, x => "anonymised-" + x.PublicId).SetProperty(x => x.TwoFactorSecret, (byte[]?)null)
                 .SetProperty(x => x.Status, "Archived")

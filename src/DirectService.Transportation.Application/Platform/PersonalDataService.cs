@@ -62,6 +62,8 @@ public sealed class PersonalDataService(IAppDbContext db, IRequestContext ctx, M
         u.FullName = "Anonymised user";
         u.Email = email;
         u.NormalizedEmail = email.ToUpperInvariant();
+        u.UserName = null;   // revision 6: a username can identify the person
+        u.NormalizedUserName = null;
         u.PasswordHash = string.Empty;
         u.SecurityStamp = Guid.NewGuid().ToString("N");
         u.TwoFactorSecret = null;

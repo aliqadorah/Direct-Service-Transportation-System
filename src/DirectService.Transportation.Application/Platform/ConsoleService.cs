@@ -123,7 +123,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         const int max = 5;
         var hits = new List<Contracts.Collaboration.SearchHit>();
         var tenants = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted);
-        var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email.Contains(text)).Select(u => u.TenantId);
+        var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email!.Contains(text)).Select(u => u.TenantId);
         foreach (var t in await tenants.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id)).OrderBy(t => t.Name).Take(max)
                      .Select(t => new { t.PublicId, t.Name, t.Status }).ToListAsync(ct).ConfigureAwait(false))
             hits.Add(new(ConsoleSearchKinds.Tenant, support.Token<Tenant>(t.PublicId), t.Name, t.Status));
@@ -135,7 +135,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
                      .Join(tenants, i => i.TenantId, t => t.Id, (i, t) => new { i.Number, i.Total, i.Status, t.PublicId, t.Name }).OrderByDescending(x => x.Number).Take(max)
                      .ToListAsync(ct).ConfigureAwait(false))
             hits.Add(new(ConsoleSearchKinds.Invoice, support.Token<Tenant>(i.PublicId), i.Number, $"{i.Name} · {Accounting.Money.Format(i.Total)} · {i.Status}"));
-        foreach (var u in await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.IsPlatformStaff && !u.IsDeleted && (u.FullName.Contains(text) || u.Email.Contains(text)))
+        foreach (var u in await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.IsPlatformStaff && !u.IsDeleted && (u.FullName.Contains(text) || u.Email!.Contains(text)))
                      .OrderBy(u => u.FullName).Take(max).Select(u => new { u.PublicId, u.FullName, u.Email }).ToListAsync(ct).ConfigureAwait(false))
             hits.Add(new(ConsoleSearchKinds.Staff, support.Token<User>(u.PublicId), u.FullName, u.Email));
         return new(text, hits);
@@ -149,7 +149,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         if (!string.IsNullOrWhiteSpace(q.Status)) query = query.Where(t => t.Status == q.Status);
         if (MasterDataSupport.SearchText(q.Q) is { } text)
         {
-            var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email.Contains(text)).Select(u => u.TenantId);
+            var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email!.Contains(text)).Select(u => u.TenantId);
             query = query.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id));
         }
         var paging = new PageRequest(q.Page, q.PageSize);

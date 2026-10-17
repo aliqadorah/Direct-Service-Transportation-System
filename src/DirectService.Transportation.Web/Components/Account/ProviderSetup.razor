@@ -116,7 +116,7 @@ else
         {
             var user = await Setup.CreateFirstStaffAsync(Details.Session, Details.FullName, Details.Email, Details.Password, Http.RequestAborted);
             // The mandatory two-step set-up follows at once (the same step every user takes at the first sign-in).
-            await Flow.PasswordAsync(Http, user.Email, Details.Password!, Http.RequestAborted);
+            await Flow.PasswordAsync(Http, user.Email!, Details.Password!, Http.RequestAborted);
         }
         catch (AppException e)
         {

@@ -6,12 +6,20 @@ namespace DirectService.Transportation.Contracts.Identity;
 
 public sealed record SignUpRequest(string FullName, string Email, string Password, string OrganisationName, bool AcceptTerms, string? Language);
 public sealed record EmailRequest(string Email);
-public sealed record SignInRequest(string Email, string Password);
+/// <summary>Sign-in: <paramref name="Login"/> is the email or the username (revision 6); <paramref name="Email"/> is still accepted for older clients.</summary>
+public sealed record SignInRequest(string? Email, string Password, string? Login = null);
 
-/// <summary>Next step after a correct password: "twoFactor" or "twoFactorSetup".</summary>
-public sealed record SignInResponse(string Next);
+/// <summary>Next step after a correct password: "twoFactor", "twoFactorSetup", "changePassword" or "done" (signed in; <paramref name="Me"/> set).</summary>
+public sealed record SignInResponse(string Next, MeResponse? Me = null);
 
-public sealed record TwoFactorSetupResponse(string SharedKey, string AuthenticatorUri);
+/// <summary>The forced new password at sign-in (stage "changePassword").</summary>
+public sealed record NewPasswordRequest(string NewPassword);
+
+/// <summary>A signed-in user's own password change.</summary>
+public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+/// <summary>Authenticator set-up; <paramref name="QrSvg"/> is the QR code as SVG markup (profile set-up, revision 6).</summary>
+public sealed record TwoFactorSetupResponse(string SharedKey, string AuthenticatorUri, string? QrSvg = null);
 public sealed record TwoFactorCodeRequest(string? Code, string? RecoveryCode);
 public sealed record RecoveryCodesResponse(IReadOnlyList<string> RecoveryCodes, MeResponse Me);
 public sealed record LinkTokenRequest(string User, string Token);
@@ -23,8 +31,9 @@ public sealed record CompanyAccess(string Id, string Name, string? NameEn, strin
     string CurrencyCode = "JOD", int CurrencyDecimals = 3);
 
 public sealed record MeResponse(
-    string Id, string FullName, string Email, string LanguageCode, string DateFormat, string? DefaultCompany,
-    bool IsPlatformStaff, string? TenantName, string? TenantStatus, IReadOnlyList<CompanyAccess> Companies);
+    string Id, string FullName, string? Email, string LanguageCode, string DateFormat, string? DefaultCompany,
+    bool IsPlatformStaff, string? TenantName, string? TenantStatus, IReadOnlyList<CompanyAccess> Companies,
+    string? UserName = null, bool TwoFactorEnabled = false);
 
 public sealed record PreferencesRequest(string LanguageCode, string? DefaultCompany, string DateFormat);
 public sealed record SessionResponse(string Id, DateTime CreatedAt, DateTime LastSeenAt, string? IpAddress, string? UserAgent, bool IsCurrent);
@@ -32,8 +41,17 @@ public sealed record SessionResponse(string Id, DateTime CreatedAt, DateTime Las
 // ---- users & roles (users.manage)
 
 public sealed record UserListItem(
-    string Id, string FullName, string Email, string Status, Ref? Role, bool IsLocked, bool TwoFactorEnabled,
-    bool EmailConfirmed, DateTime? LastSignInAt, string RowVersion);
+    string Id, string FullName, string? Email, string Status, Ref? Role, bool IsLocked, bool TwoFactorEnabled,
+    bool EmailConfirmed, DateTime? LastSignInAt, string RowVersion, string? UserName = null, bool MustChangePassword = false);
+
+/// <summary>
+/// "Add user" → "Create with username and password" (revision 6): username unique platform-wide (letters, digits, . _ -), optional email,
+/// a password that meets the tenant policy, the company role, and whether the user must choose a new password at first sign-in.
+/// </summary>
+public sealed record CreateUserRequest(string FullName, string UserName, string? Email, string Password, string Role, bool MustChangePassword = true);
+
+/// <summary>An administrator sets a new password for a user created with a username (the only reset for users without email).</summary>
+public sealed record SetPasswordRequest(string Password, bool MustChangePassword = true);
 
 public sealed record AssignRoleRequest(string Role);
 public sealed record ReasonRequest(string Reason);

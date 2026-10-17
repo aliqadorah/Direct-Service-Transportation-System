@@ -11,10 +11,16 @@ public class User : AuditableEntity, INullableTenantScoped
     public long? TenantId { get; set; }
     /// <summary>User's full name.</summary>
     public string FullName { get; set; } = string.Empty;
-    /// <summary>Sign-in email.</summary>
-    public string Email { get; set; } = string.Empty;
+    /// <summary>Sign-in email; NULL for a user created by an administrator with a username and no email (revision 6).</summary>
+    public string? Email { get; set; }
     /// <summary>Upper-cased email used for look-ups (Identity).</summary>
-    public string NormalizedEmail { get; set; } = string.Empty;
+    public string? NormalizedEmail { get; set; }
+    /// <summary>Sign-in username set by an administrator (revision 6): letters, digits and . _ - only, unique platform-wide.</summary>
+    public string? UserName { get; set; }
+    /// <summary>Upper-cased username used for look-ups (Identity).</summary>
+    public string? NormalizedUserName { get; set; }
+    /// <summary>The user must choose a new password at the next sign-in (revision 6; set by the administrator).</summary>
+    public bool MustChangePassword { get; set; }
     /// <summary>When the user verified their email address (sign-up link or accepted invitation).</summary>
     public DateTime? EmailConfirmedAt { get; set; }
     /// <summary>Salted password hash (Identity). Never shown or emailed.</summary>

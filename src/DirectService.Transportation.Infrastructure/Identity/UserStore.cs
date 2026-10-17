@@ -8,7 +8,8 @@ namespace DirectService.Transportation.Infrastructure.Identity;
 
 /// <summary>
 /// ASP.NET Core Identity store over the design's own tables (build prompt: no AspNet* tables):
-/// core.Users and core.UserRecoveryCodes. Mapping (A-16): user id = PublicId; user name = email;
+/// core.Users and core.UserRecoveryCodes. Mapping (A-16): user id = PublicId; user name = the username an administrator set (revision 6),
+/// otherwise the email — a sign-in name is looked up as either;
 /// EmailConfirmed = EmailConfirmedAt IS NOT NULL; lockout = FailedSignInCount / LockedUntil (always on);
 /// TwoFactorEnabled = TwoFactorEnabledAt IS NOT NULL; authenticator key encrypted into TwoFactorSecret;
 /// recovery codes hashed in core.UserRecoveryCodes. Look-ups by email/id are platform-wide
@@ -35,20 +36,21 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
     public Task<string> GetUserIdAsync(User user, CancellationToken cancellationToken) =>
         Task.FromResult(user.PublicId.ToString("N"));
 
-    public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken) => Task.FromResult<string?>(user.Email);
+    public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken) => Task.FromResult(user.UserName ?? user.Email);
 
     public Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
     {
-        user.Email = userName ?? string.Empty;
+        user.UserName = string.IsNullOrEmpty(userName) ? null : userName;
         return Task.CompletedTask;
     }
 
     public Task<string?> GetNormalizedUserNameAsync(User user, CancellationToken cancellationToken) =>
-        Task.FromResult<string?>(user.NormalizedEmail);
+        Task.FromResult(user.UserName is null ? user.NormalizedEmail : user.NormalizedUserName);
 
+    /// <summary>For an email-only user the user name is the email, whose normalised form is kept by <see cref="SetNormalizedEmailAsync"/>.</summary>
     public Task SetNormalizedUserNameAsync(User user, string? normalizedName, CancellationToken cancellationToken)
     {
-        user.NormalizedEmail = normalizedName ?? string.Empty;
+        if (user.UserName is not null) user.NormalizedUserName = normalizedName;
         return Task.CompletedTask;
     }
 
@@ -83,8 +85,9 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
         return await Users.SingleOrDefaultAsync(u => u.PublicId == publicId, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>The sign-in name as username or email (both unique platform-wide; a username cannot contain "@", so they never collide).</summary>
     public Task<User?> FindByNameAsync(string normalizedUserName, CancellationToken cancellationToken) =>
-        Users.SingleOrDefaultAsync(u => u.NormalizedEmail == normalizedUserName, cancellationToken);
+        Users.SingleOrDefaultAsync(u => u.NormalizedUserName == normalizedUserName || u.NormalizedEmail == normalizedUserName, cancellationToken);
 
     // ---------------- password
 
@@ -104,7 +107,7 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
 
     public Task SetEmailAsync(User user, string? email, CancellationToken cancellationToken)
     {
-        user.Email = email ?? string.Empty;
+        user.Email = string.IsNullOrEmpty(email) ? null : email;
         return Task.CompletedTask;
     }
 
@@ -127,7 +130,7 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
 
     public Task SetNormalizedEmailAsync(User user, string? normalizedEmail, CancellationToken cancellationToken)
     {
-        user.NormalizedEmail = normalizedEmail ?? string.Empty;
+        user.NormalizedEmail = string.IsNullOrEmpty(normalizedEmail) ? null : normalizedEmail;
         return Task.CompletedTask;
     }
 

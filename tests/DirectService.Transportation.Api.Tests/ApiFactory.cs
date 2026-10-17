@@ -102,6 +102,9 @@ public sealed partial class CapturingEmailSender : IEmailSender
 {
     private readonly ConcurrentQueue<EmailMessage> _sent = new();
 
+    /// <summary>How many emails were sent so far.</summary>
+    public int Count => _sent.Count;
+
     public Task SendAsync(EmailMessage message, CancellationToken ct)
     {
         _sent.Enqueue(message);
@@ -225,6 +228,15 @@ public static class ApiHelpers
     {
         if (!r.IsSuccessStatusCode)
             Assert.Fail($"{(int)r.StatusCode} {r.ReasonPhrase}: {await r.Content.ReadAsStringAsync()}");
+    }
+
+    /// <summary>The problem code, or the first field error's code for a validation problem (field errors).</summary>
+    public static async Task<string> ErrorCodeAsync(this HttpResponseMessage r)
+    {
+        var doc = await r.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        if (doc.TryGetProperty("errors", out var errors) && errors.ValueKind == System.Text.Json.JsonValueKind.Array && errors.GetArrayLength() > 0)
+            return errors[0].GetProperty("code").GetString()!;
+        return doc.TryGetProperty("code", out var c) ? c.GetString()! : string.Empty;
     }
 
     public static async Task<string> ProblemCodeAsync(this HttpResponseMessage r)

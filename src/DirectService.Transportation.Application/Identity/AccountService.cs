@@ -112,6 +112,7 @@ public sealed class AccountService(
     public async Task SendVerificationAsync(User user, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
+        if (user.Email is null) return;   // a user created with a username and no email (revision 6)
         var token = await users.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
         var link = Link("verify-email", urlTokens.Encode<User>(user.PublicId), token);
         await email.SendAsync(EmailTemplates.VerifyEmail(user.Email, user.FullName, link), ct).ConfigureAwait(false);
@@ -149,6 +150,7 @@ public sealed class AccountService(
     public async Task SendPasswordResetAsync(User user, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
+        if (user.Email is null) return;   // no email: only an administrator can set a new password (revision 6)
         var token = await users.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
         var link = Link("reset-password", urlTokens.Encode<User>(user.PublicId), token);
         await email.SendAsync(EmailTemplates.PasswordReset(user.Email, user.FullName, link), ct).ConfigureAwait(false);
