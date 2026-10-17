@@ -27,6 +27,7 @@ internal static class AccountingEndpoints
         MapBankAccounts(acc.MapGroup("/bank-accounts").WithTags("Bank accounts"));
         MapPeriods(acc.MapGroup("/periods").WithTags("Periods"));
         MapJournal(acc.MapGroup("/journal-entries").WithTags("Journal"));
+        MapJournalDrafts(acc.MapGroup("/journal-drafts").WithTags("Journal"));
         MapLedger(company.MapGroup("/ledger").WithTags("Ledger integration"));
     }
 
@@ -181,21 +182,6 @@ internal static class AccountingEndpoints
             TypedResults.Ok(await svc.EditManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
         g.MapPost("/{entry}/void", async (string entry, VoidRequest r, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.VoidManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
-        // Revision 6: drafts — saved without a number, posted later (the number and the period lock apply at posting).
-        g.MapPost("/drafts", async (ManualEntryRequest r, JournalDraftService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.CreateAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
-        g.MapGet("/drafts/{draft}", async (string draft, JournalDraftService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.GetAsync(draft, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
-        g.MapPut("/drafts/{draft}", async (string draft, ManualEntryRequest r, JournalDraftService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.UpdateAsync(draft, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
-        g.MapPost("/drafts/{draft}/delete", async (string draft, RowVersionRequest r, JournalDraftService svc, CancellationToken ct) =>
-        {
-            await svc.DeleteAsync(draft, r.RowVersion, ct).ConfigureAwait(false);
-            return TypedResults.NoContent();
-        }).RequirePermission(PermissionKeys.AcctPost);
-        g.MapPost("/drafts/{draft}/post", async (string draft, RowVersionRequest r, JournalDraftService drafts, JournalService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.GetByIdAsync(await drafts.PostAsync(draft, r.RowVersion, ct).ConfigureAwait(false), ct).ConfigureAwait(false)))
-            .RequirePermission(PermissionKeys.AcctPost);
         g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync("journal-entries", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
         g.MapPost("/import/preview", async (IFormFile file, JournalImportService svc, CancellationToken ct) =>
@@ -208,6 +194,25 @@ internal static class AccountingEndpoints
             await using var s = file.OpenReadStream();
             return TypedResults.Ok(await svc.ImportAsync(s, file.FileName, file.Length, ct).ConfigureAwait(false));
         }).RequirePermission(PermissionKeys.AcctPost).DisableAntiforgery().Upload();
+    }
+
+    /// <summary>Revision 6: journal drafts — saved without a number, posted later (the number and the period lock apply at posting).</summary>
+    private static void MapJournalDrafts(RouteGroupBuilder g)
+    {
+        g.MapPost("/", async (ManualEntryRequest r, JournalDraftService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.CreateAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+        g.MapGet("/{draft}", async (string draft, JournalDraftService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.GetAsync(draft, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
+        g.MapPut("/{draft}", async (string draft, ManualEntryRequest r, JournalDraftService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.UpdateAsync(draft, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+        g.MapPost("/{draft}/delete", async (string draft, RowVersionRequest r, JournalDraftService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(draft, r.RowVersion, ct).ConfigureAwait(false);
+            return TypedResults.NoContent();
+        }).RequirePermission(PermissionKeys.AcctPost);
+        g.MapPost("/{draft}/post", async (string draft, RowVersionRequest r, JournalDraftService drafts, JournalService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.GetByIdAsync(await drafts.PostAsync(draft, r.RowVersion, ct).ConfigureAwait(false), ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.AcctPost);
     }
 
     private static void MapLedger(RouteGroupBuilder g)

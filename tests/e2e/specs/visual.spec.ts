@@ -68,7 +68,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
     { role: "Supplier", name: "Visual supplier / مورد", taxNumber: null, phone: null, address: null, controlAccountId: code("2101"), paymentTermsDays: 30, clientId: null, rowVersion: null });
   const bill = await api<{ document: { id: string } }>(page, "POST", c(company, "apar/bills"), { partyId: supplier.id, documentDate: today(), reference: "DED-1",
     lines: [{ description: "Haulage / نقل", accountId: code("5103"), amount: 1000, taxRate: 16, deduction: 100 }, { description: "Parts / قطع", accountId: code("5104"), amount: 500, taxRate: 16 }] });
-  const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-entries/drafts"),
+  const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
   return {
     w,

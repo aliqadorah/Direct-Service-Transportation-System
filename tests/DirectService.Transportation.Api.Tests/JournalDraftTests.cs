@@ -101,7 +101,7 @@ public sealed class JournalDraftTests(ApiFactory f)
             Entry(Today, "أول", null, Dr(a["5203"], 10), Cr(a["110101"], 10))));
 
         // Incomplete drafts are kept (no account on the second line, unbalanced).
-        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-entries/drafts"),
+        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-drafts"),
             new ManualEntryRequest(Today, "مسودة إيجار", [Dr(a["5202"], 250), new JournalLineRequest(null, 0, 200, null, null, null)], null, "R-1")));
         Assert.Equal(2, draft.Lines.Count);
         Assert.Null(draft.Lines[1].Account);
@@ -120,18 +120,18 @@ public sealed class JournalDraftTests(ApiFactory f)
         Assert.Equal(10m, tb!.Totals.MovementDebit);
 
         // Posting refuses the incomplete draft and keeps it.
-        var refused = await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}/post"), new RowVersionRequest(draft.RowVersion));
+        var refused = await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-drafts/{draft.Id}/post"), new RowVersionRequest(draft.RowVersion));
         Assert.False(refused.IsSuccessStatusCode);
         Assert.Equal(1, (await o.Client.GetFromJsonAsync<PagedResult<JournalEntrySummary>>(U(o, "/accounting/journal-entries?status=Draft")))!.TotalCount);
 
         // Edited, then posted: the next JV number (gap-free), the draft is gone, the entry carries the reference.
-        var edited = await OkAsync<JournalDraftResponse>(await o.Client.PutAsJsonAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}"),
+        var edited = await OkAsync<JournalDraftResponse>(await o.Client.PutAsJsonAsync(U(o, $"/accounting/journal-drafts/{draft.Id}"),
             new ManualEntryRequest(Today, "مسودة إيجار", [Dr(a["5202"], 250), Cr(a["110101"], 250)], draft.RowVersion, "R-1")));
-        var entry = await OkAsync<JournalEntryResponse>(await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}/post"), new RowVersionRequest(edited.RowVersion)));
+        var entry = await OkAsync<JournalEntryResponse>(await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-drafts/{draft.Id}/post"), new RowVersionRequest(edited.RowVersion)));
         Assert.Equal(NextNumber(first.Number), entry.Number);
         Assert.Equal(("R-1", "Posted"), (entry.Reference, entry.Status));
         Assert.Equal(0, (await o.Client.GetFromJsonAsync<PagedResult<JournalEntrySummary>>(U(o, "/accounting/journal-entries?status=Draft")))!.TotalCount);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await o.Client.GetAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}"))).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await o.Client.GetAsync(U(o, $"/accounting/journal-drafts/{draft.Id}"))).StatusCode);
         var after = await o.Client.GetFromJsonAsync<LedgerReport>(U(o, $"/accounting/reports/account-statement?account={a["5202"].Id}&from={D(Today)}&to={D(Today)}"));
         Assert.Equal(250m, after!.Lines.Items.Single().Debit);
     }
@@ -143,16 +143,16 @@ public sealed class JournalDraftTests(ApiFactory f)
         var lastMonth = new DateOnly(Today.Year, Today.Month, 1).AddMonths(-1);
         var first = await OkAsync<JournalEntryResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-entries"),
             Entry(Today, "أول", null, Dr(a["5203"], 10), Cr(a["110101"], 10))));
-        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-entries/drafts"),
+        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-drafts"),
             Entry(lastMonth.AddDays(3), "قيد شهر سابق", null, Dr(a["5202"], 40), Cr(a["110101"], 40))));
         // The period closes after the draft was saved: the lock applies at posting.
         await (await o.Client.PostAsJsonAsync(U(o, $"/accounting/periods/{lastMonth:yyyy-MM}/close"), new PeriodActionRequest("إقفال", true))).EnsureOkAsync();
-        var post = await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}/post"), new RowVersionRequest(draft.RowVersion));
+        var post = await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-drafts/{draft.Id}/post"), new RowVersionRequest(draft.RowVersion));
         Assert.Equal("period.closed", await post.ProblemCodeAsync());
         Assert.Equal(1, (await o.Client.GetFromJsonAsync<PagedResult<JournalEntrySummary>>(U(o, "/accounting/journal-entries?status=Draft")))!.TotalCount);
 
-        var current = await o.Client.GetFromJsonAsync<JournalDraftResponse>(U(o, $"/accounting/journal-entries/drafts/{draft.Id}"));
-        await (await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-entries/drafts/{draft.Id}/delete"), new RowVersionRequest(current!.RowVersion))).EnsureOkAsync();
+        var current = await o.Client.GetFromJsonAsync<JournalDraftResponse>(U(o, $"/accounting/journal-drafts/{draft.Id}"));
+        await (await o.Client.PostAsJsonAsync(U(o, $"/accounting/journal-drafts/{draft.Id}/delete"), new RowVersionRequest(current!.RowVersion))).EnsureOkAsync();
         Assert.Equal(0, (await o.Client.GetFromJsonAsync<PagedResult<JournalEntrySummary>>(U(o, "/accounting/journal-entries?status=Draft")))!.TotalCount);
 
         // No number was used by the draft or the refused posting.
@@ -166,13 +166,13 @@ public sealed class JournalDraftTests(ApiFactory f)
     public async Task Drafts_belong_to_their_company_and_need_acct_post_to_change()
     {
         var (o, a) = await CompanyAsync();
-        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-entries/drafts"),
+        var draft = await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-drafts"),
             Entry(Today, "سري", null, Dr(a["5202"], 1), Cr(a["110101"], 1))));
         var other = await f.SignUpOwnerAsync();
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/accounting/journal-entries/drafts/{draft.Id}"))).StatusCode);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.Client.PostAsJsonAsync(U(other, $"/accounting/journal-entries/drafts/{draft.Id}/post"),
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/accounting/journal-drafts/{draft.Id}"))).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await other.Client.PostAsJsonAsync(U(other, $"/accounting/journal-drafts/{draft.Id}/post"),
             new RowVersionRequest(draft.RowVersion))).StatusCode);
-        var empty = await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-entries/drafts"), new ManualEntryRequest(null, null, [], null));
+        var empty = await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-drafts"), new ManualEntryRequest(null, null, [], null));
         Assert.Equal("validation.required", await empty.ErrorCodeAsync());
     }
 

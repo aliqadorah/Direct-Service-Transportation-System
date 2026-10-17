@@ -119,7 +119,7 @@ public sealed record JournalLineRequest(string? AccountId, decimal Debit, decima
 public sealed record ManualEntryRequest(DateOnly? EntryDate, string? Description, IReadOnlyList<JournalLineRequest>? Lines, string? RowVersion,
     string? Reference = null);
 
-/// <summary>A journal draft (revision 6): no number, not posted; posted later through <c>POST …/journal-entries/drafts/{id}/post</c>.</summary>
+/// <summary>A journal draft (revision 6): no number, not posted; posted later through <c>POST …/journal-drafts/{id}/post</c>.</summary>
 public sealed record JournalDraftResponse(
     string Id, DateOnly? EntryDate, string? Description, string? Reference, IReadOnlyList<JournalDraftLineResponse> Lines,
     decimal TotalDebit, decimal TotalCredit, DateTime CreatedAt, string? CreatedBy, string RowVersion);

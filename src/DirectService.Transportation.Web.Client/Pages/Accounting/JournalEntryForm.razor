@@ -154,7 +154,7 @@
             }
             else if (DraftId is not null)
             {
-                _draft = await Api.GetAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(DraftId)}"));
+                _draft = await Api.GetAsync<JournalDraftResponse>(Api.C($"accounting/journal-drafts/{Uri.EscapeDataString(DraftId)}"));
                 ShowDraft(_draft);
             }
             else
@@ -222,8 +222,8 @@
         {
             var req = Request();
             var d = _draft is null
-                ? await Api.PostAsync<JournalDraftResponse>(Api.C("accounting/journal-entries/drafts"), req)
-                : await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
+                ? await Api.PostAsync<JournalDraftResponse>(Api.C("accounting/journal-drafts"), req)
+                : await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
             var isNew = _draft is null;
             _draft = d;
             _m.RowVersion = d.RowVersion;
@@ -245,7 +245,7 @@
         _deleteError = null;
         try
         {
-            await Api.PostAsync(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}/delete"), new RowVersionRequest(_m.RowVersion));
+            await Api.PostAsync(Api.C($"accounting/journal-drafts/{Uri.EscapeDataString(_draft.Id)}/delete"), new RowVersionRequest(_m.RowVersion));
             _deleting = false;
             Toasts.Success(L["je.draftDeleted"]);
             Nav.NavigateTo(NavModel.Href(Company, "accounting/journal"));
@@ -266,10 +266,10 @@
             if (_draft is not null)
             {
                 // A draft posts with what is on the screen: save it, then post it (full checks, number and period lock now).
-                var saved = await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
+                var saved = await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
                 _draft = saved;
                 _m.RowVersion = saved.RowVersion;
-                r = await Api.PostAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(saved.Id)}/post"), new RowVersionRequest(saved.RowVersion));
+                r = await Api.PostAsync<JournalEntryResponse>(Api.C($"accounting/journal-drafts/{Uri.EscapeDataString(saved.Id)}/post"), new RowVersionRequest(saved.RowVersion));
             }
             else
             {

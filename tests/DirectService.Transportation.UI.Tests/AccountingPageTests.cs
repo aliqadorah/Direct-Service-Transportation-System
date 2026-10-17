@@ -63,15 +63,15 @@ public sealed class AccountingPageTests : PageTestBase
     public void Journal_form_saves_a_draft_with_the_reference()
     {
         var draft = new JournalDraftResponse("d1", new DateOnly(2026, 10, 17), "إيجار", "R-9", [], 0, 0, DateTime.UtcNow, "أنا", "RV");
-        Respond("accounting/journal-entries/drafts", draft);
+        Respond("accounting/journal-drafts", draft);
         Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/accounting/journal/new");
         var cut = Render<JournalEntryForm>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["je.reference"], cut.Markup));
         var reference = cut.FindAll("label").Single(l => l.TextContent.Trim() == L["je.reference"]).GetAttribute("for");
         cut.Find("#" + reference).Change("R-9");
         cut.FindAll("button").Single(b => b.TextContent.Contains(L["je.saveDraft"], StringComparison.Ordinal)).Click();
-        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-entries/drafts"));
-        Assert.Contains("\"reference\":\"R-9\"", Requests.Single(r => r.Method == "POST" && r.Path == "accounting/journal-entries/drafts").Body!, StringComparison.Ordinal);
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-drafts"));
+        Assert.Contains("\"reference\":\"R-9\"", Requests.Single(r => r.Method == "POST" && r.Path == "accounting/journal-drafts").Body!, StringComparison.Ordinal);
         Assert.DoesNotContain(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-entries");
     }
 
