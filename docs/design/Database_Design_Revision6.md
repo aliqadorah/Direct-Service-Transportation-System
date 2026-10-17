@@ -66,3 +66,21 @@ New table `trn.TRN_ReceiptAllocations` (company-scoped, audited, soft delete): t
 `UX_TRN_ReceiptAllocations_ReceiptId_InvoiceId` UNIQUE (filter `[IsDeleted] = 0`): an invoice once per receipt.
 
 Data: every existing receipt with an `InvoiceId` was copied as one allocation of its full amount (raw SQL in the migration).
+
+## 5. Supplier bill line deductions (item 7) — migration `Rev6_SupplierBillDeductions`
+`acc.ApArDocumentLines`:
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Deduction | DECIMAL(18,3) | NOT NULL | 0 (`DF_ApArDocumentLines_Deduction`) | new; `CK_ApArDocumentLines_Deduction` `[Deduction] >= 0 AND [Deduction] <= [Amount]`; supplier bills only (application rule); tax stays on the full amount |
+
+`acc.ApArDocuments`:
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Deduction | DECIMAL(18,3) | NOT NULL | 0 (`DF_ApArDocuments_Deduction`) | new; Σ line deductions; `CK_ApArDocuments_Deduction` ≥ 0; Total = Subtotal + Tax − Deduction (application rule) |
+
+Posting: the bill's entry credits the new posting key `ACC.SupplierDeductions` with Σ deductions (reference data only — `acc.PostingKeyMappings` rows; the chart template adds account 4105 "Supplier deductions income" and maps it).
+
+## Items without database changes
+Item 5 (trial balance tree), item 6 (account statement of several accounts, general ledger screen removed) and item 8 (OpenAPI) change no table.

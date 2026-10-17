@@ -159,6 +159,27 @@ public sealed class AccountingPageTests : PageTestBase
         Assert.EndsWith($"/c/{Company}/accounting/statement?account=a2&from=2026-10-01", nav.Uri, StringComparison.Ordinal);
     }
 
+    /// <summary>Revision 6 item 7: supplier bills have a Deduction column (receivables do not); more than the line amount blocks saving.</summary>
+    [Fact]
+    public void Supplier_bill_form_has_a_deduction_per_line_that_cannot_exceed_the_amount()
+    {
+        Respond("apar/parties/options", new[] { new ApArPartyOption("Supplier", "s1", "المناصير", null, 30) });
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo($"/c/{Company}/accounting/payables/new");
+        var cut = Render<ApArDocumentForm>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(L["ap.deduction"], cut.Markup));
+        Assert.Contains(L["ap.deductionHelp"], cut.Markup);
+        cut.Find($"input[aria-label='{L.F("ap.lineAmount", 1)}']").Change("100");
+        cut.Find($"input[aria-label='{L.F("ap.lineDeduction", 1)}']").Change("150");
+        Assert.Contains(L["ap.deductionOver"], cut.Markup);
+        Assert.True(cut.FindAll("button").Single(b => b.TextContent.Contains(L["ap.savePost"], StringComparison.Ordinal)).HasAttribute("disabled"));
+
+        nav.NavigateTo($"/c/{Company}/accounting/receivables/new");
+        var receivable = Render<ApArDocumentForm>(p => p.Add(x => x.Company, Company));
+        receivable.WaitForAssertion(() => Assert.Contains(L["inv.items"], receivable.Markup));
+        Assert.DoesNotContain(L["ap.lineDeduction"].Replace(" {0}", "", StringComparison.Ordinal), receivable.Markup);
+    }
+
     [Fact]
     public void Trial_balance_highlights_a_mismatch()
     {

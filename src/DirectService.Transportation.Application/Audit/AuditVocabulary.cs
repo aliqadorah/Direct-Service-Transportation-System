@@ -269,6 +269,7 @@ public static class AuditVocabulary
         ["Total"] = F("الإجمالي", "Total", Kind.Money),
         ["Subtotal"] = F("المجموع قبل الضريبة", "Subtotal", Kind.Money),
         ["Tax"] = F("الضريبة", "Tax", Kind.Money),
+        ["Deduction"] = F("الخصم", "Deduction", Kind.Money),
         ["TaxRate"] = F("نسبة الضريبة", "Tax rate", Kind.Percent),
         ["Discount"] = F("الخصم", "Discount", Kind.Money),
         ["ExtraFees"] = F("رسوم إضافية", "Extra fees", Kind.Money),

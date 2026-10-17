@@ -291,4 +291,72 @@ public sealed class ApArTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/apar/bills/{bill.Document.Id}"))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/apar/parties/{supplier.Id}"))).StatusCode);
     }
+
+    // ------------------------------------------------------------------ supplier-bill line deductions (revision 6, item 7)
+
+    [Fact]
+    public async Task Supplier_bill_deductions_reduce_the_payable_keep_the_tax_and_post_to_supplier_deductions()
+    {
+        var w = await WorldAsync(f);
+        var o = w.Owner;
+        var supplier = await SupplierAsync(w);
+        // 1000 at 16 % with a 100 deduction, 500 at 16 % with none: tax on the full amounts (240), payable 1000 + 500 + 240 − 100 = 1640.
+        var bill = await ReadAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, "D-1",
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 1000m, 16m, null, 100m), new ApArLineRequest("Spare parts", w.Accounts["5104"].Id, 500m, 16m, null)], null)));
+        var d = bill.Document;
+        Assert.Equal((1500m, 240m, 100m, 1640m, 1640m), (d.Subtotal, d.Tax, d.Deduction, d.Total, d.RemainingAmount));
+        Assert.Equal([100m, 0m], bill.Lines.Select(l => l.Deduction));
+
+        // Entry: Dr lines 1500 + input tax 240 = Cr supplier 1640 + Cr supplier deductions (4105) 100.
+        var entry = await EntryAsync(f, "SupplierBill");
+        var ids = entry.Lines.Select(l => l.AccountId).ToList();
+        var accounts = await f.DbAsync(db => db.Set<Account>().IgnoreQueryFilters().Where(a => ids.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Code));
+        Assert.Equal(1740m, entry.TotalDebit);
+        Assert.Equal(100m, entry.Lines.Single(l => accounts[l.AccountId] == "4105").Credit);
+        Assert.Equal(1640m, entry.Lines.Single(l => accounts[l.AccountId] == "2101").Credit);
+        Assert.Contains("100.000", entry.Description, StringComparison.Ordinal);
+
+        // List totals and export show the deductions.
+        var list = await ReadAsync<ApArDocumentPage>(await o.Client.GetAsync(U(o, "/apar/bills")));
+        Assert.Equal(100m, list.Totals.Deduction);
+        var csv = System.Text.Encoding.UTF8.GetString(await (await o.Client.GetAsync(U(o, "/apar/bills/export?format=csv"))).Content.ReadAsByteArrayAsync());
+        Assert.Contains("Deduction", csv, StringComparison.Ordinal);
+        var html = await (await o.Client.GetAsync(U(o, $"/apar/bills/{d.Id}/print?format=html"))).Content.ReadAsStringAsync();
+        Assert.Contains("Deduction", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_deduction_cannot_exceed_the_line_and_only_supplier_bills_take_one()
+    {
+        var w = await WorldAsync(f);
+        var o = w.Owner;
+        var supplier = await SupplierAsync(w);
+        var over = await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 100m, 16m, null, 100.001m)], null));
+        Assert.Equal("validation.range", await over.ErrorCodeAsync());
+        var negative = await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 100m, 16m, null, -1m)], null));
+        Assert.Equal("validation.range", await negative.ErrorCodeAsync());
+
+        var party = await ReadAsync<ApArPartyResponse>(await o.Client.PostAsJsonAsync(U(o, "/apar/parties"),
+            new ApArPartyRequest("Customer", "Ports Company", "500600700", null, null, w.Accounts["110302"].Id, 0, null, null)));
+        var receivable = await o.Client.PostAsJsonAsync(U(o, "/apar/receivables"), new ApArDocumentRequest(party.Id, null, Today, null, null,
+            [new ApArLineRequest("Crane rental", w.Accounts["4102"].Id, 200m, 16m, null, 10m)], null));
+        Assert.Equal("apar.deductionNotAllowed", await receivable.ErrorCodeAsync());
+
+        // A company whose "Supplier deductions" key is not mapped (created before revision 6) cannot save a bill with a deduction, but still posts others.
+        var email = o.Email;
+        await f.DbAsync(async db =>
+        {
+            var companyId = await db.Set<Domain.Core.UserCompanyRole>().IgnoreQueryFilters().Where(r => r.User.Email == email).Select(r => r.CompanyId).FirstAsync();
+            return await db.Set<PostingKeyMapping>().IgnoreQueryFilters().Where(m => m.PostingKey == "ACC.SupplierDeductions" && m.CompanyId == companyId).ExecuteDeleteAsync();
+        });
+        var missing = await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 100m, 16m, null, 5m)], null));
+        Assert.Equal("apar.deductionKeyMissing", await missing.ErrorCodeAsync());
+        await (await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 100m, 16m, null)], null))).EnsureOkAsync();
+        var status = await ReadAsync<AccountingStatusResponse>(await o.Client.GetAsync(U(o, "/accounting/status")));
+        Assert.True(status.PostingReady);   // the optional key never blocks posting
+    }
 }

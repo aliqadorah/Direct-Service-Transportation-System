@@ -55,6 +55,7 @@ public sealed class ApArPrintService(IAppDbContext db, IRequestContext ctx, Mast
         var d = await documents.DetailsAsync(doc.Id, ct).ConfigureAwait(false);
         var x = d.Document;
         var bill = x.Kind == ApArCodes.SupplierBill;
+        var deductions = bill && x.Deduction > 0;   // revision 6: a deduction column and total only when the bill has deductions
         var mark = await MarkAsync(ApArDocumentService.EntityType, doc.Id, ct).ConfigureAwait(false);
         var (tax, phone, address) = await PartyAsync(x.Party.Id, ct).ConfigureAwait(false);
         var qrText = bill ? null : await einvoice.ApArQrAsync(doc.Id, null, ct).ConfigureAwait(false);
@@ -69,14 +70,16 @@ public sealed class ApArPrintService(IAppDbContext db, IRequestContext ctx, Mast
             + (x.Reference is null ? string.Empty : Field(L("المرجع", "Reference"), N(x.Reference)))
             + "</div>" + (string.IsNullOrEmpty(qrText) ? string.Empty : $"<div class=\"qr\">{qr.Svg(qrText)}</div>") + "</div>"
             + $"<table><thead><tr><th>#</th><th>{E(L("الوصف", "Description"))}</th><th>{E(L("الحساب", "Account"))}</th><th>{E(L("الضريبة %", "Tax %"))}</th>"
-            + $"<th>{E(L("المبلغ", "Amount"))}</th></tr></thead><tbody>"
+            + $"<th>{E(L("المبلغ", "Amount"))}</th>" + (deductions ? $"<th>{E(L("الخصم", "Deduction"))}</th>" : string.Empty) + "</tr></thead><tbody>"
             + string.Concat(d.Lines.Select((l, i) => $"<tr><td class=\"n\">{N((i + 1).ToString(CultureInfo.InvariantCulture))}</td><td>{E(l.Description)}</td>"
                 + $"<td>{N(l.Account.Code)} {E(printer.En ? l.Account.NameEn ?? l.Account.NameAr : l.Account.NameAr)}</td>"
-                + $"<td class=\"n\">{N(l.TaxRate.ToString("0.##", CultureInfo.InvariantCulture))}</td><td class=\"n\">{N(M(l.Amount))}</td></tr>"))
+                + $"<td class=\"n\">{N(l.TaxRate.ToString("0.##", CultureInfo.InvariantCulture))}</td><td class=\"n\">{N(M(l.Amount))}</td>"
+                + (deductions ? $"<td class=\"n\">{N(M(l.Deduction))}</td>" : string.Empty) + "</tr>"))
             + "</tbody></table>"
             + "<div class=\"totals\">"
             + $"<div><span>{E(L("المجموع", "Subtotal"))}</span>{N(M(x.Subtotal))}</div>"
             + $"<div><span>{E(bill ? L("ضريبة المدخلات", "Input tax") : L("ضريبة المبيعات", "Sales tax"))}</span>{N(M(x.Tax))}</div>"
+            + (deductions ? $"<div><span>{E(L("الخصم", "Deduction"))}</span>{N(M(-x.Deduction))}</div>" : string.Empty)
             + $"<div class=\"grand\"><span>{E(L("الإجمالي", "Total"))}</span>{N(M(x.Total))}</div>"
             + (x.PaidAmount + x.ReturnedAmount > 0
                 ? $"<div><span>{E(L("المدفوع والمرتجع", "Paid and returned"))}</span>{N(M(x.PaidAmount + x.ReturnedAmount))}</div><div><span>{E(L("المتبقي", "Remaining"))}</span>{N(M(x.RemainingAmount))}</div>"

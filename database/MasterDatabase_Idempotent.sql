@@ -6449,3 +6449,48 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017131559_Rev6_SupplierBillDeductions'
+)
+BEGIN
+    ALTER TABLE [acc].[ApArDocuments] ADD [Deduction] decimal(18,3) NOT NULL CONSTRAINT [DF_ApArDocuments_Deduction] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017131559_Rev6_SupplierBillDeductions'
+)
+BEGIN
+    ALTER TABLE [acc].[ApArDocumentLines] ADD [Deduction] decimal(18,3) NOT NULL CONSTRAINT [DF_ApArDocumentLines_Deduction] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017131559_Rev6_SupplierBillDeductions'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[ApArDocuments] ADD CONSTRAINT [CK_ApArDocuments_Deduction] CHECK ([Deduction] >= 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017131559_Rev6_SupplierBillDeductions'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[ApArDocumentLines] ADD CONSTRAINT [CK_ApArDocumentLines_Deduction] CHECK ([Deduction] >= 0 AND [Deduction] <= [Amount])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017131559_Rev6_SupplierBillDeductions'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017131559_Rev6_SupplierBillDeductions', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

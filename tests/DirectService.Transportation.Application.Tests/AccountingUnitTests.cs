@@ -36,7 +36,7 @@ public sealed class AccountingUnitTests
     {
         var codes = ChartTemplate.Accounts.Select(a => a.Code).ToList();
         Assert.Equal(codes.Count, codes.Distinct().Count());
-        Assert.Equal(47, codes.Count);
+        Assert.Equal(48, codes.Count);   // revision 6: + 4105 Supplier deductions income
         var seen = new Dictionary<string, ChartTemplate.TemplateAccount>();
         foreach (var a in ChartTemplate.Accounts)
         {

@@ -65,10 +65,11 @@ public sealed class AccountingTests(ApiFactory f)
 
         var r = await owner.Client.PostAsJsonAsync(U(owner, "/accounting/accounts/template"), new { });
         await r.EnsureOkAsync();
-        Assert.Equal(new ChartTemplateResult(47, 1, 13), await r.Content.ReadFromJsonAsync<ChartTemplateResult>());
+        // Revision 6: + account 4105 "Supplier deductions income" mapped to the optional key ACC.SupplierDeductions.
+        Assert.Equal(new ChartTemplateResult(48, 1, 14), await r.Content.ReadFromJsonAsync<ChartTemplateResult>());
 
         var accounts = await AccountsAsync(owner);
-        Assert.Equal(47, accounts.Count);
+        Assert.Equal(48, accounts.Count);
         Assert.False(accounts["1"].IsPostable);
         Assert.True(accounts["110301"].IsPostable);
         Assert.Equal(("Customer", true), (accounts["110301"].ControlPartyType, accounts["110301"].IsControlAccount));
@@ -78,6 +79,7 @@ public sealed class AccountingTests(ApiFactory f)
         var keys = await owner.Client.GetFromJsonAsync<List<PostingKeyResponse>>(U(owner, "/accounting/posting-keys"));
         Assert.All(keys!, k => Assert.Equal("Mapped", k.Status));
         Assert.Equal("4104", keys!.Single(k => k.Key == "TRN.DiscountAllowed").Account!.Code);
+        Assert.Equal("4105", keys!.Single(k => k.Key == "ACC.SupplierDeductions").Account!.Code);
         var cash = await owner.Client.GetFromJsonAsync<List<CashBoxResponse>>(U(owner, "/accounting/cash-boxes"));
         Assert.Equal("110101", Assert.Single(cash!).Account.Code);
 

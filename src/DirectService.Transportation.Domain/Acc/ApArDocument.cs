@@ -27,6 +27,8 @@ public class ApArDocument : AuditableEntity, ITenantScoped, ICompanyScoped, ICas
     public decimal Subtotal { get; set; }
     /// <summary>Sales tax amount.</summary>
     public decimal Tax { get; set; }
+    /// <summary>Σ line deductions of a supplier bill (revision 6); Total = Subtotal + Tax − Deduction.</summary>
+    public decimal Deduction { get; set; }
     /// <summary>Total amount including tax.</summary>
     public decimal Total { get; set; }
     /// <summary>Total of active payments/receipts against the document (maintained by the server).</summary>

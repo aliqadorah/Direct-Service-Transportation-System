@@ -36,7 +36,7 @@
                 <div class="tbl-wrap">
                     <table class="tbl">
                         <caption class="sr-only">@L["inv.items"]</caption>
-                        <thead><tr><th scope="col">@L["inv.description"]</th><th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["inv.amount"]</th><th scope="col" class="n">@L["ap.taxRate"]</th><th scope="col">@L["je.costCentre"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th></tr></thead>
+                        <thead><tr><th scope="col">@L["inv.description"]</th><th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["inv.amount"]</th><th scope="col" class="n">@L["ap.taxRate"]</th>@if (Payables) {<th scope="col" class="n">@L["ap.deduction"]</th>}<th scope="col">@L["je.costCentre"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th></tr></thead>
                         <tbody>
                             @for (var i = 0; i < _m.Lines.Count; i++)
                             {
@@ -47,6 +47,14 @@
                                     <td style="min-width:240px"><ComboField TValue="string?" @bind-Value="line.AccountId" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" /></td>
                                     <td class="n" style="width:140px"><NumberField @bind-Value="line.Amount" Min="0.001m" aria-label="@L.F("ap.lineAmount", n)" /></td>
                                     <td class="n" style="width:110px"><NumberField @bind-Value="line.TaxRate" Min="0m" Max="100m" Decimals="2" Unit="%" aria-label="@L.F("ap.lineTax", n)" Placeholder="@L["ap.companyRate"]" /></td>
+                                    @if (Payables)
+                                    {
+                                        var over = (line.Deduction ?? 0) > (line.Amount ?? 0);
+                                        <td class="n" style="width:140px">
+                                            <NumberField @bind-Value="line.Deduction" Min="0m" aria-label="@L.F("ap.lineDeduction", n)" aria-invalid="@(over ? "true" : null)" />
+                                            @if (over) {<div class="err" role="alert">@L["ap.deductionOver"]</div>}
+                                        </td>
+                                    }
                                     <td style="width:170px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
                                     <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 1" OnClick="() => _m.Lines.Remove(line)" /></td>
                                 </tr>
@@ -58,6 +66,11 @@
         </Box>
         <Box Title="@L["inv.totals"]">
             <div class="ln"><span>@L["inv.subtotal"]</span><Money Value="_m.Lines.Sum(l => l.Amount ?? 0)" /></div>
+            @if (Payables)
+            {
+                <div class="ln"><span>@L["ap.deductions"]</span><Money Value="-_m.Lines.Sum(l => l.Deduction ?? 0)" /></div>
+                <p class="help" style="margin:6px 0 0">@L["ap.deductionHelp"]</p>
+            }
             <p class="help" style="margin:6px 0 0">@L["ap.taxOnce"]</p>
         </Box>
     </div>
@@ -79,7 +92,7 @@
 
     private bool Payables => Nav.Uri.Contains("/accounting/payables", StringComparison.Ordinal);
     private string Route => Payables ? "accounting/payables" : "accounting/receivables";
-    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.AcctApar);
+    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.AcctApar) && _m.Lines.All(l => (l.Deduction ?? 0) <= (l.Amount ?? 0));
 
     protected override async Task OnInitializedAsync()
     {
@@ -117,7 +130,7 @@
             string? partyId = null, customerId = null;
             if (_m.Party?.Split('|') is [var type, var id]) { if (type == "Customer") customerId = id; else partyId = id; }
             var req = new ApArDocumentRequest(partyId, customerId, _m.DocumentDate, _m.DueDate, string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim(),
-                _m.Lines.Select(l => new ApArLineRequest(l.Description?.Trim(), l.AccountId, l.Amount, l.TaxRate, l.CostCentreId)).ToList(), _m.ClientId);
+                _m.Lines.Select(l => new ApArLineRequest(l.Description?.Trim(), l.AccountId, l.Amount, l.TaxRate, l.CostCentreId, Payables ? l.Deduction : null)).ToList(), _m.ClientId);
             var r = await Api.PostAsync<ApArDocumentDetails>(Api.C(Payables ? "apar/bills" : "apar/receivables"), req);
             Toasts.Success(L.F("ap.saved", r.Document.Number, Fmt.Money(r.Document.Total)));
             Lookups.Invalidate();
@@ -147,6 +160,7 @@
         public string? AccountId { get; set; }
         public decimal? Amount { get; set; }
         public decimal? TaxRate { get; set; }
+        public decimal? Deduction { get; set; }
         public string? CostCentreId { get; set; }
     }
 }

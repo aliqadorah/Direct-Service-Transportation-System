@@ -19,8 +19,11 @@ public static class PostingKeys
     public const string DriverAdvances = "TRN.DriverAdvances";
     public const string DriverDeductions = "TRN.DriverDeductions";
     public const string OpeningBalanceDifference = "ACC.OpeningBalanceDifference";
+    /// <summary>Deductions on supplier-bill lines (revision 6), credited when a bill has deductions.</summary>
+    public const string SupplierDeductions = "ACC.SupplierDeductions";
 
-    public sealed record Definition(string Key, string NameAr, string NameEn, bool RequiredOnlyDuringSetup);
+    /// <summary>A posting key; an <paramref name="Optional"/> key is needed only by the documents that use it (never for "posting ready").</summary>
+    public sealed record Definition(string Key, string NameAr, string NameEn, bool RequiredOnlyDuringSetup, bool Optional = false);
 
     /// <summary>All keys in the order of PRD 7.5.1.</summary>
     public static readonly IReadOnlyList<Definition> All =
@@ -38,13 +41,15 @@ public static class PostingKeys
         new(DriverAdvances, "سلف السائقين", "Driver advances", false),
         new(DriverDeductions, "خصومات السائقين", "Driver deductions", false),
         new(OpeningBalanceDifference, "فرق الأرصدة الافتتاحية", "Opening balance difference", true),
+        // Revision 6: optional so that companies created before it keep posting; a bill with a deduction needs it mapped.
+        new(SupplierDeductions, "خصومات الموردين", "Supplier deductions", false, true),
     ];
 
     public static Definition? Find(string? key) => All.FirstOrDefault(d => d.Key == key);
 
     /// <summary>Keys that must be mapped before automatic posting and invoicing (FR-094); the opening-difference key only during setup.</summary>
     public static IEnumerable<string> Required(bool setupOpen) =>
-        All.Where(d => !d.RequiredOnlyDuringSetup || setupOpen).Select(d => d.Key);
+        All.Where(d => !d.Optional && (!d.RequiredOnlyDuringSetup || setupOpen)).Select(d => d.Key);
 }
 
 /// <summary>Stored codes used by the accounting tables (design CHECK lists).</summary>

@@ -62,6 +62,12 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
   // Revision 6: two leaf accounts with movements for the statement of several accounts.
   const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
   const statementAccounts = chart.filter((x) => x.code === "110101" || x.code === "110301").map((x) => x.id).join(",");
+  // Revision 6: a supplier bill with a line deduction.
+  const code = (c2: string) => chart.find((x) => x.code === c2)!.id;
+  const supplier = await api<{ id: string }>(page, "POST", c(company, "apar/parties"),
+    { role: "Supplier", name: "Visual supplier / مورد", taxNumber: null, phone: null, address: null, controlAccountId: code("2101"), paymentTermsDays: 30, clientId: null, rowVersion: null });
+  const bill = await api<{ document: { id: string } }>(page, "POST", c(company, "apar/bills"), { partyId: supplier.id, documentDate: today(), reference: "DED-1",
+    lines: [{ description: "Haulage / نقل", accountId: code("5103"), amount: 1000, taxRate: 16, deduction: 100 }, { description: "Parts / قطع", accountId: code("5104"), amount: 500, taxRate: 16 }] });
   const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-entries/drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
   return {
@@ -72,6 +78,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
       journal: await first("accounting/journal-entries?status=Posted", (j) => j.items),
       draft: draft.id,
       statement: statementAccounts,
+      bill: bill.document.id,
       advance: await first("advances", (j) => j.page.items),
     },
   };
@@ -88,7 +95,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     "partner-accounts", "partner-accounts/payments", "partner-accounts/payments/new",
     "accounting/chart", "accounting/chart/import", "accounting/opening-balances", "accounting/journal", "accounting/journal/new", "accounting/journal/import",
     ids.journal ? `accounting/journal/${ids.journal}` : null, ids.draft ? `accounting/journal/drafts/${ids.draft}` : null, "accounting/automatic", "accounting/statement", ids.statement ? `accounting/statement?accounts=${ids.statement}` : null, "accounting/trial-balance",
-    "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", "accounting/receivables", "accounting/receivables/new",
+    "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", ids.bill ? `accounting/payables/${ids.bill}` : null, "accounting/receivables", "accounting/receivables/new",
     "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
     "reports/operational", "reports/financial", "reports/builder", "reports/saved",
     "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, `masters/drivers/${w.driver}/edit`, "masters/customers", "masters/partners",
@@ -141,7 +148,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
     const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
     {
-      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s" };
+      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s", bill: "b" };
       const w = { driver: "d" } as World;
       const any = companyRoutes("x", w, ids).some((r) => wanted(r.replace("/c/x", "") || "dashboard")) || companyStates(ids, w).some((x) => wanted(x.name, x.route));
       test.skip(!any, "not among VISUAL_ONLY");

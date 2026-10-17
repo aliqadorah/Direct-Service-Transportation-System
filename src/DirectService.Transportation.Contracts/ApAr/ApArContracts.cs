@@ -44,7 +44,8 @@ public sealed record ApArPartyOption(string Type, string Id, string Name, string
 // ------------------------------------------------------------------ documents (FR-123, FR-124)
 
 /// <summary>A document line: description, expense/asset (bills) or revenue (receivables) account, amount before tax, tax rate (company rate when empty), cost centre.</summary>
-public sealed record ApArLineRequest(string? Description, string? AccountId, decimal? Amount, decimal? TaxRate, string? CostCentreId);
+/// <summary>A document line; <paramref name="Deduction"/> (الخصم, supplier bills only, revision 6): 0 ≤ deduction ≤ amount, tax stays on the full amount.</summary>
+public sealed record ApArLineRequest(string? Description, string? AccountId, decimal? Amount, decimal? TaxRate, string? CostCentreId, decimal? Deduction = null);
 
 /// <summary>
 /// A supplier bill or receivable document. Receivables name an accounting customer (<see cref="PartyId"/>) or a transport customer
@@ -53,12 +54,12 @@ public sealed record ApArLineRequest(string? Description, string? AccountId, dec
 public sealed record ApArDocumentRequest(
     string? PartyId, string? CustomerId, DateOnly? DocumentDate, DateOnly? DueDate, string? Reference, IReadOnlyList<ApArLineRequest>? Lines, string? ClientId);
 
-public sealed record ApArLineResponse(string Id, string Description, AccountRef Account, decimal Amount, decimal TaxRate, Ref? CostCentre);
+public sealed record ApArLineResponse(string Id, string Description, AccountRef Account, decimal Amount, decimal TaxRate, Ref? CostCentre, decimal Deduction = 0);
 
 public sealed record ApArDocumentResponse(
     string Id, string Kind, string Number, Ref Party, DateOnly DocumentDate, DateOnly DueDate, string? Reference, decimal Subtotal, decimal Tax, decimal Total,
     decimal PaidAmount, decimal ReturnedAmount, decimal RemainingAmount, string Status, string PaymentStatus, int DaysOverdue, DocRef? JournalEntry,
-    bool PostingPending, string? EInvoiceStatus, string? VoidReason, DateTime CreatedAt, string RowVersion);
+    bool PostingPending, string? EInvoiceStatus, string? VoidReason, DateTime CreatedAt, string RowVersion, decimal Deduction = 0);
 
 public sealed record ApArDocumentDetails(
     ApArDocumentResponse Document, IReadOnlyList<ApArLineResponse> Lines, IReadOnlyList<ApArPaymentResponse> Payments, IReadOnlyList<ApArReturnResponse> Returns,
@@ -68,7 +69,8 @@ public sealed record ApArDocumentDetails(
 public sealed record ApArDocumentListQuery(
     string? Party, DateOnly? From, DateOnly? To, string? Status, string? Payment, string? Q, string? Sort, int Page = 1, int PageSize = 50);
 
-public sealed record ApArDocumentTotals(int Count, decimal Total, decimal Remaining);
+/// <summary>List totals; <paramref name="Deduction"/> = Σ deductions of the posted supplier bills listed (revision 6).</summary>
+public sealed record ApArDocumentTotals(int Count, decimal Total, decimal Remaining, decimal Deduction = 0);
 
 public sealed record ApArDocumentPage(PagedResult<ApArDocumentResponse> Page, ApArDocumentTotals Totals);
 

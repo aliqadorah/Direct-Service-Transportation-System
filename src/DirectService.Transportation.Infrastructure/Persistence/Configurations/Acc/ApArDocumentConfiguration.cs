@@ -16,6 +16,7 @@ internal sealed class ApArDocumentConfiguration : IEntityTypeConfiguration<ApArD
             t.HasCheckConstraint("CK_ApArDocuments_DocumentKind", "[DocumentKind] IN ('SupplierBill','Receivable')");
             t.HasCheckConstraint("CK_ApArDocuments_Subtotal", "[Subtotal] >= 0");
             t.HasCheckConstraint("CK_ApArDocuments_Tax", "[Tax] >= 0");
+            t.HasCheckConstraint("CK_ApArDocuments_Deduction", "[Deduction] >= 0");
             t.HasCheckConstraint("CK_ApArDocuments_Total", "[Total] >= 0");
             t.HasCheckConstraint("CK_ApArDocuments_PaidAmount", "[PaidAmount] >= 0");
             t.HasCheckConstraint("CK_ApArDocuments_ReturnedAmount", "[ReturnedAmount] >= 0");
@@ -212,6 +213,15 @@ internal sealed class ApArDocumentConfiguration : IEntityTypeConfiguration<ApArD
             .HasColumnOrder(29)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6: Σ line deductions of a supplier bill (Total = Subtotal + Tax − Deduction).
+        builder.Property(e => e.Deduction)
+            .HasColumnName("Deduction")
+            .HasColumnType("decimal(18,3)")
+            .HasColumnOrder(30)
+            .HasPrecision(18, 3)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
 
         builder.HasIndex(new[] { "PublicId" }, "UX_ApArDocuments_PublicId")
             .IsUnique()

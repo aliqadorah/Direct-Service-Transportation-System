@@ -76,8 +76,11 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
 
         var lines = await LinesAsync(k, r.Lines!, company.TaxRate, decimals, ct).ConfigureAwait(false);
         var subtotal = lines.Sum(l => l.Amount);
-        var tax = ApArRules.Tax(lines.Select(l => (l.Amount, l.TaxRate)), decimals);
-        var total = subtotal + tax;
+        var tax = ApArRules.Tax(lines.Select(l => (l.Amount, l.TaxRate)), decimals);   // on the full amounts, deductions included (revision 6)
+        var deduction = lines.Sum(l => l.Deduction);
+        var total = subtotal + tax - deduction;
+        if (deduction > 0 && !await db.Set<PostingKeyMapping>().AnyAsync(m => m.PostingKey == PostingKeys.SupplierDeductions, ct).ConfigureAwait(false))
+            throw Fail.Rule(ErrorCodes.ApArDeductionKeyMissing);
         if (total > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
         if (total <= 0) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
 
@@ -85,7 +88,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
 
         var doc = new ApArDocument
         {
-            DocumentKind = k, DocumentDate = date, DueDate = due, Reference = reference, Subtotal = subtotal, Tax = tax, Total = total,
+            DocumentKind = k, DocumentDate = date, DueDate = due, Reference = reference, Subtotal = subtotal, Tax = tax, Deduction = deduction, Total = total,
             PaidAmount = 0, ReturnedAmount = 0, RemainingAmount = total, Status = ApArCodes.Posted,
         };
         foreach (var l in lines) doc.Lines.Add(l);
@@ -138,6 +141,13 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             var rate = r.TaxRate ?? companyRate;
             if (rate is < 0 or > 100 || decimal.Round(rate, 2) != rate)
                 errors.Add(new FieldError(f + ".taxRate", ErrorCodes.ValidationRange, [f + ".taxRate"]));
+            // Revision 6: a deduction only on supplier-bill lines, 0 ≤ deduction ≤ the line amount.
+            if (r.Deduction is decimal ded && ded != 0)
+            {
+                if (kind != ApArCodes.SupplierBill) errors.Add(new FieldError(f + ".deduction", ErrorCodes.ApArDeductionNotAllowed, []));
+                else if (ded < 0 || !Money.IsValidAmount(ded, decimals) || (r.Amount is decimal a && ded > a))
+                    errors.Add(new FieldError(f + ".deduction", ErrorCodes.ValidationRange, [f + ".deduction"]));
+            }
             if (string.IsNullOrWhiteSpace(r.AccountId))
                 errors.Add(new FieldError(f + ".accountId", ErrorCodes.ValidationRequired, [f + ".accountId"]));
         }
@@ -161,6 +171,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             result.Add(new ApArDocumentLine
             {
                 Description = TextNormalizer.CleanText(r.Description)!, AccountId = account.Id, Amount = r.Amount!.Value, TaxRate = r.TaxRate ?? companyRate, CostCentreId = costCentreId,
+                Deduction = r.Deduction ?? 0,
             });
         }
         return result;
@@ -168,7 +179,8 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
 
     /// <summary>
     /// The document's entry (FR-123, FR-124): bill — Dr each line account (with its cost centre) and sales tax input, Cr the supplier's
-    /// control account with the party; receivable — Dr the customer's control account with the party, Cr each line and sales tax output.
+    /// control account with the party (the payable, after deductions) and, for deductions (revision 6), Cr "Supplier deductions";
+    /// receivable — Dr the customer's control account with the party, Cr each line and sales tax output.
     /// </summary>
     public PostingRequest BuildEntry(ApArDocument d, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName)
     {
@@ -182,8 +194,11 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             result.Add(bill ? new PostingLine(null, l.AccountId, l.Amount, 0, l.CostCentreId, null, Note(l.Description)) : new PostingLine(null, l.AccountId, 0, l.Amount, l.CostCentreId, null, Note(l.Description)));
         if (d.Tax > 0) result.Add(bill ? PostingLine.DebitKey(PostingKeys.SalesTaxInput, d.Tax) : PostingLine.CreditKey(PostingKeys.SalesTaxOutput, d.Tax));
         if (bill) result.Add(new PostingLine(null, controlAccountId, 0, d.Total, null, party));
+        if (bill && d.Deduction > 0) result.Add(PostingLine.CreditKey(PostingKeys.SupplierDeductions, d.Deduction));
+        // The deduction is in the text, so the supplier's account statement shows it on the bill's line (revision 6).
         var text = (bill ? (En ? "Supplier bill " : "فاتورة مورد ") : (En ? "Receivable document " : "مستند مدين ")) + d.Number + " · " + partyName
-            + (d.Reference is null ? string.Empty : " · " + d.Reference);
+            + (d.Reference is null ? string.Empty : " · " + d.Reference)
+            + (d.Deduction > 0 ? (En ? " · deduction " : " · خصم ") + Money.Format(d.Deduction) : string.Empty);
         return new PostingRequest(d.DocumentDate, text.Length > PostingEngine.DescriptionMax ? text[..PostingEngine.DescriptionMax] : text, AccountingCodes.ModuleAcc,
             d.DocumentKind, d.Id, false, result);
     }
@@ -286,7 +301,8 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         var query = await FilterAsync(k, q, ct).ConfigureAwait(false);
         var paging = new PageRequest(q.Page, q.PageSize);
         var totals = await query.GroupBy(_ => 1).Select(g => new ApArDocumentTotals(g.Count(), g.Sum(d => d.Status == ApArCodes.Posted ? d.Total : 0),
-            g.Sum(d => d.Status == ApArCodes.Posted ? d.RemainingAmount : 0))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new ApArDocumentTotals(0, 0, 0);
+            g.Sum(d => d.Status == ApArCodes.Posted ? d.RemainingAmount : 0), g.Sum(d => d.Status == ApArCodes.Posted ? d.Deduction : 0)))
+            .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new ApArDocumentTotals(0, 0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-documentDate").ThenByDescending(d => d.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
@@ -300,9 +316,9 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         var rows = await Rows(MasterDataSupport.Sort(await FilterAsync(k, q, ct).ConfigureAwait(false), q.Sort, SortFields, "-documentDate").ThenByDescending(d => d.Id)
             .Take(SheetData.MaxRows)).ToListAsync(ct).ConfigureAwait(false);
         string[] headers = En
-            ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Reference", "Subtotal", "Tax", "Total", "Paid", "Returned", "Remaining", "Due date", "Status"]
-            : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المرجع", "المجموع", "الضريبة", "الإجمالي", "المدفوع", "المرتجع", "المتبقي", "الاستحقاق", "الحالة"];
-        var data = rows.Select(x => (IReadOnlyList<object?>)[x.D.Number, x.D.DocumentDate, x.PartyName, x.D.Reference, x.D.Subtotal, x.D.Tax, x.D.Total, x.D.PaidAmount,
+            ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Reference", "Subtotal", "Tax", "Deduction", "Total", "Paid", "Returned", "Remaining", "Due date", "Status"]
+            : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المرجع", "المجموع", "الضريبة", "الخصم", "الإجمالي", "المدفوع", "المرتجع", "المتبقي", "الاستحقاق", "الحالة"];
+        var data = rows.Select(x => (IReadOnlyList<object?>)[x.D.Number, x.D.DocumentDate, x.PartyName, x.D.Reference, x.D.Subtotal, x.D.Tax, x.D.Deduction, x.D.Total, x.D.PaidAmount,
             x.D.ReturnedAmount, x.D.RemainingAmount, x.D.DueDate, ApArRules.PaymentStatus(x.D.Status, x.D.Total, x.D.RemainingAmount)]).ToList();
         return await CashExport.FileAsync(k == ApArCodes.SupplierBill ? "supplier-bills" : "receivables", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
@@ -327,7 +343,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         return new ApArDocumentDetails(ToResponse(row, today),
             lines.Select(l => new ApArLineResponse(support.Token<ApArDocumentLine>(l.PublicId), l.Description, chart.Ref(l.Account), l.Amount, l.TaxRate,
-                l.CostCentre is null ? null : new Ref(support.Token<CostCentre>(l.CostCentre.PublicId), l.CostCentre.Code + " " + l.CostCentre.Name))).ToList(),
+                l.CostCentre is null ? null : new Ref(support.Token<CostCentre>(l.CostCentre.PublicId), l.CostCentre.Code + " " + l.CostCentre.Name), l.Deduction)).ToList(),
             payments, returns, await cash.WordsAsync(row.D.Total, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
     }
 
@@ -335,7 +351,8 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         new Ref(support.Token<ApArParty>(x.PartyPid), x.PartyName), x.D.DocumentDate, x.D.DueDate, x.D.Reference, x.D.Subtotal, x.D.Tax, x.D.Total, x.D.PaidAmount,
         x.D.ReturnedAmount, x.D.RemainingAmount, x.D.Status, ApArRules.PaymentStatus(x.D.Status, x.D.Total, x.D.RemainingAmount),
         x.D.Status == ApArCodes.Posted && x.D.RemainingAmount > 0 && x.D.DueDate < today ? today.DayNumber - x.D.DueDate.DayNumber : 0,
-        cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.EStatus, x.D.VoidReason, DateTime.SpecifyKind(x.D.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.D.RowVersion));
+        cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.EStatus, x.D.VoidReason, DateTime.SpecifyKind(x.D.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.D.RowVersion),
+        x.D.Deduction);
 }
 
 /// <summary>Pending-posting retries of supplier bills.</summary>

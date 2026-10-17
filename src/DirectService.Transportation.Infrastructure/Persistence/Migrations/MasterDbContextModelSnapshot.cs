@@ -235,6 +235,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("CreatedBy")
                         .HasColumnOrder(22);
 
+                    b.Property<decimal>("Deduction")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Deduction")
+                        .HasColumnOrder(30)
+                        .HasDefaultValueSql("0", "DF_ApArDocuments_Deduction");
+
                     b.Property<string>("DeleteReason")
                         .HasMaxLength(500)
                         .IsUnicode(true)
@@ -413,6 +420,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ApArDocuments", "acc", t =>
                         {
+                            t.HasCheckConstraint("CK_ApArDocuments_Deduction", "[Deduction] >= 0");
+
                             t.HasCheckConstraint("CK_ApArDocuments_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_ApArDocuments_DocumentKind", "[DocumentKind] IN ('SupplierBill','Receivable')");
@@ -478,6 +487,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("CreatedBy")
                         .HasColumnOrder(11);
+
+                    b.Property<decimal>("Deduction")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Deduction")
+                        .HasColumnOrder(19)
+                        .HasDefaultValueSql("0", "DF_ApArDocumentLines_Deduction");
 
                     b.Property<string>("DeleteReason")
                         .HasMaxLength(500)
@@ -568,6 +584,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.ToTable("ApArDocumentLines", "acc", t =>
                         {
                             t.HasCheckConstraint("CK_ApArDocumentLines_Amount", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_ApArDocumentLines_Deduction", "[Deduction] >= 0 AND [Deduction] <= [Amount]");
 
                             t.HasCheckConstraint("CK_ApArDocumentLines_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
 

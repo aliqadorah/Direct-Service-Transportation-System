@@ -130,6 +130,7 @@
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["trip.date"]" Value="d => Fmt.Date(d.DocumentDate, Shell.DateFormat)" Ltr="true" />
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["ap.party"]" Value="d => d.Party.Name" Clip="true" />
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["ap.reference"]" Value="d => d.Reference" Ltr="true" />
+                        @if (Payables) {<GridColumn TItem="ApArDocumentResponse" Title="@L["ap.deduction"]" Value="@(d => d.Deduction == 0 ? null : Fmt.Money(d.Deduction))" Numeric="true" Footer="@Fmt.Money(_docs.Totals.Deduction)" />}
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.total"]" Value="d => Fmt.Money(d.Total)" Numeric="true" Footer="@Fmt.Money(_docs.Totals.Total)" />
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.remaining"]" Value="d => Fmt.Money(d.RemainingAmount)" Numeric="true" Footer="@Fmt.Money(_docs.Totals.Remaining)" />
                         <GridColumn TItem="ApArDocumentResponse" Title="@L["inv.due"]">

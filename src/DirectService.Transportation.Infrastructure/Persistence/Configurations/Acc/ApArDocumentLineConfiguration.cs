@@ -15,6 +15,7 @@ internal sealed class ApArDocumentLineConfiguration : IEntityTypeConfiguration<A
         {
             t.HasCheckConstraint("CK_ApArDocumentLines_Amount", "[Amount] > 0");
             t.HasCheckConstraint("CK_ApArDocumentLines_TaxRate", "[TaxRate] BETWEEN 0 AND 100");
+            t.HasCheckConstraint("CK_ApArDocumentLines_Deduction", "[Deduction] >= 0 AND [Deduction] <= [Amount]");
             t.HasCheckConstraint("CK_ApArDocumentLines_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
         });
 
@@ -129,6 +130,15 @@ internal sealed class ApArDocumentLineConfiguration : IEntityTypeConfiguration<A
             .HasColumnOrder(18)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6: line deduction of supplier bills (owner change request 15 Oct 2026).
+        builder.Property(e => e.Deduction)
+            .HasColumnName("Deduction")
+            .HasColumnType("decimal(18,3)")
+            .HasColumnOrder(19)
+            .HasPrecision(18, 3)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
 
         builder.HasIndex(new[] { "PublicId" }, "UX_ApArDocumentLines_PublicId")
             .IsUnique()

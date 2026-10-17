@@ -47,6 +47,7 @@ public static class ChartTemplate
         new("4102", "إيرادات أخرى (رسوم إضافية)", "Other revenue (extra fees)", "Revenue", "4", null),
         new("4103", "إيرادات خصومات السائقين", "Driver deductions income", "Revenue", "4", null),
         new("4104", "الخصم المسموح به", "Discount allowed", "Revenue", "4", null),
+        new("4105", "إيرادات خصومات الموردين", "Supplier deductions income", "Revenue", "4", null),
         new("5", "المصروفات", "Expenses", "Expense", null, null),
         new("51", "تكاليف النقل المباشرة", "Direct transport costs", "Expense", "5", null),
         new("5101", "أجور السائقين", "Driver wage expense", "Expense", "51", null),
@@ -80,6 +81,7 @@ public static class ChartTemplate
         [PostingKeys.DriverAdvances] = "1104",
         [PostingKeys.DriverDeductions] = "4103",
         [PostingKeys.OpeningBalanceDifference] = "3103",
+        [PostingKeys.SupplierDeductions] = "4105",
     };
 
     /// <summary>An account is postable when no other template account names it as parent.</summary>

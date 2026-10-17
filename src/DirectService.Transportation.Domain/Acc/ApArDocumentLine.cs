@@ -21,6 +21,8 @@ public class ApArDocumentLine : AuditableEntity, ITenantScoped, ICompanyScoped
     public decimal Amount { get; set; }
     /// <summary>Tax rate %.</summary>
     public decimal TaxRate { get; set; }
+    /// <summary>Deduction (الخصم) of a supplier-bill line (revision 6): 0 ≤ deduction ≤ amount; line payable = amount + tax − deduction, tax on the full amount.</summary>
+    public decimal Deduction { get; set; }
     /// <summary>Cost centre.</summary>
     public long? CostCentreId { get; set; }
     public ApArDocument Document { get; set; } = null!;

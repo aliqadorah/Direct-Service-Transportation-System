@@ -35,6 +35,8 @@ public static class ErrorCatalog
         [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} أحرف على الأقل، مع الحروف والأرقام المطلوبة.", "The password does not meet your organisation's policy: at least {0} characters, with the required letters and digits."),
         [ErrorCodes.TokenInvalid] = ("الرابط غير صالح أو منتهي الصلاحية.", "The link is invalid or has expired."),
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
+        [ErrorCodes.ApArDeductionNotAllowed] = ("الخصم متاح على أسطر فواتير الموردين فقط.", "A deduction is available on supplier-bill lines only."),
+        [ErrorCodes.ApArDeductionKeyMissing] = ("اربط «خصومات الموردين» بحساب في ربط الحسابات قبل حفظ فاتورة فيها خصم.", "Map “Supplier deductions” to an account in the account mapping before saving a bill with a deduction."),
         [ErrorCodes.StatementNoAccounts] = ("اختر حساباً واحداً على الأقل، أو نطاق أرقام حسابات، أو «كل الحسابات».", "Choose at least one account, a range of account codes, or all accounts."),
         [ErrorCodes.StatementOverlap] = ("الحساب {0} جزء من الحساب {1} المختار أيضاً؛ اختر أحدهما.", "Account {0} is part of account {1}, which is also selected; choose one of them."),
         [ErrorCodes.StatementTooLarge] = ("الكشف يتجاوز {0} سطر. ضيّق الفترة أو الحسابات.", "The statement has more than {0} lines. Narrow the period or the accounts."),
@@ -284,6 +286,8 @@ public static class ErrorCodes
     public const string UserNameInUse = "user.userNameInUse";
     public const string ReceiptAllocationsExceedAmount = "receipt.allocationsExceedAmount";
     public const string StatementNoAccounts = "statement.noAccounts";
+    public const string ApArDeductionNotAllowed = "apar.deductionNotAllowed";
+    public const string ApArDeductionKeyMissing = "apar.deductionKeyMissing";
     public const string StatementOverlap = "statement.overlap";
     public const string StatementTooLarge = "statement.tooLarge";
     public const string ReceiptAllocationDuplicate = "receipt.allocationDuplicate";
