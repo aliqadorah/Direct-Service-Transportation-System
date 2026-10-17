@@ -51,6 +51,6 @@
     {
         if (!r.IsLeaf || Shell.Company is not { } c || !Shell.Can(PermissionKeys.AcctView)) return;
         string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
-        Nav.NavigateTo(NavModel.Href(c.Id, $"accounting/ledger?account={Uri.EscapeDataString(r.Account.Id)}&from={D(From)}&to={D(To)}"));
+        Nav.NavigateTo(NavModel.Href(c.Id, $"accounting/statement?accounts={Uri.EscapeDataString(r.Account.Id)}&from={D(From)}&to={D(To)}"));
     }
 }

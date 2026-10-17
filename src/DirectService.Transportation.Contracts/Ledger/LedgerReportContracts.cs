@@ -23,6 +23,27 @@ public sealed record LedgerReport(
     AccountRef Account, string AccountType, PartyResponse? Party, Ref? CostCentre, DateOnly From, DateOnly To, decimal Opening, decimal TotalDebit, decimal TotalCredit,
     decimal Closing, PagedResult<LedgerLine> Lines);
 
+// ------------------------------------------------------------------ account statement of several accounts (revision 6)
+
+/// <summary>
+/// Account statement of several accounts (revision 6, owner change request 15 Oct 2026): <paramref name="Accounts"/> = comma-separated
+/// account ids (a group covers its sub-accounts; selections may not overlap), or a code range <paramref name="CodeFrom"/>–<paramref name="CodeTo"/>
+/// (inclusive, accounts without sub-accounts), or <paramref name="AllAccounts"/>. Accounts with no opening and no movement are left out of a
+/// range or of "all accounts" (<paramref name="HideEmpty"/>, default on).
+/// </summary>
+public sealed record AccountStatementsQuery(
+    string? Accounts, string? CodeFrom, string? CodeTo, bool? AllAccounts, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party,
+    bool? HideEmpty = null);
+
+/// <summary>One account of the statement: opening, every movement with its running balance, the subtotal (totals and closing).</summary>
+public sealed record AccountStatementSection(
+    AccountRef Account, string AccountType, decimal Opening, decimal TotalDebit, decimal TotalCredit, decimal Closing, IReadOnlyList<LedgerLine> Lines);
+
+/// <summary>The sections in chart order and the grand total over all of them.</summary>
+public sealed record AccountStatementsReport(
+    DateOnly From, DateOnly To, PartyResponse? Party, Ref? CostCentre, IReadOnlyList<AccountStatementSection> Sections,
+    decimal Opening, decimal TotalDebit, decimal TotalCredit, decimal Closing);
+
 // ------------------------------------------------------------------ trial balance (FR-117)
 
 /// <summary>Trial balance for a period at a tree level (1 = top accounts; default the deepest level); optionally hide rows with nothing in them.</summary>

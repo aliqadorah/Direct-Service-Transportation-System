@@ -184,6 +184,11 @@ table.grid tr.grp td { background: var(--surface-group); font-weight: var(--fw-s
 .tb-toggle { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }
 button.tb-toggle:hover { background: var(--surface-hover, var(--page)); color: var(--text); }
 button.tb-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Account statement of several accounts (revision 6): a heading per account, chosen-account chips, the grand total. */
+.stmt-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); padding: var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.stmt-title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.stmt-chip { display: inline-flex; align-items: center; gap: 2px; padding-inline-start: var(--sp-3); border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: var(--fs-sm); }
+.stmt-grand { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: baseline; margin-top: var(--sp-4); flex: none; }
 table.grid tfoot td { font-weight: var(--fw-semibold); background: var(--surface-foot); border-top: 1px solid var(--line-strong); position: sticky; bottom: 0; }
 table.grid tr.flt td { background: var(--surface-filter); height: 32px; padding: 0 var(--sp-2); position: sticky; top: var(--row); z-index: var(--z-sticky); }
 table.grid tr.flt .input { height: 24px; font-size: 12px; padding: 0 var(--sp-3); width: 100%; }

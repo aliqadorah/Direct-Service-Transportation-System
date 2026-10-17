@@ -28,6 +28,11 @@ internal static class LedgerReportEndpoints
             TypedResults.Ok(await svc.LedgerAsync(q, ct).ConfigureAwait(false))).RequireAnyPermission(listed);
         r.MapGet("/account-statement/export", async ([AsParameters] LedgerQuery q, string? format, LedgerReportExports svc, CancellationToken ct) =>
             File(await svc.LedgerAsync(q, format, true, ct).ConfigureAwait(false))).RequireAnyPermission(listed);
+        // Revision 6: the statement of several accounts (multi-select, code range or all) — replaces the general ledger screen.
+        r.MapGet("/account-statements", async ([AsParameters] AccountStatementsQuery q, LedgerReportService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.StatementsAsync(q, ct).ConfigureAwait(false))).RequireAnyPermission(listed);
+        r.MapGet("/account-statements/export", async ([AsParameters] AccountStatementsQuery q, string? format, LedgerReportExports svc, CancellationToken ct) =>
+            File(await svc.StatementsAsync(q, format, ct).ConfigureAwait(false))).RequireAnyPermission(listed);
         r.MapGet("/trial-balance", async ([AsParameters] TrialBalanceQuery q, LedgerReportService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.TrialBalanceAsync(q, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         r.MapGet("/trial-balance/export", async ([AsParameters] TrialBalanceQuery q, string? format, LedgerReportExports svc, CancellationToken ct) =>

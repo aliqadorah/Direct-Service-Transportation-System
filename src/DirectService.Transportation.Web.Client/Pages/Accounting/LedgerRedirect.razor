@@ -1,0 +1,16 @@
+@page "/c/{Company}/accounting/ledger"
+@*
+  Revision 6 (owner change request 15 Oct 2026): the general ledger screen was removed; its old address (bookmarks, links in older notifications
+  or help) opens the account statement with the same account and period.
+*@
+@inject NavigationManager Nav
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        var query = new Uri(Nav.Uri).Query;
+        Nav.NavigateTo(NavModel.Href(Company, "accounting/statement") + query, replace: true);
+    }
+}

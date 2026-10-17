@@ -85,7 +85,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
       "driver-accounts/advances", advance ? `driver-accounts/advances/${advance}` : null, "driver-accounts/settlements",
       "partner-accounts", "partner-accounts/payments", "partner-accounts/payments/new",
       "accounting/chart", "accounting/chart/import", "accounting/opening-balances", "accounting/journal", "accounting/journal/new", "accounting/journal/import",
-      journal ? `accounting/journal/${journal}` : null, "accounting/automatic", "accounting/ledger", "accounting/statement", "accounting/trial-balance",
+      journal ? `accounting/journal/${journal}` : null, "accounting/automatic", "accounting/statement", "accounting/trial-balance",
       "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", "accounting/receivables", "accounting/receivables/new",
       "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
       "reports/operational", "reports/financial", "reports/builder", "reports/saved",

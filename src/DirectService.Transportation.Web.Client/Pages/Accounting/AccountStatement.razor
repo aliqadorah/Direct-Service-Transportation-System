@@ -1,0 +1,251 @@
+@page "/c/{Company}/accounting/statement"
+@*
+  SCR-39 account statement (FR-120), revision 6 (owner change request 15 Oct 2026): it replaces the general ledger screen (SCR-35). Several
+  accounts — chosen one by one (a group covers its sub-accounts), a range of account codes, or every account — for a period, with an
+  optional cost centre and, for one control account, a party. Per account: opening, every movement with its running balance and a subtotal;
+  a grand total over all accounts. Each line opens its entry and its source document. Excel / PDF of the whole statement. Also open to
+  reports.view (DT-113).
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+@inject ShellState Shell
+@inject AccountingLookups Lookups
+@inject TripLookups Transport
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.statement"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.statement"])])" />
+<div class="stack" style="flex:none;gap:8px">
+    <TabStrip Items="Modes" Selected="@_mode" SelectedChanged="SetMode" Label="@L["stmt.choose"]" />
+    <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+        @switch (_mode)
+        {
+            case "range":
+                <ComboField TValue="string?" @bind-Value="_codeFrom" Options="_codes" Label="@L["stmt.codeFrom"]" FieldClass="w260" />
+                <ComboField TValue="string?" @bind-Value="_codeTo" Options="_codes" Label="@L["stmt.codeTo"]" FieldClass="w260" />
+                break;
+            case "all":
+                <p class="muted" style="margin:0 0 8px">@L["stmt.allHelp"]</p>
+                break;
+            default:
+                <ComboField TValue="string?" Value="_adding" ValueChanged="Add" ValueExpression="() => _adding" Options="_accounts" Label="@L["stmt.addAccount"]" FieldClass="w260" />
+                break;
+        }
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        @if (Lookups.CostCentres.Count > 0) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="Lookups.CostCentres" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
+        @if (PartyType is { } pt)
+        {
+            @if (pt == "Driver") {<ComboField TValue="string?" @bind-Value="_party" SearchAsync="SearchDrivers" Label="@L["je.party"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+            else {<ComboField TValue="string?" @bind-Value="_party" Options="_parties.GetValueOrDefault(pt) ?? []" Label="@L["je.party"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
+        }
+        <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" Disabled="!Ready" OnClick="Run" />
+        @if (_report is not null)
+        {
+            <span style="margin-inline-start:auto;display:flex;gap:6px">
+                <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+                <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+            </span>
+        }
+    </div>
+    @if (_mode == "accounts" && _chosen.Count > 0)
+    {
+        <ul class="chips" aria-label="@L["stmt.chosen"]" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px">
+            @foreach (var id in _chosen)
+            {
+                var account = id;
+                <li class="stmt-chip"><bdi>@AccountName(account)</bdi><button type="button" class="btn ghost sm" aria-label="@L.F("stmt.remove", AccountName(account))" @onclick="() => Remove(account)"><Icon Name="x" /></button></li>
+            }
+        </ul>
+    }
+</div>
+@if (!Ready && _report is null)
+{
+    <Box Fill="true"><EmptyState Icon="book" Title="@L["rep.pickAccount"]" Text="@L["stmt.pickText"]" /></Box>
+}
+else
+{
+    <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Run">
+        <Empty><EmptyState Icon="book" Title="@L["stmt.empty"]" /></Empty>
+        <ChildContent>
+            @{ var r = _report!; }
+            <Figures Items="@([new Figure(L["rep.opening"], Fmt.Money(r.Opening)), new Figure(L["je.debit"], Fmt.Money(r.TotalDebit)), new Figure(L["je.credit"], Fmt.Money(r.TotalCredit)), new Figure(L["stmt.grandClosing"], Fmt.Money(r.Closing))])" />
+            <div class="stack" style="gap:12px;flex:none">
+                @foreach (var s in r.Sections)
+                {
+                    var section = s;
+                    @* A plain box per account (not a ListFrame, which fills the page height): the page scrolls through the sections. *@
+                    <section class="box" aria-label="@Lookups.Name(section.Account)" style="flex:none">
+                            <div class="stmt-head">
+                                <h2 class="stmt-title"><bdi class="num">@section.Account.Code</bdi> <bdi>@L.Pick(section.Account.NameAr, section.Account.NameEn)</bdi></h2>
+                                <span class="muted">@L["rep.opening"]: <Money Value="section.Opening" /></span>
+                            </div>
+                            <div style="overflow-x:auto" tabindex="0">
+                            <DataGrid TItem="LedgerLine" Items="section.Lines" Key="l => (object)l" Caption="@Lookups.Name(section.Account)" OnRowClick="Open" FooterLabel="@L["stmt.subtotal"]">
+                                <Columns>
+                                    <GridColumn TItem="LedgerLine" Title="@L["trip.date"]" Value="l => Fmt.Date(l.Date, Shell.DateFormat)" Ltr="true" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["rep.entry"]" Value="l => l.Entry.Number" Ltr="true" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.source"]">
+                                        <Template>
+                                            @if (context.Source is { } src && Links.ForSource(Company, src.Type, src.Id) is { } href) {<a href="@href" @onclick:stopPropagation="true"><bdi>@(src.Number ?? L["je.src." + src.Type])</bdi></a>}
+                                        </Template>
+                                    </GridColumn>
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.description"]" Value="l => l.Note ?? l.Description" Clip="true" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.reference"]" Value="l => l.Reference" Clip="true" />
+                                    @if (section.Lines.Any(l => l.Account.Id != section.Account.Id)) {<GridColumn TItem="LedgerLine" Title="@L["je.account"]" Value="l => l.Account.Code" Ltr="true" />}
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.party"]" Value="l => l.Party?.Name" Clip="true" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.debit"]" Value="@(l => l.Debit == 0 ? null : Fmt.Money(l.Debit))" Numeric="true" Footer="@Fmt.Money(section.TotalDebit)" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["je.credit"]" Value="@(l => l.Credit == 0 ? null : Fmt.Money(l.Credit))" Numeric="true" Footer="@Fmt.Money(section.TotalCredit)" />
+                                    <GridColumn TItem="LedgerLine" Title="@L["dash.balance"]" Value="l => Fmt.Money(l.Balance)" Numeric="true" Footer="@Fmt.Money(section.Closing)" />
+                                </Columns>
+                            </DataGrid>
+                            </div>
+                    </section>
+                }
+            </div>
+            <div class="box pad stmt-grand" role="group" aria-label="@L["stmt.grandTotal"]">
+                <strong>@L["stmt.grandTotal"]</strong>
+                <span>@L["je.debit"]: <Money Value="r.TotalDebit" /></span>
+                <span>@L["je.credit"]: <Money Value="r.TotalCredit" /></span>
+                <span>@L["stmt.grandClosing"]: <Money Value="r.Closing" /></span>
+            </div>
+        </ChildContent>
+    </StateView>
+}
+
+@code {
+    private AccountStatementsReport? _report;
+    private IReadOnlyList<Option<string?>> _accounts = [], _codes = [];
+    private readonly Dictionary<string, string> _names = new(StringComparer.Ordinal);
+    private readonly List<string> _chosen = [];
+    private readonly Dictionary<string, IReadOnlyList<Option<string?>>> _parties = new(StringComparer.Ordinal);
+    private LoadState _state = LoadState.Loading;
+    private string _mode = "accounts";
+    private string? _reference, _costCentre, _party, _adding, _codeFrom, _codeTo;
+    private DateOnly? _from, _to;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    // Links from other screens (and the old general-ledger address): ?accounts=a,b or ?account=, ?from, ?to — applied whenever they change,
+    // also when only the query of this page changes (the page is not created again then).
+    [SupplyParameterFromQuery(Name = "accounts")] public string? QueryAccounts { get; set; }
+    [SupplyParameterFromQuery(Name = "account")] public string? QueryAccount { get; set; }
+    [SupplyParameterFromQuery(Name = "from")] public string? QueryFrom { get; set; }
+    [SupplyParameterFromQuery(Name = "to")] public string? QueryTo { get; set; }
+    private string? _appliedQuery;
+
+    private IReadOnlyList<TabItem> Modes => [new("accounts", L["stmt.modeAccounts"]), new("range", L["stmt.modeRange"]), new("all", L["stmt.modeAll"])];
+
+    private bool Ready => _mode switch { "all" => true, "range" => _codeFrom is not null || _codeTo is not null, _ => _chosen.Count > 0 };
+
+    /// <summary>The party type when exactly one control account is chosen (statement by party, FR-120).</summary>
+    private string? PartyType => _mode == "accounts" && _chosen.Count == 1 && Lookups.Account(_chosen[0]) is { IsControlAccount: true } a ? a.ControlPartyType : null;
+
+    private string AccountName(string id) => _names.GetValueOrDefault(id) ?? id;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            // Group accounts cover their descendants (FR-116): the whole chart for acct.view, postable accounts otherwise.
+            if (Shell.Can(PermissionKeys.AcctView))
+            {
+                var all = await Api.GetAsync<IReadOnlyList<AccountResponse>>(Api.C("accounting/accounts?status=Active"));
+                _accounts = all.Select(a => new Option<string?>(a.Id, $"{a.Code} · {L.Pick(a.NameAr, a.NameEn)}", a.IsPostable ? null : L["acc.group"])).ToList();
+                _codes = all.Select(a => new Option<string?>(a.Code, $"{a.Code} · {L.Pick(a.NameAr, a.NameEn)}")).ToList();
+            }
+            else
+            {
+                _accounts = Lookups.Accounts.Select(a => new Option<string?>(a.Account.Id, Lookups.Name(a.Account))).ToList();
+                _codes = Lookups.Accounts.Select(a => new Option<string?>(a.Account.Code, Lookups.Name(a.Account))).ToList();
+            }
+            foreach (var o in _accounts) if (o.Value is { } v) _names[v] = o.Text;
+        }
+        catch (ApiException) { }
+        static Option<string?> Opt(ApArPartyOption p) => new($"{p.Type}|{p.Id}", p.Name);
+        try { _parties["Customer"] = (await Lookups.PartiesAsync("Customer")).Select(Opt).ToList(); } catch (ApiException) { }
+        try { _parties["Supplier"] = (await Lookups.PartiesAsync("Supplier")).Select(Opt).ToList(); } catch (ApiException) { }
+        try { await Transport.EnsureAsync(); _parties["Partner"] = Transport.Partners.Select(p => new Option<string?>($"Partner|{p.Value}", p.Text)).ToList(); } catch (ApiException) { }
+
+        _state = LoadState.Ready;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{QueryAccounts}|{QueryAccount}|{QueryFrom}|{QueryTo}";
+        if (key == _appliedQuery) return;
+        _appliedQuery = key;
+        static DateOnly? Day(string? s) => DateOnly.TryParseExact(s, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+        var ids = (QueryAccounts ?? QueryAccount ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (ids.Length == 0) return;
+        _mode = "accounts";
+        _chosen.Clear();
+        _chosen.AddRange(ids.Distinct(StringComparer.Ordinal));
+        _from = Day(QueryFrom);
+        _to = Day(QueryTo);
+        _party = null;
+        await Run();
+    }
+
+    private Task SetMode(string m) { _mode = m; _party = null; return Task.CompletedTask; }
+
+    private void Add(string? id)
+    {
+        _adding = null;
+        if (id is not null && !_chosen.Contains(id)) _chosen.Add(id);
+        _party = null;
+    }
+
+    private void Remove(string id) { _chosen.Remove(id); _party = null; }
+
+    private async Task<IReadOnlyList<Option<string?>>> SearchDrivers(string text, CancellationToken ct) =>
+        (await Transport.SearchDriversAsync(text, ct)).Select(o => new Option<string?>($"Driver|{o.Value}", o.Text, o.Sub)).ToList();
+
+    private string Query()
+    {
+        var p = new List<string>();
+        void Put(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
+        switch (_mode)
+        {
+            case "range": Put("codeFrom", _codeFrom); Put("codeTo", _codeTo); break;
+            case "all": Put("allAccounts", "true"); break;
+            default: Put("accounts", string.Join(',', _chosen)); break;
+        }
+        Put("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Put("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Put("costCentre", _costCentre);
+        if (PartyType is not null && _party?.Split('|') is [var type, var id]) { Put("partyType", type); Put("party", id); }
+        return "?" + string.Join('&', p);
+    }
+
+    private async Task Run()
+    {
+        if (!Ready) return;
+        var before = _state;
+        _state = LoadState.Loading;
+        try
+        {
+            _report = await Api.GetAsync<AccountStatementsReport>(Api.C("accounting/reports/account-statements" + Query()));
+            _from ??= _report.From;
+            _to ??= _report.To;
+            _state = _report.Sections.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        // A refused filter is one message, not "could not load" (owner feedback 13 Oct 2026, RPT-12).
+        catch (ApiException e) when (e.Problem.Status is 400 or 422)
+        {
+            Toasts.Error(e.Problem.Errors is { Count: > 0 } errors ? string.Join(" · ", errors.Select(x => x.Message)) : e.Problem.Detail ?? L["ui.loadFailed"]);
+            _state = before == LoadState.Loading ? (_report is null ? LoadState.Empty : LoadState.Ready) : before;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/reports/account-statements/export" + Query()), format);
+
+    /// <summary>A line opens its entry for readers of the journal (report readers see the statement only).</summary>
+    private void Open(LedgerLine l)
+    {
+        if (Shell.Can(PermissionKeys.AcctView) || Shell.Can(PermissionKeys.JeView)) Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{l.Entry.Id}"));
+    }
+}

@@ -56,6 +56,52 @@ public sealed class LedgerReportTests(ApiFactory f)
     }
 
     [Fact]
+    public async Task Account_statement_of_several_accounts_has_subtotals_and_a_grand_total()
+    {
+        // Revision 6 item 6: several accounts (chosen, code range, all), a subtotal per account, a grand total, exports; replaces the general ledger.
+        var w = await LedgerAsync();
+        var o = w.Owner;
+        var a = w.Accounts;
+        var q = $"from={D(Start)}&to={D(Today)}";
+
+        // Two chosen accounts: one section each with its own opening, lines, subtotal and closing; the grand total adds them.
+        var two = await ReadAsync<AccountStatementsReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements?accounts={a["110101"].Id},{a["5203"].Id}&{q}")));
+        Assert.Equal(["110101", "5203"], two.Sections.Select(s => s.Account.Code));
+        var cash = two.Sections[0];
+        var single = await ReadAsync<LedgerReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/account-statement?account={a["110101"].Id}&{q}")));
+        Assert.Equal((single.Opening, single.TotalDebit, single.TotalCredit, single.Closing), (cash.Opening, cash.TotalDebit, cash.TotalCredit, cash.Closing));
+        Assert.Equal(single.Lines.TotalCount, cash.Lines.Count);
+        Assert.Equal(cash.Closing, cash.Lines[^1].Balance);
+        Assert.Equal(two.Sections.Sum(s => s.TotalDebit), two.TotalDebit);
+        Assert.Equal(two.Sections.Sum(s => s.Closing), two.Closing);
+
+        // A group and one of its own sub-accounts would count lines twice: refused.
+        var overlap = await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements?accounts={a["1101"].Id},{a["110101"].Id}&{q}"));
+        Assert.Equal("statement.overlap", await overlap.ErrorCodeAsync());
+        Assert.Equal("statement.noAccounts", await (await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements?{q}"))).ErrorCodeAsync());
+
+        // A code range and all accounts: accounts without sub-accounts with a balance or a movement; all accounts balance to zero.
+        var range = await ReadAsync<AccountStatementsReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements?codeFrom=11&codeTo=1199&{q}")));
+        Assert.All(range.Sections, s => Assert.StartsWith("11", s.Account.Code, StringComparison.Ordinal));
+        Assert.Contains(range.Sections, s => s.Account.Code == "110101");
+        var all = await ReadAsync<AccountStatementsReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements?allAccounts=true&{q}")));
+        Assert.True(all.Sections.Count > 4);
+        Assert.Equal(all.TotalDebit, all.TotalCredit);
+        Assert.Equal(0m, all.Closing);
+        Assert.All(all.Sections, s => Assert.True(s.Opening != 0 || s.Lines.Count > 0));
+
+        // The export lists every section with its subtotal and the grand total.
+        var csv = System.Text.Encoding.UTF8.GetString(await (await o.Client.GetAsync(U(o, $"/accounting/reports/account-statements/export?accounts={a["110101"].Id},{a["5203"].Id}&{q}&format=csv"))).Content.ReadAsByteArrayAsync());
+        Assert.Contains("Subtotal 110101", csv, StringComparison.Ordinal);
+        Assert.Contains("Subtotal 5203", csv, StringComparison.Ordinal);
+        Assert.Contains("Grand total", csv, StringComparison.Ordinal);
+
+        // Another company cannot read these accounts.
+        var other = await f.SignUpOwnerAsync();
+        Assert.False((await other.Client.GetAsync(U(other, $"/accounting/reports/account-statements?accounts={a["110101"].Id}&{q}"))).IsSuccessStatusCode);
+    }
+
+    [Fact]
     public async Task Trial_balance_tree_sums_parents_from_children_and_keeps_the_totals()
     {
         // Revision 6 item 5: the trial balance as a tree — parents = sum of their children, links, chart order, level filter, same totals, export indentation.

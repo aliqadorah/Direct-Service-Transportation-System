@@ -36,6 +36,29 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
         return await exporter.ExportAsync(table, format, (statement ? "account-statement-" : "general-ledger-") + r.Account.Code, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Account statement of several accounts (revision 6): per account a heading, its opening, its lines and its subtotal; the grand total last.</summary>
+    public async Task<GeneratedFile> StatementsAsync(AccountStatementsQuery q, string? format, CancellationToken ct)
+    {
+        var r = await reports.StatementsAsync(q, ct).ConfigureAwait(false);
+        var filters = new List<(string, string)> { Period(r.From, r.To), (L("الحسابات", "Accounts"), r.Sections.Count.ToString(CultureInfo.InvariantCulture)) };
+        if (r.Party is not null) filters.Add((L("الطرف", "Party"), r.Party.Name ?? string.Empty));
+        if (r.CostCentre is not null) filters.Add((L("مركز التكلفة", "Cost centre"), r.CostCentre.Name));
+        var rows = new List<IReadOnlyList<object?>>();
+        foreach (var s in r.Sections)
+        {
+            rows.Add(new object?[] { null, null, Name(s.Account), null, null, null, null, null, null });
+            rows.Add(new object?[] { r.From, null, L("رصيد افتتاحي", "Opening balance"), null, null, null, null, null, s.Opening });
+            rows.AddRange(s.Lines.Select(l => (IReadOnlyList<object?>)[l.Date, l.Entry.Number, l.Description, l.Reference, l.Source?.Number, l.Party?.Name,
+                l.Debit == 0 ? null : l.Debit, l.Credit == 0 ? null : l.Credit, l.Balance]));
+            rows.Add(new object?[] { null, null, L("المجموع الفرعي ", "Subtotal ") + s.Account.Code, null, null, null, s.TotalDebit, s.TotalCredit, s.Closing });
+        }
+        var table = new ReportTable(L("كشف حساب", "Account statement"), filters,
+            [new(L("التاريخ", "Date"), ReportValue.Date), new(L("القيد", "Entry")), new(L("البيان", "Description")), new(L("المرجع", "Reference")), new(L("المستند", "Document")),
+             new(L("الطرف", "Party")), new(L("مدين", "Debit"), ReportValue.Money), new(L("دائن", "Credit"), ReportValue.Money), new(L("الرصيد", "Balance"), ReportValue.Money)],
+            rows, [null, null, L("الإجمالي العام", "Grand total"), null, null, null, r.TotalDebit, r.TotalCredit, r.Closing]);
+        return await exporter.ExportAsync(table, format, "account-statement", ct).ConfigureAwait(false);
+    }
+
     public async Task<GeneratedFile> TrialBalanceAsync(TrialBalanceQuery q, string? format, CancellationToken ct)
     {
         var r = await reports.TrialBalanceAsync(q, ct).ConfigureAwait(false);

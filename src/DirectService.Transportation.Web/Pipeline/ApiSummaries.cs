@@ -399,6 +399,8 @@ internal static class ApiSummaries
         ["GET /api/v1/companies/{company}/apar/e-invoice-submissions/"] = "E-invoicing submissions of receivable documents and returns (D-15)",
         ["GET /api/v1/companies/{company}/apar/e-invoice-submissions/{submission}"] = "A receivable e-invoicing submission with the document sent and the response",
         ["POST /api/v1/companies/{company}/apar/e-invoice-submissions/{submission}/submit"] = "Submit or resubmit a receivable document or return now (D-04, D-15)",
+        ["GET /api/v1/companies/{company}/accounting/reports/account-statements"] = "Account statement of several accounts (chosen, code range or all): sections with subtotals and a grand total (revision 6)",
+        ["GET /api/v1/companies/{company}/accounting/reports/account-statements/export"] = "Export the statement of several accounts as Excel, CSV or PDF",
         ["GET /api/v1/companies/{company}/accounting/reports/general-ledger"] = "General ledger of an account for a period: opening, movements, running and closing balance (FR-116, FR-121)",
         ["GET /api/v1/companies/{company}/accounting/reports/general-ledger/export"] = "Export the general ledger as Excel, CSV or PDF (FR-121)",
         ["GET /api/v1/companies/{company}/accounting/reports/account-statement"] = "Account statement, optionally by party (FR-120, RPT-15)",

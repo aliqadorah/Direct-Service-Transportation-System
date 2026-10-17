@@ -184,6 +184,96 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         return await AllOfAsync(account, q, ct).ConfigureAwait(false);
     }
 
+    // ============================================================ account statement of several accounts (revision 6)
+
+    /// <summary>The most lines of a statement of several accounts (screen and exports).</summary>
+    public const int MaxStatementLines = 20_000;
+
+    /// <summary>
+    /// Account statement of several accounts (revision 6, replaces the general ledger screen): chosen accounts (a group covers its sub-accounts;
+    /// overlapping choices are refused so the grand total counts every line once), a code range or every account (accounts without
+    /// sub-accounts); each with opening, movements and running balance and a subtotal; a grand total; optional cost centre and party.
+    /// </summary>
+    public async Task<AccountStatementsReport> StatementsAsync(AccountStatementsQuery q, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(q);
+        var (from, to) = await PeriodAsync(q.From, q.To, ct).ConfigureAwait(false);
+        var tree = await TreeAsync(ct).ConfigureAwait(false);
+        var costCentreId = await CostCentreAsync(q.CostCentre, ct).ConfigureAwait(false);
+        PostingParty? party = null;
+        if (!string.IsNullOrWhiteSpace(q.PartyType) || !string.IsNullOrWhiteSpace(q.Party))
+        {
+            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, "partyType");
+            var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            party = new PostingParty(PartyResolver.ModuleOf(q.PartyType), q.PartyType, pid);
+        }
+
+        // The accounts of the statement: chosen ones (as chosen), or the leaves of a code range / of the whole chart.
+        List<long> chosen;
+        var explicitChoice = !string.IsNullOrWhiteSpace(q.Accounts);
+        if (explicitChoice)
+        {
+            chosen = [];
+            foreach (var token in q.Accounts!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal))
+            {
+                var g = support.Decode<Account>(token) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, "accounts");
+                var node = tree.Values.FirstOrDefault(n => n.Account.PublicId == g) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, "accounts");
+                chosen.Add(node.Account.Id);
+            }
+            if (chosen.Count > 500) throw Fail.Field("accounts", ErrorCodes.ValidationRange, "accounts");
+            foreach (var a in chosen)
+            {
+                for (var p = tree[a].Account.ParentId; p is long pid && tree.ContainsKey(pid); p = tree[pid].Account.ParentId)
+                    if (chosen.Contains(pid)) throw Fail.RuleOn("accounts", ErrorCodes.StatementOverlap, tree[a].Account.Code, tree[pid].Account.Code);
+            }
+        }
+        else if (q.AllAccounts == true || !string.IsNullOrWhiteSpace(q.CodeFrom) || !string.IsNullOrWhiteSpace(q.CodeTo))
+        {
+            var lo = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeFrom);
+            var hi = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeTo);
+            if (lo is not null && hi is not null && string.CompareOrdinal(lo, hi) > 0) throw Fail.Field("codeFrom", ErrorCodes.ValidationRange, "codeFrom");
+            chosen = tree.Values.Where(n => n.Children.Count == 0
+                    && (lo is null || string.CompareOrdinal(n.Account.Code, lo) >= 0)
+                    && (hi is null || string.CompareOrdinal(n.Account.Code, hi) <= 0 || n.Account.Code.StartsWith(hi, StringComparison.Ordinal)))
+                .Select(n => n.Account.Id).ToList();
+        }
+        else throw Fail.Rule(ErrorCodes.StatementNoAccounts);
+
+        var sections = chosen.OrderBy(id => tree[id].Account.Code, StringComparer.Ordinal).Select(id => (Id: id, Ids: Subtree(tree, id).ToHashSet())).ToList();
+        var all = sections.SelectMany(s => s.Ids).Distinct().ToList();
+        var lines = db.Set<EntryLine>().AsNoTracking().Where(l => all.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
+        if (costCentreId is long cc) lines = lines.Where(l => l.CostCentreId == cc);
+        if (party is not null) lines = lines.Where(l => l.PartyModule == party.Module && l.PartyType == party.Type && l.PartyId == party.Id);
+        var openings = await lines.Where(l => l.JournalEntry.EntryDate < from).GroupBy(l => l.AccountId).Select(g => new { g.Key, B = g.Sum(l => l.Debit - l.Credit) })
+            .ToDictionaryAsync(x => x.Key, x => x.B, ct).ConfigureAwait(false);
+        var rows = await Project(lines.Where(l => l.JournalEntry.EntryDate >= from)
+                .OrderBy(l => l.JournalEntry.EntryDate).ThenBy(l => l.JournalEntryId).ThenBy(l => l.LineNo).Take(MaxStatementLines + 1))
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (rows.Count > MaxStatementLines) throw Fail.Rule(ErrorCodes.StatementTooLarge, MaxStatementLines);
+        var described = await DescribeAsync(rows, tree, ct).ConfigureAwait(false);
+
+        var hideEmpty = !explicitChoice && q.HideEmpty != false;
+        var result = new List<AccountStatementSection>();
+        foreach (var (id, ids) in sections)
+        {
+            var opening = ids.Sum(i => openings.GetValueOrDefault(i));
+            var own = rows.Where(r => ids.Contains(r.AccountId)).ToList();
+            if (hideEmpty && opening == 0 && own.Count == 0) continue;
+            var running = opening;
+            var items = own.Select(r =>
+            {
+                running += r.Debit - r.Credit;
+                return described(r, running);
+            }).ToList();
+            var d = own.Sum(r => r.Debit);
+            var c = own.Sum(r => r.Credit);
+            result.Add(new AccountStatementSection(chart.Ref(tree[id].Account), tree[id].Account.AccountType, opening, d, c, opening + d - c, items));
+        }
+        var partyRef = party is null ? null : (await parties.DescribeAsync([(party.Type, (long?)party.Id)], ct).ConfigureAwait(false)).GetValueOrDefault((party.Type, party.Id));
+        return new AccountStatementsReport(from, to, partyRef, await CostCentreRefAsync(costCentreId, ct).ConfigureAwait(false), result,
+            result.Sum(s => s.Opening), result.Sum(s => s.TotalDebit), result.Sum(s => s.TotalCredit), result.Sum(s => s.Closing));
+    }
+
     // ============================================================ trial balance (FR-117)
 
     public async Task<TrialBalanceReport> TrialBalanceAsync(TrialBalanceQuery q, CancellationToken ct)

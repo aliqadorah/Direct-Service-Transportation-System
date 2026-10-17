@@ -1,7 +1,7 @@
 @page "/c/{Company}/accounting/trial-balance"
 @*
   SCR-36 trial balance (FR-117, FR-110): period, tree level, hide empty rows; opening, movements and closing as debit / credit with totals;
-  a mismatch is highlighted; the opening-balance difference still to clear is shown during setup. A row opens its ledger. Excel / PDF.
+  a mismatch is highlighted; the opening-balance difference still to clear is shown during setup. A row opens its account statement. Excel / PDF.
   Revision 6: the chart as a tree — each parent with its sub-accounts, parent rows = sum of their children, expand / collapse one row, all
   rows or one level at a time; the level filter sets how deep the tree goes; totals are those of the deepest rows and still balance; the
   exports keep the indentation.
@@ -155,6 +155,6 @@
     private void Open(TrialBalanceRow x)
     {
         string D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
-        Nav.NavigateTo(NavModel.Href(Company, $"accounting/ledger?account={Uri.EscapeDataString(x.Account.Id)}&from={D(_from)}&to={D(_to)}"));
+        Nav.NavigateTo(NavModel.Href(Company, $"accounting/statement?accounts={Uri.EscapeDataString(x.Account.Id)}&from={D(_from)}&to={D(_to)}"));
     }
 }

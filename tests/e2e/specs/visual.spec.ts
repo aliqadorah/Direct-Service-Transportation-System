@@ -59,6 +59,9 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
   await api(page, "POST", c(company, "advances"), { driverId: w.driver, advanceDate: today(), amount: 20, paymentMethod: "Cash", cashBoxId: cash });
   const first = async (p: string, pick: (j: any) => any[]) => { const j = await api<any>(page, "GET", c(company, p)); return (pick(j)[0]?.id as string | undefined) ?? null; };
   // Revision 6: a journal draft (no number) with a reference, so the draft form and the Drafts view have content.
+  // Revision 6: two leaf accounts with movements for the statement of several accounts.
+  const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+  const statementAccounts = chart.filter((x) => x.code === "110101" || x.code === "110301").map((x) => x.id).join(",");
   const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-entries/drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
   return {
@@ -68,6 +71,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
       receipt: await first("receipts", (j) => j.page.items),
       journal: await first("accounting/journal-entries?status=Posted", (j) => j.items),
       draft: draft.id,
+      statement: statementAccounts,
       advance: await first("advances", (j) => j.page.items),
     },
   };
@@ -83,7 +87,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     "driver-accounts/advances", "driver-accounts/advances/new", ids.advance ? `driver-accounts/advances/${ids.advance}` : null, "driver-accounts/settlements",
     "partner-accounts", "partner-accounts/payments", "partner-accounts/payments/new",
     "accounting/chart", "accounting/chart/import", "accounting/opening-balances", "accounting/journal", "accounting/journal/new", "accounting/journal/import",
-    ids.journal ? `accounting/journal/${ids.journal}` : null, ids.draft ? `accounting/journal/drafts/${ids.draft}` : null, "accounting/automatic", "accounting/ledger", "accounting/statement", "accounting/trial-balance",
+    ids.journal ? `accounting/journal/${ids.journal}` : null, ids.draft ? `accounting/journal/drafts/${ids.draft}` : null, "accounting/automatic", "accounting/statement", ids.statement ? `accounting/statement?accounts=${ids.statement}` : null, "accounting/trial-balance",
     "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", "accounting/receivables", "accounting/receivables/new",
     "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
     "reports/operational", "reports/financial", "reports/builder", "reports/saved",
@@ -137,7 +141,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
     const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
     {
-      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d" };
+      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s" };
       const w = { driver: "d" } as World;
       const any = companyRoutes("x", w, ids).some((r) => wanted(r.replace("/c/x", "") || "dashboard")) || companyStates(ids, w).some((x) => wanted(x.name, x.route));
       test.skip(!any, "not among VISUAL_ONLY");

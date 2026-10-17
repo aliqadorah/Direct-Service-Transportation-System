@@ -121,6 +121,44 @@ public sealed class AccountingPageTests : PageTestBase
         Assert.Contains("1101", cut.Markup);
     }
 
+    /// <summary>Revision 6 item 6: the statement of several accounts — one section per account with its subtotal, the grand total, the request with all accounts.</summary>
+    [Fact]
+    public void Account_statement_shows_a_section_per_account_and_the_grand_total()
+    {
+        var day = new DateOnly(2026, 10, 10);
+        LedgerLine Line(AccountRef a, decimal d, decimal c, decimal b) => new(day, new EntryLinkRef("e1", "JV-00001"), "حركة", null, a, null, null, null, d, c, b, "R-1");
+        Respond("accounting/accounts", new[]
+        {
+            new AccountResponse("a2", "1101", "الصندوق الرئيسي", "Main cash box", "Asset", null, null, 1, true, false, 0, 0, false, null, "Active", "A"),
+            new AccountResponse("a3", "1110", "الذمم التجارية", "Trade receivables", "Asset", null, null, 1, true, true, 0, 0, false, null, "Active", "A"),
+        });
+        Respond("accounting/reports/account-statements", new AccountStatementsReport(new DateOnly(2026, 10, 1), day, null, null,
+        [
+            new AccountStatementSection(Cash, "Asset", 100, 50, 0, 150, [Line(Cash, 50, 0, 150)]),
+            new AccountStatementSection(Receivables, "Asset", 0, 0, 30, -30, [Line(Receivables, 0, 30, -30)]),
+        ], 100, 50, 30, 120));
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/accounting/statement?accounts=a2,a3");
+        var cut = Render<AccountStatement>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("الذمم التجارية", cut.Markup));
+        Assert.Contains(Requests, r => r.Path.StartsWith("accounting/reports/account-statements?", StringComparison.Ordinal) && r.Path.Contains("accounts=a2%2Ca3", StringComparison.Ordinal));
+        Assert.Equal(2, cut.FindAll("table.grid").Count);
+        Assert.Contains(L["stmt.subtotal"], cut.Markup);
+        Assert.Contains(L["stmt.grandTotal"], cut.Markup);
+        Assert.Contains("R-1", cut.Markup);
+        Assert.Equal(3, cut.FindAll("[role=tab]").Count(t => t.TextContent.Contains(L["stmt.modeAccounts"], StringComparison.Ordinal)
+            || t.TextContent.Contains(L["stmt.modeRange"], StringComparison.Ordinal) || t.TextContent.Contains(L["stmt.modeAll"], StringComparison.Ordinal)));
+    }
+
+    /// <summary>Revision 6 item 6: the old general-ledger address opens the account statement with the same query.</summary>
+    [Fact]
+    public void Old_general_ledger_address_redirects_to_the_statement()
+    {
+        var nav = Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo($"/c/{Company}/accounting/ledger?account=a2&from=2026-10-01");
+        Render<LedgerRedirect>(p => p.Add(x => x.Company, Company));
+        Assert.EndsWith($"/c/{Company}/accounting/statement?account=a2&from=2026-10-01", nav.Uri, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Trial_balance_highlights_a_mismatch()
     {
