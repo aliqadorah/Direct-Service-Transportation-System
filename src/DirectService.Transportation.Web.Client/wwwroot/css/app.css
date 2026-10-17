@@ -475,4 +475,7 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
   .shell { display: block; height: auto; }
 }
 .w100 { width: 100%; }
-.w160 { width: 160px; } .w200 { width: 200px; } .w220 { width: 220px; }
+.w120 { width: 120px; } .w160 { width: 160px; } .w200 { width: 200px; } .w220 { width: 220px; }
+/* Budget vs Actual (revision 6 part B): favourable / unfavourable variances; the badge text beside them says it too (colour is never alone). */
+.var-good { color: var(--ok); }
+.var-bad { color: var(--err); }

@@ -148,7 +148,8 @@ public sealed class FoundationTests
     public void Help_pages_cover_every_Section_9_flow_in_both_languages()
     {
         var topics = Web.Client.Help.HelpTopics.All;
-        Assert.Equal(Enumerable.Range(1, 14).Select(i => $"9.{i}"), topics.Select(t => t.Prd));
+        Assert.Equal(Enumerable.Range(1, 14).Select(i => $"9.{i}"), topics.Take(14).Select(t => t.Prd));
+        Assert.All(topics.Skip(14), t => Assert.Equal("Rev. 6", t.Prd));   // owner change requests of 15 Oct 2026, part B
         Assert.Equal(topics.Count, topics.Select(t => t.Key).Distinct().Count());
         Assert.All(topics, t =>
         {

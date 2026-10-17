@@ -1,0 +1,309 @@
+@page "/c/{Company}/accounting/budgets/{Id}"
+@*
+  A budget (revision 6 part B): name, status, lines — revenue or expense account (posting or parent account), optional cost centre, twelve
+  months and the yearly total — with totals per month for revenue and for expenses. A draft is edited here (acc.budget.manage): add / remove
+  lines, type the amounts, import the lines from Excel (template, strict preview; the import replaces every line), save. Approve / return to
+  draft (acc.budget.approve); only one approved budget per year. An approved budget is read-only. Record lock, leave-page confirmation, history.
+*@
+@using Md = DirectService.Transportation.Contracts.MasterData
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        @{ var b = _b!; }
+        <PageHeader Title="@b.Name" Help="budget" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.budgets"], NavModel.Href(Company, "accounting/budgets")), new Crumb(b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture))])">
+            <Badges><StatusTag Status="@(Approved ? "approved" : "draft")" /></Badges>
+            <Actions>
+                <Btn Icon="clock" Text="@L["ui.history"]" OnClick="ShowHistory" />
+                @if (Approved) {<Btn Icon="chart" Text="@L["nav.budgetVsActual"]" OnClick="@(() => Nav.NavigateTo(NavModel.Href(Company, $"accounting/budget-vs-actual?year={b.FiscalYear}")))" />}
+                @if (Editable)
+                {
+                    <Btn Danger="true" Ghost="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => _deleting = true" />
+                    <Btn Icon="import" Text="@L["bud.import"]" OnClick="() => _importing = !_importing" />
+                }
+                @if (CanApprove && !Approved) {<Btn Icon="check" Text="@L["bud.approve"]" Disabled="Busy" OnClick="() => _approving = true" />}
+                @if (CanApprove && Approved) {<Btn Icon="refresh" Text="@L["bud.returnToDraft"]" Disabled="Busy" OnClick="() => _reopening = true" />}
+                @if (Editable) {<Btn Primary="true" Icon="save" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="Busy" OnClick="Save" />}
+            </Actions>
+        </PageHeader>
+        <RecordLockGuard EntityType="ACC.Budget" Id="@b.Id" OnState="h => _lockedBy = h" />
+        <UnsavedGuard Dirty="Dirty" />
+        @if (Approved) {<Banner Tone="Tone.Ok" Icon="check" Text="@L.F("bud.approvedHelp", b.ApprovedByName ?? "", Fmt.Date(b.ApprovedAt?.ToLocalTime(), Shell.DateFormat), b.FiscalYear)" />}
+        else {<Banner Tone="Tone.Info" Icon="info" Text="@L["bud.draftHelp"]" />}
+        @if (_importing && Editable)
+        {
+            @if (Dirty) {<Banner Tone="Tone.Warn" Text="@L["bud.importUnsaved"]" />}
+            <ImportPanel PreviewPath="@($"accounting/budgets/{b.Id}/import/preview")" ImportPath="@($"accounting/budgets/{b.Id}/import")" Done="@($"accounting/budgets/{b.Id}")"
+                         Help="@L["bud.importHelp"]" OnImported="Imported" />
+        }
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <section class="box pad" style="flex:none">
+                <div class="fg" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);align-items:end">
+                    <TextField @bind-Value="_m.Name" Label="@L["md.name"]" Required="true" MaxLength="200" ReadOnly="!Editable" />
+                    <Figures Columns="3" Items="@([new Figure(L["bud.year"], b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture)), new Figure(L["bud.revenueTotal"], Fmt.Money(Total("Revenue"))), new Figure(L["bud.expenseTotal"], Fmt.Money(Total("Expense")))])" />
+                </div>
+            </section>
+            <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
+                <Actions>@if (Editable) {<Btn Small="true" Icon="plus" Text="@L["bud.addLine"]" OnClick="AddLine" />}</Actions>
+                <ChildContent>
+                    @if (_m.Lines.Count == 0)
+                    {
+                        <EmptyState Icon="chart" Title="@L["bud.noLines"]" Text="@L[Editable ? "bud.noLinesText" : "bud.noLinesReadOnly"]" />
+                    }
+                    else
+                    {
+                        <div class="tbl-wrap fill">
+                            <table class="tbl bud-tbl">
+                                <caption class="sr-only">@L["bud.lines"]</caption>
+                                <thead><tr>
+                                    <th scope="col">@L["je.account"]</th><th scope="col">@L["je.costCentre"]</th>
+                                    @for (var m = 0; m < 12; m++) {<th scope="col" class="n">@L["bud.m" + (m + 1)]</th>}
+                                    <th scope="col" class="n">@L["bud.yearTotal"]</th>
+                                    @if (Editable) {<th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>}
+                                </tr></thead>
+                                <tbody>
+                                    @for (var i = 0; i < _m.Lines.Count; i++)
+                                    {
+                                        var line = _m.Lines[i];
+                                        var n = i + 1;
+                                        <tr @key="line">
+                                            <td style="min-width:240px">
+                                                @if (Editable) {<ComboField TValue="string?" @bind-Value="line.AccountId" @bind-Value:after="Changed" Options="_accounts" aria-label="@L.F("bud.lineAccount", n)" />}
+                                                else {<bdi>@AccountName(line.AccountId)</bdi>}
+                                            </td>
+                                            <td style="min-width:150px">
+                                                @if (Editable) {<SelectField TValue="string?" @bind-Value="line.CostCentreId" @bind-Value:after="Changed" Options="_centres" Empty="—" aria-label="@L.F("bud.lineCostCentre", n)" />}
+                                                else {@(_centres.FirstOrDefault(c => c.Value == line.CostCentreId)?.Text ?? line.CostCentreName ?? "—")}
+                                            </td>
+                                            @for (var m = 0; m < 12; m++)
+                                            {
+                                                var mi = m;
+                                                <td class="n" style="min-width:104px">
+                                                    @if (Editable) {<NumberField @bind-Value="line.Months[mi]" aria-label="@L.F("bud.lineMonth", n, L["bud.m" + (mi + 1)])" />}
+                                                    else {<bdi class="num">@M(line.Months[mi])</bdi>}
+                                                </td>
+                                            }
+                                            <td class="n" style="min-width:120px"><bdi class="num">@Fmt.Money(line.Total)</bdi></td>
+                                            @if (Editable) {<td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" OnClick="() => Remove(line)" /></td>}
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    @foreach (var type in new[] { "Revenue", "Expense" })
+                                    {
+                                        <tr>
+                                            <td colspan="2">@L[type == "Revenue" ? "bud.revenueTotal" : "bud.expenseTotal"]</td>
+                                            @for (var m = 0; m < 12; m++) {<td class="n"><bdi class="num">@Fmt.Money(MonthTotal(type, m))</bdi></td>}
+                                            <td class="n"><bdi class="num">@Fmt.Money(Total(type))</bdi></td>
+                                            @if (Editable) {<td></td>}
+                                        </tr>
+                                    }
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </ChildContent>
+            </Box>
+        </EditForm>
+    </ChildContent>
+</StateView>
+<SidePanel @bind-Open="_historyOpen" Title="@L["ui.history"]">
+    @if (_history is null) {<Skeleton />} else {<RecordHistory Items="_history" />}
+</SidePanel>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _b?.Name ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["bud.deleteText"]"
+               Busy="_saving" Error="@_actionError" OnConfirm="_ => Delete()" />
+<ConfirmDialog @bind-Open="_approving" Title="@L["bud.approve"]" ConfirmText="@L["bud.approve"]" Message="@L.F("bud.approveText", _b?.FiscalYear ?? 0)"
+               Busy="_saving" Error="@_actionError" OnConfirm="_ => Approve()" />
+<ConfirmDialog @bind-Open="_reopening" Title="@L["bud.returnToDraft"]" ConfirmText="@L["bud.returnToDraft"]" Message="@L.F("bud.returnText", _b?.FiscalYear ?? 0)"
+               Busy="_saving" Error="@_actionError" OnConfirm="_ => ReturnToDraft()" />
+
+@code {
+    private BudgetResponse? _b;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy, _actionError;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private bool _saving, _deleting, _approving, _reopening, _importing, _historyOpen, _structure;
+    private IReadOnlyList<Option<string?>> _accounts = [];
+    private IReadOnlyList<Option<string?>> _centres = [];
+    private Dictionary<string, BudgetAccountOption> _accountById = new(StringComparer.Ordinal);
+    private IReadOnlyList<Md.HistoryEntry>? _history;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "import")] public string? ImportQuery { get; set; }
+
+    private bool Approved => _b?.Status == BudgetStatus.Approved;
+    private bool Busy => _saving || _lockedBy is not null;
+    private bool CanApprove => Shell.Can(PermissionKeys.BudgetApprove);
+    private bool Editable => !Approved && _lockedBy is null && Shell.Can(PermissionKeys.BudgetManage);
+    private bool Dirty => Editable && (_structure || _ctx.IsModified());
+
+    private static string? M(decimal? v) => v is null or 0 ? null : Fmt.Money(v);
+
+    protected override Task OnParametersSetAsync()
+    {
+        _importing = ImportQuery == "1";
+        return Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            if (_accountById.Count == 0)
+            {
+                var options = await Api.GetAsync<IReadOnlyList<BudgetAccountOption>>(Api.C("accounting/budgets/account-options"));
+                _accountById = options.ToDictionary(o => o.Account.Id, StringComparer.Ordinal);
+                _accounts = options.Select(o => new Option<string?>(o.Account.Id, new string(' ', (o.Level - 1) * 2) + $"{o.Account.Code} · {L.Pick(o.Account.NameAr, o.Account.NameEn)}",
+                    L["acc.t." + o.AccountType] + (o.IsParent ? " · " + L["bud.parentAccount"] : ""))).ToList();
+                try { _centres = (await Api.GetAsync<IReadOnlyList<Md.MasterOption>>(Api.C("accounting/cost-centres/options"))).Select(c => new Option<string?>(c.Id, c.Name)).ToList(); }
+                catch (ApiException) { _centres = []; }
+            }
+            Show(await Api.GetAsync<BudgetResponse>(Api.C($"accounting/budgets/{Uri.EscapeDataString(Id)}")));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Show(BudgetResponse b)
+    {
+        _b = b;
+        _m = new Model
+        {
+            Name = b.Name,
+            Lines = b.Lines.Select(l => new LineModel
+            {
+                AccountId = l.Account.Id, AccountType = l.AccountType, AccountLabel = $"{l.Account.Code} · {L.Pick(l.Account.NameAr, l.Account.NameEn)}",
+                CostCentreId = l.CostCentre?.Id, CostCentreName = l.CostCentre?.Name, Months = l.Months.Select(v => (decimal?)v).ToArray(),
+            }).ToList(),
+        };
+        _ctx = new EditContext(_m);
+        _structure = false;
+        _history = null;
+    }
+
+    private string AccountName(string? id) => id is null ? "" : _m.Lines.FirstOrDefault(l => l.AccountId == id)?.AccountLabel ?? id;
+
+    private string? TypeOf(LineModel l) => l.AccountId is { } id && _accountById.TryGetValue(id, out var o) ? o.AccountType : l.AccountType;
+
+    private decimal MonthTotal(string type, int m) => _m.Lines.Where(l => TypeOf(l) == type).Sum(l => l.Months[m] ?? 0);
+
+    private decimal Total(string type) => _m.Lines.Where(l => TypeOf(l) == type).Sum(l => l.Total);
+
+    private void Changed() => _structure = true;
+
+    private void AddLine()
+    {
+        _m.Lines.Add(new LineModel());
+        _structure = true;
+    }
+
+    private void Remove(LineModel line)
+    {
+        _m.Lines.Remove(line);
+        _structure = true;
+    }
+
+    private BudgetRequest Request() => new(_m.Name?.Trim(),
+        _m.Lines.Where(l => l.AccountId is not null || l.Months.Any(v => v is not null and not 0))
+            .Select(l => new BudgetLineRequest(l.AccountId, l.CostCentreId, l.Months.Select(v => v ?? 0).ToList())).ToList(),
+        _b?.RowVersion);
+
+    private async Task Save()
+    {
+        if (_b is null || !Editable || _saving) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            Show(await Api.PutAsync<BudgetResponse>(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}"), Request()));
+            Toasts.Success(L["bud.saved"]);
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task Imported()
+    {
+        _importing = false;
+        await Load();
+    }
+
+    private async Task Act(string path, string done, Action after)
+    {
+        if (_b is null) return;
+        _saving = true;
+        _actionError = null;
+        try
+        {
+            Show(await Api.PostAsync<BudgetResponse>(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/{path}"), new RowVersionRequest(_b.RowVersion)));
+            after();
+            Toasts.Success(L[done]);
+        }
+        catch (ApiException e) { _actionError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
+    private Task Approve() => Act("approve", "bud.approved", () => _approving = false);
+
+    private Task ReturnToDraft() => Act("return-to-draft", "bud.returned", () => _reopening = false);
+
+    private async Task Delete()
+    {
+        if (_b is null) return;
+        _saving = true;
+        _actionError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/delete"), new RowVersionRequest(_b.RowVersion));
+            _deleting = false;
+            _structure = false;
+            _ctx.MarkAsUnmodified();
+            Toasts.Success(L["bud.deleted"]);
+            Nav.NavigateTo(NavModel.Href(Company, "accounting/budgets"));
+        }
+        catch (ApiException e) { _actionError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
+    private async Task ShowHistory()
+    {
+        _historyOpen = true;
+        if (_b is null) return;
+        try { _history = await Api.GetAsync<IReadOnlyList<Md.HistoryEntry>>(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/history")); }
+        catch (ApiException) { _history = []; }
+    }
+
+    private sealed class Model
+    {
+        public string? Name { get; set; }
+        public List<LineModel> Lines { get; set; } = [];
+    }
+
+    private sealed class LineModel
+    {
+        public string? AccountId { get; set; }
+        public string? AccountType { get; set; }
+        public string? AccountLabel { get; set; }
+        public string? CostCentreId { get; set; }
+        public string? CostCentreName { get; set; }
+        public decimal?[] Months { get; set; } = new decimal?[12];
+        public decimal Total => Months.Sum(v => v ?? 0);
+    }
+}

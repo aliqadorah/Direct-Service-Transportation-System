@@ -51,6 +51,9 @@ public static class NavModel
             new("nav.profitLoss", "accounting/profit-loss", PermissionKeys.AcctView),
             new("nav.balanceSheet", "accounting/balance-sheet", PermissionKeys.AcctView),
             new("nav.statement", "accounting/statement", PermissionKeys.AcctView, PermissionKeys.ReportsView),
+            // Revision 6 part B: budgets and Budget vs Actual.
+            new("nav.budgets", "accounting/budgets", PermissionKeys.BudgetView),
+            new("nav.budgetVsActual", "accounting/budget-vs-actual", PermissionKeys.BudgetView),
             new("nav.payables", "accounting/payables", PermissionKeys.AcctApar, PermissionKeys.AcctView),
             new("nav.receivables", "accounting/receivables", PermissionKeys.AcctApar, PermissionKeys.AcctView),
             new("nav.cashBanks", "accounting/cash-banks", PermissionKeys.AcctView),

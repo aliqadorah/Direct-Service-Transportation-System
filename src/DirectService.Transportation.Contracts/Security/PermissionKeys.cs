@@ -1,7 +1,7 @@
 namespace DirectService.Transportation.Contracts.Security;
 
 /// <summary>
-/// The 22 permission keys of PRD 3.4, namespaced per owner decision D-01 (module prefix + PRD key).
+/// The 22 permission keys of PRD 3.4, namespaced per owner decision D-01 (module prefix + PRD key), and the three budget keys of revision 6.
 /// The UI shows the PRD names (<see cref="PrdName"/>).
 /// </summary>
 public static class PermissionKeys
@@ -28,12 +28,16 @@ public static class PermissionKeys
     public const string SettingsManage = "core.settings.manage";
     public const string UsersManage = "core.users.manage";
     public const string TenantManage = "core.tenant.manage";
+    // Revision 6 part B (owner change request 15 Oct 2026): budgets.
+    public const string BudgetView = "acc.budget.view";
+    public const string BudgetManage = "acc.budget.manage";
+    public const string BudgetApprove = "acc.budget.approve";
 
     public static readonly IReadOnlyList<string> All =
     [
         TripsView, TripsEdit, TripsVoid, InvView, InvIssue, InvVoid, RcptManage, DrvView, DrvAdvance,
         DrvSettle, JeView, JeExport, AcctView, AcctPost, AcctApar, AcctSetup, AcctMaint, ReportsView,
-        MastersManage, SettingsManage, UsersManage, TenantManage,
+        MastersManage, SettingsManage, UsersManage, TenantManage, BudgetView, BudgetManage, BudgetApprove,
     ];
 
     /// <summary>PRD 3.4 name of a namespaced key, e.g. "trn.trips.view" → "trips.view".</summary>
@@ -59,7 +63,7 @@ public static class PresetRoles
                 PermissionKeys.TripsView, PermissionKeys.InvView, PermissionKeys.InvIssue, PermissionKeys.InvVoid,
                 PermissionKeys.RcptManage, PermissionKeys.DrvView, PermissionKeys.DrvAdvance, PermissionKeys.DrvSettle,
                 PermissionKeys.JeView, PermissionKeys.JeExport, PermissionKeys.AcctView, PermissionKeys.AcctPost,
-                PermissionKeys.AcctApar, PermissionKeys.ReportsView,
+                PermissionKeys.AcctApar, PermissionKeys.ReportsView, PermissionKeys.BudgetView, PermissionKeys.BudgetManage,
             ],
             [Dispatcher] =
             [
@@ -69,7 +73,7 @@ public static class PresetRoles
             [Viewer] =
             [
                 PermissionKeys.TripsView, PermissionKeys.InvView, PermissionKeys.DrvView, PermissionKeys.JeView,
-                PermissionKeys.AcctView, PermissionKeys.ReportsView,
+                PermissionKeys.AcctView, PermissionKeys.ReportsView, PermissionKeys.BudgetView,
             ],
         };
 

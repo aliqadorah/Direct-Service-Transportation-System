@@ -12,8 +12,8 @@ public sealed class FoundationUnitTests
     [Fact]
     public void There_are_22_permission_keys_namespaced_per_D01()
     {
-        Assert.Equal(22, PermissionKeys.All.Count);
-        Assert.Equal(22, PermissionKeys.All.Distinct().Count());
+        Assert.Equal(25, PermissionKeys.All.Count);
+        Assert.Equal(25, PermissionKeys.All.Distinct().Count());
         Assert.All(PermissionKeys.All, k => Assert.Matches("^(trn|acc|core)\\.[a-z]+\\.[a-z]+$", k));
         Assert.Equal("trips.view", PermissionKeys.PrdName(PermissionKeys.TripsView));
         Assert.Equal("acct.maint", PermissionKeys.PrdName(PermissionKeys.AcctMaint));
@@ -29,9 +29,9 @@ public sealed class FoundationUnitTests
         Assert.Equal(PermissionKeys.All.Where(k => k != PermissionKeys.TenantManage).Order(), PresetRoles.Permissions[PresetRoles.Administrator].Order());
         Assert.Contains(PermissionKeys.AcctMaint, PresetRoles.Permissions[PresetRoles.Administrator]);
         Assert.Equal(Prd("trips.view", "inv.view", "inv.issue", "inv.void", "rcpt.manage", "drv.view", "drv.advance", "drv.settle",
-            "je.view", "je.export", "acct.view", "acct.post", "acct.apar", "reports.view"), PresetRoles.Permissions[PresetRoles.Accountant].Order());
+            "je.view", "je.export", "acct.view", "acct.post", "acct.apar", "reports.view", "budget.view", "budget.manage"), PresetRoles.Permissions[PresetRoles.Accountant].Order());   // + budgets (revision 6 part B)
         Assert.Equal(Prd("trips.view", "trips.edit", "trips.void", "drv.view", "masters.manage", "reports.view"), PresetRoles.Permissions[PresetRoles.Dispatcher].Order());
-        Assert.Equal(Prd("trips.view", "inv.view", "drv.view", "je.view", "acct.view", "reports.view"), PresetRoles.Permissions[PresetRoles.Viewer].Order());
+        Assert.Equal(Prd("trips.view", "inv.view", "drv.view", "je.view", "acct.view", "reports.view", "budget.view"), PresetRoles.Permissions[PresetRoles.Viewer].Order());
     }
 
     [Theory]

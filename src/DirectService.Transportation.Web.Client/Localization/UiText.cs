@@ -8,7 +8,7 @@ namespace DirectService.Transportation.Web.Client.Localization;
 public static partial class UiText
 {
     /// <summary>Every key of every module; a key defined twice fails at start-up (and in the UI tests).</summary>
-    public static readonly IReadOnlyDictionary<string, (string Ar, string En)> All = Merge(Core(), Billing(), Accounting(), Reports(), Settings(), Platform());
+    public static readonly IReadOnlyDictionary<string, (string Ar, string En)> All = Merge(Core(), Billing(), Accounting(), Budgets(), Reports(), Settings(), Platform());
 
     private static Dictionary<string, (string Ar, string En)> Merge(params Dictionary<string, (string Ar, string En)>[] parts)
     {

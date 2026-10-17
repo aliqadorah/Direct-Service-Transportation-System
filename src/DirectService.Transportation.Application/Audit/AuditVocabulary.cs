@@ -50,6 +50,8 @@ public static class AuditVocabulary
         ["ACC.CashBox"] = E("صندوق", "Cash box", "الصندوق", "cash box"),
         ["ACC.BankAccount"] = E("حساب بنكي", "Bank account", "الحساب البنكي", "bank account"),
         ["ACC.CostCentre"] = E("مركز تكلفة", "Cost centre", "مركز التكلفة", "cost centre"),
+        ["ACC.Budget"] = E("موازنة", "Budget", "الموازنة", "budget"),
+        ["ACC.BudgetLine"] = E("سطر موازنة", "Budget line", "سطر الموازنة", "the budget line"),
         ["ACC.Period"] = E("فترة محاسبية", "Accounting period", "الفترة", "period"),
         ["ACC.PostingKeyMapping"] = E("ربط حساب", "Account mapping", "ربط الحساب", "the account mapping"),
         ["ACC.PendingPosting"] = E("قيد معلّق", "Pending posting", "القيد المعلّق", "the pending posting"),
@@ -519,6 +521,22 @@ public static class AuditVocabulary
         ["CORE.Plan.Code"] = F("رمز الخطة", "Plan code"),
         ["CORE.SupportAccessGrant.Reason"] = F("سبب الطلب", "Reason"),
         ["CFG.CompanySetting.SettingValue"] = F("القيمة", "Value"),
+        // Revision 6 part B: budgets (month names as in the budget screen and its Excel template).
+        ["ACC.Budget.FiscalYear"] = F("السنة المالية", "Fiscal year", Kind.Number),
+        ["ACC.BudgetLine.BudgetId"] = R("الموازنة", "Budget", "ACC.Budget"),
+        ["ACC.BudgetLine.Total"] = F("الإجمالي السنوي", "Yearly total", Kind.Money),
+        ["ACC.BudgetLine.Month01"] = F("كانون الثاني", "January", Kind.Money),
+        ["ACC.BudgetLine.Month02"] = F("شباط", "February", Kind.Money),
+        ["ACC.BudgetLine.Month03"] = F("آذار", "March", Kind.Money),
+        ["ACC.BudgetLine.Month04"] = F("نيسان", "April", Kind.Money),
+        ["ACC.BudgetLine.Month05"] = F("أيار", "May", Kind.Money),
+        ["ACC.BudgetLine.Month06"] = F("حزيران", "June", Kind.Money),
+        ["ACC.BudgetLine.Month07"] = F("تموز", "July", Kind.Money),
+        ["ACC.BudgetLine.Month08"] = F("آب", "August", Kind.Money),
+        ["ACC.BudgetLine.Month09"] = F("أيلول", "September", Kind.Money),
+        ["ACC.BudgetLine.Month10"] = F("تشرين الأول", "October", Kind.Money),
+        ["ACC.BudgetLine.Month11"] = F("تشرين الثاني", "November", Kind.Money),
+        ["ACC.BudgetLine.Month12"] = F("كانون الأول", "December", Kind.Money),
     };
 
     public static FieldWords? Field(string? entityType, string column)

@@ -99,7 +99,7 @@ internal static class AccountingEndpoints
     private static void MapCostCentres(RouteGroupBuilder g)
     {
         g.MapGet("/options", async (CashBankService svc, CancellationToken ct) => TypedResults.Ok(await svc.CostCentreOptionsAsync(ct).ConfigureAwait(false)))
-            .RequireAnyPermission(PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.AcctApar, PermissionKeys.ReportsView);
+            .RequireAnyPermission(PermissionKeys.AcctView, PermissionKeys.AcctPost, PermissionKeys.AcctApar, PermissionKeys.ReportsView, PermissionKeys.BudgetView);
         g.MapGet("/", async (CashBankService svc, CancellationToken ct) => TypedResults.Ok(await svc.CostCentresAsync(ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (CostCentreRequest r, CashBankService svc, CancellationToken ct) =>

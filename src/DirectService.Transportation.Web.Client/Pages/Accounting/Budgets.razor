@@ -1,0 +1,155 @@
+@page "/c/{Company}/accounting/budgets"
+@*
+  Budgets (الموازنة; revision 6 part B, owner change request 15 Oct 2026): the company's budgets by year with status, revenue and expense
+  totals. "New budget" (acc.budget.manage): year and name, then type the lines, import them from Excel, or copy last year's actuals with an
+  optional % increase (and one line per cost centre if wanted). A row opens the budget. Only one approved budget per year is compared with
+  the actuals (Budget vs Actual, accounting dashboard).
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.budgets"]" Help="budget" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.budgets"])])">
+    <Actions>
+        @if (Shell.Can(PermissionKeys.BudgetView)) {<Btn Icon="chart" Text="@L["nav.budgetVsActual"]" OnClick="@(() => Nav.NavigateTo(NavModel.Href(Company, "accounting/budget-vs-actual")))" />}
+        @if (CanManage) {<Btn Primary="true" Icon="plus" Text="@L["bud.new"]" OnClick="New" />}
+    </Actions>
+</PageHeader>
+<LiveRefresh EntityTypes="@(["ACC.Budget"])" OnChange="Load" />
+<div class="row" role="group" aria-label="@L["ui.filter"]" style="gap:8px;align-items:flex-end;flex:none">
+    <SelectField TValue="int?" @bind-Value="_year" @bind-Value:after="Load" Options="Years" Empty="@L["bud.allYears"]" Label="@L["bud.year"]" FieldClass="w160" />
+</div>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="chart" Title="@L["bud.none"]" Text="@L["bud.noneText"]"><Actions>@if (CanManage) {<Btn Primary="true" Text="@L["bud.new"]" OnClick="New" />}</Actions></EmptyState>
+    </Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.budgets"]">
+            <DataGrid TItem="BudgetSummary" Items="_items" Key="b => b.Id" Caption="@L["nav.budgets"]" OnRowClick="Open">
+                <Columns>
+                    <GridColumn TItem="BudgetSummary" Title="@L["bud.year"]" Value="b => b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture)" Ltr="true" Width="90px" />
+                    <GridColumn TItem="BudgetSummary" Title="@L["md.name"]" Value="b => b.Name" />
+                    <GridColumn TItem="BudgetSummary" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == BudgetStatus.Approved ? "approved" : "draft")" /></Template></GridColumn>
+                    <GridColumn TItem="BudgetSummary" Title="@L["bud.lines"]" Value="b => Fmt.Count(b.Lines)" Numeric="true" />
+                    <GridColumn TItem="BudgetSummary" Title="@L["rep.revenue"]" Value="b => Fmt.Money(b.RevenueTotal)" Numeric="true" />
+                    <GridColumn TItem="BudgetSummary" Title="@L["rep.expenses"]" Value="b => Fmt.Money(b.ExpenseTotal)" Numeric="true" />
+                    <GridColumn TItem="BudgetSummary" Title="@L["bud.approvedBy"]" Value="@(b => b.ApprovedByName is null ? null : $"{b.ApprovedByName} · {Fmt.Date(b.ApprovedAt!.Value.ToLocalTime(), Shell.DateFormat)}")" />
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_creating" Title="@L["bud.new"]" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Create" id="bud-new" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <div class="fg" style="grid-template-columns:140px minmax(0,1fr)">
+                <IntField @bind-Value="_m.FiscalYear" Label="@L["bud.year"]" Required="true" Min="2000" Max="2100" />
+                <TextField @bind-Value="_m.Name" Label="@L["md.name"]" Required="true" MaxLength="200" />
+            </div>
+            <fieldset class="stack" style="gap:6px">
+                <legend class="lbl">@L["bud.start"]</legend>
+                @foreach (var (value, key) in Starts)
+                {
+                    <label class="row" style="gap:8px;align-items:center">
+                        <input type="radio" name="bud-start" value="@value" checked="@(_m.Start == value)" @onchange="() => _m.Start = value" />
+                        <span>@L[key]</span>
+                    </label>
+                }
+            </fieldset>
+            @if (_m.Start == "actuals")
+            {
+                <div class="fg" style="grid-template-columns:160px minmax(0,1fr);align-items:end">
+                    <NumberField @bind-Value="_m.IncreasePercent" Label="@L["bud.increase"]" Decimals="2" Min="-100m" Max="1000m" Unit="%" />
+                    <CheckField @bind-Value="_m.ByCostCentre" Label="@L["bud.byCostCentre"]" />
+                </div>
+                <p class="help">@L.F("bud.copyHelp", (_m.FiscalYear ?? DateTime.Today.Year) - 1)</p>
+            }
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _creating = false" />
+        <Btn Type="submit" Primary="true" Text="@L["bud.create"]" Busy="_busy" form="bud-new" />
+    </Footer>
+</Modal>
+
+@code {
+    private IReadOnlyList<BudgetSummary> _items = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private int? _year;
+    private bool _creating, _busy;
+    private NewModel _m = new();
+    private EditContext _ctx = new(new NewModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    private static readonly (string Value, string Key)[] Starts = [("empty", "bud.startEmpty"), ("import", "bud.startImport"), ("actuals", "bud.startActuals")];
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private bool CanManage => Shell.Can(PermissionKeys.BudgetManage);
+
+    private IReadOnlyList<Option<int?>> Years
+    {
+        get
+        {
+            var now = DateTime.Today.Year;
+            return _items.Select(b => b.FiscalYear).Concat([now - 1, now, now + 1]).Distinct().OrderByDescending(y => y)
+                .Select(y => new Option<int?>(y, y.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            var q = _year is int y ? "?year=" + y.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            _items = await Api.GetAsync<IReadOnlyList<BudgetSummary>>(Api.C("accounting/budgets" + q));
+            _state = _items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void New()
+    {
+        var year = DateTime.Today.Year + (DateTime.Today.Month >= 10 ? 1 : 0);
+        _m = new NewModel { FiscalYear = year, Name = L.F("bud.defaultName", year) };
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _creating = true;
+    }
+
+    private async Task Create()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var r = await Api.PostAsync<BudgetResponse>(Api.C("accounting/budgets"),
+                new CreateBudgetRequest(_m.FiscalYear ?? 0, _m.Name?.Trim(), _m.Start == "actuals", _m.Start == "actuals" ? _m.IncreasePercent : null, _m.Start == "actuals" && _m.ByCostCentre));
+            _creating = false;
+            Toasts.Success(L.F("bud.created", r.Name));
+            Nav.NavigateTo(NavModel.Href(Company, $"accounting/budgets/{r.Id}" + (_m.Start == "import" ? "?import=1" : "")));
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private void Open(BudgetSummary b) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/budgets/{b.Id}"));
+
+    private sealed class NewModel
+    {
+        public int? FiscalYear { get; set; }
+        public string? Name { get; set; }
+        public string Start { get; set; } = "empty";
+        public decimal? IncreasePercent { get; set; }
+        public bool ByCostCentre { get; set; }
+    }
+}

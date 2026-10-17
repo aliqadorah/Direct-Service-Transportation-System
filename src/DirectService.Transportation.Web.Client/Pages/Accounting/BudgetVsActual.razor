@@ -1,0 +1,202 @@
+@page "/c/{Company}/accounting/budget-vs-actual"
+@*
+  Budget vs Actual (revision 6 part B): the approved budget of a year against the posted ledger — one month, January to the end of a month
+  (period to date) or the whole year — as the account tree (parents total their children; expand / collapse), optionally for one cost centre.
+  Columns Budget, Actual, Variance (= Actual − Budget), Variance %; favourable variances green, unfavourable red (revenue above budget and
+  expenses below budget are favourable). Totals: revenue, expenses, net result. A row opens the account statement of the period. Excel / PDF.
+*@
+@using DirectService.Transportation.Contracts.MasterData
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject Downloads Files
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.budgetVsActual"]" Help="budget" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.budgets"], NavModel.Href(Company, "accounting/budgets")), new Crumb(L["nav.budgetVsActual"])])" />
+<div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
+    <IntField @bind-Value="_year" Label="@L["bud.year"]" Min="2000" Max="2100" FieldClass="w120" />
+    <SelectField TValue="int?" @bind-Value="_month" Options="Months" Label="@L["bud.month"]" FieldClass="w160" />
+    <SelectField TValue="string" @bind-Value="_mode" Options="Modes" Label="@L["bud.mode"]" FieldClass="w200" />
+    <SelectField TValue="string?" @bind-Value="_centre" Options="_centres" Empty="@L["bud.allCentres"]" Label="@L["je.costCentre"]" FieldClass="w200" />
+    <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
+    <span class="row" style="gap:6px" role="group" aria-label="@L["rep.treeTools"]">
+        <Btn Small="true" Text="@L["rep.expandAll"]" OnClick="() => _collapsed.Clear()" Disabled="_r is null" />
+        <Btn Small="true" Icon="up" Text="@L["rep.collapseAll"]" OnClick="CollapseAll" Disabled="_r is null" />
+    </span>
+    <span style="margin-inline-start:auto;display:flex;gap:6px">
+        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" Disabled="_r is null" />
+        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" Disabled="_r is null" />
+    </span>
+</div>
+<StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="chart" Title="@(_noBudget ?? L["rep.noMovement"])" Text="@(_noBudget is null ? null : L["bud.noApprovedText"])">
+            <Actions>@if (_noBudget is not null) {<Btn Primary="true" Text="@L["nav.budgets"]" OnClick="@(() => Nav.NavigateTo(NavModel.Href(Company, "accounting/budgets")))" />}</Actions>
+        </EmptyState>
+    </Empty>
+    <ChildContent>
+        @{ var r = _r!; }
+        <Figures Items="@([new Figure(L["bud.budget"], r.Budget.Name, $"{Fmt.Date(r.From, Shell.DateFormat)} – {Fmt.Date(r.To, Shell.DateFormat)}"),
+                           new Figure(L["bud.revenueVar"], Signed(r.Revenue.Variance), Pct(r.Revenue.VariancePercent)),
+                           new Figure(L["bud.expenseVar"], Signed(r.Expenses.Variance), Pct(r.Expenses.VariancePercent)),
+                           new Figure(L["bud.netVar"], Signed(r.Net.Variance), Pct(r.Net.VariancePercent))])" />
+        <p class="help" style="flex:none">@L["bud.varianceHelp"]</p>
+        <ListFrame Label="@L["nav.budgetVsActual"]">
+            <DataGrid TItem="BudgetVsActualRow" Items="Visible" Key="x => x.Account.Id" Caption="@L["nav.budgetVsActual"]" OnRowClick="Open"
+                      RowClass="@(x => x.IsGroup ? "grp" : null)">
+                <Columns>
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["acc.code"]" Value="x => x.Account.Code" Ltr="true" />
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["md.name"]">
+                        <Template>
+                            <span class="tb-name" style="padding-inline-start:@((context.Level - 1) * 18)px">
+                                @if (context.IsGroup)
+                                {
+                                    var open = !_collapsed.Contains(context.Account.Id);
+                                    <button type="button" class="tb-toggle" aria-expanded="@(open ? "true" : "false")" aria-label="@L.F(open ? "acc.collapse" : "acc.expand", context.Account.Code)"
+                                            @onclick="() => Toggle(context)" @onclick:stopPropagation="true"><Icon Name="@(open ? "down" : "left")" Flip="@(!open && L.En)" /></button>
+                                }
+                                else {<span class="tb-toggle" aria-hidden="true"></span>}
+                                <bdi>@L.Pick(context.Account.NameAr, context.Account.NameEn)</bdi>
+                            </span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["bud.budget"]" Value="x => Fmt.Money(x.Budget)" Numeric="true" />
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["bud.actual"]" Value="x => Fmt.Money(x.Actual)" Numeric="true" />
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["bud.variance"]" Numeric="true">
+                        <Template><bdi class="num @Tone(context.Status)">@Signed(context.Variance)</bdi></Template>
+                    </GridColumn>
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["bud.variancePct"]" Numeric="true">
+                        <Template><bdi class="num @Tone(context.Status)">@Pct(context.VariancePercent)</bdi></Template>
+                    </GridColumn>
+                    <GridColumn TItem="BudgetVsActualRow" Title="@L["bud.assessment"]">
+                        <Template><Badge Tone="@BadgeTone(context.Status)" Text="@L["bud.st." + context.Status]" /></Template>
+                    </GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+        <div class="tbl-wrap" style="flex:none">
+            <table class="tbl">
+                <caption class="sr-only">@L["ui.total"]</caption>
+                <thead><tr><th scope="col"></th><th scope="col" class="n">@L["bud.budget"]</th><th scope="col" class="n">@L["bud.actual"]</th>
+                    <th scope="col" class="n">@L["bud.variance"]</th><th scope="col" class="n">@L["bud.variancePct"]</th><th scope="col">@L["bud.assessment"]</th></tr></thead>
+                <tbody>
+                    @foreach (var (label, t) in new[] { (L["bud.revenueTotal"], r.Revenue), (L["bud.expenseTotal"], r.Expenses), (L["bud.netResult"], r.Net) })
+                    {
+                        <tr class="grp">
+                            <th scope="row">@label</th>
+                            <td class="n"><bdi class="num">@Fmt.Money(t.Budget)</bdi></td>
+                            <td class="n"><bdi class="num">@Fmt.Money(t.Actual)</bdi></td>
+                            <td class="n"><bdi class="num @Tone(t.Status)">@Signed(t.Variance)</bdi></td>
+                            <td class="n"><bdi class="num @Tone(t.Status)">@Pct(t.VariancePercent)</bdi></td>
+                            <td><Badge Tone="@BadgeTone(t.Status)" Text="@L["bud.st." + t.Status]" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </ChildContent>
+</StateView>
+
+@code {
+    private BudgetVsActualReport? _r;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _noBudget;
+    private int? _year, _month;
+    private string _mode = "ytd";
+    private string? _centre;
+    private IReadOnlyList<Option<string?>> _centres = [];
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+
+    [Parameter] public string Company { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "year")] public int? YearQuery { get; set; }
+
+    private IReadOnlyList<Option<int?>> Months => Enumerable.Range(1, 12).Select(m => new Option<int?>(m, L["bud.m" + m])).ToList();
+
+    private IReadOnlyList<Option<string>> Modes => [new("month", L["bud.mode.month"]), new("ytd", L["bud.mode.ytd"]), new("year", L["bud.mode.year"])];
+
+    private IReadOnlyList<BudgetVsActualRow> Visible
+    {
+        get
+        {
+            if (_r is null) return [];
+            var hidden = new HashSet<string>(StringComparer.Ordinal);
+            var list = new List<BudgetVsActualRow>();
+            foreach (var x in _r.Rows)
+            {
+                if (x.ParentId is { } p && (hidden.Contains(p) || _collapsed.Contains(p))) { hidden.Add(x.Account.Id); continue; }
+                list.Add(x);
+            }
+            return list;
+        }
+    }
+
+    private void Toggle(BudgetVsActualRow x) { if (!_collapsed.Remove(x.Account.Id)) _collapsed.Add(x.Account.Id); }
+
+    private void CollapseAll()
+    {
+        _collapsed.Clear();
+        foreach (var x in _r?.Rows ?? []) if (x.IsGroup) _collapsed.Add(x.Account.Id);
+    }
+
+    private static string Tone(string status) => status switch { "favourable" => "var-good", "unfavourable" => "var-bad", _ => "" };
+
+    private static Tone BadgeTone(string status) => status switch { "favourable" => Ui.Tone.Ok, "unfavourable" => Ui.Tone.Err, _ => Ui.Tone.Mute };
+
+    private static string Signed(decimal v) => (v > 0 ? "+" : "") + Fmt.Money(v);
+
+    private string Pct(decimal? p) => p is decimal v ? (v > 0 ? "+" : "") + Fmt.Percent(v, 1) : "—";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _year = YearQuery ?? DateTime.Today.Year;
+        _month = _year == DateTime.Today.Year ? DateTime.Today.Month : 12;
+        try { _centres = (await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("accounting/cost-centres/options"))).Select(c => new Option<string?>(c.Id, c.Name)).ToList(); }
+        catch (ApiException) { _centres = []; }
+        await Load();
+    }
+
+    private string Query()
+    {
+        var p = new List<string> { "mode=" + _mode };
+        if (_year is { } y) p.Add("year=" + y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (_month is { } m) p.Add("month=" + m.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (_centre is { } c) p.Add("costCentre=" + Uri.EscapeDataString(c));
+        return "?" + string.Join('&', p);
+    }
+
+    private async Task Load()
+    {
+        _state = LoadState.Loading;
+        _noBudget = null;
+        try
+        {
+            _r = await Api.GetAsync<BudgetVsActualReport>(Api.C("accounting/reports/budget-vs-actual" + Query()));
+            _collapsed.RemoveWhere(id => !_r.Rows.Any(x => x.Account.Id == id && x.IsGroup));
+            _month = _r.Month;
+            _state = _r.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Code == "budget.noneApproved")
+        {
+            _r = null;
+            _noBudget = e.Problem.Detail;
+            _state = LoadState.Empty;
+        }
+        catch (ApiException e) when (e.Problem.Status == 400)
+        {
+            Toasts.Error(e.Problem.Errors is { Count: > 0 } errors ? string.Join(" · ", errors.Select(x => x.Message)) : e.Problem.Detail ?? L["ui.loadFailed"]);
+            _r = null;
+            _state = LoadState.Empty;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private Task Export(string format) => Files.SaveAsync(Api.C("accounting/reports/budget-vs-actual/export" + Query()), format);
+
+    private void Open(BudgetVsActualRow x)
+    {
+        if (_r is null || !Shell.Can(PermissionKeys.AcctView)) return;
+        string D(DateOnly d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        Nav.NavigateTo(NavModel.Href(Company, $"accounting/statement?accounts={Uri.EscapeDataString(x.Account.Id)}&from={D(_r.From)}&to={D(_r.To)}"));
+    }
+}

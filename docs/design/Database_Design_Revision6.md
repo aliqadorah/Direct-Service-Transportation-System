@@ -91,3 +91,36 @@ Posting: the bill's entry credits the new posting key `ACC.SupplierDeductions` w
 
 ## Items without database changes
 Item 5 (trial balance tree), item 6 (account statement of several accounts, general ledger screen removed) and item 8 (OpenAPI) change no table.
+
+# Part B — owner change requests of 15 Oct 2026, new accounting features
+
+## B1. Budgets — migration `Rev6_Budgets`
+New table `acc.Budgets` (company-scoped, audited, soft delete): a budget (الموازنة) of one fiscal year. The fiscal year is the calendar year (the application has no fiscal-year setting; periods are calendar months).
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Id | BIGINT IDENTITY | NOT NULL | — | PK `PK_Budgets` |
+| PublicId | UNIQUEIDENTIFIER | NOT NULL | NEWID() | `UX_Budgets_PublicId` |
+| TenantId / CompanyId | BIGINT | NOT NULL | — | FK to core.Tenants / core.Companies |
+| FiscalYear | INT | NOT NULL | — | `CK_Budgets_FiscalYear` 2000–2100 |
+| Name | NVARCHAR(200) | NOT NULL | — | `UX_Budgets_CompanyId_FiscalYear_Name` (filter `[IsDeleted] = 0`) |
+| Status | NVARCHAR(20) | NOT NULL | N'Draft' | `CK_Budgets_Status` Draft / Approved; **`UX_Budgets_CompanyId_FiscalYear_Approved`** unique on (CompanyId, FiscalYear) filtered `[Status] = N'Approved' AND [IsDeleted] = 0` — one approved budget per company and year |
+| ApprovedAt | DATETIME2(3) | NULL | — | `CK_Budgets_Status_ApprovedAt_ApprovedBy`: required when Approved |
+| ApprovedBy | BIGINT | NULL | — | FK core.Users |
+| CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_Budgets_DeletedAt_DeletedBy_DeleteReason` |
+
+New table `acc.BudgetLines` (company-scoped, audited, soft delete): one revenue or expense account (posting or parent account), optionally one cost centre, twelve monthly amounts in the natural direction of the account (revenue = credit − debit, expense = debit − credit; may be negative).
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Id | BIGINT IDENTITY | NOT NULL | — | PK `PK_BudgetLines` |
+| PublicId | UNIQUEIDENTIFIER | NOT NULL | NEWID() | `UX_BudgetLines_PublicId` |
+| TenantId / CompanyId | BIGINT | NOT NULL | — | FK to core.Tenants / core.Companies |
+| BudgetId | BIGINT | NOT NULL | — | FK acc.Budgets |
+| AccountId | BIGINT | NOT NULL | — | FK acc.Accounts; revenue or expense type (application rule); no line on an account whose ancestor also has a line for the same cost centre (application rule, no double counting) |
+| CostCentreId | BIGINT | NULL | — | FK acc.CostCentres; **`UX_BudgetLines_BudgetId_AccountId_CostCentreId`** (filter `[IsDeleted] = 0`): one line per account and cost centre |
+| Month01 … Month12 | DECIMAL(18,3) | NOT NULL | 0 | January … December |
+| Total | DECIMAL(18,3) | NOT NULL | 0 | `CK_BudgetLines_Total` = Month01 + … + Month12 |
+| CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_BudgetLines_DeletedAt_DeletedBy_DeleteReason` |
+
+Reference data: three permission keys in `core.Permissions` (group Accounting) — 23 `acc.budget.view`, 24 `acc.budget.manage`, 25 `acc.budget.approve`. Data step: existing preset roles receive the keys of their preset (Owner and Administrator all three, Accountant view + manage, Viewer view); custom roles are unchanged.

@@ -150,6 +150,7 @@ company.MapUserAdminEndpoints();
 company.MapSettingsEndpoints();
 company.MapLockEndpoints();
 company.MapAccountingEndpoints();
+company.MapBudgetEndpoints();
 company.MapMasterDataEndpoints();
 company.MapPricingEndpoints();
 company.MapTripEndpoints();

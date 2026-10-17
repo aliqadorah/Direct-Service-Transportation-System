@@ -6523,3 +6523,174 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    CREATE TABLE [acc].[Budgets] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_Budgets_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [FiscalYear] int NOT NULL,
+        [Name] nvarchar(200) NOT NULL,
+        [Status] nvarchar(20) NOT NULL CONSTRAINT [DF_Budgets_Status] DEFAULT (N'Draft'),
+        [ApprovedAt] datetime2(3) NULL,
+        [ApprovedBy] bigint NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_Budgets_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_Budgets_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_Budgets] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_Budgets_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_Budgets_FiscalYear] CHECK ([FiscalYear] BETWEEN 2000 AND 2100),
+        CONSTRAINT [CK_Budgets_Status] CHECK ([Status] IN (N'Draft', N'Approved')),
+        CONSTRAINT [CK_Budgets_Status_ApprovedAt_ApprovedBy] CHECK ([Status] <> N'Approved' OR ([ApprovedAt] IS NOT NULL AND [ApprovedBy] IS NOT NULL)),
+        CONSTRAINT [FK_Budgets_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_Budgets_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_Budgets_Users_ApprovedBy] FOREIGN KEY ([ApprovedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_Budgets_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_Budgets_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_Budgets_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    CREATE TABLE [acc].[BudgetLines] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_BudgetLines_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [BudgetId] bigint NOT NULL,
+        [AccountId] bigint NOT NULL,
+        [CostCentreId] bigint NULL,
+        [Month01] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month01] DEFAULT (0),
+        [Month02] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month02] DEFAULT (0),
+        [Month03] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month03] DEFAULT (0),
+        [Month04] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month04] DEFAULT (0),
+        [Month05] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month05] DEFAULT (0),
+        [Month06] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month06] DEFAULT (0),
+        [Month07] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month07] DEFAULT (0),
+        [Month08] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month08] DEFAULT (0),
+        [Month09] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month09] DEFAULT (0),
+        [Month10] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month10] DEFAULT (0),
+        [Month11] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month11] DEFAULT (0),
+        [Month12] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Month12] DEFAULT (0),
+        [Total] decimal(18,3) NOT NULL CONSTRAINT [DF_BudgetLines_Total] DEFAULT (0),
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_BudgetLines_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_BudgetLines_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_BudgetLines] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_BudgetLines_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_BudgetLines_Total] CHECK ([Total] = [Month01] + [Month02] + [Month03] + [Month04] + [Month05] + [Month06] + [Month07] + [Month08] + [Month09] + [Month10] + [Month11] + [Month12]),
+        CONSTRAINT [FK_BudgetLines_Accounts_AccountId] FOREIGN KEY ([AccountId]) REFERENCES [acc].[Accounts] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Budgets_BudgetId] FOREIGN KEY ([BudgetId]) REFERENCES [acc].[Budgets] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_BudgetLines_CostCentres_CostCentreId] FOREIGN KEY ([CostCentreId]) REFERENCES [acc].[CostCentres] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_BudgetLines_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'Id', N'CreatedAt', N'CreatedBy', N'DeleteReason', N'DeletedAt', N'DeletedBy', N'DescriptionAr', N'DescriptionEn', N'GroupName', N'IsDeleted', N'PermissionKey', N'PublicId', N'UpdatedAt', N'UpdatedBy') AND [object_id] = OBJECT_ID(N'[core].[Permissions]'))
+        SET IDENTITY_INSERT [core].[Permissions] ON;
+    EXEC(N'INSERT INTO [core].[Permissions] ([Id], [CreatedAt], [CreatedBy], [DeleteReason], [DeletedAt], [DeletedBy], [DescriptionAr], [DescriptionEn], [GroupName], [IsDeleted], [PermissionKey], [PublicId], [UpdatedAt], [UpdatedBy])
+    VALUES (CAST(23 AS bigint), ''2026-10-08T00:00:00.000Z'', NULL, NULL, NULL, NULL, N''عرض الموازنات وتقرير الموازنة مقابل الفعلي'', N''View budgets and the budget vs actual report'', ''Accounting'', CAST(0 AS bit), ''acc.budget.view'', ''7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a23'', NULL, NULL),
+    (CAST(24 AS bigint), ''2026-10-08T00:00:00.000Z'', NULL, NULL, NULL, NULL, N''إنشاء الموازنات وتعديلها واستيرادها ونسخها من فعلي السنة السابقة وحذف المسودات'', N''Create, edit and import budgets, copy them from last year''''s actuals, delete drafts'', ''Accounting'', CAST(0 AS bit), ''acc.budget.manage'', ''7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a24'', NULL, NULL),
+    (CAST(25 AS bigint), ''2026-10-08T00:00:00.000Z'', NULL, NULL, NULL, NULL, N''اعتماد الموازنات وإعادتها إلى مسودة'', N''Approve budgets and return them to draft'', ''Accounting'', CAST(0 AS bit), ''acc.budget.approve'', ''7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25'', NULL, NULL)');
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'Id', N'CreatedAt', N'CreatedBy', N'DeleteReason', N'DeletedAt', N'DeletedBy', N'DescriptionAr', N'DescriptionEn', N'GroupName', N'IsDeleted', N'PermissionKey', N'PublicId', N'UpdatedAt', N'UpdatedBy') AND [object_id] = OBJECT_ID(N'[core].[Permissions]'))
+        SET IDENTITY_INSERT [core].[Permissions] OFF;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_BudgetLines_BudgetId_AccountId_CostCentreId] ON [acc].[BudgetLines] ([BudgetId], [AccountId], [CostCentreId]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_BudgetLines_PublicId] ON [acc].[BudgetLines] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_Budgets_CompanyId_FiscalYear_Approved] ON [acc].[Budgets] ([CompanyId], [FiscalYear]) WHERE [Status] = N''Approved'' AND [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_Budgets_CompanyId_FiscalYear_Name] ON [acc].[Budgets] ([CompanyId], [FiscalYear], [Name]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_Budgets_PublicId] ON [acc].[Budgets] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    INSERT INTO [core].[RolePermissions] ([TenantId], [RoleId], [PermissionId])
+    SELECT r.[TenantId], r.[Id], p.[Id]
+    FROM [core].[Roles] r
+    JOIN [core].[Permissions] p ON
+           (r.[Name] IN (N'Owner', N'Administrator') AND p.[PermissionKey] IN (N'acc.budget.view', N'acc.budget.manage', N'acc.budget.approve'))
+        OR (r.[Name] = N'Accountant' AND p.[PermissionKey] IN (N'acc.budget.view', N'acc.budget.manage'))
+        OR (r.[Name] = N'Viewer' AND p.[PermissionKey] = N'acc.budget.view')
+    WHERE r.[IsPreset] = 1 AND r.[IsDeleted] = 0
+      AND NOT EXISTS (SELECT 1 FROM [core].[RolePermissions] x WHERE x.[RoleId] = r.[Id] AND x.[PermissionId] = p.[Id] AND x.[IsDeleted] = 0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017145631_Rev6_Budgets'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017145631_Rev6_Budgets', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

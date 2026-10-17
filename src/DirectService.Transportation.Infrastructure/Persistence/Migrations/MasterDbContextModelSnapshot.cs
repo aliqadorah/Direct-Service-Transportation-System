@@ -1484,6 +1484,344 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Budget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("ApprovedAt")
+                        .HasColumnOrder(7);
+
+                    b.Property<long?>("ApprovedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ApprovedBy")
+                        .HasColumnOrder(8);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(9)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_Budgets_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(10);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(16);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(14);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(15);
+
+                    b.Property<int>("FiscalYear")
+                        .HasColumnType("int")
+                        .HasColumnName("FiscalYear")
+                        .HasColumnOrder(4);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(13)
+                        .HasDefaultValueSql("0", "DF_Budgets_IsDeleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("Name")
+                        .HasColumnOrder(5);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_Budgets_PublicId");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(17);
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("Status")
+                        .HasColumnOrder(6)
+                        .HasDefaultValueSql("N'Draft'", "DF_Budgets_Status");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(11);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(12);
+
+                    b.HasKey("Id")
+                        .HasName("PK_Budgets");
+
+                    b.HasIndex(new[] { "CompanyId", "FiscalYear" }, "UX_Budgets_CompanyId_FiscalYear_Approved")
+                        .IsUnique()
+                        .HasFilter("[Status] = N'Approved' AND [IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "CompanyId", "FiscalYear", "Name" }, "UX_Budgets_CompanyId_FiscalYear_Name")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_Budgets_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("Budgets", "acc", t =>
+                        {
+                            t.HasCheckConstraint("CK_Budgets_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Budgets_FiscalYear", "[FiscalYear] BETWEEN 2000 AND 2100");
+
+                            t.HasCheckConstraint("CK_Budgets_Status", "[Status] IN (N'Draft', N'Approved')");
+
+                            t.HasCheckConstraint("CK_Budgets_Status_ApprovedAt_ApprovedBy", "[Status] <> N'Approved' OR ([ApprovedAt] IS NOT NULL AND [ApprovedBy] IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.BudgetLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AccountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("AccountId")
+                        .HasColumnOrder(5);
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("BudgetId")
+                        .HasColumnOrder(4);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<long?>("CostCentreId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CostCentreId")
+                        .HasColumnOrder(6);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(20)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_BudgetLines_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(21);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(27);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(25);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(26);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(24)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_IsDeleted");
+
+                    b.Property<decimal>("Month01")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month01")
+                        .HasColumnOrder(7)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month01");
+
+                    b.Property<decimal>("Month02")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month02")
+                        .HasColumnOrder(8)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month02");
+
+                    b.Property<decimal>("Month03")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month03")
+                        .HasColumnOrder(9)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month03");
+
+                    b.Property<decimal>("Month04")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month04")
+                        .HasColumnOrder(10)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month04");
+
+                    b.Property<decimal>("Month05")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month05")
+                        .HasColumnOrder(11)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month05");
+
+                    b.Property<decimal>("Month06")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month06")
+                        .HasColumnOrder(12)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month06");
+
+                    b.Property<decimal>("Month07")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month07")
+                        .HasColumnOrder(13)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month07");
+
+                    b.Property<decimal>("Month08")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month08")
+                        .HasColumnOrder(14)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month08");
+
+                    b.Property<decimal>("Month09")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month09")
+                        .HasColumnOrder(15)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month09");
+
+                    b.Property<decimal>("Month10")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month10")
+                        .HasColumnOrder(16)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month10");
+
+                    b.Property<decimal>("Month11")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month11")
+                        .HasColumnOrder(17)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month11");
+
+                    b.Property<decimal>("Month12")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Month12")
+                        .HasColumnOrder(18)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Month12");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_BudgetLines_PublicId");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(28);
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Total")
+                        .HasColumnOrder(19)
+                        .HasDefaultValueSql("0", "DF_BudgetLines_Total");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(22);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(23);
+
+                    b.HasKey("Id")
+                        .HasName("PK_BudgetLines");
+
+                    b.HasIndex(new[] { "BudgetId", "AccountId", "CostCentreId" }, "UX_BudgetLines_BudgetId_AccountId_CostCentreId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_BudgetLines_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("BudgetLines", "acc", t =>
+                        {
+                            t.HasCheckConstraint("CK_BudgetLines_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_BudgetLines_Total", "[Total] = [Month01] + [Month02] + [Month03] + [Month04] + [Month05] + [Month06] + [Month07] + [Month08] + [Month09] + [Month10] + [Month11] + [Month12]");
+                        });
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CashBox", b =>
                 {
                     b.Property<long>("Id")
@@ -5284,6 +5622,42 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             IsDeleted = false,
                             PermissionKey = "core.tenant.manage",
                             PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a22"),
+                            RowVersion = new byte[0]
+                        },
+                        new
+                        {
+                            Id = 23L,
+                            CreatedAt = new DateTime(2026, 10, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DescriptionAr = "عرض الموازنات وتقرير الموازنة مقابل الفعلي",
+                            DescriptionEn = "View budgets and the budget vs actual report",
+                            GroupName = "Accounting",
+                            IsDeleted = false,
+                            PermissionKey = "acc.budget.view",
+                            PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a23"),
+                            RowVersion = new byte[0]
+                        },
+                        new
+                        {
+                            Id = 24L,
+                            CreatedAt = new DateTime(2026, 10, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DescriptionAr = "إنشاء الموازنات وتعديلها واستيرادها ونسخها من فعلي السنة السابقة وحذف المسودات",
+                            DescriptionEn = "Create, edit and import budgets, copy them from last year's actuals, delete drafts",
+                            GroupName = "Accounting",
+                            IsDeleted = false,
+                            PermissionKey = "acc.budget.manage",
+                            PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a24"),
+                            RowVersion = new byte[0]
+                        },
+                        new
+                        {
+                            Id = 25L,
+                            CreatedAt = new DateTime(2026, 10, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DescriptionAr = "اعتماد الموازنات وإعادتها إلى مسودة",
+                            DescriptionEn = "Approve budgets and return them to draft",
+                            GroupName = "Accounting",
+                            IsDeleted = false,
+                            PermissionKey = "acc.budget.approve",
+                            PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25"),
                             RowVersion = new byte[0]
                         });
                 });
@@ -11475,6 +11849,106 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("Account");
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Budget", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Budgets_Users_ApprovedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_Budgets_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Budgets_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Budgets_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_Budgets_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Budgets_Users_UpdatedBy");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.BudgetLine", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_BudgetLines_Accounts_AccountId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Acc.Budget", "Budget")
+                        .WithMany("Lines")
+                        .HasForeignKey("BudgetId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_BudgetLines_Budgets_BudgetId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_BudgetLines_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Acc.CostCentre", null)
+                        .WithMany()
+                        .HasForeignKey("CostCentreId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_BudgetLines_CostCentres_CostCentreId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_BudgetLines_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_BudgetLines_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_BudgetLines_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_BudgetLines_Users_UpdatedBy");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Budget");
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CashBox", b =>
                 {
                     b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
@@ -14230,6 +14704,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocument", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Budget", b =>
                 {
                     b.Navigation("Lines");
                 });

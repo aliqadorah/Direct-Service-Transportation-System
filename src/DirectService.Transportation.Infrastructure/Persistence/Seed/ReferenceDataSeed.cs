@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Seed;
 
 /// <summary>
 /// Platform-wide reference data defined by the PRD, seeded through EF Core migration seed data:
-/// the 22 permission keys (PRD 3.4, namespaced per owner decision D-01) and the TRIAL plan
+/// the 22 permission keys (PRD 3.4, namespaced per owner decision D-01), the three budget keys (revision 6 part B) and the TRIAL plan
 /// (owner decision D-12; limits are placeholders the provider edits in the console).
 /// Per-tenant and per-company reference data (preset roles, built-in ownership type, settings,
 /// number sequences, invoice layouts) is created by the application when a tenant/company is created.
@@ -69,6 +69,14 @@ internal static class ReferenceDataSeed
         (22, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a22", "core.tenant.manage", "Tenant",
             "الاشتراك والخطة والفوترة، وإنشاء الشركات وأرشفتها، وإعدادات المشترك العامة",
             "Subscription, plan and billing; create and archive companies; tenant-wide settings"),
+        // Revision 6 part B (owner change request 15 Oct 2026): budgets.
+        (23, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a23", "acc.budget.view", "Accounting",
+            "عرض الموازنات وتقرير الموازنة مقابل الفعلي", "View budgets and the budget vs actual report"),
+        (24, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a24", "acc.budget.manage", "Accounting",
+            "إنشاء الموازنات وتعديلها واستيرادها ونسخها من فعلي السنة السابقة وحذف المسودات",
+            "Create, edit and import budgets, copy them from last year's actuals, delete drafts"),
+        (25, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25", "acc.budget.approve", "Accounting",
+            "اعتماد الموازنات وإعادتها إلى مسودة", "Approve budgets and return them to draft"),
     ];
 
     internal static void Apply(ModelBuilder modelBuilder)
