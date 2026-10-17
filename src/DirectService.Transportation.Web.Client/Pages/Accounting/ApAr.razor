@@ -210,7 +210,9 @@
         new("payments", L[Payables ? "ap.payments" : "ap.collections"]), new("returns", L["ap.returns"]), new("ageing", L["ap.ageing"]),
     ];
 
-    private IReadOnlyList<TabItem> Views => [new("open", L["ap.viewOpen"]), new("overdue", L["inv.viewOverdue"]), new("closed", L["st.closed"]), new("void", L["st.void"]), new("all", L["ml.all"])];
+    private IReadOnlyList<TabItem> Views => Payables
+        ? [new("open", L["ap.viewOpen"]), new("overdue", L["inv.viewOverdue"]), new("due-soon", L["ap.viewDueSoon"]), new("closed", L["st.closed"]), new("void", L["st.void"]), new("all", L["ml.all"])]
+        : [new("open", L["ap.viewOpen"]), new("overdue", L["inv.viewOverdue"]), new("closed", L["st.closed"]), new("void", L["st.void"]), new("all", L["ml.all"])];
 
     /// <summary>Control accounts of the party's role (trade payables / receivables) for the party editor (DT-110).</summary>
     private IReadOnlyList<Option<string?>> ControlAccounts =>
@@ -219,7 +221,10 @@
     protected override async Task OnInitializedAsync()
     {
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
-        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["tab"] is { Length: > 0 } t) _tab = t;
+        var address = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        if (address["tab"] is { Length: > 0 } t) _tab = t;
+        // A view in the address (?view=overdue / due-soon from the accounting dashboard reminders, revision 6 part B).
+        if (address["view"] is { Length: > 0 } v && Views.Any(x => x.Key == v)) _view = v;
         await Load();
     }
 
@@ -228,7 +233,7 @@
         var p = new List<string>();
         void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
         Add("status", _view switch { "void" => "void", "all" => "all", _ => "posted" });
-        Add("payment", _view is "open" or "overdue" or "closed" ? _view : null);
+        Add("payment", _view is "open" or "overdue" or "due-soon" or "closed" ? _view : null);
         Add("q", _q);
         Add("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         Add("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));

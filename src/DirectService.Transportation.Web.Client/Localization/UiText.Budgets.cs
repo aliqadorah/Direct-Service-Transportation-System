@@ -1,6 +1,6 @@
 namespace DirectService.Transportation.Web.Client.Localization;
 
-/// <summary>Text of the accounting additions of revision 6 part B (owner change request 15 Oct 2026): budgets, Budget vs Actual, journal templates.</summary>
+/// <summary>Text of the accounting additions of revision 6 part B (owner change request 15 Oct 2026): budgets, Budget vs Actual, journal templates, accounting dashboard.</summary>
 public static partial class UiText
 {
     private static Dictionary<string, (string Ar, string En)> Budgets() => new(StringComparer.Ordinal)
@@ -113,6 +113,43 @@ public static partial class UiText
         ["tpl.amountsOptional"] = ("المبالغ اختيارية في النموذج.", "Amounts are optional in a template."),
         ["tpl.saveFirst"] = ("احفظ التعديلات أولاً", "Save the changes first"),
         ["tpl.updatedOk"] = ("حُفظ النموذج.", "Template saved."),
+
+        // ---- accounting dashboard
+        ["nav.accountingDashboard"] = ("لوحة المحاسبة", "Accounting dashboard"),
+        ["adash.period"] = ("الفترة", "Period"),
+        ["adash.asOf"] = ("في {0}", "As of {0}"),
+        ["adash.cash"] = ("النقد والبنوك", "Cash and banks"),
+        ["adash.receivables"] = ("الذمم المدينة", "Receivables"),
+        ["adash.payables"] = ("الذمم الدائنة (الموردون)", "Payables (suppliers)"),
+        ["adash.budgetUsage"] = ("استخدام موازنة المصروفات", "Expense budget used"),
+        ["adash.budgetNote"] = ("{0} · مضى من السنة {1}", "{0} · {1} of the year passed"),
+        ["adash.monthTitle"] = ("شهر {0} {1}", "{0} {1}"),
+        ["adash.ytdTitle"] = ("من بداية السنة: {0} – {1}", "Year to date: {0} – {1}"),
+        ["adash.net"] = ("صافي الربح", "Net profit"),
+        ["adash.trend"] = ("الإيرادات مقابل المصروفات — آخر 12 شهراً", "Revenue vs expenses — last 12 months"),
+        ["adash.ageing"] = ("أعمار الذمم المدينة", "Receivables ageing"),
+        ["adash.notDue"] = ("غير مستحقة", "Not due"),
+        ["adash.d30"] = ("1–30 يوماً", "1–30 days"),
+        ["adash.d60"] = ("31–60 يوماً", "31–60 days"),
+        ["adash.d90"] = ("61–90 يوماً", "61–90 days"),
+        ["adash.over90"] = ("أكثر من 90 يوماً", "Over 90 days"),
+        ["adash.unapplied"] = ("مقبوضات غير مخصصة لفواتير: {0} (تُخصم من الذمم).", "Receipts not allocated to invoices: {0} (they reduce the receivables)."),
+        ["adash.reminders"] = ("تذكيرات", "Reminders"),
+        ["adash.noReminders"] = ("لا شيء يحتاج انتباهك.", "Nothing needs your attention."),
+        ["adash.openReminder"] = ("فتح: {0}", "Open: {0}"),
+        ["adash.quickLinks"] = ("روابط سريعة", "Quick links"),
+        ["adash.supplierStatement"] = ("كشف حساب مورد", "Supplier statement"),
+        ["adash.rem.draft-journals"] = ("مسودات قيود غير مرحّلة: {0}", "Draft journal entries not posted: {0}"),
+        ["adash.rem.pending-postings"] = ("ترحيلات تلقائية معلّقة: {0}", "Automatic postings pending: {0}"),
+        ["adash.rem.open-months"] = ("أشهر سابقة ما زالت مفتوحة: {0}", "Previous months still open: {0}"),
+        ["adash.rem.overdue-invoices"] = ("فواتير عملاء متأخرة السداد: {0}", "Overdue customer invoices: {0}"),
+        ["adash.rem.bills-due-soon"] = ("فواتير موردين مستحقة خلال 7 أيام: {0}", "Supplier bills due in the next 7 days: {0}"),
+        ["adash.rem.rejected-einvoices"] = ("فواتير إلكترونية مرفوضة: {0}", "Rejected e-invoices: {0}"),
+        ["adash.rem.budget-over"] = ("أسطر موازنة تجاوزت 100%: {0}", "Budget lines over 100%: {0}"),
+        ["adash.rem.unallocated-receipts"] = ("سندات قبض غير مخصصة بالكامل: {0}", "Receipts not fully allocated: {0}"),
+        ["adash.rem.deductions-unmapped"] = ("«خصومات الموردين» غير مربوطة بحساب وتوجد فواتير بخصم ({0})", "“Supplier deductions” is not mapped while bills with deductions exist ({0})"),
+        ["ap.viewDueSoon"] = ("مستحقة خلال 7 أيام", "Due within 7 days"),
+        ["rcpt.unallocatedView"] = ("غير مخصصة", "Not allocated"),
 
         ["bud.noApprovedText"] = ("التقرير يقارن الموازنة المعتمدة للسنة بالفعلي المرحّل.", "The report compares the year's approved budget with the posted actuals."),
     };

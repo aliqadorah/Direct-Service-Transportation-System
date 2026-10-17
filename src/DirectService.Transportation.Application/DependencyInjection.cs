@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<JournalService>();
         services.AddScoped<JournalDraftService>();
         services.AddScoped<JournalTemplateService>();
+        services.AddScoped<AccountingDashboardService>();
         services.AddScoped<Budgets.BudgetService>();
         services.AddScoped<Budgets.BudgetImportService>();
         services.AddScoped<Budgets.BudgetReportService>();

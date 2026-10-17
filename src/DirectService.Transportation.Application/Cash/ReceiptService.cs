@@ -210,6 +210,8 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
             null or "" => query,
             "invoice" => query.Where(r => r.Allocations.Any()),
             "account" => query.Where(r => !r.Allocations.Any()),
+            // Revision 6 part B (accounting dashboard reminder): any part not allocated to invoices.
+            "unallocated" => query.Where(r => r.Amount > (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0)),
             _ => throw Fail.Field("applied", ErrorCodes.ValidationFormat, "applied"),
         };
         if (!string.IsNullOrWhiteSpace(q.Invoice))

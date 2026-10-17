@@ -479,3 +479,24 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
 /* Budget vs Actual (revision 6 part B): favourable / unfavourable variances; the badge text beside them says it too (colour is never alone). */
 .var-good { color: var(--ok); }
 .var-bad { color: var(--err); }
+/* Accounting dashboard (revision 6 part B): small bar charts in HTML (they follow the page direction), reminders and quick links. */
+.ch-rev { background: var(--primary); }
+.ch-exp { background: #B26A10; }
+.ch-ok { background: var(--ok); } .ch-warn { background: #B26A10; } .ch-err { background: var(--err); }
+.ch-legend { display: flex; gap: var(--sp-4); font-size: var(--fs-sm); color: var(--muted); margin-bottom: var(--sp-2); }
+.ch-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-inline-end: 6px; vertical-align: -1px; }
+.ch-trend { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; align-items: end; height: 170px; }
+.ch-col { display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+.ch-bars { flex: 1; display: flex; gap: 2px; align-items: flex-end; width: 100%; justify-content: center; }
+.ch-bars i { display: block; width: 42%; max-width: 16px; border-radius: 2px 2px 0 0; }
+.ch-lbl { font-size: var(--fs-xs); color: var(--muted); margin-top: 4px; }
+.ch-hbars { margin: 0; display: grid; gap: 8px; }
+.ch-hrow { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--sp-3); align-items: center; }
+.ch-hrow dt { font-size: var(--fs-sm); color: var(--muted); }
+.ch-hrow dd { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; }
+.ch-track { display: block; height: 10px; background: var(--surface-mute); border-radius: 5px; overflow: hidden; }
+.ch-track i { display: block; height: 100%; }
+.rem-list { list-style: none; margin: 0; padding: 0; }
+.rem-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
+.rem-list li:first-child { border-top: 0; }
+.quick-links { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; }

@@ -138,3 +138,6 @@ New table `acc.JournalTemplates` (company-scoped, audited, soft delete): a journ
 | Reference | NVARCHAR(100) | NULL | — | the entry Reference it fills in |
 | Lines | NVARCHAR(MAX) | NOT NULL | — | JSON array (account id, cost centre id, line description, debit, credit — amounts optional, 0 = none); `CK_JournalTemplates_Lines` ISJSON |
 | CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_JournalTemplates_DeletedAt_DeletedBy_DeleteReason` |
+
+## B3. Accounting dashboard — no new table
+The dashboard reads the existing tables. One new `cfg.CompanySettings` key (no schema change): `ACC.SupplierDeductionAttempted` = the last date (company time, yyyy-MM-dd) a supplier bill with a deduction was refused because "Supplier deductions" is not mapped; the reminder "Supplier deductions not mapped" shows while bills with deductions exist or such a refusal happened in the last 30 days.

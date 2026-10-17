@@ -29,6 +29,9 @@ internal static class AccountingEndpoints
         MapJournal(acc.MapGroup("/journal-entries").WithTags("Journal"));
         MapJournalDrafts(acc.MapGroup("/journal-drafts").WithTags("Journal"));
         MapJournalTemplates(acc.MapGroup("/journal-templates").WithTags("Journal"));
+        // Revision 6 part B: the accounting dashboard (each part by its own permission).
+        acc.MapGet("/dashboard", async (int? year, int? month, AccountingDashboardService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.GetAsync(year, month, ct).ConfigureAwait(false))).WithTags("Accounting dashboard").RequireAnyPermission(AccountingDashboardService.Readers);
         MapLedger(company.MapGroup("/ledger").WithTags("Ledger integration"));
     }
 

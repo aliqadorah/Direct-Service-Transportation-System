@@ -80,7 +80,10 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         var deduction = lines.Sum(l => l.Deduction);
         var total = subtotal + tax - deduction;
         if (deduction > 0 && !await db.Set<PostingKeyMapping>().AnyAsync(m => m.PostingKey == PostingKeys.SupplierDeductions, ct).ConfigureAwait(false))
+        {
+            await NoteDeductionAttemptAsync(ct).ConfigureAwait(false);
             throw Fail.Rule(ErrorCodes.ApArDeductionKeyMissing);
+        }
         if (total > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
         if (total <= 0) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
 
@@ -281,6 +284,8 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             "partial" => query.Where(d => d.RemainingAmount > 0 && d.RemainingAmount < d.Total),
             "closed" => query.Where(d => d.RemainingAmount == 0),
             "overdue" => query.Where(d => d.RemainingAmount > 0 && d.DueDate < today),
+            // Revision 6 part B (accounting dashboard reminder): open and due within the next 7 days.
+            "due-soon" => query.Where(d => d.RemainingAmount > 0 && d.DueDate >= today && d.DueDate <= today.AddDays(Accounting.AccountingDashboardService.DueSoonDays)),
             _ => throw Fail.Field("payment", ErrorCodes.ValidationFormat, "payment"),
         };
         if (!string.IsNullOrWhiteSpace(q.Party))
@@ -353,6 +358,20 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         x.D.Status == ApArCodes.Posted && x.D.RemainingAmount > 0 && x.D.DueDate < today ? today.DayNumber - x.D.DueDate.DayNumber : 0,
         cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.EStatus, x.D.VoidReason, DateTime.SpecifyKind(x.D.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.D.RowVersion),
         x.D.Deduction);
+
+    /// <summary>
+    /// Remembers (once a day) that a bill with a deduction was refused for the unmapped "Supplier deductions" key, so the accounting dashboard
+    /// reminds to map it while such bills are being entered (revision 6 part B). Saved on its own: nothing of the refused bill is saved.
+    /// </summary>
+    private async Task NoteDeductionAttemptAsync(CancellationToken ct)
+    {
+        var today = (await support.TodayAsync(ct).ConfigureAwait(false)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var setting = await db.Set<Domain.Cfg.CompanySetting>().SingleOrDefaultAsync(s => s.SettingKey == Configuration.SettingKeys.SupplierDeductionAttempted, ct).ConfigureAwait(false);
+        if (setting?.SettingValue == today) return;
+        if (setting is null) db.Set<Domain.Cfg.CompanySetting>().Add(new Domain.Cfg.CompanySetting { SettingKey = Configuration.SettingKeys.SupplierDeductionAttempted, SettingValue = today });
+        else setting.SettingValue = today;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Pending-posting retries of supplier bills.</summary>

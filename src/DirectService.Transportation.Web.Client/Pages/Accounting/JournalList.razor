@@ -91,6 +91,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // A view in the address (?view=Draft from the accounting dashboard reminders, revision 6 part B).
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["view"] is { Length: > 0 } v && Views.Any(x => x.Key == v)) _view = v;
         if (FullList)
         {
             try { await Lookups.EnsureAsync(); } catch (ApiException) { }

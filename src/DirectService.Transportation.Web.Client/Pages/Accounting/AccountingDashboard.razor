@@ -1,0 +1,196 @@
+@page "/c/{Company}/accounting/dashboard"
+@*
+  Accounting dashboard (لوحة المحاسبة; revision 6 part B, owner change request 15 Oct 2026), first page under Accounting. For the chosen month
+  (default the current one): cash and bank balances, receivables and payables, revenue, expenses and net profit of the month and of the year to
+  date, budget usage of the approved budget; revenue vs expenses of the last 12 months and the receivables ageing as small bar charts (values
+  also in text for screen readers); reminders computed from the data, each with a count and a link; quick links. The API leaves out what the
+  user may not open; everything is of the company in the address.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+
+<LiveRefresh EntityTypes="@(["ACC.JournalEntry", "ACC.JournalDraft", "ACC.PendingPosting", "ACC.Period", "ACC.Budget", "TRN.Invoice", "TRN.Receipt", "ACC.ApArDocument"])" OnChange="Load" />
+<PageHeader Title="@L["nav.accountingDashboard"]" Help="accounting-dashboard" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.accountingDashboard"])])">
+    <Actions>
+        <span class="row" role="group" aria-label="@L["adash.period"]" style="gap:8px;align-items:flex-end">
+            <SelectField TValue="int?" @bind-Value="_month" @bind-Value:after="Load" Options="Months" Label="@L["bud.month"]" FieldClass="w160" />
+            <SelectField TValue="int?" @bind-Value="_year" @bind-Value:after="Load" Options="Years" Label="@L["bud.year"]" FieldClass="w120" />
+        </span>
+    </Actions>
+</PageHeader>
+<StateView State="_state" Kind="SkeletonKind.Dashboard" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        @{ var d = _d!; }
+        @if (d.Figures is { } f)
+        {
+            <Figures Items="TopFigures(d, f)" />
+            @if (f.Month is { } month && f.YearToDate is { } ytd)
+            {
+                <div class="cols" style="grid-template-columns:1fr 1fr;flex:none">
+                    <Box Title="@L.F("adash.monthTitle", L["bud.m" + d.Month], d.Year)" NoPad="true"><Figures Columns="3" Items="Result(month)" /></Box>
+                    <Box Title="@L.F("adash.ytdTitle", Fmt.Date(d.YearFrom, Shell.DateFormat), Fmt.Date(d.MonthTo, Shell.DateFormat))" NoPad="true"><Figures Columns="3" Items="Result(ytd)" /></Box>
+                </div>
+            }
+        }
+        <div class="cols fill" style="grid-template-columns:1.4fr 1fr;align-items:start">
+            <div class="stack">
+                @if (d.Trend is { } trend)
+                {
+                    <Box Title="@L["adash.trend"]">
+                        <div class="ch-legend" aria-hidden="true"><span><i class="ch-rev"></i>@L["rep.revenue"]</span><span><i class="ch-exp"></i>@L["rep.expenses"]</span></div>
+                        <div class="ch-trend" role="img" aria-label="@L["adash.trend"]">
+                            @{ var max = Math.Max(1m, trend.Max(t => Math.Max(Math.Abs(t.Revenue), Math.Abs(t.Expenses)))); }
+                            @foreach (var t in trend)
+                            {
+                                <div class="ch-col" title="@($"{t.Month} · {L["rep.revenue"]} {Fmt.Money(t.Revenue)} · {L["rep.expenses"]} {Fmt.Money(t.Expenses)}")">
+                                    <div class="ch-bars">
+                                        <i class="ch-rev" style="height:@H(t.Revenue, max)%"></i>
+                                        <i class="ch-exp" style="height:@H(t.Expenses, max)%"></i>
+                                    </div>
+                                    <span class="ch-lbl"><bdi class="num">@t.Month[5..]</bdi></span>
+                                </div>
+                            }
+                        </div>
+                        <table class="sr-only">
+                            <caption>@L["adash.trend"]</caption>
+                            <thead><tr><th scope="col">@L["bud.month"]</th><th scope="col">@L["rep.revenue"]</th><th scope="col">@L["rep.expenses"]</th></tr></thead>
+                            <tbody>@foreach (var t in trend) {<tr><th scope="row">@t.Month</th><td>@Fmt.Money(t.Revenue)</td><td>@Fmt.Money(t.Expenses)</td></tr>}</tbody>
+                        </table>
+                    </Box>
+                }
+                @if (d.ReceivablesAgeing is { } a)
+                {
+                    <Box Title="@L["adash.ageing"]">
+                        @{ var buckets = Buckets(a); var top = Math.Max(1m, buckets.Max(b => Math.Abs(b.Amount))); }
+                        <dl class="ch-hbars">
+                            @foreach (var b in buckets)
+                            {
+                                <div class="ch-hrow">
+                                    <dt>@b.Label</dt>
+                                    <dd>
+                                        <span class="ch-track" aria-hidden="true"><i class="@b.Css" style="width:@H(b.Amount, top)%"></i></span>
+                                        <bdi class="num">@Fmt.Money(b.Amount)</bdi>
+                                    </dd>
+                                </div>
+                            }
+                        </dl>
+                        @if (a.Unapplied != 0) {<p class="help">@L.F("adash.unapplied", Fmt.Money(a.Unapplied))</p>}
+                    </Box>
+                }
+            </div>
+            <div class="stack">
+                <Box Title="@L["adash.reminders"]" NoPad="true">
+                    @if (d.Reminders.Count == 0)
+                    {
+                        <EmptyState Icon="check" Title="@L["adash.noReminders"]" />
+                    }
+                    else
+                    {
+                        <ul class="rem-list">
+                            @foreach (var r in d.Reminders)
+                            {
+                                <li>
+                                    <span class="badge @ToneCss.Badge(SeverityTone(r.Severity))"><Icon Name="@(r.Severity == "info" ? "info" : "alert")" Label="@L["sev." + r.Severity]" /></span>
+                                    <span class="rem-text"><Tx Value="@L.F("adash.rem." + r.Key, r.Count)" />@if (r.Amount is decimal v && v != 0) {<span class="muted"> · <bdi class="num">@Fmt.Money(v)</bdi></span>}</span>
+                                    <a href="@NavModel.Href(Company, r.Route)" aria-label="@L.F("adash.openReminder", L.F("adash.rem." + r.Key, r.Count))">@L["dash.openList"]</a>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </Box>
+                @if (QuickLinks.Count > 0)
+                {
+                    <Box Title="@L["adash.quickLinks"]">
+                        <ul class="quick-links">
+                            @foreach (var (key, route) in QuickLinks) {<li><a href="@NavModel.Href(Company, route)">@L[key]</a></li>}
+                        </ul>
+                    </Box>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</StateView>
+
+@code {
+    private AccountingDashboardResponse? _d;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference;
+    private int? _year, _month;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<Option<int?>> Months => Enumerable.Range(1, 12).Select(m => new Option<int?>(m, L["bud.m" + m])).ToList();
+
+    private IReadOnlyList<Option<int?>> Years
+    {
+        get
+        {
+            var now = DateTime.Today.Year;
+            return Enumerable.Range(now - 4, 6).Reverse().Select(y => new Option<int?>(y, y.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToList();
+        }
+    }
+
+    /// <summary>The quick links the user can open (account statement, trial balance, supplier statement, budget vs actual).</summary>
+    private IReadOnlyList<(string Key, string Route)> QuickLinks
+    {
+        get
+        {
+            var links = new List<(string, string)>();
+            if (Shell.Can(PermissionKeys.AcctView) || Shell.Can(PermissionKeys.ReportsView)) links.Add(("nav.statement", "accounting/statement"));
+            if (Shell.Can(PermissionKeys.AcctView)) links.Add(("nav.trialBalance", "accounting/trial-balance"));
+            if ((Shell.Can(PermissionKeys.ReportsView) || Shell.Can(PermissionKeys.AcctView)) && (Shell.Can(PermissionKeys.AcctApar) || Shell.Can(PermissionKeys.ReportsView)))
+                links.Add(("adash.supplierStatement", "reports/financial?report=supplier-statement"));
+            if (Shell.Can(PermissionKeys.BudgetView)) links.Add(("nav.budgetVsActual", "accounting/budget-vs-actual"));
+            return links;
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            var q = _year is int y && _month is int m ? $"?year={y}&month={m}" : "";
+            _d = await Api.GetAsync<AccountingDashboardResponse>(Api.C("accounting/dashboard" + q));
+            (_year, _month) = (_d.Year, _d.Month);
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private IReadOnlyList<Figure> TopFigures(AccountingDashboardResponse d, AccountingFigures f)
+    {
+        var list = new List<Figure>();
+        var asOf = L.F("adash.asOf", Fmt.Date(d.MonthTo, Shell.DateFormat));
+        if (f.CashAndBank is decimal cash) list.Add(new Figure(L["adash.cash"], Fmt.Money(cash), asOf));
+        if (f.Receivables is decimal rec) list.Add(new Figure(L["adash.receivables"], Fmt.Money(rec), asOf));
+        if (f.Payables is decimal pay) list.Add(new Figure(L["adash.payables"], Fmt.Money(pay), asOf));
+        if (d.Budget is { } b)
+            list.Add(new Figure(L["adash.budgetUsage"], b.ExpenseUsedPercent is decimal p ? Fmt.Percent(p, 1) : "—",
+                L.F("adash.budgetNote", b.BudgetName, Fmt.Percent(b.YearElapsedPercent, 1))));
+        return list;
+    }
+
+    private IReadOnlyList<Figure> Result(PeriodResult r) =>
+        [new(L["rep.revenue"], Fmt.Money(r.Revenue)), new(L["rep.expenses"], Fmt.Money(r.Expenses)), new(L["adash.net"], Fmt.Money(r.NetProfit))];
+
+    private sealed record Bucket(string Label, decimal Amount, string Css);
+
+    private IReadOnlyList<Bucket> Buckets(AgeingBuckets a) =>
+    [
+        new(L["adash.notDue"], a.NotDue, "ch-ok"), new(L["adash.d30"], a.Days1To30, "ch-warn"), new(L["adash.d60"], a.Days31To60, "ch-warn"),
+        new(L["adash.d90"], a.Days61To90, "ch-err"), new(L["adash.over90"], a.Over90, "ch-err"),
+    ];
+
+    /// <summary>Bar length in % of the largest value (negative amounts drawn by their size; at least a hairline when not zero).</summary>
+    private static string H(decimal v, decimal max)
+    {
+        if (v == 0) return "0";
+        var pct = Math.Max(1m, Math.Round(Math.Abs(v) * 100m / max, 1));
+        return pct.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static Tone SeverityTone(string severity) => severity switch { "error" => Ui.Tone.Err, "warning" => Ui.Tone.Warn, _ => Ui.Tone.Info };
+}

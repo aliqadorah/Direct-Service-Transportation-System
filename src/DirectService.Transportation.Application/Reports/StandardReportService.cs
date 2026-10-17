@@ -493,7 +493,8 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             .Concat(await payments.Where(x => x.PaymentDate >= f.From && x.PaymentDate <= f.To)
                 .Select(x => new { x.Id, x.PublicId, x.Number, Date = x.PaymentDate, Kind = "payment", Reference = (string?)x.Document.Number, Amount = (decimal?)null, Tax = (decimal?)null, Deduction = (decimal?)null, Net = -x.Amount })
                 .ToListAsync(ct).ConfigureAwait(false))
-            .OrderBy(e => e.Date).ThenBy(e => e.Kind == "bill" ? 0 : 1).ThenBy(e => e.Id).ToList();
+            // Same date: bills, then returns, then payments (ids of different tables do not order them).
+            .OrderBy(e => e.Date).ThenBy(e => e.Kind switch { "bill" => 0, "return" => 1, _ => 2 }).ThenBy(e => e.Id).ToList();
         var running = opening;
         var rows = new List<ResultRow> { new([f.From, null, L("رصيد افتتاحي", "Opening balance"), null, null, null, null, opening], null) };
         foreach (var e in events)

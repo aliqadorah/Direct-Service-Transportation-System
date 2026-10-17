@@ -598,5 +598,37 @@ public static class HelpTopics
                     "An account deactivated after the template was saved: choose another account in the entry before posting.",
                 ]),
             [new("accounting/journal-templates", "nav.journalTemplates"), new("accounting/journal/new", "nav.newJournal")]),
+        new("accounting-dashboard", "Rev. 6",
+            new("لوحة المحاسبة",
+                "نظرة على وضع الشركة المالي لشهر: النقد والذمم والإيرادات والمصروفات والموازنة، مع تذكيرات بما يحتاج عملاً.",
+                "كل من يملك صلاحية محاسبية؛ يرى كل مستخدم الأرقام والتذكيرات التي يستطيع فتحها فقط.",
+                [
+                    "المحاسبة ← لوحة المحاسبة (أول صفحة في المحاسبة). اختر الشهر والسنة أعلى الصفحة؛ الافتراضي الشهر الحالي.",
+                    "الأرقام: النقد والبنوك والذمم المدينة والدائنة في نهاية الشهر (أو اليوم للشهر الحالي)، والإيرادات والمصروفات وصافي الربح للشهر ومن بداية السنة، واستخدام موازنة المصروفات إن وُجدت موازنة معتمدة.",
+                    "الرسمان: الإيرادات مقابل المصروفات لآخر 12 شهراً، وأعمار الذمم المدينة.",
+                    "التذكيرات تُحسب تلقائياً، ولكل منها عدد ورابط يفتح القائمة المعنية: مسودات القيود، والترحيلات المعلّقة، والأشهر السابقة المفتوحة، وفواتير العملاء المتأخرة، وفواتير الموردين المستحقة خلال 7 أيام، والفواتير الإلكترونية المرفوضة، وأسطر الموازنة فوق 100%، والمقبوضات غير المخصصة، و«خصومات الموردين» غير المربوطة.",
+                    "الروابط السريعة: كشف الحساب، وميزان المراجعة، وكشف حساب مورد، والموازنة مقابل الفعلي.",
+                ],
+                [
+                    "لا يظهر رقم أو تذكير: لا تملك الصلاحية التي تفتحه.",
+                    "«أشهر سابقة ما زالت مفتوحة» تُعد من شهر أول قيد حتى الشهر الماضي؛ أغلقها من المحاسبة ← الفترات.",
+                    "تذكير «خصومات الموردين» يظهر حين توجد فواتير بخصم أو رُفضت فاتورة بخصم خلال آخر 30 يوماً، ويختفي بعد الربط في ربط الحسابات.",
+                ]),
+            new("Accounting dashboard",
+                "The company's financial position for a month: cash, receivables and payables, revenue, expenses and budget, with reminders of what needs work.",
+                "Everyone with an accounting permission; each user sees only the figures and reminders they can open.",
+                [
+                    "Accounting → Accounting dashboard (the first page under Accounting). Choose the month and year at the top; the default is the current month.",
+                    "Figures: cash and banks, receivables and payables at the end of the month (today for the current month), revenue, expenses and net profit of the month and of the year to date, and the expense budget used when an approved budget exists.",
+                    "Charts: revenue vs expenses of the last 12 months, and the receivables ageing.",
+                    "Reminders are computed automatically, each with a count and a link to the list: draft journal entries, pending automatic postings, previous months still open, overdue customer invoices, supplier bills due in the next 7 days, rejected e-invoices, budget lines over 100%, receipts not fully allocated, and “Supplier deductions” not mapped.",
+                    "Quick links: account statement, trial balance, supplier statement and Budget vs Actual.",
+                ],
+                [
+                    "A figure or reminder is missing: you do not have the permission that opens it.",
+                    "“Previous months still open” counts from the month of the first entry to last month; close them in Accounting → Periods.",
+                    "The “Supplier deductions” reminder shows while bills with deductions exist or a bill with a deduction was refused in the last 30 days; it disappears once the key is mapped in Account mapping.",
+                ]),
+            [new("accounting/dashboard", "nav.accountingDashboard"), new("accounting/periods", "nav.periods"), new("settings/mapping", "nav.mapping")]),
     ];
 }

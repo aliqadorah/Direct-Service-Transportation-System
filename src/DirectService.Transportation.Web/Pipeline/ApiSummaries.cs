@@ -142,6 +142,7 @@ internal static class ApiSummaries
         ["PUT /api/v1/companies/{company}/accounting/journal-drafts/{draft}"] = "Update a journal draft",
         ["POST /api/v1/companies/{company}/accounting/journal-drafts/{draft}/delete"] = "Delete a journal draft",
         ["POST /api/v1/companies/{company}/accounting/journal-drafts/{draft}/post"] = "Post a journal draft: full validation, period lock and JV number now",
+        ["GET /api/v1/companies/{company}/accounting/dashboard"] = "Accounting dashboard of a month: key figures, budget usage, 12-month revenue vs expenses, receivables ageing and reminders (by permission)",
         // Journal entry templates (revision 6 part B)
         ["GET /api/v1/companies/{company}/accounting/journal-templates/"] = "List the company's journal entry templates",
         ["POST /api/v1/companies/{company}/accounting/journal-templates/"] = "Save a journal entry template: name, description, Reference, lines (accounts, cost centres, line descriptions, optional amounts)",

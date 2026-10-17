@@ -18,6 +18,12 @@ public static class SettingKeys
     public const string IsDemo = "CORE.IsDemo";
     public const string SetupPrefix = "CORE.Setup.";
 
+    /// <summary>
+    /// Last date (company time, yyyy-MM-dd) a supplier bill with a deduction was refused because "Supplier deductions" is not mapped: the
+    /// accounting dashboard reminds to map it while such bills are being entered (revision 6 part B).
+    /// </summary>
+    public const string SupplierDeductionAttempted = "ACC.SupplierDeductionAttempted";
+
     public const string JordanPhonePattern = "^(07[789][0-9]{7}|06[0-9]{7})$";
     public const string JordanIbanPattern = "^JO[0-9]{2}[A-Z]{4}[0-9]{4}[A-Z0-9]{18}$";
 

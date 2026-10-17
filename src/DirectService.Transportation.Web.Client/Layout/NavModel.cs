@@ -41,6 +41,9 @@ public static class NavModel
         ]),
         new("nav.accounting", "book", null,
         [
+            // Revision 6 part B: the accounting dashboard is the first page under Accounting (each part by its own permission).
+            new("nav.accountingDashboard", "accounting/dashboard", PermissionKeys.AcctView, PermissionKeys.JeView, PermissionKeys.JeExport, PermissionKeys.AcctPost,
+                PermissionKeys.AcctApar, PermissionKeys.AcctSetup, PermissionKeys.BudgetView, PermissionKeys.ReportsView, PermissionKeys.SettingsManage),
             new("nav.chart", "accounting/chart", PermissionKeys.AcctView),
             new("nav.journal", "accounting/journal", PermissionKeys.JeView, PermissionKeys.AcctView),
             new("nav.newJournal", "accounting/journal/new", PermissionKeys.AcctPost),
