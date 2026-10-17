@@ -227,7 +227,48 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var totals = new TrialBalanceTotals(result.Sum(r => r.OpeningDebit), result.Sum(r => r.OpeningCredit), result.Sum(r => r.MovementDebit),
             result.Sum(r => r.MovementCredit), result.Sum(r => r.ClosingDebit), result.Sum(r => r.ClosingCredit));
         var balanced = totals.OpeningDebit == totals.OpeningCredit && totals.MovementDebit == totals.MovementCredit && totals.ClosingDebit == totals.ClosingCredit;
+        if (q.Tree == true) result = TrialBalanceTree(tree, result);
         return new TrialBalanceReport(from, to, level, maxLevel, result, totals, balanced, await OpeningDifferenceAsync(to, ct).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// The trial balance as a tree (revision 6): the rows of the chosen level with every parent above them, each parent the column-by-column sum
+    /// of its children, in chart order (depth first, children by code). The level rows keep their amounts, so the totals are unchanged.
+    /// </summary>
+    private List<TrialBalanceRow> TrialBalanceTree(Dictionary<long, Node> tree, List<TrialBalanceRow> levelRows)
+    {
+        var byCode = tree.Values.ToDictionary(n => n.Account.Code, n => n.Account.Id, StringComparer.Ordinal);
+        var sums = new Dictionary<long, decimal[]>();
+        foreach (var r in levelRows)
+        {
+            var id = byCode[r.Account.Code];
+            decimal[] values = [r.OpeningDebit, r.OpeningCredit, r.MovementDebit, r.MovementCredit, r.ClosingDebit, r.ClosingCredit];
+            for (long? x = id; x is long cur && tree.ContainsKey(cur); x = tree[cur].Account.ParentId)
+            {
+                if (!sums.TryGetValue(cur, out var acc)) sums[cur] = acc = new decimal[6];
+                for (var i = 0; i < 6; i++) acc[i] += values[i];
+            }
+        }
+        var levelById = levelRows.ToDictionary(r => byCode[r.Account.Code]);
+        var output = new List<TrialBalanceRow>();
+        void Walk(long id)
+        {
+            var n = tree[id];
+            var children = n.Children.Where(sums.ContainsKey).OrderBy(c => tree[c].Account.Code, StringComparer.Ordinal).ToList();
+            var parent = n.Account.ParentId is long p && sums.ContainsKey(p) ? chart.Ref(tree[p].Account).Id : null;
+            // A row of the chosen level holds its whole subtree (rows of the level never contain one another).
+            if (levelById.TryGetValue(id, out var own))
+            {
+                output.Add(own with { ParentId = parent, IsGroup = false });
+                return;
+            }
+            var s = sums[id];
+            output.Add(new TrialBalanceRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, s[0], s[1], s[2], s[3], s[4], s[5], parent, true));
+            foreach (var c in children) Walk(c);
+        }
+        foreach (var root in sums.Keys.Where(id => tree[id].Account.ParentId is not long p || !sums.ContainsKey(p)).OrderBy(id => tree[id].Account.Code, StringComparer.Ordinal))
+            Walk(root);
+        return output;
     }
 
     // ============================================================ statements (FR-118, FR-119)

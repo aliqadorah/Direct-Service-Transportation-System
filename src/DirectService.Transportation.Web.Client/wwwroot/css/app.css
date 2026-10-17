@@ -179,6 +179,11 @@ table.grid tr.sel td { background: var(--tint); }
 table.grid tr.live td { background: var(--live-row); transition: background var(--dur-live) var(--ease); }
 table.grid tr.void td { color: var(--muted); }
 table.grid tr.grp td { background: var(--surface-group); font-weight: var(--fw-semibold); }
+/* Trial balance tree (revision 6): indented names with an expand / collapse button on parent rows. */
+.tb-name { display: inline-flex; align-items: center; gap: 4px; }
+.tb-toggle { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }
+button.tb-toggle:hover { background: var(--surface-hover, var(--page)); color: var(--text); }
+button.tb-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 table.grid tfoot td { font-weight: var(--fw-semibold); background: var(--surface-foot); border-top: 1px solid var(--line-strong); position: sticky; bottom: 0; }
 table.grid tr.flt td { background: var(--surface-filter); height: 32px; padding: 0 var(--sp-2); position: sticky; top: var(--row); z-index: var(--z-sticky); }
 table.grid tr.flt .input { height: 24px; font-size: 12px; padding: 0 var(--sp-3); width: 100%; }

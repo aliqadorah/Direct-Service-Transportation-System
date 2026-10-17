@@ -44,7 +44,9 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
             [new(L("الحساب", "Account")), new(L("افتتاحي مدين", "Opening debit"), ReportValue.Money), new(L("افتتاحي دائن", "Opening credit"), ReportValue.Money),
              new(L("حركة مدين", "Movement debit"), ReportValue.Money), new(L("حركة دائن", "Movement credit"), ReportValue.Money),
              new(L("ختامي مدين", "Closing debit"), ReportValue.Money), new(L("ختامي دائن", "Closing credit"), ReportValue.Money)],
-            r.Rows.Select(x => (IReadOnlyList<object?>)[Name(x.Account), x.OpeningDebit, x.OpeningCredit, x.MovementDebit, x.MovementCredit, x.ClosingDebit, x.ClosingCredit]).ToList(),
+            // The tree (revision 6) keeps its indentation in Excel and PDF: two spaces per level below the first.
+            r.Rows.Select(x => (IReadOnlyList<object?>)[(q.Tree == true ? new string(' ', (x.Level - 1) * 2) : string.Empty) + Name(x.Account), x.OpeningDebit, x.OpeningCredit,
+                x.MovementDebit, x.MovementCredit, x.ClosingDebit, x.ClosingCredit]).ToList(),
             [L("الإجمالي", "Total"), t.OpeningDebit, t.OpeningCredit, t.MovementDebit, t.MovementCredit, t.ClosingDebit, t.ClosingCredit],
             (r.Balanced ? string.Empty : L("الميزان غير متوازن. ", "The trial balance does not balance. ")) + Note(r.OpeningDifference) is { Length: > 0 } n ? n : null);
         return await exporter.ExportAsync(table, format, "trial-balance", ct).ConfigureAwait(false);

@@ -92,6 +92,35 @@ public sealed class AccountingPageTests : PageTestBase
         Assert.EndsWith($"/c/{Company}/accounting/journal/drafts/d1", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
     }
 
+    /// <summary>Revision 6 item 5: the tree — a parent collapses its children, "collapse all" and "expand one level" work, the request asks for the tree.</summary>
+    [Fact]
+    public void Trial_balance_tree_expands_and_collapses()
+    {
+        var assets = new AccountRef("g1", "1", "الأصول", "Assets");
+        var current = new AccountRef("g2", "11", "الأصول المتداولة", "Current assets");
+        Respond("accounting/reports/trial-balance", new TrialBalanceReport(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), 3, 3,
+        [
+            new TrialBalanceRow(assets, "Asset", 1, false, 0, 0, 100, 0, 100, 0, null, true),
+            new TrialBalanceRow(current, "Asset", 2, false, 0, 0, 100, 0, 100, 0, "g1", true),
+            new TrialBalanceRow(Cash, "Asset", 3, true, 0, 0, 100, 0, 100, 0, "g2"),
+        ], new TrialBalanceTotals(0, 0, 100, 100, 100, 100), true, null));
+        var cut = Render<TrialBalance>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("1101", cut.Markup));
+        Assert.Contains(Requests, r => r.Path.StartsWith("accounting/reports/trial-balance?", StringComparison.Ordinal) && r.Path.Contains("tree=true", StringComparison.Ordinal));
+
+        cut.Find($"button[aria-label='{L.F("acc.collapse", "11")}']").Click();
+        Assert.DoesNotContain("1101", cut.Markup);
+        Assert.Contains("الأصول المتداولة", cut.Markup);
+
+        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.collapseAll"], StringComparison.Ordinal)).Click();
+        Assert.DoesNotContain("الأصول المتداولة", cut.Markup);
+        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandLevel"], StringComparison.Ordinal)).Click();
+        Assert.Contains("الأصول المتداولة", cut.Markup);
+        Assert.DoesNotContain("1101", cut.Markup);
+        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandAll"], StringComparison.Ordinal)).Click();
+        Assert.Contains("1101", cut.Markup);
+    }
+
     [Fact]
     public void Trial_balance_highlights_a_mismatch()
     {

@@ -26,12 +26,17 @@ public sealed record LedgerReport(
 // ------------------------------------------------------------------ trial balance (FR-117)
 
 /// <summary>Trial balance for a period at a tree level (1 = top accounts; default the deepest level); optionally hide rows with nothing in them.</summary>
-public sealed record TrialBalanceQuery(DateOnly? From, DateOnly? To, int? Level, bool? HideZero);
+/// <summary>Trial balance filters; <paramref name="Tree"/> (revision 6) adds every parent above the rows of the chosen level, in chart order.</summary>
+public sealed record TrialBalanceQuery(DateOnly? From, DateOnly? To, int? Level, bool? HideZero, bool? Tree = null);
 
-/// <summary>An account at the chosen level (leaves above it shown as themselves): opening and closing as net debit or credit, movements gross.</summary>
+/// <summary>
+/// An account at the chosen level (leaves above it shown as themselves): opening and closing as net debit or credit, movements gross. In the
+/// tree (revision 6) a parent row (<paramref name="IsGroup"/>) is the sum of its children column by column; <paramref name="ParentId"/> links a
+/// row to the parent row above it; the totals are those of the rows of the chosen level, so they balance as before.
+/// </summary>
 public sealed record TrialBalanceRow(
     AccountRef Account, string AccountType, int Level, bool IsLeaf, decimal OpeningDebit, decimal OpeningCredit, decimal MovementDebit, decimal MovementCredit,
-    decimal ClosingDebit, decimal ClosingCredit);
+    decimal ClosingDebit, decimal ClosingCredit, string? ParentId = null, bool IsGroup = false);
 
 public sealed record TrialBalanceTotals(decimal OpeningDebit, decimal OpeningCredit, decimal MovementDebit, decimal MovementCredit, decimal ClosingDebit, decimal ClosingCredit);
 

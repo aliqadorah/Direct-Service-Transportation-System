@@ -2,6 +2,9 @@
 @*
   SCR-36 trial balance (FR-117, FR-110): period, tree level, hide empty rows; opening, movements and closing as debit / credit with totals;
   a mismatch is highlighted; the opening-balance difference still to clear is shown during setup. A row opens its ledger. Excel / PDF.
+  Revision 6: the chart as a tree — each parent with its sub-accounts, parent rows = sum of their children, expand / collapse one row, all
+  rows or one level at a time; the level filter sets how deep the tree goes; totals are those of the deepest rows and still balance; the
+  exports keep the indentation.
 *@
 @inject Api Api
 @inject Loc L
@@ -17,6 +20,11 @@
     <SelectField TValue="int?" @bind-Value="_level" Options="Levels" Empty="@L["rep.allLevels"]" Label="@L["rep.level"]" FieldClass="w160" />
     <CheckField @bind-Value="_hideZero" Label="@L["rep.hideZero"]" />
     <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
+    <span class="row" style="gap:6px" role="group" aria-label="@L["rep.treeTools"]">
+        <Btn Small="true" Text="@L["rep.expandAll"]" OnClick="ExpandAll" Disabled="_r is null" />
+        <Btn Small="true" Icon="up" Text="@L["rep.collapseAll"]" OnClick="CollapseAll" Disabled="_r is null" />
+        <Btn Small="true" Icon="down" Text="@L["rep.expandLevel"]" OnClick="ExpandLevel" Disabled="_r is null" />
+    </span>
     <span style="margin-inline-start:auto;display:flex;gap:6px">
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
@@ -29,11 +37,24 @@
         @if (!r.Balanced) {<Banner Tone="Tone.Err" Text="@L["rep.tbMismatch"]" />}
         @if (r.OpeningDifference is decimal d && d != 0) {<Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(d))" />}
         <ListFrame Label="@L["nav.trialBalance"]">
-            <DataGrid TItem="TrialBalanceRow" Items="r.Rows" Key="x => x.Account.Id" Caption="@L["nav.trialBalance"]" OnRowClick="Open" FooterLabel="@L["ui.total"]"
-                      RowClass="@(x => x.IsLeaf ? null : "grp")">
+            <DataGrid TItem="TrialBalanceRow" Items="Visible" Key="x => x.Account.Id" Caption="@L["nav.trialBalance"]" OnRowClick="Open" FooterLabel="@L["ui.total"]"
+                      RowClass="@(x => x.IsGroup ? "grp" : null)">
                 <Columns>
                     <GridColumn TItem="TrialBalanceRow" Title="@L["acc.code"]" Value="x => x.Account.Code" Ltr="true" />
-                    <GridColumn TItem="TrialBalanceRow" Title="@L["md.name"]" Value="x => L.Pick(x.Account.NameAr, x.Account.NameEn)" />
+                    <GridColumn TItem="TrialBalanceRow" Title="@L["md.name"]">
+                        <Template>
+                            <span class="tb-name" style="padding-inline-start:@((context.Level - 1) * 18)px">
+                                @if (context.IsGroup)
+                                {
+                                    var open = !_collapsed.Contains(context.Account.Id);
+                                    <button type="button" class="tb-toggle" aria-expanded="@(open ? "true" : "false")" aria-label="@L.F(open ? "acc.collapse" : "acc.expand", context.Account.Code)"
+                                            @onclick="() => Toggle(context)" @onclick:stopPropagation="true"><Icon Name="@(open ? "down" : "left")" Flip="@(!open && L.En)" /></button>
+                                }
+                                else {<span class="tb-toggle" aria-hidden="true"></span>}
+                                <bdi>@L.Pick(context.Account.NameAr, context.Account.NameEn)</bdi>
+                            </span>
+                        </Template>
+                    </GridColumn>
                     <GridColumn TItem="TrialBalanceRow" Title="@L["rep.openDebit"]" Value="x => M(x.OpeningDebit)" Numeric="true" Footer="@Fmt.Money(r.Totals.OpeningDebit)" />
                     <GridColumn TItem="TrialBalanceRow" Title="@L["rep.openCredit"]" Value="x => M(x.OpeningCredit)" Numeric="true" Footer="@Fmt.Money(r.Totals.OpeningCredit)" />
                     <GridColumn TItem="TrialBalanceRow" Title="@L["rep.moveDebit"]" Value="x => M(x.MovementDebit)" Numeric="true" Footer="@Fmt.Money(r.Totals.MovementDebit)" />
@@ -53,6 +74,43 @@
     private DateOnly? _from, _to;
     private int? _level;
     private bool _hideZero = true;
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+
+    /// <summary>Rows whose parents are all expanded.</summary>
+    private IReadOnlyList<TrialBalanceRow> Visible
+    {
+        get
+        {
+            if (_r is null) return [];
+            var hidden = new HashSet<string>(StringComparer.Ordinal);
+            var list = new List<TrialBalanceRow>();
+            foreach (var x in _r.Rows)
+            {
+                if (x.ParentId is { } p && (hidden.Contains(p) || _collapsed.Contains(p))) { hidden.Add(x.Account.Id); continue; }
+                list.Add(x);
+            }
+            return list;
+        }
+    }
+
+    private void Toggle(TrialBalanceRow x) { if (!_collapsed.Remove(x.Account.Id)) _collapsed.Add(x.Account.Id); }
+
+    private void ExpandAll() => _collapsed.Clear();
+
+    private void CollapseAll()
+    {
+        _collapsed.Clear();
+        foreach (var x in _r?.Rows ?? []) if (x.IsGroup) _collapsed.Add(x.Account.Id);
+    }
+
+    /// <summary>Opens the collapsed parents nearest to the top: one more level becomes visible.</summary>
+    private void ExpandLevel()
+    {
+        var visible = Visible.Where(x => x.IsGroup && _collapsed.Contains(x.Account.Id)).ToList();
+        if (visible.Count == 0) return;
+        var level = visible.Min(x => x.Level);
+        foreach (var x in visible.Where(x => x.Level == level)) _collapsed.Remove(x.Account.Id);
+    }
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -64,7 +122,7 @@
 
     private string Query()
     {
-        var p = new List<string> { "hideZero=" + (_hideZero ? "true" : "false") };
+        var p = new List<string> { "hideZero=" + (_hideZero ? "true" : "false"), "tree=true" };
         if (_from is { } f) p.Add("from=" + f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         if (_to is { } t) p.Add("to=" + t.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         if (_level is { } l) p.Add("level=" + l.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -78,6 +136,7 @@
         try
         {
             _r = await Api.GetAsync<TrialBalanceReport>(Api.C("accounting/reports/trial-balance" + Query()));
+            _collapsed.RemoveWhere(id => !_r.Rows.Any(x => x.Account.Id == id && x.IsGroup));
             _from ??= _r.From;
             _to ??= _r.To;
             _state = _r.Rows.Count == 0 ? LoadState.Empty : LoadState.Ready;

@@ -56,6 +56,55 @@ public sealed class LedgerReportTests(ApiFactory f)
     }
 
     [Fact]
+    public async Task Trial_balance_tree_sums_parents_from_children_and_keeps_the_totals()
+    {
+        // Revision 6 item 5: the trial balance as a tree — parents = sum of their children, links, chart order, level filter, same totals, export indentation.
+        var w = await LedgerAsync();
+        var o = w.Owner;
+        var q = $"from={D(Start)}&to={D(Today)}";
+        var flat = await ReadAsync<TrialBalanceReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/trial-balance?{q}")));
+        var tree = await ReadAsync<TrialBalanceReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/trial-balance?{q}&tree=true")));
+
+        // Same totals, still balancing; the level rows are exactly the flat rows.
+        Assert.Equal(flat.Totals, tree.Totals);
+        Assert.True(tree.Balanced);
+        Assert.Equal(flat.Rows.Select(r => r.Account.Code).Order(StringComparer.Ordinal), tree.Rows.Where(r => !r.IsGroup).Select(r => r.Account.Code).Order(StringComparer.Ordinal));
+
+        // Every parent row is the column-by-column sum of its children, and the roots add up to the totals.
+        foreach (var parent in tree.Rows.Where(r => r.IsGroup))
+        {
+            var children = tree.Rows.Where(r => r.ParentId == parent.Account.Id).ToList();
+            Assert.NotEmpty(children);
+            Assert.Equal(children.Sum(c => c.MovementDebit), parent.MovementDebit);
+            Assert.Equal(children.Sum(c => c.MovementCredit), parent.MovementCredit);
+            Assert.Equal(children.Sum(c => c.ClosingDebit), parent.ClosingDebit);
+            Assert.Equal(children.Sum(c => c.ClosingCredit), parent.ClosingCredit);
+            Assert.All(children, c => Assert.Equal(parent.Level + 1, c.Level));
+        }
+        var roots = tree.Rows.Where(r => r.ParentId is null).ToList();
+        Assert.Equal(tree.Totals.ClosingDebit, roots.Sum(r => r.ClosingDebit));
+        Assert.Equal(tree.Totals.MovementCredit, roots.Sum(r => r.MovementCredit));
+
+        // Depth-first chart order: each row comes after its parent.
+        var seen = new HashSet<string>();
+        foreach (var r in tree.Rows)
+        {
+            if (r.ParentId is not null) Assert.Contains(r.ParentId, seen);
+            seen.Add(r.Account.Id);
+        }
+
+        // The level filter sets the depth of the tree; totals do not change.
+        var level2 = await ReadAsync<TrialBalanceReport>(await o.Client.GetAsync(U(o, $"/accounting/reports/trial-balance?{q}&tree=true&level=2")));
+        Assert.True(level2.Rows.Max(r => r.Level) <= 2);
+        Assert.Equal(flat.Totals, level2.Totals);
+
+        // The export keeps the indentation (two spaces per level).
+        var csv = System.Text.Encoding.UTF8.GetString(await (await o.Client.GetAsync(U(o, $"/accounting/reports/trial-balance/export?{q}&tree=true&format=csv"))).Content.ReadAsByteArrayAsync());
+        var deepest = tree.Rows.First(r => r.Level == 3);
+        Assert.Contains("    " + deepest.Account.Code, csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task General_ledger_trial_balance_statements_and_reconciliation_FR116_FR121()
     {
         var w = await LedgerAsync();
