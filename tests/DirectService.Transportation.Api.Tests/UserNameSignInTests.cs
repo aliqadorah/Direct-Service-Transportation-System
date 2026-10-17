@@ -152,11 +152,38 @@ public sealed class UserNameSignInTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
 
         var (adminName, _) = await CreateAsync(owner, mustChange: false, role: PresetRoles.Administrator);
-        var (admin, _) = await PasswordStepAsync(adminName, ApiHelpers.Password);
+        var (admin, offered) = await PasswordStepAsync(adminName, ApiHelpers.Password);
+        Assert.Equal("twoFactorOffer", offered.Next);   // Administrators always see the offer (owner decision 17 Oct 2026)
+        await (await admin.PostAsync("/api/v1/auth/2fa/skip", null)).EnsureOkAsync();
         await admin.UseAntiforgeryAsync();
         var escalate = await admin.PostAsJsonAsync($"/api/v1/companies/{owner.CompanyId}/users",
             new CreateUserRequest("X", NewUserName(), null, ApiHelpers.Password, await RoleAsync(owner, PresetRoles.Owner)));
         Assert.Equal(HttpStatusCode.Forbidden, escalate.StatusCode);   // DT-18
+    }
+
+    /// <summary>Owner decision 17 Oct 2026: an email entered by the administrator is verified first; until then no reset email goes to it.</summary>
+    [Fact]
+    public async Task An_admin_entered_email_is_verified_before_any_reset_link_goes_to_it()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var email = $"clerk-{Guid.NewGuid():N}@example.test";
+        var (userName, user) = await CreateAsync(owner, mustChange: false, email: email);
+        Assert.False(user.EmailConfirmed);
+        var verify = f.Emails.LinkParameters(email, "VerifyEmail");   // the verification email was sent
+
+        // Not verified: "forgot password" sends nothing, and the administrator cannot send a link (only set a new password).
+        var anon = f.NewClient();
+        await anon.UseAntiforgeryAsync();
+        var before = f.Emails.Count;
+        await (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(email))).EnsureOkAsync();
+        Assert.Equal(before, f.Emails.Count);
+        Assert.Equal("user.emailNotVerified", await (await owner.Client.PostAsync(U(owner, $"/users/{user.Id}/password-reset"), null)).ErrorCodeAsync());
+        Assert.Equal("done", (await PasswordStepAsync(userName, ApiHelpers.Password)).Response.Next);   // sign-in does not wait for it
+
+        // Verified: the reset email goes out.
+        await (await anon.PostAsJsonAsync("/api/v1/auth/verify-email", new LinkTokenRequest(verify["u"], verify["t"]))).EnsureOkAsync();
+        await (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(email))).EnsureOkAsync();
+        Assert.True(f.Emails.LinkParameters(email, "PasswordReset").ContainsKey("t"));
     }
 
     [Fact]

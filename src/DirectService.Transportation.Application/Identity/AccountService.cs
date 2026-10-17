@@ -143,7 +143,9 @@ public sealed class AccountService(
     public async Task RequestPasswordResetAsync(string? address, CancellationToken ct)
     {
         var user = string.IsNullOrWhiteSpace(address) ? null : await users.FindByEmailAsync(address.Trim()).ConfigureAwait(false);
-        if (user is { Status: "Active" } && !IsPendingStaff(user))
+        // Owner decision 17 Oct 2026: never to an email that is not verified yet (e.g. entered by an administrator) — only an
+        // administrator's reset then. Platform staff keep their own flow (their invitation link completes the account).
+        if (user is { Status: "Active" } && !IsPendingStaff(user) && (user.EmailConfirmedAt is not null || user.IsPlatformStaff))
             await SendPasswordResetAsync(user, ct).ConfigureAwait(false);
     }
 

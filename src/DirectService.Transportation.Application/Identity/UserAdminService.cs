@@ -95,6 +95,8 @@ public sealed class UserAdminService(
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             return u;
         }, ct).ConfigureAwait(false);
+        // Owner decision 17 Oct 2026: an email entered by the administrator is verified by its owner; until then no reset email goes to it.
+        if (user.Email is not null) await accounts.SendVerificationAsync(user, ct).ConfigureAwait(false);
         return new UserListItem(tokens.Encode<User>(user.PublicId), user.FullName, user.Email, user.Status, new Ref(tokens.Encode<Role>(role.PublicId), role.Name),
             false, false, false, null, Convert.ToBase64String(user.RowVersion ?? []), user.UserName, user.MustChangePassword);
     }
@@ -171,6 +173,7 @@ public sealed class UserAdminService(
     {
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
         if (user.Email is null) throw Fail.Rule(ErrorCodes.UserHasNoEmail);
+        if (user.EmailConfirmedAt is null && !user.IsPlatformStaff) throw Fail.Rule(ErrorCodes.UserEmailNotVerified);
         await accounts.SendPasswordResetAsync(user, ct).ConfigureAwait(false);
     }
 

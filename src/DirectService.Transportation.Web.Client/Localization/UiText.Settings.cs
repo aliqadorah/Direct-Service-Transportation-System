@@ -179,7 +179,7 @@ public static partial class UiText
         ["usr.passwordPolicyHelp"] = ("تنطبق سياسة كلمة المرور لجهتكم.", "Your organisation's password policy applies."),
         ["usr.mustChange"] = ("يجب تغيير كلمة المرور عند أول دخول", "Must change password at first login"),
         ["usr.mustChangeBadge"] = ("يغيّر كلمة المرور عند الدخول", "Must change password"),
-        ["usr.createNote"] = ("لا يلزم هذا المستخدمَ التحقق بخطوتين، ويمكنه تفعيله بنفسه لاحقاً. دون بريد إلكتروني لا يستطيع استخدام «نسيت كلمة المرور»: أنت من يعيّن له كلمة مرور جديدة.", "This user does not need two-step verification and can turn it on later. Without an email they cannot use “forgot password”: you set a new password for them."),
+        ["usr.createNote"] = ("لا يلزم هذا المستخدمَ التحقق بخطوتين، ويمكنه تفعيله بنفسه لاحقاً. دون بريد إلكتروني لا يستطيع استخدام «نسيت كلمة المرور»: أنت من يعيّن له كلمة مرور جديدة. إن أدخلت بريداً يُرسل إليه رابط تأكيد، ولا يُرسل إليه رابط إعادة تعيين قبل تأكيده.", "This user does not need two-step verification and can turn it on later. Without an email they cannot use “forgot password”: you set a new password for them. If you enter an email, a verification link is sent to it; no reset link goes to it until it is confirmed."),
         ["usr.create"] = ("إنشاء المستخدم", "Create the user"),
         ["usr.created"] = ("أُنشئ المستخدم {0}.", "User {0} created."),
         ["usr.setPassword"] = ("تعيين كلمة مرور جديدة", "Set a new password"),

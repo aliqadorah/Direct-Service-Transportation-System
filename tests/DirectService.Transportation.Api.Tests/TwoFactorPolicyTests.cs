@@ -61,7 +61,7 @@ public sealed class TwoFactorPolicyTests(ApiFactory f)
     }
 
     [Fact]
-    public async Task Sign_up_offers_2FA_once_and_skip_for_now_signs_in_and_is_audited()
+    public async Task Sign_up_offers_2FA_and_skip_for_now_signs_in_and_is_audited()
     {
         var (client, email, response) = await SignUpToPasswordStepAsync();
         Assert.Equal("twoFactorOffer", response.Next);
@@ -73,15 +73,15 @@ public sealed class TwoFactorPolicyTests(ApiFactory f)
         await client.UseAntiforgeryAsync();
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
 
-        // Offered once: the next sign-in goes straight in.
-        Assert.Equal("done", (await SignInAsync(email, ApiHelpers.Password)).Next);
+        // The Owner sees the offer again at every sign-in until 2FA is set up (owner decision 17 Oct 2026).
+        Assert.Equal("twoFactorOffer", (await SignInAsync(email, ApiHelpers.Password)).Next);
         await f.DbAsync(async db =>
         {
             var u = await db.Set<User>().IgnoreQueryFilters().SingleAsync(x => x.Email == email);
             Assert.Null(u.TwoFactorEnabledAt);
             Assert.NotNull(u.LastSignInAt);
             Assert.Equal(1, await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityType == "CORE.User" && a.EntityId == u.Id && a.Action == "TwoFactorSkipped"));
-            Assert.True(await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityType == "CORE.User" && a.EntityId == u.Id && a.Action == "SignIn") >= 2);
+            Assert.True(await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityType == "CORE.User" && a.EntityId == u.Id && a.Action == "SignIn") >= 1);
             return true;
         });
     }
@@ -175,9 +175,40 @@ public sealed class TwoFactorPolicyTests(ApiFactory f)
         var client = f.NewClient();
         await client.UseAntiforgeryAsync();
         await (await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, admin))).EnsureOkAsync();
+        await (await client.PostAsync("/api/v1/auth/2fa/skip", null)).EnsureOkAsync();
         await client.UseAntiforgeryAsync();
         var r = await client.PutAsJsonAsync("/api/v1/tenant/security", new TenantSecurityRequest(8, true, true, 30, null, true));
         Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+    }
+
+    /// <summary>Owner decision 17 Oct 2026: Owner/Administrator users see the offer at every sign-in (even created with a username); others once.</summary>
+    [Fact]
+    public async Task Owners_and_administrators_see_the_offer_at_every_sign_in_others_once()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var admin = await CreateUserAsync(owner, PresetRoles.Administrator);
+        var clerk = await CreateUserAsync(owner, PresetRoles.Accountant);
+        for (var i = 0; i < 2; i++)
+        {
+            var client = f.NewClient();
+            await client.UseAntiforgeryAsync();
+            var r = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, admin));
+            Assert.Equal("twoFactorOffer", (await r.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+            await (await client.PostAsync("/api/v1/auth/2fa/skip", null)).EnsureOkAsync();   // skip allowed every time
+        }
+        Assert.Equal("done", (await SignInAsync(clerk, ApiHelpers.Password)).Next);   // a username user without the role: not asked
+
+        // An invited email user without the role: offered at the first sign-in only.
+        var roles = await owner.Client.GetFromJsonAsync<List<RoleResponse>>(U(owner, "/roles"));
+        var email = $"viewer-{Guid.NewGuid():N}@example.test";
+        await (await owner.Client.PostAsJsonAsync(U(owner, "/invitations"), new InviteRequest(email, roles!.Single(x => x.Name == PresetRoles.Viewer).Id))).EnsureOkAsync();
+        var invited = f.NewClient();
+        await invited.UseAntiforgeryAsync();
+        await (await invited.PostAsJsonAsync("/api/v1/auth/invitations/accept", new InvitationAcceptRequest(f.Emails.LinkParameters(email, "Invitation")["t"], "Viewer", ApiHelpers.Password))).EnsureOkAsync();
+        var first = await invited.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(email, ApiHelpers.Password));
+        Assert.Equal("twoFactorOffer", (await first.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+        await (await invited.PostAsync("/api/v1/auth/2fa/skip", null)).EnsureOkAsync();
+        Assert.Equal("done", (await SignInAsync(email, ApiHelpers.Password)).Next);
     }
 
     [Fact]

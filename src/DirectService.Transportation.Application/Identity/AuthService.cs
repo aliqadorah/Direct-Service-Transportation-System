@@ -77,10 +77,17 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         ArgumentNullException.ThrowIfNull(user);
         if (user.TwoFactorEnabledAt is not null) return SignInNextStep.TwoFactor;
         if (await RequiresTwoFactorAsync(user, ct).ConfigureAwait(false)) return SignInNextStep.TwoFactorSetup;
-        // Offered once, at the first sign-in of a user who signs in with their email (sign-up, invitation); a user created by an
-        // administrator with a username is not asked (the administrator chose; the profile recommends it).
+        // Owner decision 17 Oct 2026: users with the Owner or Administrator role see the offer at every sign-in until they set it up
+        // (skip allowed), however they were created. Others: offered once, at the first sign-in of a user who signs in with an email
+        // (sign-up, invitation); a user created by an administrator with a username is not asked (the profile recommends it).
+        if (await IsOwnerOrAdministratorAsync(user.Id, ct).ConfigureAwait(false)) return SignInNextStep.TwoFactorOffer;
         return user.LastSignInAt is null && user.UserName is null ? SignInNextStep.TwoFactorOffer : SignInNextStep.None;
     }
+
+    /// <summary>Whether the user holds the preset Owner or Administrator role in any company.</summary>
+    private Task<bool> IsOwnerOrAdministratorAsync(long userId, CancellationToken ct) =>
+        db.Set<UserCompanyRole>().IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsDeleted && r.Role.IsPreset
+            && (r.Role.Name == Contracts.Security.PresetRoles.Owner || r.Role.Name == Contracts.Security.PresetRoles.Administrator), ct);
 
     /// <summary>Platform staff always need 2FA, without exception; tenant users when their tenant requires it for all users.</summary>
     public async Task<bool> RequiresTwoFactorAsync(User user, CancellationToken ct)
