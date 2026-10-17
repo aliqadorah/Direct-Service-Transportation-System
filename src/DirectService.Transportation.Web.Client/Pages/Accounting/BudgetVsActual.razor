@@ -37,11 +37,7 @@
     </Empty>
     <ChildContent>
         @{ var r = _r!; }
-        <Figures Items="@([new Figure(L["bud.budget"], r.Budget.Name, $"{Fmt.Date(r.From, Shell.DateFormat)} – {Fmt.Date(r.To, Shell.DateFormat)}"),
-                           new Figure(L["bud.revenueVar"], Signed(r.Revenue.Variance), Pct(r.Revenue.VariancePercent)),
-                           new Figure(L["bud.expenseVar"], Signed(r.Expenses.Variance), Pct(r.Expenses.VariancePercent)),
-                           new Figure(L["bud.netVar"], Signed(r.Net.Variance), Pct(r.Net.VariancePercent))])" />
-        <p class="help" style="flex:none">@L["bud.varianceHelp"]</p>
+        <p class="help" style="flex:none"><strong>@L["bud.budget"]: <bdi>@r.Budget.Name</bdi></strong> · <bdi class="num">@Fmt.Date(r.From, Shell.DateFormat) – @Fmt.Date(r.To, Shell.DateFormat)</bdi> · @L["bud.varianceHelp"]</p>
         <ListFrame Label="@L["nav.budgetVsActual"]">
             <DataGrid TItem="BudgetVsActualRow" Items="Visible" Key="x => x.Account.Id" Caption="@L["nav.budgetVsActual"]" OnRowClick="Open"
                       RowClass="@(x => x.IsGroup ? "grp" : null)">
@@ -75,8 +71,8 @@
                 </Columns>
             </DataGrid>
         </ListFrame>
-        <div class="tbl-wrap" style="flex:none">
-            <table class="tbl">
+        <section class="box" style="flex:none" aria-label="@L["ui.total"]">
+            <table class="grid">
                 <caption class="sr-only">@L["ui.total"]</caption>
                 <thead><tr><th scope="col"></th><th scope="col" class="n">@L["bud.budget"]</th><th scope="col" class="n">@L["bud.actual"]</th>
                     <th scope="col" class="n">@L["bud.variance"]</th><th scope="col" class="n">@L["bud.variancePct"]</th><th scope="col">@L["bud.assessment"]</th></tr></thead>
@@ -94,7 +90,7 @@
                     }
                 </tbody>
             </table>
-        </div>
+        </section>
     </ChildContent>
 </StateView>
 

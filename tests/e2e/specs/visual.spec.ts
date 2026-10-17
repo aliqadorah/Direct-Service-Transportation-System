@@ -72,6 +72,20 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
   const billReturn = await api<{ return: { id: string } }>(page, "POST", c(company, "apar/returns"), { documentId: bill.document.id, returnDate: today(), amount: 300, reason: "Visual return / مرتجع" });
   const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
+  // Revision 6 part B: an approved budget of this year (revenue, a parent expense account and a posting account) for the budget page,
+  // Budget vs Actual and the dashboard's budget usage; a journal template for the templates list.
+  const year = Number(today().slice(0, 4));
+  const every = (v: number) => Array.from({ length: 12 }, () => v);
+  let budget = await api<{ id: string; rowVersion: string; name: string }>(page, "POST", c(company, "accounting/budgets"), { fiscalYear: year, name: `Budget ${year} / موازنة` });
+  budget = await api<{ id: string; rowVersion: string; name: string }>(page, "PUT", c(company, `accounting/budgets/${budget.id}`), { name: budget.name, rowVersion: budget.rowVersion, lines: [
+    { accountId: code("4101"), costCentreId: null, months: every(1500) },
+    { accountId: code("51"), costCentreId: null, months: every(400) },
+    { accountId: code("5202"), costCentreId: null, months: every(300) },
+  ] });
+  await api(page, "POST", c(company, `accounting/budgets/${budget.id}/approve`), { rowVersion: budget.rowVersion });
+  const template = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-templates"), {
+    name: "Monthly rent / إيجار شهري", description: "Office rent / إيجار المكتب", reference: "Contract 12",
+    lines: [{ accountId: code("5202"), debit: 300, credit: 0, costCentreId: null, note: "Rent / إيجار" }, { accountId: code("110101"), debit: 0, credit: 300, costCentreId: null, note: null }] });
   return {
     w,
     ids: {
@@ -82,6 +96,8 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
       statement: statementAccounts,
       bill: bill.document.id,
       billReturn: billReturn.return.id,
+      budget: budget.id,
+      template: template.id,
       advance: await first("advances", (j) => j.page.items),
     },
   };
@@ -100,6 +116,9 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     ids.journal ? `accounting/journal/${ids.journal}` : null, ids.draft ? `accounting/journal/drafts/${ids.draft}` : null, "accounting/automatic", "accounting/statement", ids.statement ? `accounting/statement?accounts=${ids.statement}` : null, "accounting/trial-balance",
     "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", ids.bill ? `accounting/payables/${ids.bill}` : null, ids.billReturn ? `accounting/apar-returns/${ids.billReturn}` : null, "accounting/receivables", "accounting/receivables/new",
     "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
+    // Revision 6 part B.
+    "accounting/dashboard", "accounting/budgets", ids.budget ? `accounting/budgets/${ids.budget}` : null, "accounting/budget-vs-actual",
+    "accounting/journal-templates", ids.template ? `accounting/journal-templates/${ids.template}` : null,
     "reports/operational", "reports/financial", "reports/builder", "reports/saved",
     "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, `masters/drivers/${w.driver}/edit`, "masters/customers", "masters/partners",
     "masters/materials", "masters/loading-sites", "masters/unloading-sites", "masters/ownership-types", "masters/tariffs", "masters/monthly-rates",

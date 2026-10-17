@@ -82,9 +82,6 @@ public static partial class UiText
         ["bud.st.favourable"] = ("ملائم", "Favourable"),
         ["bud.st.unfavourable"] = ("غير ملائم", "Unfavourable"),
         ["bud.st.onBudget"] = ("مطابق", "On budget"),
-        ["bud.revenueVar"] = ("انحراف الإيرادات", "Revenue variance"),
-        ["bud.expenseVar"] = ("انحراف المصروفات", "Expense variance"),
-        ["bud.netVar"] = ("انحراف صافي النتيجة", "Net result variance"),
         ["bud.varianceHelp"] = ("الانحراف = الفعلي − الموازنة. الإيرادات فوق الموازنة والمصروفات دونها ملائمة (أخضر)، والعكس غير ملائم (أحمر).", "Variance = Actual − Budget. Revenue above budget and expenses below budget are favourable (green); the opposite is unfavourable (red)."),
         // ---- journal entry templates
         ["nav.journalTemplates"] = ("نماذج القيود", "Journal templates"),
