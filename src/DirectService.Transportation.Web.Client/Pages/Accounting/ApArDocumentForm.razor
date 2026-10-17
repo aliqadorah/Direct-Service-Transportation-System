@@ -21,6 +21,16 @@
 <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
     <ProblemValidator @ref="_problems" />
     <ErrorSummary @ref="_summary" Extra="_extra" />
+    @if (_keyMissing)
+    {
+        @* Owner decision 17 Oct 2026: a clear message with the way to fix it, not a generic error. *@
+        <Banner Tone="Tone.Err" Text="@L["ap.deductionKeyMissing"]">
+            <Actions>
+                @if (Shell.Can(PermissionKeys.SettingsManage)) {<a class="btn sm" href="@NavModel.Href(Company, "settings/mapping")">@L["ap.openMapping"]</a>}
+                else {<span>@L["ap.askMapping"]</span>}
+            </Actions>
+        </Banner>
+    }
     <section class="box pad" style="flex:none">
         <div class="fg" style="grid-template-columns:repeat(5,minmax(0,1fr))">
             <ComboField TValue="string?" @bind-Value="_m.Party" Options="_parties" Label="@L["ap.party"]" Required="true" Span="2" OnSelected="_ => PartyChanged()" />
@@ -83,7 +93,7 @@
     private IReadOnlyList<ApArPartyOption> _partyOptions = [];
     private int? _terms;
     private DateOnly? _lastAutoDue;
-    private bool _saving, _postingReady = true;
+    private bool _saving, _postingReady = true, _keyMissing;
     private IReadOnlyList<string>? _extra;
     private ProblemValidator? _problems;
     private ErrorSummary? _summary;
@@ -125,6 +135,7 @@
         if (!CanSave) return;
         _saving = true;
         _extra = null;
+        _keyMissing = false;
         try
         {
             string? partyId = null, customerId = null;
@@ -135,6 +146,10 @@
             Toasts.Success(L.F("ap.saved", r.Document.Number, Fmt.Money(r.Document.Total)));
             Lookups.Invalidate();
             Nav.NavigateTo(NavModel.Href(Company, $"{Route}/{r.Document.Id}"));
+        }
+        catch (ApiException e) when (e.Problem.Code == DirectService.Transportation.Contracts.Errors.ErrorCodes.ApArDeductionKeyMissing)
+        {
+            _keyMissing = true;
         }
         catch (ApiException e)
         {

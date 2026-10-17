@@ -175,7 +175,8 @@ Database changes allowed for these items only → **database design revision 6**
 
 ## Owner decisions of 17 Oct 2026 on part A — progress (one commit each)
 - **(4) + (6) Sign-in — done.** An email entered by an administrator gets a verification link (`UserAdminService.CreateWithPasswordAsync` → `AccountService.SendVerificationAsync`); `RequestPasswordResetAsync` sends nothing to an unverified email (platform staff excepted); the administrator's "send reset link" is refused with `user.emailNotVerified` (set a new password instead); sign-in does not wait for the verification. `AuthService.SecondStepAsync`: users with the preset Owner or Administrator role get `TwoFactorOffer` at every sign-in until 2FA is set up (skip allowed); others as before. Tests: `UserNameSignInTests` (+1, admin test skips the offer), `TwoFactorPolicyTests` (+1, Owner offer repeats).
-- (3) deduction key message, (1) returns reverse deductions, (2) supplier statement — next.
+- **(3) "Supplier deductions" not mapped — done.** The key stays optional; the bill form turns `apar.deductionKeyMissing` into an error banner with "Open account mapping" (settings.manage) or "ask a settings administrator". Adding it to the accounting reminders is listed under Open issues (owner: "later"). Test: `UI.Tests/AccountingPageTests` (+1).
+- (1) returns reverse deductions, (2) supplier statement — next.
 
 ## Resume here (for a new session)
 1. Read this file, then `docs/inputs/Build_Prompt.md` (process), `docs/step2/02_Owner_Decisions_Step2.md` (working mode), `docs/step2/01_Architecture_and_Build_Plan.md` §10 (build order) and `docs/step4/B1_Foundation_and_Identity.md` (patterns in use).
@@ -445,6 +446,7 @@ See `docs/design/Database_Design_Revision6.md` ("Changes in revision 6"). So far
 `tools/design/parse_design.py` (design → model), `checks.py` (check constraints), `gen_efcore.py` (one-off source generation — do not re-run over hand-edited files), `verify_database.py` + `catalog.sql` (verification report), `selftest_verify.py`.
 
 ## Open issues
+- Owner decision 17 Oct 2026 (3), for later: add an accounting reminder (setup checklist / accounting status banner) for an unmapped "Supplier deductions" key once the company records deductions.
 - Owner feedback 13 Oct 2026: the full E2E suite was not run (owner's testing rule); the OpenAPI document was exported and linted again and the import flow spec passed on its own (third round). Monthly rates and opening balances have no importer of their own (DT-172): an importer for monthly rates would be new work if wanted. The local appsettings.json still holds a real `UrlTokens:Key` (never committed).
 - The visual check cannot see placeholder text or field values being cut off (reviewed by eye). (The built-in ownership type shown in English on Arabic screens was fixed on 13 Oct 2026, DT-179.)
 - The owner's `src/DirectService.Transportation.Web/appsettings.json` has a real `UrlTokens:Key` (uncommitted local change) — move it to user secrets (`docs/step9/Setup_and_Run.md` §4) and restore the empty value; never commit it.

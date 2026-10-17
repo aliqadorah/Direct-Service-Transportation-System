@@ -180,6 +180,23 @@ public sealed class AccountingPageTests : PageTestBase
         Assert.DoesNotContain(L["ap.lineDeduction"].Replace(" {0}", "", StringComparison.Ordinal), receivable.Markup);
     }
 
+    /// <summary>Owner decision 17 Oct 2026: "Supplier deductions" not mapped → a clear message with a link to Account mapping, not a generic error.</summary>
+    [Fact]
+    public void Unmapped_supplier_deductions_key_shows_a_message_with_a_link_to_account_mapping()
+    {
+        Respond("apar/parties/options", new[] { new ApArPartyOption("Supplier", "s1", "المناصير", null, 30) });
+        Respond("apar/bills", _ => new System.Net.Http.HttpResponseMessage((System.Net.HttpStatusCode)422)
+        {
+            Content = new System.Net.Http.StringContent("{\"status\":422,\"code\":\"apar.deductionKeyMissing\",\"detail\":\"x\"}", System.Text.Encoding.UTF8, "application/problem+json"),
+        });
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/accounting/payables/new");
+        var cut = Render<ApArDocumentForm>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(L["ap.deduction"], cut.Markup));
+        cut.FindAll("button").Single(b => b.TextContent.Contains(L["ap.savePost"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(L["ap.deductionKeyMissing"], cut.Markup));
+        Assert.NotNull(cut.Find($"a[href='/c/{Company}/settings/mapping']"));
+    }
+
     [Fact]
     public void Trial_balance_highlights_a_mismatch()
     {
