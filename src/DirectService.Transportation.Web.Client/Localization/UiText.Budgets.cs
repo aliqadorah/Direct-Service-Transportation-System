@@ -1,6 +1,6 @@
 namespace DirectService.Transportation.Web.Client.Localization;
 
-/// <summary>Text of the accounting additions of revision 6 part B (owner change request 15 Oct 2026): budgets and Budget vs Actual.</summary>
+/// <summary>Text of the accounting additions of revision 6 part B (owner change request 15 Oct 2026): budgets, Budget vs Actual, journal templates.</summary>
 public static partial class UiText
 {
     private static Dictionary<string, (string Ar, string En)> Budgets() => new(StringComparer.Ordinal)
@@ -86,6 +86,34 @@ public static partial class UiText
         ["bud.expenseVar"] = ("انحراف المصروفات", "Expense variance"),
         ["bud.netVar"] = ("انحراف صافي النتيجة", "Net result variance"),
         ["bud.varianceHelp"] = ("الانحراف = الفعلي − الموازنة. الإيرادات فوق الموازنة والمصروفات دونها ملائمة (أخضر)، والعكس غير ملائم (أحمر).", "Variance = Actual − Budget. Revenue above budget and expenses below budget are favourable (green); the opposite is unfavourable (red)."),
+        // ---- journal entry templates
+        ["nav.journalTemplates"] = ("نماذج القيود", "Journal templates"),
+        ["tpl.use"] = ("استخدام نموذج", "Use template"),
+        ["tpl.useShort"] = ("استخدام", "Use"),
+        ["tpl.useOne"] = ("استخدام النموذج {0}", "Use template {0}"),
+        ["tpl.useHelp"] = ("يملأ النموذج البيان والمرجع والأسطر في القيد الحالي (يبقى التاريخ). عدّل ما تريد ثم احفظه مسودة أو رحّله كالعادة.", "The template fills the description, Reference and lines of this entry (the date stays). Change what you need, then save it as a draft or post it as usual."),
+        ["tpl.used"] = ("مُلئ القيد من النموذج «{0}».", "The entry was filled from template “{0}”."),
+        ["tpl.saveAs"] = ("حفظ كنموذج", "Save as template"),
+        ["tpl.name"] = ("اسم النموذج", "Template name"),
+        ["tpl.withAmounts"] = ("حفظ المبالغ أيضاً", "Save the amounts too"),
+        ["tpl.saveHelp"] = ("يحفظ البيان والمرجع والأسطر (الحسابات ومراكز التكلفة وبيان كل سطر). لا يُرحَّل شيء.", "Saves the description, Reference and lines (accounts, cost centres, line descriptions). Nothing is posted."),
+        ["tpl.saved"] = ("حُفظ النموذج «{0}».", "Template “{0}” saved."),
+        ["tpl.none"] = ("لا توجد نماذج قيود", "No journal templates yet"),
+        ["tpl.noneText"] = ("في شاشة «قيد جديد» استخدم «حفظ كنموذج» لحفظ قيد يتكرر.", "On the New journal entry screen, use “Save as template” to keep an entry you make often."),
+        ["tpl.amounts"] = ("مبالغ محفوظة", "Amounts saved"),
+        ["tpl.updated"] = ("آخر تعديل", "Last changed"),
+        ["tpl.actions"] = ("إجراءات", "Actions"),
+        ["tpl.rename"] = ("إعادة تسمية", "Rename"),
+        ["tpl.renameOne"] = ("إعادة تسمية {0}", "Rename {0}"),
+        ["tpl.renamed"] = ("أُعيدت تسمية النموذج.", "Template renamed."),
+        ["tpl.deleteText"] = ("يُحذف النموذج فقط؛ القيود التي أُنشئت منه لا تتغير.", "Only the template is deleted; entries made from it do not change."),
+        ["tpl.deleted"] = ("حُذف النموذج.", "Template deleted."),
+        ["tpl.formHelp"] = ("النموذج لا يُرحّل شيئاً. «استخدام» يفتح قيداً جديداً مملوءاً منه تراجعه ثم تحفظه أو ترحّله.", "A template never posts anything. “Use” opens a new entry filled from it, which you check and then save or post."),
+        ["tpl.lineDescription"] = ("بيان السطر", "Line description"),
+        ["tpl.amountsOptional"] = ("المبالغ اختيارية في النموذج.", "Amounts are optional in a template."),
+        ["tpl.saveFirst"] = ("احفظ التعديلات أولاً", "Save the changes first"),
+        ["tpl.updatedOk"] = ("حُفظ النموذج.", "Template saved."),
+
         ["bud.noApprovedText"] = ("التقرير يقارن الموازنة المعتمدة للسنة بالفعلي المرحّل.", "The report compares the year's approved budget with the posted actuals."),
     };
 }

@@ -7,6 +7,8 @@
   are shown while typing; the API refuses unbalanced entries, closed periods and missing parties. Editing a posted manual entry reverses it
   and posts the corrected entry. Revision 6: Reference / المرجع (free text, 100) next to the description; "Save as draft" keeps the entry without
   a JV number and without posting — a draft opens here again to be edited, deleted or posted (number and period lock apply at posting).
+  Revision 6 part B: "Use template" fills the description, Reference and lines from a journal template (also ?template=… from the templates
+  list); "Save as template" keeps them (amounts optional) under a name. The entry is then saved or posted as usual.
 *@
 @inject Api Api
 @inject Loc L
@@ -22,6 +24,11 @@
     <ChildContent>
         <PageHeader Title="@(_existing is not null ? L.F("je.edit", _existing.Number) : _draft is not null ? L["je.draftTitle"] : L["nav.newJournal"])" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
             <Actions>
+                @if (_existing is null)
+                {
+                    <Btn Icon="layers" Text="@L["tpl.use"]" Disabled="!CanSave" OnClick="OpenTemplates" />
+                    <Btn Icon="copy" Text="@L["tpl.saveAs"]" Disabled="!CanSave" OnClick="AskTemplateName" />
+                }
                 @if (_draft is not null) {<Btn Danger="true" Ghost="true" Icon="trash" Text="@L["je.deleteDraft"]" Disabled="!CanSave" OnClick="() => _deleting = true" />}
                 @if (_existing is null) {<Btn Icon="save" Text="@L["je.saveDraft"]" Busy="_savingDraft" Disabled="!CanSave" OnClick="SaveDraft" />}
                 <Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" />
@@ -97,6 +104,42 @@
         </EditForm>
     </ChildContent>
 </StateView>
+<Modal @bind-Open="_picking" Title="@L["tpl.use"]" Wide="true">
+    <ChildContent>
+        <p class="help">@L["tpl.useHelp"]</p>
+        @if (_templates is null) {<Skeleton />}
+        else if (_templates.Count == 0) {<EmptyState Icon="layers" Title="@L["tpl.none"]" Text="@L["tpl.noneText"]" />}
+        else
+        {
+            <ListFrame Label="@L["nav.journalTemplates"]">
+                <DataGrid TItem="JournalTemplateSummary" Items="_templates" Key="t => t.Id" Caption="@L["nav.journalTemplates"]" OnRowClick="UseTemplate">
+                    <Columns>
+                        <GridColumn TItem="JournalTemplateSummary" Title="@L["md.name"]" Value="t => t.Name" />
+                        <GridColumn TItem="JournalTemplateSummary" Title="@L["je.description"]" Value="t => t.Description" />
+                        <GridColumn TItem="JournalTemplateSummary" Title="@L["bud.lines"]" Value="t => Fmt.Count(t.Lines)" Numeric="true" />
+                    </Columns>
+                </DataGrid>
+            </ListFrame>
+        }
+        @if (_templateError is not null) {<Banner Tone="Tone.Err" Text="@_templateError" />}
+    </ChildContent>
+    <Footer><Btn Text="@L["ui.cancel"]" OnClick="() => _picking = false" /></Footer>
+</Modal>
+<Modal @bind-Open="_naming" Title="@L["tpl.saveAs"]" Busy="_savingTemplate">
+    <ChildContent>
+        <EditForm EditContext="_tplCtx" OnValidSubmit="SaveTemplate" id="tpl-save" class="stack">
+            <ProblemValidator @ref="_tplProblems" />
+            <ErrorSummary Extra="_tplExtra" />
+            <TextField @bind-Value="_tpl.Name" Label="@L["tpl.name"]" Required="true" MaxLength="100" />
+            <CheckField @bind-Value="_tpl.WithAmounts" Label="@L["tpl.withAmounts"]" />
+            <p class="help">@L["tpl.saveHelp"]</p>
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _naming = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_savingTemplate" form="tpl-save" />
+    </Footer>
+</Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L["je.deleteDraft"]" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["je.deleteDraftText"]" Busy="_saving" Error="@_deleteError" OnConfirm="_ => DeleteDraft()" />
 
 @code {
@@ -118,6 +161,15 @@
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string? Id { get; set; }
     [Parameter] public string? DraftId { get; set; }
+    [SupplyParameterFromQuery(Name = "template")] public string? TemplateId { get; set; }
+
+    private bool _picking, _naming, _savingTemplate;
+    private IReadOnlyList<JournalTemplateSummary>? _templates;
+    private string? _templateError;
+    private TemplateModel _tpl = new();
+    private EditContext _tplCtx = new(new TemplateModel());
+    private ProblemValidator? _tplProblems;
+    private IReadOnlyList<string>? _tplExtra;
 
     private decimal Debit => _m.Lines.Sum(l => l.Debit ?? 0);
     private decimal Credit => _m.Lines.Sum(l => l.Credit ?? 0);
@@ -162,6 +214,7 @@
                 try { await Money.EnsureAsync(); } catch (ApiException) { }
                 _m.EntryDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today);
                 _m.Lines = [new LineModel(), new LineModel()];
+                if (TemplateId is not null) Fill(await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(TemplateId)}")));
             }
             _state = LoadState.Ready;
         }
@@ -286,6 +339,74 @@
             if (_summary is not null) await _summary.FocusAsync();
         }
         finally { _saving = false; }
+    }
+
+    // ------------------------------------------------------------ templates (revision 6 part B)
+
+    private async Task OpenTemplates()
+    {
+        _picking = true;
+        _templateError = null;
+        _templates = null;
+        try { _templates = await Api.GetAsync<IReadOnlyList<JournalTemplateSummary>>(Api.C("accounting/journal-templates")); }
+        catch (ApiException e) { _templates = []; _templateError = e.Problem.Detail; }
+    }
+
+    private async Task UseTemplate(JournalTemplateSummary t)
+    {
+        try
+        {
+            Fill(await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(t.Id)}")));
+            _picking = false;
+            Toasts.Success(L.F("tpl.used", t.Name));
+        }
+        catch (ApiException e) { _templateError = e.Problem.Detail; }
+    }
+
+    /// <summary>The template's description, Reference and lines replace those on the screen; the date stays.</summary>
+    private void Fill(JournalTemplateResponse t)
+    {
+        _m.Description = t.Description;
+        _m.Reference = t.Reference;
+        _m.Lines = t.Lines.Select(l => new LineModel
+        {
+            AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+        }).ToList();
+        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel());
+        _ctx = new EditContext(_m);
+    }
+
+    private void AskTemplateName()
+    {
+        _tpl = new TemplateModel { Name = _m.Description, WithAmounts = true };
+        _tplCtx = new EditContext(_tpl);
+        _tplExtra = null;
+        _naming = true;
+    }
+
+    private async Task SaveTemplate()
+    {
+        _savingTemplate = true;
+        _tplExtra = null;
+        try
+        {
+            var lines = _m.Lines.Where(l => l.AccountId is not null)
+                .Select(l => new JournalTemplateLineRequest(l.AccountId, _tpl.WithAmounts ? l.Debit ?? 0 : 0, _tpl.WithAmounts ? l.Credit ?? 0 : 0, l.CostCentreId,
+                    string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim())).ToList();
+            var t = await Api.PostAsync<JournalTemplateResponse>(Api.C("accounting/journal-templates"),
+                new JournalTemplateRequest(_tpl.Name?.Trim(), string.IsNullOrWhiteSpace(_m.Description) ? null : _m.Description.Trim(),
+                    string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim(), lines));
+            _naming = false;
+            Toasts.Success(L.F("tpl.saved", t.Name));
+        }
+        catch (ApiException e) { if (_tplProblems?.Show(e.Problem) is { } other) _tplExtra = [other]; }
+        finally { _savingTemplate = false; }
+    }
+
+    private sealed class TemplateModel
+    {
+        public string? Name { get; set; }
+        public bool WithAmounts { get; set; } = true;
     }
 
     private sealed class Model

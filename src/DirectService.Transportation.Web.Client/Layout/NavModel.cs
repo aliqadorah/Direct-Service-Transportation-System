@@ -45,6 +45,7 @@ public static class NavModel
             new("nav.journal", "accounting/journal", PermissionKeys.JeView, PermissionKeys.AcctView),
             new("nav.newJournal", "accounting/journal/new", PermissionKeys.AcctPost),
             new("nav.journalImport", "accounting/journal/import", PermissionKeys.AcctPost),
+            new("nav.journalTemplates", "accounting/journal-templates", PermissionKeys.AcctPost),   // revision 6 part B
             new("nav.automatic", "accounting/automatic", PermissionKeys.JeView),
             // Revision 6: the general ledger screen was removed (its address opens the account statement of several accounts).
             new("nav.trialBalance", "accounting/trial-balance", PermissionKeys.AcctView),

@@ -1,0 +1,204 @@
+@page "/c/{Company}/accounting/journal-templates/{Id}"
+@*
+  A journal entry template (revision 6 part B): name, entry description, Reference and lines — account, debit, credit (amounts optional), cost
+  centre, line description. Save (also renames), Delete, "Use" (a new entry filled from the saved template), history. Record lock and
+  leave-page confirmation like the other accounting forms. acct.post.
+*@
+@using Md = DirectService.Transportation.Contracts.MasterData
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+@inject NavigationManager Nav
+
+<StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><NotFoundView /></Empty>
+    <ChildContent>
+        <PageHeader Title="@(_t?.Name ?? "")" Help="journal-templates" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journalTemplates"], NavModel.Href(Company, "accounting/journal-templates"))])">
+            <Actions>
+                <Btn Icon="history" Text="@L["ui.history"]" OnClick="ShowHistory" />
+                <Btn Danger="true" Ghost="true" Icon="trash" Text="@L["ml.delete"]" Disabled="!CanSave" OnClick="() => _deleting = true" />
+                <Btn Icon="right" Text="@L["tpl.useShort"]" Disabled="Dirty" Title="@(Dirty ? L["tpl.saveFirst"] : null)" OnClick="Use" />
+                <Btn Primary="true" Icon="save" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" />
+            </Actions>
+        </PageHeader>
+        @if (_t is not null) {<RecordLockGuard EntityType="ACC.JournalTemplate" Id="@_t.Id" OnState="h => _lockedBy = h" />}
+        <UnsavedGuard Dirty="Dirty" />
+        <Banner Tone="Tone.Info" Icon="info" Text="@L["tpl.formHelp"]" />
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary @ref="_summary" Extra="_extra" />
+            <section class="box pad" style="flex:none">
+                <div class="fg" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)">
+                    <TextField @bind-Value="_m.Name" Label="@L["tpl.name"]" Required="true" MaxLength="100" />
+                    <TextField @bind-Value="_m.Description" Label="@L["je.description"]" MaxLength="500" />
+                    <TextField @bind-Value="_m.Reference" Label="@L["je.reference"]" MaxLength="100" />
+                </div>
+            </section>
+            <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
+                <Actions><Btn Small="true" Icon="plus" Text="@L["je.addLine"]" OnClick="() => { _m.Lines.Add(new LineModel()); _structure = true; }" /></Actions>
+                <ChildContent>
+                    <div class="tbl-wrap fill">
+                        <table class="tbl">
+                            <caption class="sr-only">@L["je.lines"]</caption>
+                            <thead><tr>
+                                <th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.costCentre"]</th><th scope="col">@L["tpl.lineDescription"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>
+                            </tr></thead>
+                            <tbody>
+                                @for (var i = 0; i < _m.Lines.Count; i++)
+                                {
+                                    var line = _m.Lines[i];
+                                    var n = i + 1;
+                                    <tr @key="line">
+                                        <td style="min-width:260px"><ComboField TValue="string?" @bind-Value="line.AccountId" @bind-Value:after="() => _structure = true" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" /></td>
+                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
+                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
+                                        <td style="width:180px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" @bind-Value:after="() => _structure = true" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
+                                        <td style="min-width:200px"><TextField @bind-Value="line.Note" MaxLength="500" aria-label="@L.F("je.lineNote", n)" /></td>
+                                        <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 1" OnClick="() => { _m.Lines.Remove(line); _structure = true; }" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td>@L["ui.total"]</td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(_m.Lines.Sum(l => l.Debit ?? 0))</bdi></td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(_m.Lines.Sum(l => l.Credit ?? 0))</bdi></td>
+                                    <td colspan="3" class="muted">@L["tpl.amountsOptional"]</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </ChildContent>
+            </Box>
+        </EditForm>
+    </ChildContent>
+</StateView>
+<SidePanel @bind-Open="_historyOpen" Title="@L["ui.history"]">
+    @if (_history is null) {<Skeleton />} else {<RecordHistory Items="_history" />}
+</SidePanel>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _t?.Name ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["tpl.deleteText"]"
+               Busy="_saving" Error="@_deleteError" OnConfirm="_ => Delete()" />
+
+@code {
+    private JournalTemplateResponse? _t;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _lockedBy, _deleteError;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private bool _saving, _deleting, _historyOpen, _structure;
+    private IReadOnlyList<Option<string?>> _accounts = [];
+    private IReadOnlyList<Md.HistoryEntry>? _history;
+    private IReadOnlyList<string>? _extra;
+    private ProblemValidator? _problems;
+    private ErrorSummary? _summary;
+
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string Id { get; set; } = "";
+
+    private bool CanSave => !_saving && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
+    private bool Dirty => _structure || _ctx.IsModified();
+
+    protected override Task OnParametersSetAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            await Lookups.EnsureAsync();
+            _accounts = Lookups.AccountOptions();
+            Show(await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(Id)}")));
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Show(JournalTemplateResponse t)
+    {
+        _t = t;
+        _m = new Model
+        {
+            Name = t.Name, Description = t.Description, Reference = t.Reference,
+            Lines = t.Lines.Select(l => new LineModel
+            {
+                AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+            }).ToList(),
+        };
+        if (_m.Lines.Count == 0) _m.Lines.Add(new LineModel());
+        _ctx = new EditContext(_m);
+        _structure = false;
+        _history = null;
+    }
+
+    private async Task Save()
+    {
+        if (_t is null || !CanSave) return;
+        _saving = true;
+        _extra = null;
+        try
+        {
+            var lines = _m.Lines.Where(l => l.AccountId is not null || l.Debit is not null || l.Credit is not null || !string.IsNullOrWhiteSpace(l.Note))
+                .Select(l => new JournalTemplateLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim())).ToList();
+            Show(await Api.PutAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_t.Id)}"),
+                new JournalTemplateRequest(_m.Name?.Trim(), _m.Description?.Trim(), _m.Reference?.Trim(), lines, _t.RowVersion)));
+            Toasts.Success(L["tpl.updatedOk"]);
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private void Use()
+    {
+        if (_t is not null) Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/new?template={Uri.EscapeDataString(_t.Id)}"));
+    }
+
+    private async Task Delete()
+    {
+        if (_t is null) return;
+        _saving = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_t.Id)}/delete"), new RowVersionRequest(_t.RowVersion));
+            _deleting = false;
+            _structure = false;
+            _ctx.MarkAsUnmodified();
+            Toasts.Success(L["tpl.deleted"]);
+            Nav.NavigateTo(NavModel.Href(Company, "accounting/journal-templates"));
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
+    private async Task ShowHistory()
+    {
+        _historyOpen = true;
+        if (_t is null) return;
+        try { _history = await Api.GetAsync<IReadOnlyList<Md.HistoryEntry>>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_t.Id)}/history")); }
+        catch (ApiException) { _history = []; }
+    }
+
+    private sealed class Model
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Reference { get; set; }
+        public List<LineModel> Lines { get; set; } = [];
+    }
+
+    private sealed class LineModel
+    {
+        public string? AccountId { get; set; }
+        public decimal? Debit { get; set; }
+        public decimal? Credit { get; set; }
+        public string? CostCentreId { get; set; }
+        public string? Note { get; set; }
+    }
+}

@@ -37,6 +37,7 @@ public static class ErrorCatalog
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
         [ErrorCodes.ApArDeductionNotAllowed] = ("الخصم متاح على أسطر فواتير الموردين فقط.", "A deduction is available on supplier-bill lines only."),
         [ErrorCodes.ApArDeductionKeyMissing] = ("اربط «خصومات الموردين» بحساب في ربط الحسابات قبل حفظ فاتورة فيها خصم.", "Map “Supplier deductions” to an account in the account mapping before saving a bill with a deduction."),
+        [ErrorCodes.TemplateNameTaken] = ("يوجد نموذج قيد باسم «{0}».", "A journal template named “{0}” already exists."),
         [ErrorCodes.BudgetDuplicateLine] = ("الحساب {0} مكرر في الموازنة لمركز التكلفة نفسه؛ اجمع المبلغين في سطر واحد.", "Account {0} appears twice in the budget for the same cost centre; put both amounts on one line."),
         [ErrorCodes.BudgetOverlap] = ("الحساب {0} جزء من الحساب {1} الموجود في الموازنة لمركز التكلفة نفسه؛ ضع المبلغ على أحدهما فقط.", "Account {0} is part of account {1}, which is also in the budget for the same cost centre; budget only one of them."),
         [ErrorCodes.BudgetAccountType] = ("الحساب {0} ليس حساب إيرادات أو مصروفات؛ الموازنة لحسابات الإيرادات والمصروفات فقط.", "Account {0} is not a revenue or expense account; budgets cover revenue and expense accounts only."),
@@ -299,6 +300,7 @@ public static class ErrorCodes
     public const string StatementNoAccounts = "statement.noAccounts";
     public const string ApArDeductionNotAllowed = "apar.deductionNotAllowed";
     public const string ApArDeductionKeyMissing = "apar.deductionKeyMissing";
+    public const string TemplateNameTaken = "template.nameTaken";
     public const string BudgetDuplicateLine = "budget.duplicateLine";
     public const string BudgetOverlap = "budget.overlap";
     public const string BudgetAccountType = "budget.accountType";

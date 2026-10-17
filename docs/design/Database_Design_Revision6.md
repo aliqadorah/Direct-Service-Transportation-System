@@ -124,3 +124,17 @@ New table `acc.BudgetLines` (company-scoped, audited, soft delete): one revenue 
 | CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_BudgetLines_DeletedAt_DeletedBy_DeleteReason` |
 
 Reference data: three permission keys in `core.Permissions` (group Accounting) — 23 `acc.budget.view`, 24 `acc.budget.manage`, 25 `acc.budget.approve`. Data step: existing preset roles receive the keys of their preset (Owner and Administrator all three, Accountant view + manage, Viewer view); custom roles are unchanged.
+
+## B2. Journal entry templates — migration `Rev6_JournalTemplates`
+New table `acc.JournalTemplates` (company-scoped, audited, soft delete): a journal entry template (نموذج قيد). "Use template" fills a new entry on the screen; a template never posts (no recurring posting in this version).
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Id | BIGINT IDENTITY | NOT NULL | — | PK `PK_JournalTemplates` |
+| PublicId | UNIQUEIDENTIFIER | NOT NULL | NEWID() | `UX_JournalTemplates_PublicId` |
+| TenantId / CompanyId | BIGINT | NOT NULL | — | FK to core.Tenants / core.Companies |
+| Name | NVARCHAR(100) | NOT NULL | — | `UX_JournalTemplates_CompanyId_Name` (filter `[IsDeleted] = 0`) |
+| Description | NVARCHAR(500) | NULL | — | the entry description it fills in |
+| Reference | NVARCHAR(100) | NULL | — | the entry Reference it fills in |
+| Lines | NVARCHAR(MAX) | NOT NULL | — | JSON array (account id, cost centre id, line description, debit, credit — amounts optional, 0 = none); `CK_JournalTemplates_Lines` ISJSON |
+| CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_JournalTemplates_DeletedAt_DeletedBy_DeleteReason` |

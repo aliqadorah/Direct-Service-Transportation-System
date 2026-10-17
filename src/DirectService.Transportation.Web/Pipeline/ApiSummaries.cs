@@ -142,6 +142,13 @@ internal static class ApiSummaries
         ["PUT /api/v1/companies/{company}/accounting/journal-drafts/{draft}"] = "Update a journal draft",
         ["POST /api/v1/companies/{company}/accounting/journal-drafts/{draft}/delete"] = "Delete a journal draft",
         ["POST /api/v1/companies/{company}/accounting/journal-drafts/{draft}/post"] = "Post a journal draft: full validation, period lock and JV number now",
+        // Journal entry templates (revision 6 part B)
+        ["GET /api/v1/companies/{company}/accounting/journal-templates/"] = "List the company's journal entry templates",
+        ["POST /api/v1/companies/{company}/accounting/journal-templates/"] = "Save a journal entry template: name, description, Reference, lines (accounts, cost centres, line descriptions, optional amounts)",
+        ["GET /api/v1/companies/{company}/accounting/journal-templates/{template}"] = "Get a journal entry template (to fill a new entry)",
+        ["GET /api/v1/companies/{company}/accounting/journal-templates/{template}/history"] = "History of a journal entry template",
+        ["PUT /api/v1/companies/{company}/accounting/journal-templates/{template}"] = "Edit or rename a journal entry template",
+        ["POST /api/v1/companies/{company}/accounting/journal-templates/{template}/delete"] = "Delete a journal entry template",
         // Budgets (revision 6 part B)
         ["GET /api/v1/companies/{company}/accounting/budgets/"] = "List the company's budgets (optionally of one year) with status and revenue / expense totals",
         ["POST /api/v1/companies/{company}/accounting/budgets/"] = "Create a draft budget of a year: empty, or copied from the previous year's actuals with an optional percentage",

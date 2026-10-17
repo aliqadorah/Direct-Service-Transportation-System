@@ -50,6 +50,7 @@ public static class AuditVocabulary
         ["ACC.CashBox"] = E("صندوق", "Cash box", "الصندوق", "cash box"),
         ["ACC.BankAccount"] = E("حساب بنكي", "Bank account", "الحساب البنكي", "bank account"),
         ["ACC.CostCentre"] = E("مركز تكلفة", "Cost centre", "مركز التكلفة", "cost centre"),
+        ["ACC.JournalTemplate"] = E("نموذج قيد", "Journal template", "نموذج القيد", "journal template"),
         ["ACC.Budget"] = E("موازنة", "Budget", "الموازنة", "budget"),
         ["ACC.BudgetLine"] = E("سطر موازنة", "Budget line", "سطر الموازنة", "the budget line"),
         ["ACC.Period"] = E("فترة محاسبية", "Accounting period", "الفترة", "period"),

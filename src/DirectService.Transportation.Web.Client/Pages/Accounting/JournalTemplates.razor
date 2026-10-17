@@ -1,0 +1,145 @@
+@page "/c/{Company}/accounting/journal-templates"
+@*
+  Journal entry templates (نماذج القيود; revision 6 part B, owner change request 15 Oct 2026): the company's templates with their description,
+  Reference and number of lines. "Use" opens a new journal entry filled from the template; "Edit" opens the template; "Rename" and "Delete" from
+  the row. Templates are saved from the new journal entry screen ("Save as template"); nothing is ever posted automatically. acct.post.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+@inject NavigationManager Nav
+
+<PageHeader Title="@L["nav.journalTemplates"]" Help="journal-templates" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journalTemplates"])])">
+    <Actions><Btn Primary="true" Icon="plus" Text="@L["nav.newJournal"]" OnClick="@(() => Nav.NavigateTo(NavModel.Href(Company, "accounting/journal/new")))" /></Actions>
+</PageHeader>
+<LiveRefresh EntityTypes="@(["ACC.JournalTemplate"])" OnChange="Load" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty><EmptyState Icon="layers" Title="@L["tpl.none"]" Text="@L["tpl.noneText"]" /></Empty>
+    <ChildContent>
+        <ListFrame Label="@L["nav.journalTemplates"]">
+            <DataGrid TItem="JournalTemplateSummary" Items="_items" Key="t => t.Id" Caption="@L["nav.journalTemplates"]" OnRowClick="Edit">
+                <Columns>
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["md.name"]" Value="t => t.Name" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["je.description"]" Value="t => t.Description" Wrap="true" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["je.reference"]" Value="t => t.Reference" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["bud.lines"]" Value="t => Fmt.Count(t.Lines)" Numeric="true" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["tpl.amounts"]" Value="@(t => L[t.HasAmounts ? "ui.yes" : "ui.no"])" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["tpl.updated"]" Value="@(t => $"{Fmt.Date(t.UpdatedAt.ToLocalTime(), Shell.DateFormat)}{(t.UpdatedByName is null ? "" : " · " + t.UpdatedByName)}")" />
+                    <GridColumn TItem="JournalTemplateSummary" Title="@L["tpl.actions"]">
+                        <Template>
+                            <span class="row" style="gap:4px;flex-wrap:nowrap" @onclick:stopPropagation="true">
+                                <Btn Small="true" Icon="right" Text="@L["tpl.useShort"]" AriaLabel="@L.F("tpl.useOne", context.Name)" OnClick="() => Use(context)" />
+                                <Btn Small="true" Ghost="true" Icon="edit" AriaLabel="@L.F("tpl.renameOne", context.Name)" Title="@L["tpl.rename"]" OnClick="() => AskRename(context)" />
+                                <Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("ml.deleteTitle", context.Name)" Title="@L["ml.delete"]" OnClick="() => AskDelete(context)" />
+                            </span>
+                        </Template>
+                    </GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_renaming" Title="@L["tpl.rename"]" Busy="_busy">
+    <ChildContent>
+        <EditForm EditContext="_ctx" OnValidSubmit="Rename" id="tpl-rename" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <TextField @bind-Value="_m.Name" Label="@L["tpl.name"]" Required="true" MaxLength="100" />
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _renaming = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="tpl-rename" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target?.Name ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["tpl.deleteText"]"
+               Busy="_busy" Error="@_error" OnConfirm="_ => Delete()" />
+
+@code {
+    private IReadOnlyList<JournalTemplateSummary> _items = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _error;
+    private bool _renaming, _deleting, _busy;
+    private JournalTemplateSummary? _target;
+    private NameModel _m = new();
+    private EditContext _ctx = new(new NameModel());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _items = await Api.GetAsync<IReadOnlyList<JournalTemplateSummary>>(Api.C("accounting/journal-templates"));
+            _state = _items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Use(JournalTemplateSummary t) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/new?template={Uri.EscapeDataString(t.Id)}"));
+
+    private void Edit(JournalTemplateSummary t) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal-templates/{t.Id}"));
+
+    private void AskRename(JournalTemplateSummary t)
+    {
+        _target = t;
+        _m = new NameModel { Name = t.Name };
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _renaming = true;
+    }
+
+    private void AskDelete(JournalTemplateSummary t)
+    {
+        _target = t;
+        _error = null;
+        _deleting = true;
+    }
+
+    /// <summary>Rename = save the template with the new name and its other values unchanged.</summary>
+    private async Task Rename()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var t = await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_target.Id)}"));
+            await Api.PutAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(t.Id)}"),
+                new JournalTemplateRequest(_m.Name?.Trim(), t.Description, t.Reference,
+                    t.Lines.Select(l => new JournalTemplateLineRequest(l.Account?.Id, l.Debit, l.Credit, l.CostCentre?.Id, l.Note)).ToList(), t.RowVersion));
+            _renaming = false;
+            Toasts.Success(L["tpl.renamed"]);
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete()
+    {
+        if (_target is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_target.Id)}/delete"), new RowVersionRequest(_target.RowVersion));
+            _deleting = false;
+            Toasts.Success(L["tpl.deleted"]);
+            await Load();
+        }
+        catch (ApiException e) { _error = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class NameModel
+    {
+        public string? Name { get; set; }
+    }
+}

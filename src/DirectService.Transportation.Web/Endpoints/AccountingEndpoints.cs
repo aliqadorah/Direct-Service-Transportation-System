@@ -28,6 +28,7 @@ internal static class AccountingEndpoints
         MapPeriods(acc.MapGroup("/periods").WithTags("Periods"));
         MapJournal(acc.MapGroup("/journal-entries").WithTags("Journal"));
         MapJournalDrafts(acc.MapGroup("/journal-drafts").WithTags("Journal"));
+        MapJournalTemplates(acc.MapGroup("/journal-templates").WithTags("Journal"));
         MapLedger(company.MapGroup("/ledger").WithTags("Ledger integration"));
     }
 
@@ -213,6 +214,26 @@ internal static class AccountingEndpoints
         g.MapPost("/{draft}/post", async (string draft, RowVersionRequest r, JournalDraftService drafts, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetByIdAsync(await drafts.PostAsync(draft, r.RowVersion, ct).ConfigureAwait(false), ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.AcctPost);
+    }
+
+    /// <summary>Revision 6 part B: journal entry templates — saved from and used on the new entry screen; list, edit (rename), delete. acct.post.</summary>
+    private static void MapJournalTemplates(RouteGroupBuilder g)
+    {
+        g.MapGet("/", async (JournalTemplateService svc, CancellationToken ct) => TypedResults.Ok(await svc.ListAsync(ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.AcctPost);
+        g.MapPost("/", async (JournalTemplateRequest r, JournalTemplateService svc, CancellationToken ct) => TypedResults.Ok(await svc.CreateAsync(r, ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.AcctPost);
+        g.MapGet("/{template}", async (string template, JournalTemplateService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetAsync(template, ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.AcctPost);
+        g.MapGet("/{template}/history", async (string template, JournalTemplateService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.HistoryAsync(template, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+        g.MapPut("/{template}", async (string template, JournalTemplateRequest r, JournalTemplateService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.UpdateAsync(template, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+        g.MapPost("/{template}/delete", async (string template, RowVersionRequest r, JournalTemplateService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(template, r.RowVersion, ct).ConfigureAwait(false);
+            return TypedResults.NoContent();
+        }).RequirePermission(PermissionKeys.AcctPost);
     }
 
     private static void MapLedger(RouteGroupBuilder g)

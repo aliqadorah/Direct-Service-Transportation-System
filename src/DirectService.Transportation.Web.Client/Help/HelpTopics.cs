@@ -568,5 +568,35 @@ public static class HelpTopics
                     "An approved budget cannot be deleted or changed: return it to draft first.",
                 ]),
             [new("accounting/budgets", "nav.budgets"), new("accounting/budget-vs-actual", "nav.budgetVsActual")]),
+        new("journal-templates", "Rev. 6",
+            new("نماذج القيود",
+                "حفظ قيد يتكرر كنموذج (البيان والمرجع والحسابات ومراكز التكلفة وبيان الأسطر والمبالغ اختيارياً)، واستخدامه لملء قيد جديد.",
+                "صلاحية «ترحيل القيود» (المحاسب والمسؤول والمالك).",
+                [
+                    "المحاسبة ← قيد جديد: أدخل البيان والمرجع والأسطر، ثم «حفظ كنموذج». اكتب اسم النموذج واختر «حفظ المبالغ أيضاً» أو أزل الاختيار، ثم «حفظ».",
+                    "لاستخدامه: في «قيد جديد» اختر «استخدام نموذج» ثم النموذج؛ أو من المحاسبة ← نماذج القيود اختر «استخدام» في سطره.",
+                    "يملأ النموذج البيان والمرجع والأسطر ويبقى التاريخ. عدّل ما تريد (أضف الأطراف لحسابات الرقابة والمبالغ) ثم «حفظ كمسودة» أو «ترحيل» كالعادة.",
+                    "المحاسبة ← نماذج القيود: «إعادة تسمية» أو «حذف» من سطر النموذج، أو افتحه لتعديل البيان والمرجع والأسطر ثم «حفظ».",
+                ],
+                [
+                    "اسم النموذج مستخدم: اختر اسماً آخر (الاسم فريد في الشركة).",
+                    "النموذج لا يرحّل شيئاً ولا يتكرر تلقائياً؛ كل قيد يُرحَّل يدوياً وتنطبق عليه قواعد الترحيل كلها (التوازن، الفترة، الأطراف).",
+                    "حساب أُوقف بعد حفظ النموذج: اختر حساباً آخر في القيد قبل ترحيله.",
+                ]),
+            new("Journal templates",
+                "Keeping an entry you make often as a template (description, Reference, accounts, cost centres, line descriptions, optionally the amounts) and using it to fill a new entry.",
+                "Users who may post journal entries (accountants, administrators, owners).",
+                [
+                    "Accounting → New journal entry: enter the description, Reference and lines, then “Save as template”. Type the template name, tick or clear “Save the amounts too”, then “Save”.",
+                    "To use it: on New journal entry choose “Use template”, then the template; or in Accounting → Journal templates choose “Use” on its row.",
+                    "The template fills the description, Reference and lines; the date stays. Change what you need (parties of control accounts, amounts), then “Save as draft” or “Post” as usual.",
+                    "Accounting → Journal templates: “Rename” or “Delete” on the template's row, or open it to change the description, Reference and lines, then “Save”.",
+                ],
+                [
+                    "The template name is taken: choose another name (names are unique in the company).",
+                    "A template never posts and never repeats on its own; every entry is posted by hand and every posting rule applies (balance, period, parties).",
+                    "An account deactivated after the template was saved: choose another account in the entry before posting.",
+                ]),
+            [new("accounting/journal-templates", "nav.journalTemplates"), new("accounting/journal/new", "nav.newJournal")]),
     ];
 }

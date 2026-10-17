@@ -19,7 +19,7 @@
         <PageHeader Title="@b.Name" Help="budget" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.budgets"], NavModel.Href(Company, "accounting/budgets")), new Crumb(b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture))])">
             <Badges><StatusTag Status="@(Approved ? "approved" : "draft")" /></Badges>
             <Actions>
-                <Btn Icon="clock" Text="@L["ui.history"]" OnClick="ShowHistory" />
+                <Btn Icon="history" Text="@L["ui.history"]" OnClick="ShowHistory" />
                 @if (Approved) {<Btn Icon="chart" Text="@L["nav.budgetVsActual"]" OnClick="@(() => Nav.NavigateTo(NavModel.Href(Company, $"accounting/budget-vs-actual?year={b.FiscalYear}")))" />}
                 @if (Editable)
                 {
