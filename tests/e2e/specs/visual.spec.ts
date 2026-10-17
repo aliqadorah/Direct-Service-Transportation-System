@@ -78,7 +78,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     "", "setup", "profile",
     "trips", "trips/list", "trips/new", "trips/import", "trips/shortage", `trips/${ids.trip}`,
     "invoices", "invoices/new", "invoices/manual", `invoices/${ids.invoice}`, "credit-notes", `credit-notes/new?invoice=${ids.invoice}`, "e-invoicing",
-    "receipts", "receipts/new", ids.receipt ? `receipts/${ids.receipt}` : null,
+    "receipts", "receipts/new", `receipts/new?customer=${w.customer}&invoice=${ids.invoice}`, ids.receipt ? `receipts/${ids.receipt}` : null,
     "driver-accounts", `driver-accounts/${w.driver}`, `driver-accounts/${w.driver}/advance`, `driver-accounts/${w.driver}/settle`,
     "driver-accounts/advances", "driver-accounts/advances/new", ids.advance ? `driver-accounts/advances/${ids.advance}` : null, "driver-accounts/settlements",
     "partner-accounts", "partner-accounts/payments", "partner-accounts/payments/new",

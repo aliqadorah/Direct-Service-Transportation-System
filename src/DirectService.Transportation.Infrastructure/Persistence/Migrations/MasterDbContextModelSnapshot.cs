@@ -9832,6 +9832,120 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.ReceiptAllocation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Amount")
+                        .HasColumnOrder(6);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(7)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_TRN_ReceiptAllocations_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(8);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(14);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(12);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(13);
+
+                    b.Property<long>("InvoiceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("InvoiceId")
+                        .HasColumnOrder(5);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(11)
+                        .HasDefaultValueSql("0", "DF_TRN_ReceiptAllocations_IsDeleted");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_TRN_ReceiptAllocations_PublicId");
+
+                    b.Property<long>("ReceiptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ReceiptId")
+                        .HasColumnOrder(4);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(15);
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(9);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(10);
+
+                    b.HasKey("Id")
+                        .HasName("PK_TRN_ReceiptAllocations");
+
+                    b.HasIndex(new[] { "InvoiceId" }, "IX_TRN_ReceiptAllocations_InvoiceId");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_TRN_ReceiptAllocations_PublicId")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "ReceiptId", "InvoiceId" }, "UX_TRN_ReceiptAllocations_ReceiptId_InvoiceId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("TRN_ReceiptAllocations", "trn", t =>
+                        {
+                            t.HasCheckConstraint("CK_TRN_ReceiptAllocations_Amount", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_TRN_ReceiptAllocations_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Settlement", b =>
                 {
                     b.Property<long>("Id")
@@ -13672,6 +13786,59 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.ReceiptAllocation", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_TRN_Invoices_InvoiceId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Receipt", "Receipt")
+                        .WithMany("Allocations")
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_TRN_Receipts_ReceiptId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_ReceiptAllocations_Users_UpdatedBy");
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Receipt");
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Settlement", b =>
                 {
                     b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
@@ -14058,6 +14225,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Invoice", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Receipt", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Settlement", b =>

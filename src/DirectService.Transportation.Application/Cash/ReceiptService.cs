@@ -17,8 +17,8 @@ using Microsoft.EntityFrameworkCore;
 namespace DirectService.Transportation.Application.Cash;
 
 /// <summary>
-/// Customer receipts (FR-067 … FR-071, 9.9): against one of the customer's open invoices (≤ its remaining balance, which it reduces and
-/// whose status it updates) or on account; numbered from the receipt sequence; entry Dr cash/bank, Cr trade receivables with the
+/// Customer receipts (FR-067 … FR-071, 9.9): applied to one or several of the customer's open invoices (revision 6 — each allocation ≤ that
+/// invoice's remaining balance, which it reduces and whose status it updates; together ≤ the receipt amount, the rest on account) or on account; numbered from the receipt sequence; entry Dr cash/bank, Cr trade receivables with the
 /// customer; void with reason (reversal, invoice balance restored, number kept); list with filters, totals and export.
 /// </summary>
 public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
@@ -38,22 +38,32 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         var (_, decimals) = await cash.CurrencyAsync(ct).ConfigureAwait(false);
         var amount = CashSupport.Amount(r.Amount, decimals);
         var date = await cash.DateAsync(r.ReceiptDate, "receiptDate", ct).ConfigureAwait(false);
+        // Revision 6: allocations to one or more invoices; "InvoiceId" alone = one invoice for the whole amount (as before).
+        var requested = r.Allocations is { Count: > 0 } list ? list.Select((a, i) => (Field: $"allocations[{i}]", a.InvoiceId, a.Amount)).ToList()
+            : string.IsNullOrWhiteSpace(r.InvoiceId) ? [] : [(Field: "invoiceId", r.InvoiceId, Amount: (decimal?)amount)];
+        if (requested.Count > 200) throw Fail.Field("allocations", ErrorCodes.ValidationRange, "allocations");
         // On account: an active customer (7.4.1); against an invoice an archived customer can still pay it (DT-97).
-        var customer = string.IsNullOrWhiteSpace(r.InvoiceId)
+        var customer = requested.Count == 0
             ? await support.ChooseAsync<Customer>("customerId", r.CustomerId, null, c => c.Name, ct).ConfigureAwait(false)
             : await cash.PartyAsync<Customer>("customerId", r.CustomerId, ct).ConfigureAwait(false);
-        Invoice? inv = null;
-        if (!string.IsNullOrWhiteSpace(r.InvoiceId))
+        var allocations = new List<(Invoice Invoice, decimal Amount, string Field)>();
+        foreach (var (field, invoiceToken, allocated) in requested)
         {
-            var pid = support.Decode<Invoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
-            inv = await db.Set<Invoice>().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
+            var invoiceField = field == "invoiceId" ? field : field + ".invoiceId";
+            var pid = support.Decode<Invoice>(invoiceToken) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, invoiceField);
+            var inv = await db.Set<Invoice>().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, invoiceField);
+            if (allocations.Any(a => a.Invoice.Id == inv.Id)) throw Fail.RuleOn(invoiceField, ErrorCodes.ReceiptAllocationDuplicate, inv.Number);
+            var share = CashSupport.Amount(allocated, decimals, field == "invoiceId" ? "amount" : field + ".amount");
             await locks.EnsureNotLockedByOthersAsync(InvoiceService.EntityType, inv.Id, ct).ConfigureAwait(false);
+            allocations.Add((inv, share, field));
         }
+        var allocatedTotal = allocations.Sum(a => a.Amount);
+        if (allocatedTotal > amount) throw Fail.RuleOn("allocations", ErrorCodes.ReceiptAllocationsExceedAmount, Money.Format(allocatedTotal), Money.Format(amount));
         var money = await cash.ChooseAsync(r.PaymentMethod, r.CashBoxId, r.BankAccountId, r.Reference, ct).ConfigureAwait(false);
 
         var receipt = new Receipt
         {
-            CustomerId = customer.Id, InvoiceId = inv?.Id, ReceiptDate = date, Amount = amount, PaymentMethod = money.Method, CashBoxId = money.CashBoxId,
+            CustomerId = customer.Id, InvoiceId = allocations.Count == 1 ? allocations[0].Invoice.Id : null, ReceiptDate = date, Amount = amount, PaymentMethod = money.Method, CashBoxId = money.CashBoxId,
             BankAccountId = money.BankAccountId, Reference = money.Reference, AttachmentsCount = r.AttachmentsCount ?? 0, Notes = notes, Status = CashCodes.Active,
         };
         if (clientId is Guid id) receipt.PublicId = id;
@@ -66,19 +76,22 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 // The receipt number serialises receipts of the company; the invoice is read again under it.
                 receipt.Number = await numbering.NextAsync(Configuration.DocumentTypes.Receipt, c).ConfigureAwait(false);
-                if (inv is not null)
+                foreach (var (inv, share, field) in allocations)
                 {
                     await db.Set<Invoice>().Entry(inv).ReloadAsync(c).ConfigureAwait(false);
+                    var invoiceField = field == "invoiceId" ? field : field + ".invoiceId";
                     if (inv.CustomerId != customer.Id || inv.Status != InvoiceCodes.Approved || inv.RemainingAmount <= 0)
-                        throw Fail.RuleOn("invoiceId", ErrorCodes.ReceiptInvoiceNotOpen, inv.Number);
-                    if (amount > inv.RemainingAmount) throw Fail.RuleOn("amount", ErrorCodes.ReceiptExceedsRemaining, Money.Format(amount), Money.Format(inv.RemainingAmount));
-                    inv.PaidAmount += amount;
+                        throw Fail.RuleOn(invoiceField, ErrorCodes.ReceiptInvoiceNotOpen, inv.Number);
+                    if (share > inv.RemainingAmount)
+                        throw Fail.RuleOn(field == "invoiceId" ? "amount" : field + ".amount", ErrorCodes.ReceiptExceedsRemaining, Money.Format(share), Money.Format(inv.RemainingAmount));
+                    inv.PaidAmount += share;
                     InvoiceService.Rebalance(inv);
                     changes.SetAction(inv, "Receipt", receipt.Number);
+                    receipt.Allocations.Add(new ReceiptAllocation { InvoiceId = inv.Id, Amount = share });
                 }
                 db.Set<Receipt>().Add(receipt);
                 if (await support.SaveCreateAsync<Receipt>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
-                var entry = await posting.PostOrPendAsync(BuildEntry(receipt, money.AccountId, inv?.Number), c).ConfigureAwait(false);
+                var entry = await posting.PostOrPendAsync(BuildEntry(receipt, money.AccountId, InvoiceText(allocations.Select(a => a.Invoice.Number))), c).ConfigureAwait(false);
                 receipt.JournalEntryId = entry?.Id;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
@@ -104,7 +117,8 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         var receipt = await support.FindAsync<Receipt>(token, ct).ConfigureAwait(false);
         await locks.EnsureNotLockedByOthersAsync(EntityType, receipt.Id, ct).ConfigureAwait(false);
         CashSupport.EnsureActive(receipt, ErrorCodes.ReceiptIsVoid);
-        if (receipt.InvoiceId is long lockedInvoice) await locks.EnsureNotLockedByOthersAsync(InvoiceService.EntityType, lockedInvoice, ct).ConfigureAwait(false);
+        var allocated = await db.Set<ReceiptAllocation>().Where(a => a.ReceiptId == receipt.Id).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var a in allocated) await locks.EnsureNotLockedByOthersAsync(InvoiceService.EntityType, a.InvoiceId, ct).ConfigureAwait(false);
         CashSupport.RequireRowVersion(r.RowVersion);
         db.ExpectRowVersion(receipt, r.RowVersion);
         await db.InTransactionAsync(async c =>
@@ -115,10 +129,11 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
             receipt.VoidedBy = cash.UserId;
             receipt.VoidedAt = DateTime.UtcNow;
             changes.SetAction(receipt, "Void", why);
-            if (receipt.InvoiceId is long invoiceId)
+            // Every invoice the receipt was applied to gets its allocated amount back (the allocation rows stay as the record).
+            foreach (var a in allocated)
             {
-                var inv = await db.Set<Invoice>().SingleAsync(i => i.Id == invoiceId, c).ConfigureAwait(false);
-                inv.PaidAmount -= receipt.Amount;
+                var inv = await db.Set<Invoice>().SingleAsync(i => i.Id == a.InvoiceId, c).ConfigureAwait(false);
+                inv.PaidAmount -= a.Amount;
                 InvoiceService.Rebalance(inv);
                 changes.SetAction(inv, "ReceiptVoid", receipt.Number);
             }
@@ -131,6 +146,13 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
     /// <summary>Reverses the posted entry of a cash document, or closes its waiting pending posting (shared by the cash services).</summary>
     internal async Task ReverseAsync(Domain.Common.ICashDocument d, string description, CancellationToken ct) =>
         await CashPosting.ReverseAsync(db, posting, d, SourceType, description, ct).ConfigureAwait(false);
+
+    /// <summary>The invoice numbers of a receipt for its entry text: up to three, then "…".</summary>
+    internal static string? InvoiceText(IEnumerable<string?> numbers)
+    {
+        var list = numbers.Where(n => !string.IsNullOrEmpty(n)).ToList();
+        return list.Count == 0 ? null : string.Join(", ", list.Take(3)) + (list.Count > 3 ? ", …" : string.Empty);
+    }
 
     /// <summary>Receipt entry (8.6): Dr cash / bank, Cr trade receivables with the customer.</summary>
     public PostingRequest BuildEntry(Receipt r, long moneyAccountId, string? invoiceNumber)
@@ -186,17 +208,17 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         query = (q.Applied?.Trim().ToLowerInvariant()) switch
         {
             null or "" => query,
-            "invoice" => query.Where(r => r.InvoiceId != null),
-            "account" => query.Where(r => r.InvoiceId == null),
+            "invoice" => query.Where(r => r.Allocations.Any()),
+            "account" => query.Where(r => !r.Allocations.Any()),
             _ => throw Fail.Field("applied", ErrorCodes.ValidationFormat, "applied"),
         };
         if (!string.IsNullOrWhiteSpace(q.Invoice))
         {
             var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, "invoice");
-            query = query.Where(r => r.Invoice != null && r.Invoice.PublicId == g);
+            query = query.Where(r => r.Allocations.Any(a => a.Invoice.PublicId == g));
         }
         if (MasterDataSupport.SearchText(q.Q) is { } text)
-            query = query.Where(r => r.Number.Contains(text) || (r.Reference != null && r.Reference.Contains(text)) || (r.Invoice != null && r.Invoice.Number!.Contains(text)));
+            query = query.Where(r => r.Number.Contains(text) || (r.Reference != null && r.Reference.Contains(text)) || r.Allocations.Any(a => a.Invoice.Number!.Contains(text)));
         return query;
     }
 
@@ -208,17 +230,20 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(r => r.Status == CashCodes.Active ? r.Amount : 0), g.Count(r => r.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-receiptDate").ThenByDescending(r => r.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
-        return new ReceiptPage(new PagedResult<ReceiptResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);
+        var allocations = await AllocationsAsync(rows.Select(x => x.R.Id).ToList(), ct).ConfigureAwait(false);
+        return new ReceiptPage(new PagedResult<ReceiptResponse>(rows.Select(x => ToResponse(x, allocations)).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);
     }
 
     public async Task<GeneratedFile> ExportAsync(ReceiptListQuery q, string? format, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
         var rows = await Rows(MasterDataSupport.Sort(Filter(q), q.Sort, SortFields, "-receiptDate").ThenByDescending(r => r.Id).Take(SheetData.MaxRows)).ToListAsync(ct).ConfigureAwait(false);
+        var allocations = await AllocationsAsync(rows.Select(x => x.R.Id).ToList(), ct).ConfigureAwait(false);
         string[] headers = cash.En
             ? ["Number", "Date", "Customer", "Invoice", "Amount", "Method", "Cash box / bank", "Reference", "Attachments", "Status", "Notes"]
             : ["الرقم", "التاريخ", "العميل", "الفاتورة", "المبلغ", "طريقة الدفع", "الصندوق / البنك", "المرجع", "المرفقات", "الحالة", "ملاحظات"];
-        var data = rows.Select(x => (IReadOnlyList<object?>)[x.R.Number, x.R.ReceiptDate, x.CustomerName, x.InvoiceNumber ?? (cash.En ? "On account" : "على الحساب"), x.R.Amount,
+        var data = rows.Select(x => (IReadOnlyList<object?>)[x.R.Number, x.R.ReceiptDate, x.CustomerName,
+            allocations.TryGetValue(x.R.Id, out var a) && a.Count > 0 ? string.Join(", ", a.Select(i => i.Invoice.Number)) : (cash.En ? "On account" : "على الحساب"), x.R.Amount,
             x.R.PaymentMethod, x.BoxName ?? x.BankName, x.R.Reference, x.R.AttachmentsCount, x.R.Status, x.R.Notes]).ToList();
         return await CashExport.FileAsync("receipts", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
@@ -232,13 +257,26 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
     internal async Task<ReceiptDetails> DetailsAsync(long id, CancellationToken ct)
     {
         var row = await Rows(db.Set<Receipt>().AsNoTracking().Where(r => r.Id == id)).SingleAsync(ct).ConfigureAwait(false);
-        return new ReceiptDetails(ToResponse(row), await cash.WordsAsync(row.R.Amount, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
+        var allocations = await AllocationsAsync([id], ct).ConfigureAwait(false);
+        return new ReceiptDetails(ToResponse(row, allocations), await cash.WordsAsync(row.R.Amount, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
     }
 
-    private ReceiptResponse ToResponse(Row x) => new(support.Token<Receipt>(x.R.PublicId), x.R.Number, new Ref(support.Token<Customer>(x.CustomerPid), x.CustomerName),
-        x.InvoicePid is Guid i ? new DocRef(support.Token<Invoice>(i), x.InvoiceNumber) : null, x.R.ReceiptDate, x.R.Amount, x.R.PaymentMethod,
-        cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.R.Reference, x.R.AttachmentsCount, x.R.Notes, x.R.Status, cash.Entry(x.EntryPid, x.EntryNumber),
-        x.Pending, x.R.VoidReason, DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.R.RowVersion));
+    /// <summary>The allocations of the given receipts, by receipt, in invoice-date order.</summary>
+    private async Task<Dictionary<long, List<ReceiptAllocationResponse>>> AllocationsAsync(IReadOnlyCollection<long> receiptIds, CancellationToken ct) =>
+        (await db.Set<ReceiptAllocation>().AsNoTracking().Where(a => receiptIds.Contains(a.ReceiptId))
+            .OrderBy(a => a.Invoice.InvoiceDate).ThenBy(a => a.Invoice.Number)
+            .Select(a => new { a.ReceiptId, a.Invoice.PublicId, a.Invoice.Number, a.Amount }).ToListAsync(ct).ConfigureAwait(false))
+        .GroupBy(a => a.ReceiptId)
+        .ToDictionary(g => g.Key, g => g.Select(a => new ReceiptAllocationResponse(new DocRef(support.Token<Invoice>(a.PublicId), a.Number), a.Amount)).ToList());
+
+    private ReceiptResponse ToResponse(Row x, Dictionary<long, List<ReceiptAllocationResponse>> allocations)
+    {
+        var own = allocations.GetValueOrDefault(x.R.Id) ?? [];
+        return new(support.Token<Receipt>(x.R.PublicId), x.R.Number, new Ref(support.Token<Customer>(x.CustomerPid), x.CustomerName),
+            x.InvoicePid is Guid i ? new DocRef(support.Token<Invoice>(i), x.InvoiceNumber) : null, x.R.ReceiptDate, x.R.Amount, x.R.PaymentMethod,
+            cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.R.Reference, x.R.AttachmentsCount, x.R.Notes, x.R.Status, cash.Entry(x.EntryPid, x.EntryNumber),
+            x.Pending, x.R.VoidReason, DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.R.RowVersion), own, x.R.Amount - own.Sum(a => a.Amount));
+    }
 }
 
 /// <summary>Pending-posting retries for receipts.</summary>
@@ -252,8 +290,8 @@ public sealed class ReceiptPostingHandler(IAppDbContext db, IUrlTokenService tok
 
     protected override async Task<PostingRequest?> EntryAsync(Receipt d, CancellationToken ct)
     {
-        var invoiceNumber = d.InvoiceId is long i ? await _db.Set<Invoice>().Where(x => x.Id == i).Select(x => x.Number).SingleAsync(ct).ConfigureAwait(false) : null;
-        return receipts.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), invoiceNumber);
+        var numbers = await _db.Set<ReceiptAllocation>().Where(a => a.ReceiptId == d.Id).OrderBy(a => a.Invoice.InvoiceDate).Select(a => a.Invoice.Number).ToListAsync(ct).ConfigureAwait(false);
+        return receipts.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), ReceiptService.InvoiceText(numbers));
     }
 }
 

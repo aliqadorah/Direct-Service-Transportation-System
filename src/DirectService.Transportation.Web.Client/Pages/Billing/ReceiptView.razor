@@ -41,7 +41,10 @@
     [
         new(L["trip.customer"], r.Customer.Name),
         new(L["trip.date"], Fmt.Date(r.ReceiptDate, Shell.DateFormat)),
-        r.Invoice is { } inv ? new(L["cn.invoice"], null, @<a href="@NavModel.Href(Company, $"invoices/{inv.Id}")"><bdi>@inv.Number</bdi></a>) : new(L["cn.invoice"], L["rcpt.onAccount"]),
+        r.Allocations is { Count: > 0 } list
+            ? new(L[list.Count == 1 ? "cn.invoice" : "rcpt.invoices"], null, @<span class="stack" style="gap:2px">@foreach (var a in list) {<span><a href="@NavModel.Href(Company, $"invoices/{a.Invoice.Id}")"><bdi>@a.Invoice.Number</bdi></a> · <Money Value="a.Amount" /></span>}</span>)
+            : r.Invoice is { } inv ? new(L["cn.invoice"], null, @<a href="@NavModel.Href(Company, $"invoices/{inv.Id}")"><bdi>@inv.Number</bdi></a>) : new(L["cn.invoice"], L["rcpt.onAccount"]),
+        new(L["rcpt.unallocated"], Fmt.Money(r.Unallocated)),
         new(L["cash.method"], L["pay." + r.PaymentMethod]),
         new(L["cash.account"], r.Account.Name),
         new(L["cash.reference"], r.Reference),

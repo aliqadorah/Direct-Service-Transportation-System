@@ -310,4 +310,78 @@ public sealed class CashTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/advances/{adv.Advance.Id}"))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await other.Client.GetAsync(U(other, $"/drivers/{w.Driver.Id}/account"))).StatusCode);
     }
+
+    // ------------------------------------------------------------------ receipts against several invoices (revision 6, item 4)
+
+    private static async Task<InvoiceResponse> ManualInvoiceAsync(World w, decimal net, DateOnly date) =>
+        (await ReadAsync<InvoiceDetails>(await w.Owner.Client.PostAsJsonAsync(U(w.Owner, "/invoices"), new InvoiceRequest(w.Customer.Id, "Manual", date, null, null,
+            [new ManualLineRequest("Service", 1, net)], 0, 0, null, null, null, true, null, null)))).Invoice;
+
+    private static ReceiptRequest Allocated(World w, decimal amount, params (string Invoice, decimal Amount)[] allocations) =>
+        new(w.Customer.Id, Today, null, amount, "Cash", w.CashBox, null, null, 0, null, null, allocations.Select(a => new ReceiptAllocationRequest(a.Invoice, a.Amount)).ToList());
+
+    [Fact]
+    public async Task A_receipt_is_applied_to_several_invoices_with_a_part_payment_and_the_rest_on_account()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var i1 = await ManualInvoiceAsync(w, 100m, Today.AddDays(-2));   // 116.000
+        var i2 = await ManualInvoiceAsync(w, 200m, Today.AddDays(-1));   // 232.000
+        var i3 = await ManualInvoiceAsync(w, 300m, Today);               // 348.000
+
+        // 500: invoice 1 and 2 in full, 100 on invoice 3 (part payment), 52 on account.
+        var r = await ReadAsync<ReceiptDetails>(await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 500m, (i1.Id, 116m), (i2.Id, 232m), (i3.Id, 100m))));
+        Assert.Equal([116m, 232m, 100m], r.Receipt.Allocations!.Select(a => a.Amount));
+        Assert.Equal(52m, r.Receipt.Unallocated);
+        Assert.Null(r.Receipt.Invoice);   // several invoices: no single invoice link
+        var states = new List<(decimal Remaining, string State)>();
+        foreach (var id in new[] { i1.Id, i2.Id, i3.Id })
+        {
+            var inv = (await ReadAsync<InvoiceDetails>(await o.Client.GetAsync(U(o, $"/invoices/{id}")))).Invoice;
+            states.Add((inv.RemainingAmount, inv.PaymentState));
+        }
+        Assert.Equal([(0m, "Closed"), (0m, "Closed"), (248m, "PartiallyPaid")], states);
+
+        // The entry credits trade receivables with the whole amount and names the invoices.
+        var e = await EntryAsync("Receipt");
+        Assert.Equal(500m, e.TotalDebit);
+        Assert.Contains(i1.Number!, e.Description, StringComparison.Ordinal);
+
+        // Ageing: 248 open on invoice 3, 52 unapplied.
+        var ageing = await ReadAsync<Contracts.ApAr.AgeingReport>(await o.Client.GetAsync(U(o, "/apar/ageing/receivables")));
+        var row = ageing.Rows.Single(x => x.Party.Name == w.Customer.Name);
+        Assert.Equal((248m, 52m), (row.Amounts.Total, row.Amounts.Unapplied));
+
+        // Lists: filter by any of its invoices, "applied" = to invoices.
+        var byInvoice = await ReadAsync<ReceiptPage>(await o.Client.GetAsync(U(o, $"/receipts?invoice={i2.Id}")));
+        Assert.Equal([r.Receipt.Id], byInvoice.Page.Items.Select(x => x.Id));
+        Assert.Single((await ReadAsync<ReceiptPage>(await o.Client.GetAsync(U(o, "/receipts?applied=invoice")))).Page.Items);
+
+        // Void gives every invoice its amount back.
+        await (await o.Client.PostAsJsonAsync(U(o, $"/receipts/{r.Receipt.Id}/void"), new CashVoidRequest("Bounced", r.Receipt.RowVersion))).EnsureOkAsync();
+        foreach (var (id, total) in new[] { (i1.Id, 116m), (i2.Id, 232m), (i3.Id, 348m) })
+            Assert.Equal(total, (await ReadAsync<InvoiceDetails>(await o.Client.GetAsync(U(o, $"/invoices/{id}")))).Invoice.RemainingAmount);
+    }
+
+    [Fact]
+    public async Task Allocations_cannot_exceed_an_invoice_balance_or_the_receipt_amount()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var i1 = await ManualInvoiceAsync(w, 100m, Today);   // 116.000
+        var i2 = await ManualInvoiceAsync(w, 200m, Today);   // 232.000
+        Assert.Equal("receipt.exceedsRemaining", await (await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 500m, (i1.Id, 120m)))).ErrorCodeAsync());
+        Assert.Equal("receipt.allocationsExceedAmount", await (await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 300m, (i1.Id, 116m), (i2.Id, 200m)))).ErrorCodeAsync());
+        Assert.Equal("receipt.allocationDuplicate", await (await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 300m, (i1.Id, 10m), (i1.Id, 10m)))).ErrorCodeAsync());
+        Assert.Equal("validation.range", await (await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 300m, (i1.Id, 0m)))).ErrorCodeAsync());
+
+        // Another customer's invoice is not open for this customer.
+        var other = await ReadAsync<CustomerResponse>(await o.Client.PostAsJsonAsync(U(o, "/customers"), new CustomerRequest("Other Co", null, null, "0781234500", null, null, null, null, 30, null, null, null, null, null)));
+        var foreign = await ManualInvoiceAsync(w with { Customer = other }, 50m, Today);
+        Assert.Equal("receipt.invoiceNotOpen", await (await o.Client.PostAsJsonAsync(U(o, "/receipts"), Allocated(w, 50m, (foreign.Id, 10m)))).ErrorCodeAsync());
+
+        // Nothing was saved by the refused receipts.
+        Assert.Equal(116m, (await ReadAsync<InvoiceDetails>(await o.Client.GetAsync(U(o, $"/invoices/{i1.Id}")))).Invoice.RemainingAmount);
+        Assert.Equal(0, (await ReadAsync<ReceiptPage>(await o.Client.GetAsync(U(o, "/receipts")))).Page.TotalCount);
+    }
 }

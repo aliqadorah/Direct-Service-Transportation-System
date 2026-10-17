@@ -146,4 +146,56 @@ public sealed class BillingPageTests : PageTestBase
         Assert.DoesNotContain("INV-02209", cut.Markup);
         Assert.Contains(L["cash.cashBox"], cut.Markup);
     }
+
+    /// <summary>
+    /// Revision 6 item 4: ticking invoices fills the allocations oldest first up to the receipt amount; the user edits one; the summary shows
+    /// selected, allocated and unallocated, and the request carries the allocations.
+    /// </summary>
+    [Fact]
+    public void Receipt_form_allocates_ticked_invoices_oldest_first_and_posts_the_allocations()
+    {
+        var older = Invoice() with { Id = "i1", Number = "INV-1", InvoiceDate = Day.AddDays(-10), RemainingAmount = 100m };
+        var newer = Invoice() with { Id = "i2", Number = "INV-2", InvoiceDate = Day, RemainingAmount = 300m };
+        Respond("invoices", new InvoicePage(new PagedResult<InvoiceResponse>([newer, older], 1, 200, 2), new InvoiceListTotals(2, 0, 0, 0, 0)));
+        Respond("receipts", new ReceiptDetails(new ReceiptResponse("r1", "RCV-00001", new Ref("cu1", "x"), null, Day, 250m, "Cash", new MoneyAccountRef("CashBox", "b1", "Box"),
+            null, 0, null, "Active", null, false, null, DateTime.UtcNow, "RV"), "words", []));
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/receipts/new?customer=cu1");
+        var cut = Render<ReceiptForm>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("INV-2", cut.Markup));
+        var rows = cut.FindAll("table.alloc tbody tr");
+        Assert.Contains("INV-1", rows[0].TextContent, StringComparison.Ordinal);   // oldest first
+
+        // Select all with an empty amount: the amount becomes the total and both invoices are covered.
+        cut.Find("table.alloc thead input[type=checkbox]").Change(true);
+        Assert.Equal("400.000", ((AngleSharp.Html.Dom.IHtmlInputElement)AmountInput(cut)).Value.Replace(",", "", StringComparison.Ordinal));
+
+        // A smaller amount fills the oldest first: 100 on INV-1, 150 on INV-2 (part payment).
+        AmountInput(cut).Change("250");
+        Assert.Equal("100.000", Allocated(cut, "INV-1"));
+        Assert.Equal("150.000", Allocated(cut, "INV-2"));
+
+        // The user changes the last allocation: 50 stays unallocated (on account).
+        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-2")}']").Change("100");
+        Assert.Contains(L["rcpt.restOnAccount"], cut.Markup);
+
+        // More than the invoice's balance: an error and no save.
+        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("120");
+        Assert.Contains(L["rcpt.overRemaining"], cut.Markup);
+        Assert.All(cut.FindAll("button").Where(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) || b.TextContent.Contains(L["cash.savePrint"], StringComparison.Ordinal)),
+            b => Assert.True(b.HasAttribute("disabled")));
+
+        // Back within the balance: saved with both allocations (100 + 100) and 50 left on account.
+        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("100");
+        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) && !b.TextContent.Contains(L["cash.savePrint"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "receipts"));
+        var body = Requests.Single(r => r.Method == "POST" && r.Path == "receipts").Body!;
+        Assert.Contains("\"allocations\":[{\"invoiceId\":\"i1\",\"amount\":100", body, StringComparison.Ordinal);
+        Assert.Contains("{\"invoiceId\":\"i2\",\"amount\":100", body, StringComparison.Ordinal);
+    }
+
+    private AngleSharp.Dom.IElement AmountInput(IRenderedComponent<ReceiptForm> cut) =>
+        cut.Find("#" + cut.FindAll("label").First(l => l.TextContent.Trim().StartsWith(L["inv.amount"], StringComparison.Ordinal)).GetAttribute("for"));
+
+    private string Allocated(IRenderedComponent<ReceiptForm> cut, string number) =>
+        ((AngleSharp.Html.Dom.IHtmlInputElement)cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", number)}']")).Value.Replace(",", "", StringComparison.Ordinal);
 }

@@ -55,12 +55,15 @@ public sealed class AgeingService(IAppDbContext db, MasterDataSupport support, R
                     .Select(i => new
                     {
                         i.CustomerId, i.DueDate, i.Total,
-                        Paid = db.Set<Receipt>().Where(r => r.InvoiceId == i.Id && r.Status == CashCodes.Active && r.ReceiptDate <= date).Sum(r => (decimal?)r.Amount) ?? 0,
+                        Paid = db.Set<ReceiptAllocation>().Where(a => a.InvoiceId == i.Id && a.Receipt.Status == CashCodes.Active && a.Receipt.ReceiptDate <= date).Sum(a => (decimal?)a.Amount) ?? 0,
                         Credited = db.Set<CreditNote>().Where(c => c.InvoiceId == i.Id && c.Status == InvoiceCodes.Posted && c.CreditDate <= date).Sum(c => (decimal?)c.Total) ?? 0,
                     }).ToListAsync(ct).ConfigureAwait(false))
                 .Select(i => new Due(AccountingCodes.PartyCustomer, i.CustomerId, i.DueDate, i.Total - i.Paid - i.Credited)));
-            unapplied = await db.Set<Receipt>().AsNoTracking().Where(r => r.InvoiceId == null && r.Status == CashCodes.Active && r.ReceiptDate <= date)
-                .GroupBy(r => r.CustomerId).Select(g => new { g.Key, A = g.Sum(r => r.Amount) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
+            // The part of each receipt not allocated to invoices (revision 6: a receipt may be applied to several invoices, the rest on account).
+            unapplied = (await db.Set<Receipt>().AsNoTracking().Where(r => r.Status == CashCodes.Active && r.ReceiptDate <= date)
+                    .Select(r => new { r.CustomerId, U = r.Amount - (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0) }).Where(x => x.U != 0)
+                    .GroupBy(x => x.CustomerId).Select(g => new { g.Key, A = g.Sum(x => x.U) }).ToListAsync(ct).ConfigureAwait(false))
+                .ToDictionary(x => x.Key, x => x.A);
         }
 
         var open = dues.Where(d => d.Amount != 0).ToList();

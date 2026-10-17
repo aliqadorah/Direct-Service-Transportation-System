@@ -499,11 +499,11 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         {
             var invoices = await db.Set<Domain.Trn.Invoice>().AsNoTracking().Where(i => (i.Status == "Approved" || i.Status == "Closed") && i.InvoiceDate <= asOf)
                 .Select(i => i.Total
-                    - (db.Set<Domain.Trn.Receipt>().Where(r => r.InvoiceId == i.Id && r.Status == "Active" && r.ReceiptDate <= asOf).Sum(r => (decimal?)r.Amount) ?? 0)
+                    - (db.Set<Domain.Trn.ReceiptAllocation>().Where(a => a.InvoiceId == i.Id && a.Receipt.Status == "Active" && a.Receipt.ReceiptDate <= asOf).Sum(a => (decimal?)a.Amount) ?? 0)
                     - (db.Set<Domain.Trn.CreditNote>().Where(n => n.InvoiceId == i.Id && n.Status == "Posted" && n.CreditDate <= asOf).Sum(n => (decimal?)n.Total) ?? 0))
                 .SumAsync(ct).ConfigureAwait(false);
-            var unapplied = await db.Set<Domain.Trn.Receipt>().AsNoTracking().Where(r => r.InvoiceId == null && r.Status == "Active" && r.ReceiptDate <= asOf)
-                .SumAsync(r => r.Amount, ct).ConfigureAwait(false);
+            var unapplied = await db.Set<Domain.Trn.Receipt>().AsNoTracking().Where(r => r.Status == "Active" && r.ReceiptDate <= asOf)
+                .SumAsync(r => r.Amount - (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0), ct).ConfigureAwait(false);
             total = (total ?? 0) + invoices - unapplied;
         }
         if (keys.Contains(PostingKeys.PartnerPayable))

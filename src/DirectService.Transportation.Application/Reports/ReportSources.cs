@@ -167,9 +167,11 @@ public static class ReportSources
                 .Text("number", "الرقم", "Number", r => r.Number, groupable: false)
                 .Date("receiptDate", "التاريخ", "Date", r => r.ReceiptDate)
                 .Ref<Customer>("customer", "العميل", "Customer", r => r.Customer.Name, r => r.Customer.PublicId)
-                .Text("invoice", "الفاتورة", "Invoice", r => r.Invoice != null ? r.Invoice.Number : null, groupable: false)
-                .Bool("onAccount", "على الحساب", "On account", r => r.InvoiceId == null)
+                // Revision 6: one invoice, or the first of several (by invoice date); "On account" = nothing allocated.
+                .Text("invoice", "الفاتورة", "Invoice", r => r.Allocations.OrderBy(a => a.Invoice.InvoiceDate).Select(a => a.Invoice.Number).FirstOrDefault(), groupable: false)
+                .Bool("onAccount", "على الحساب", "On account", r => !r.Allocations.Any())
                 .Amount("amount", "المبلغ", "Amount", FieldTypes.Money, r => r.Amount)
+                .Amount("unallocated", "غير مخصص", "Unallocated", FieldTypes.Money, r => r.Amount - (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0))
                 .Text("method", "طريقة الدفع", "Method", r => r.PaymentMethod)
                 .Text("status", "الحالة", "Status", r => r.Status),
             "receiptDate", null, null, r => r.Status == Active, r => r.PublicId, "receipt"),

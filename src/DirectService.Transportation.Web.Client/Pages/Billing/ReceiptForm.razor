@@ -1,8 +1,11 @@
 @page "/c/{Company}/receipts/new"
 @*
-  SCR-26 receipt form (FR-067…070): customer, date, one of the customer's open invoices or none (on account), amount (not above the
-  invoice's remaining balance — checked by the API), method, cash box or bank account, reference for transfer / CliQ, attachments count,
-  notes. "Save & print" opens the voucher with the amount in words (FR-070). Opened from an invoice with its customer and invoice filled in.
+  SCR-26 receipt form (FR-067…070): customer, date, amount, method, cash box or bank account, reference for transfer / CliQ, attachments
+  count, notes. "Save & print" opens the voucher with the amount in words (FR-070). Opened from an invoice with its customer and invoice filled in.
+  Revision 6 (owner change request 15 Oct 2026): the customer's open invoices are listed with checkboxes (all / some / one); ticking fills the
+  allocations oldest first up to the receipt amount (an empty amount becomes the total of the ticked invoices); each allocated amount can be
+  edited, including a part payment on the last invoice. Totals: selected, allocated, unallocated (stays on account). An allocation cannot exceed
+  its invoice's open balance and together they cannot exceed the receipt amount (checked here and by the API).
 *@
 @inject Api Api
 @inject Loc L
@@ -19,7 +22,7 @@
     </Actions>
 </PageHeader>
 <PostingBanner OnStatus="r => _postingReady = r" />
-<EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+<EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="cols fill" style="grid-template-columns:minmax(0,1fr) 300px;align-items:start">
     <div class="stack">
         <ProblemValidator @ref="_problems" />
         <ErrorSummary @ref="_summary" Extra="_extra" />
@@ -27,25 +30,79 @@
             <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
                 <ComboField TValue="string?" @bind-Value="_m.CustomerId" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="true" Span="2" OnSelected="_ => CustomerChanged()" />
                 <DateField @bind-Value="_m.ReceiptDate" Label="@L["trip.date"]" Required="true" />
-                <SelectField TValue="string?" @bind-Value="_m.InvoiceId" Options="InvoiceOptions" Empty="@L["rcpt.onAccount"]" Label="@L["cn.invoice"]" Span="2"
-                             Help="@L["rcpt.invoiceHelp"]" @bind-Value:after="InvoiceChanged" />
-                <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" />
+                <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" @bind-Value:after="AmountChanged" />
                 <PaymentFields Model="_m" />
                 <IntField @bind-Value="_m.AttachmentsCount" Label="@L["rcpt.attachments"]" Min="0" Max="99" />
                 <TextField @bind-Value="_m.Notes" Label="@L["md.notes"]" MaxLength="500" Span="2" />
             </div>
         </section>
+        @if (_m.CustomerId is not null)
+        {
+            <Box Title="@L["rcpt.openInvoices"]" NoPad="true">
+                <ChildContent>
+                    @if (_picks.Count == 0)
+                    {
+                        <p class="muted" style="margin:12px 16px">@L["rcpt.noOpenInvoices"]</p>
+                    }
+                    else
+                    {
+                        <div style="overflow:auto">
+                            <table class="grid alloc">
+                                <caption class="sr-only">@L["rcpt.openInvoices"]</caption>
+                                <thead><tr>
+                                    <th scope="col" style="width:40px"><input type="checkbox" aria-label="@L["rcpt.selectAll"]" checked="@AllSelected" @onchange="e => SelectAll(e.Value is true)" /></th>
+                                    <th scope="col">@L["doc.number"]</th>
+                                    <th scope="col">@L["trip.date"]</th>
+                                    <th scope="col">@L["inv.due"]</th>
+                                    <th scope="col" class="n">@L["inv.total"]</th>
+                                    <th scope="col" class="n">@L["inv.remaining"]</th>
+                                    <th scope="col" class="n" style="width:170px">@L["rcpt.allocated"]</th>
+                                </tr></thead>
+                                <tbody>
+                                    @foreach (var p in _picks)
+                                    {
+                                        var pick = p;
+                                        var over = pick.Selected && (pick.Allocated ?? 0) > pick.Invoice.RemainingAmount;
+                                        <tr @key="pick.Invoice.Id" class="@(pick.Selected ? "sel" : null)">
+                                            <td><input type="checkbox" aria-label="@L.F("rcpt.selectInvoice", pick.Invoice.Number ?? "")" checked="@pick.Selected" @onchange="e => Toggle(pick, e.Value is true)" /></td>
+                                            <td><bdi class="num">@pick.Invoice.Number</bdi></td>
+                                            <td><bdi class="num">@Fmt.Date(pick.Invoice.InvoiceDate, Shell.DateFormat)</bdi></td>
+                                            <td><bdi class="num">@Fmt.Date(pick.Invoice.DueDate, Shell.DateFormat)</bdi>@if (pick.Invoice.IsOverdue) {<Badge Tone="Tone.Warn" Text="@L["inv.overdue"]" />}</td>
+                                            <td class="n"><Money Value="pick.Invoice.Total" /></td>
+                                            <td class="n"><Money Value="pick.Invoice.RemainingAmount" /></td>
+                                            <td class="n">
+                                                @if (pick.Selected)
+                                                {
+                                                    <NumberField @bind-Value="pick.Allocated" Min="0m" aria-label="@L.F("rcpt.allocatedTo", pick.Invoice.Number ?? "")" @bind-Value:after="() => pick.Manual = true"
+                                                                 aria-invalid="@(over ? "true" : null)" />
+                                                    @if (over) {<div class="err" role="alert">@L["rcpt.overRemaining"]</div>}
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </ChildContent>
+            </Box>
+        }
     </div>
     <Box Title="@L["rcpt.after"]">
-        @if (SelectedInvoice is { } inv)
+        <div class="ln"><span>@L["rcpt.totalSelected"]</span><Money Value="TotalSelected" /></div>
+        <div class="ln"><span>@L["rcpt.allocated"]</span><Money Value="Allocated" /></div>
+        <div class="ln tot"><span>@L["rcpt.unallocated"]</span><Money Value="Unallocated" /></div>
+        @if (Unallocated < 0)
         {
-            <div class="ln"><span>@L["rcpt.remainingNow"]</span><Money Value="inv.RemainingAmount" /></div>
-            <div class="ln tot"><span>@L["rcpt.afterReceipt"]</span><Money Value="inv.RemainingAmount - (_m.Amount ?? 0)" /></div>
-            <p class="help" style="margin:6px 0 0">@L[inv.RemainingAmount - (_m.Amount ?? 0) == 0 ? "rcpt.willClose" : "rcpt.partly"]</p>
+            <p class="err" role="alert" style="margin:6px 0 0">@L["rcpt.overAmount"]</p>
+        }
+        else if (Selected.Count == 0)
+        {
+            <p class="muted" style="margin:6px 0 0">@L["rcpt.onAccountHelp"]</p>
         }
         else
         {
-            <p class="muted" style="margin:0">@L["rcpt.onAccountHelp"]</p>
+            <p class="help" style="margin:6px 0 0">@L[Unallocated > 0 ? "rcpt.restOnAccount" : "rcpt.allAllocated"]</p>
         }
     </Box>
 </EditForm>
@@ -53,7 +110,7 @@
 @code {
     private readonly Model _m = new();
     private EditContext _ctx = default!;
-    private IReadOnlyList<InvoiceResponse> _invoices = [];
+    private List<Pick> _picks = [];
     private bool _saving, _postingReady = true;
     private int _invoicesVersion;
     private decimal? _autoAmount;
@@ -63,10 +120,13 @@
 
     [Parameter] public string Company { get; set; } = "";
 
-    private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.RcptManage);
-    private InvoiceResponse? SelectedInvoice => _invoices.FirstOrDefault(i => i.Id == _m.InvoiceId);
-    private IReadOnlyList<Option<string?>> InvoiceOptions =>
-        _invoices.Select(i => new Option<string?>(i.Id, $"{i.Number} · {L["inv.remaining"]} {Fmt.Money(i.RemainingAmount)}")).ToList();
+    private List<Pick> Selected => _picks.Where(p => p.Selected).ToList();
+    private bool AllSelected => _picks.Count > 0 && _picks.All(p => p.Selected);
+    private decimal TotalSelected => Selected.Sum(p => p.Invoice.RemainingAmount);
+    private decimal Allocated => Selected.Sum(p => p.Allocated ?? 0);
+    private decimal Unallocated => (_m.Amount ?? 0) - Allocated;
+    private bool AllocationsValid => Unallocated >= 0 && Selected.All(p => (p.Allocated ?? 0) >= 0 && (p.Allocated ?? 0) <= p.Invoice.RemainingAmount);
+    private bool CanSave => _postingReady && !_saving && AllocationsValid && Shell.Can(PermissionKeys.RcptManage);
 
     protected override async Task OnInitializedAsync()
     {
@@ -79,35 +139,73 @@
         {
             _m.CustomerId = c;
             await LoadInvoices();
-            if (query["invoice"] is { Length: > 0 } i && _invoices.Any(x => x.Id == i)) { _m.InvoiceId = i; InvoiceChanged(); }
+            if (query["invoice"] is { Length: > 0 } i && _picks.FirstOrDefault(x => x.Invoice.Id == i) is { } pick) Toggle(pick, true);
         }
     }
 
     private async Task CustomerChanged()
     {
-        _m.InvoiceId = null;
+        _m.Amount = _m.Amount == _autoAmount ? null : _m.Amount;
+        _autoAmount = null;
         await LoadInvoices();
     }
 
-    /// <summary>The customer's approved invoices with a remaining balance (FR-067).</summary>
+    /// <summary>The customer's approved invoices with a remaining balance (FR-067), oldest first.</summary>
     private async Task LoadInvoices()
     {
-        _invoices = [];
+        _picks = [];
         var version = ++_invoicesVersion;
         if (_m.CustomerId is null) return;
         try
         {
-            var page = await Api.GetAsync<InvoicePage>(Api.C($"invoices?customer={Uri.EscapeDataString(_m.CustomerId)}&status=approved&sort=dueDate&pageSize=200"));
+            var page = await Api.GetAsync<InvoicePage>(Api.C($"invoices?customer={Uri.EscapeDataString(_m.CustomerId)}&status=approved&sort=invoiceDate&pageSize=200"));
             if (version != _invoicesVersion) return;   // another customer was chosen meanwhile
-            _invoices = page.Page.Items.Where(i => i.RemainingAmount > 0).ToList();
+            _picks = page.Page.Items.Where(i => i.RemainingAmount > 0).OrderBy(i => i.InvoiceDate).ThenBy(i => i.Number, StringComparer.Ordinal)
+                .Select(i => new Pick(i)).ToList();
         }
         catch (ApiException) { }
     }
 
-    private void InvoiceChanged()
+    private void Toggle(Pick pick, bool on)
     {
-        // The amount follows the chosen invoice's remaining balance until the user types another amount.
-        if (_m.Amount is null || _m.Amount == _autoAmount) _m.Amount = _autoAmount = SelectedInvoice?.RemainingAmount;
+        pick.Selected = on;
+        if (!on) { pick.Allocated = null; pick.Manual = false; }
+        AfterSelection();
+    }
+
+    private void SelectAll(bool on)
+    {
+        foreach (var p in _picks)
+        {
+            p.Selected = on;
+            if (!on) { p.Allocated = null; p.Manual = false; }
+        }
+        AfterSelection();
+    }
+
+    /// <summary>An empty (or still automatic) amount follows the ticked invoices' total; then the allocations are filled again.</summary>
+    private void AfterSelection()
+    {
+        if (_m.Amount is null || _m.Amount == _autoAmount) _m.Amount = _autoAmount = Selected.Count == 0 ? null : TotalSelected;
+        Reallocate();
+    }
+
+    private void AmountChanged()
+    {
+        if (_m.Amount != _autoAmount) _autoAmount = null;
+        Reallocate();
+    }
+
+    /// <summary>Oldest first up to the receipt amount; amounts the user typed are kept and taken out of the amount first.</summary>
+    private void Reallocate()
+    {
+        var budget = (_m.Amount ?? 0) - Selected.Where(p => p.Manual).Sum(p => p.Allocated ?? 0);
+        foreach (var p in Selected.Where(p => !p.Manual))
+        {
+            var share = Math.Max(0, Math.Min(p.Invoice.RemainingAmount, budget));
+            p.Allocated = share;
+            budget -= share;
+        }
     }
 
     private async Task Save(bool print)
@@ -117,8 +215,9 @@
         _extra = null;
         try
         {
-            var r = await Api.PostAsync<ReceiptDetails>(Api.C("receipts"), new ReceiptRequest(_m.CustomerId, _m.ReceiptDate, _m.InvoiceId, _m.Amount, _m.PaymentMethod,
-                _m.CashBox(), _m.Bank(), _m.Ref(), _m.AttachmentsCount ?? 0, string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId));
+            var allocations = Selected.Where(p => (p.Allocated ?? 0) > 0).Select(p => new ReceiptAllocationRequest(p.Invoice.Id, p.Allocated)).ToList();
+            var r = await Api.PostAsync<ReceiptDetails>(Api.C("receipts"), new ReceiptRequest(_m.CustomerId, _m.ReceiptDate, null, _m.Amount, _m.PaymentMethod,
+                _m.CashBox(), _m.Bank(), _m.Ref(), _m.AttachmentsCount ?? 0, string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId, allocations));
             var rc = r.Receipt;
             Toasts.Success(L.F("rcpt.saved", rc.Number, Fmt.Money(rc.Amount)), L["ui.print"], NavModel.Href(Company, $"print/receipt/{rc.Id}"));
             Nav.NavigateTo(NavModel.Href(Company, print ? $"print/receipt/{rc.Id}" : $"receipts/{rc.Id}"));
@@ -131,11 +230,20 @@
         finally { _saving = false; }
     }
 
+    private sealed class Pick(InvoiceResponse invoice)
+    {
+        public InvoiceResponse Invoice { get; } = invoice;
+        public bool Selected { get; set; }
+        public decimal? Allocated { get; set; }
+
+        /// <summary>The user typed this amount: automatic filling leaves it alone.</summary>
+        public bool Manual { get; set; }
+    }
+
     private sealed class Model : IPaymentModel
     {
         public string? CustomerId { get; set; }
         public DateOnly? ReceiptDate { get; set; }
-        public string? InvoiceId { get; set; }
         public decimal? Amount { get; set; }
         public string? PaymentMethod { get; set; }
         public string? CashBoxId { get; set; }

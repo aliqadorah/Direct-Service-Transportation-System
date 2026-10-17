@@ -35,6 +35,8 @@ public static class ErrorCatalog
         [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} أحرف على الأقل، مع الحروف والأرقام المطلوبة.", "The password does not meet your organisation's policy: at least {0} characters, with the required letters and digits."),
         [ErrorCodes.TokenInvalid] = ("الرابط غير صالح أو منتهي الصلاحية.", "The link is invalid or has expired."),
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
+        [ErrorCodes.ReceiptAllocationsExceedAmount] = ("مجموع المبالغ المخصصة للفواتير ({0}) أكبر من مبلغ السند ({1}).", "The amounts allocated to invoices ({0}) are more than the receipt amount ({1})."),
+        [ErrorCodes.ReceiptAllocationDuplicate] = ("الفاتورة {0} مختارة أكثر من مرة.", "Invoice {0} is selected more than once."),
         [ErrorCodes.UserNameInUse] = ("اسم المستخدم هذا مستخدم لحساب آخر.", "This username is already used by another account."),
         [ErrorCodes.UserNameFormat] = ("اسم المستخدم من 3 إلى 50 خانة: حروف إنجليزية وأرقام و . _ - فقط.", "The username must be 3 to 50 characters: English letters, digits and . _ - only."),
         [ErrorCodes.UserHasNoEmail] = ("ليس لهذا المستخدم بريد إلكتروني. عيّن له كلمة مرور جديدة بدلاً من ذلك.", "This user has no email address. Set a new password for them instead."),
@@ -277,6 +279,8 @@ public static class ErrorCodes
     public const string TokenInvalid = "auth.tokenInvalid";
     public const string EmailInUse = "user.emailInUse";
     public const string UserNameInUse = "user.userNameInUse";
+    public const string ReceiptAllocationsExceedAmount = "receipt.allocationsExceedAmount";
+    public const string ReceiptAllocationDuplicate = "receipt.allocationDuplicate";
     public const string UserNameFormat = "user.userNameFormat";
     public const string UserHasNoEmail = "user.noEmail";
     public const string PasswordUnchanged = "auth.passwordUnchanged";

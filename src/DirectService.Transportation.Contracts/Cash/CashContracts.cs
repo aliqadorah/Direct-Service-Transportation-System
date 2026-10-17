@@ -32,13 +32,23 @@ public sealed record CashListTotals(int Count, decimal Amount, int Included = 0)
 // ------------------------------------------------------------------ receipts (7.4.1)
 
 /// <summary>A customer receipt (FR-067, FR-068): against one of the customer's open invoices, or on account when no invoice is given.</summary>
+/// <summary>
+/// A receipt. Revision 6: <paramref name="Allocations"/> applies it to one or more of the customer's open invoices (each ≤ the invoice's open
+/// balance, together ≤ the amount; the rest stays on account). <paramref name="InvoiceId"/> alone still means one invoice for the whole amount.
+/// </summary>
 public sealed record ReceiptRequest(
     string? CustomerId, DateOnly? ReceiptDate, string? InvoiceId, decimal? Amount, string? PaymentMethod, string? CashBoxId, string? BankAccountId,
-    string? Reference, int? AttachmentsCount, string? Notes, string? ClientId);
+    string? Reference, int? AttachmentsCount, string? Notes, string? ClientId, IReadOnlyList<ReceiptAllocationRequest>? Allocations = null);
+
+public sealed record ReceiptAllocationRequest(string? InvoiceId, decimal? Amount);
+
+/// <summary>Part of a receipt applied to an invoice.</summary>
+public sealed record ReceiptAllocationResponse(DocRef Invoice, decimal Amount);
 
 public sealed record ReceiptResponse(
     string Id, string Number, Ref Customer, DocRef? Invoice, DateOnly ReceiptDate, decimal Amount, string PaymentMethod, MoneyAccountRef Account, string? Reference,
-    int AttachmentsCount, string? Notes, string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion);
+    int AttachmentsCount, string? Notes, string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion,
+    IReadOnlyList<ReceiptAllocationResponse>? Allocations = null, decimal Unallocated = 0);
 
 public sealed record ReceiptDetails(ReceiptResponse Receipt, string AmountInWords, IReadOnlyList<HistoryEntry> History);
 

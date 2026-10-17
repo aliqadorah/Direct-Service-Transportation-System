@@ -6366,3 +6366,86 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    CREATE TABLE [trn].[TRN_ReceiptAllocations] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_TRN_ReceiptAllocations_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [ReceiptId] bigint NOT NULL,
+        [InvoiceId] bigint NOT NULL,
+        [Amount] decimal(18,3) NOT NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_TRN_ReceiptAllocations_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_TRN_ReceiptAllocations_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_TRN_ReceiptAllocations] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_TRN_ReceiptAllocations_Amount] CHECK ([Amount] > 0),
+        CONSTRAINT [CK_TRN_ReceiptAllocations_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_TRN_Invoices_InvoiceId] FOREIGN KEY ([InvoiceId]) REFERENCES [trn].[TRN_Invoices] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_TRN_Receipts_ReceiptId] FOREIGN KEY ([ReceiptId]) REFERENCES [trn].[TRN_Receipts] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_ReceiptAllocations_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    CREATE INDEX [IX_TRN_ReceiptAllocations_InvoiceId] ON [trn].[TRN_ReceiptAllocations] ([InvoiceId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_TRN_ReceiptAllocations_PublicId] ON [trn].[TRN_ReceiptAllocations] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_TRN_ReceiptAllocations_ReceiptId_InvoiceId] ON [trn].[TRN_ReceiptAllocations] ([ReceiptId], [InvoiceId]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    INSERT INTO [trn].[TRN_ReceiptAllocations] ([PublicId], [TenantId], [CompanyId], [ReceiptId], [InvoiceId], [Amount], [CreatedAt], [CreatedBy], [IsDeleted])
+    SELECT NEWID(), r.[TenantId], r.[CompanyId], r.[Id], r.[InvoiceId], r.[Amount], r.[CreatedAt], r.[CreatedBy], 0
+    FROM [trn].[TRN_Receipts] r
+    WHERE r.[InvoiceId] IS NOT NULL AND r.[IsDeleted] = 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017122900_Rev6_ReceiptAllocations'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017122900_Rev6_ReceiptAllocations', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

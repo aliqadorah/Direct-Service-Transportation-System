@@ -360,7 +360,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         {
             // Blocked with active receipts or credit notes (FR-045, BR-040).
             var credits = await db.Set<CreditNote>().CountAsync(x => x.InvoiceId == inv.Id && x.Status == InvoiceCodes.Posted, c).ConfigureAwait(false);
-            var receipts = await db.Set<Receipt>().CountAsync(x => x.InvoiceId == inv.Id && x.Status != InvoiceCodes.Void, c).ConfigureAwait(false);
+            var receipts = await db.Set<ReceiptAllocation>().CountAsync(x => x.InvoiceId == inv.Id && x.Receipt.Status != InvoiceCodes.Void, c).ConfigureAwait(false);
             if (credits > 0 || receipts > 0 || inv.PaidAmount > 0 || inv.ReturnedAmount > 0) throw Fail.Rule(ErrorCodes.InvoiceHasPayments, inv.Number, receipts, credits);
             await periods.EnsureOpenAsync(inv.InvoiceDate, c).ConfigureAwait(false);
             // An invoice accepted by the national e-invoicing system is cancelled only by a full credit note (FR-046); a queued or

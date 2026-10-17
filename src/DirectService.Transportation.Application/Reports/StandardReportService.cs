@@ -430,7 +430,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             - await receipts.Where(r => r.ReceiptDate < f.From).SumAsync(r => r.Amount, ct).ConfigureAwait(false);
         var events = (await invoices.Where(i => i.InvoiceDate >= f.From && i.InvoiceDate <= f.To).Select(i => new { i.Id, i.PublicId, Number = i.Number!, Date = i.InvoiceDate, Kind = "invoice", Debit = i.Total, Credit = 0m, Unapplied = false }).ToListAsync(ct).ConfigureAwait(false))
             .Concat(await credits.Where(n => n.CreditDate >= f.From && n.CreditDate <= f.To).Select(n => new { n.Id, n.PublicId, n.Number, Date = n.CreditDate, Kind = "credit-note", Debit = 0m, Credit = n.Total, Unapplied = false }).ToListAsync(ct).ConfigureAwait(false))
-            .Concat(await receipts.Where(r => r.ReceiptDate >= f.From && r.ReceiptDate <= f.To).Select(r => new { r.Id, r.PublicId, r.Number, Date = r.ReceiptDate, Kind = "receipt", Debit = 0m, Credit = r.Amount, Unapplied = r.InvoiceId == null }).ToListAsync(ct).ConfigureAwait(false))
+            .Concat(await receipts.Where(r => r.ReceiptDate >= f.From && r.ReceiptDate <= f.To).Select(r => new { r.Id, r.PublicId, r.Number, Date = r.ReceiptDate, Kind = "receipt", Debit = 0m, Credit = r.Amount, Unapplied = !r.Allocations.Any() }).ToListAsync(ct).ConfigureAwait(false))
             .OrderBy(e => e.Date).ThenBy(e => e.Kind == "invoice" ? 0 : 1).ThenBy(e => e.Id).ToList();
         var running = opening;
         var rows = new List<ResultRow> { new([f.From, null, L("رصيد افتتاحي", "Opening balance"), null, null, opening], null) };
@@ -451,7 +451,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             };
             rows.Add(new ResultRow([e.Date, e.Number, label, e.Debit == 0 ? null : e.Debit, e.Credit == 0 ? null : e.Credit, running], link));
         }
-        var unapplied = await receipts.Where(r => r.InvoiceId == null && r.ReceiptDate <= f.To).SumAsync(r => r.Amount, ct).ConfigureAwait(false);
+        var unapplied = await receipts.Where(r => r.ReceiptDate <= f.To).SumAsync(r => r.Amount - (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0), ct).ConfigureAwait(false);
         var filters = PeriodFilters(f);
         filters.Insert(0, new(L("العميل", "Customer"), customer.Name));
         return new ReportResult(d.Key, title, filters,

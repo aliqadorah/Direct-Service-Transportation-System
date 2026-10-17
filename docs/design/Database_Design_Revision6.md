@@ -49,3 +49,20 @@ New table `acc.JournalDrafts` (company-scoped, audited, soft delete): a manual j
 | Lines | NVARCHAR(MAX) | NOT NULL | — | JSON array (account id, debit, credit, cost centre id, party type + id, note); `CK_JournalDrafts_Lines` ISJSON |
 | TotalDebit / TotalCredit | DECIMAL(18,3) | NOT NULL | — | as entered (may differ while drafting) |
 | CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_JournalDrafts_DeletedAt_DeletedBy_DeleteReason` |
+
+## 4. Receipts against several invoices (item 4) — migration `Rev6_ReceiptAllocations`
+New table `trn.TRN_ReceiptAllocations` (company-scoped, audited, soft delete): the part of a receipt applied to one open invoice of the customer. The rest of a receipt is on account. `TRN_Receipts.InvoiceId` is kept and filled only when exactly one invoice is allocated.
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Id | BIGINT IDENTITY | NOT NULL | — | PK `PK_TRN_ReceiptAllocations` |
+| PublicId | UNIQUEIDENTIFIER | NOT NULL | NEWID() | `UX_TRN_ReceiptAllocations_PublicId` |
+| TenantId / CompanyId | BIGINT | NOT NULL | — | FK to core.Tenants / core.Companies |
+| ReceiptId | BIGINT | NOT NULL | — | FK `FK_TRN_ReceiptAllocations_TRN_Receipts_ReceiptId` |
+| InvoiceId | BIGINT | NOT NULL | — | FK `FK_TRN_ReceiptAllocations_TRN_Invoices_InvoiceId`; `IX_TRN_ReceiptAllocations_InvoiceId` |
+| Amount | DECIMAL(18,3) | NOT NULL | — | `CK_TRN_ReceiptAllocations_Amount` > 0; ≤ the invoice's open balance and Σ ≤ the receipt amount (application rules) |
+| CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_TRN_ReceiptAllocations_DeletedAt_DeletedBy_DeleteReason` |
+
+`UX_TRN_ReceiptAllocations_ReceiptId_InvoiceId` UNIQUE (filter `[IsDeleted] = 0`): an invoice once per receipt.
+
+Data: every existing receipt with an `InvoiceId` was copied as one allocation of its full amount (raw SQL in the migration).
