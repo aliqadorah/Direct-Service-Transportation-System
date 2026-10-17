@@ -79,6 +79,7 @@
             new(L["trip.date"], Fmt.Date(r.ReturnDate, Shell.DateFormat)),
             new(L["ap.returnAmount"], Fmt.Money(r.Amount)),
             new(L["inv.tax"], Fmt.Money(r.Tax)),
+            new(L["ap.deductionReturned"], r.Deduction == 0 ? "—" : Fmt.Money(-r.Deduction)),
             new(L["ui.reason"], r.Reason),
         ];
         // A return on a receivable is a credit note for national e-invoicing (D-15): its submission status is shown like the invoice's.

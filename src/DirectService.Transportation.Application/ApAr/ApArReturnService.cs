@@ -64,15 +64,19 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
                 if (doc.Status != ApArCodes.Posted) throw Fail.RuleOn("documentId", ErrorCodes.ApArDocumentIsVoid, doc.Number);
                 if (doc.RemainingAmount <= 0) throw Fail.RuleOn("documentId", ErrorCodes.ApArDocumentNotOpen, doc.Number);
                 var earlier = await db.Set<ApArReturn>().Where(x => x.DocumentId == doc.Id && x.Status == ApArCodes.Posted)
-                    .GroupBy(_ => 1).Select(g => new { Amount = g.Sum(x => x.Amount), Tax = g.Sum(x => x.Tax) }).SingleOrDefaultAsync(c).ConfigureAwait(false);
+                    .GroupBy(_ => 1).Select(g => new { Amount = g.Sum(x => x.Amount), Tax = g.Sum(x => x.Tax), Deduction = g.Sum(x => x.Deduction) })
+                    .SingleOrDefaultAsync(c).ConfigureAwait(false);
                 var returnedAmount = earlier?.Amount ?? 0;
                 var returnedTax = earlier?.Tax ?? 0;
+                var returnedDeduction = earlier?.Deduction ?? 0;
                 if (amount > doc.Subtotal - returnedAmount)
                     throw Fail.RuleOn("amount", ErrorCodes.ApArExceedsRemaining, Money.Format(amount), Money.Format(doc.Subtotal - returnedAmount));
-                ret.Tax = amount == doc.Subtotal - returnedAmount
-                    ? doc.Tax - returnedTax
-                    : doc.Subtotal == 0 ? 0 : Money.Round(doc.Tax * amount / doc.Subtotal, decimals);
-                ret.Total = amount + ret.Tax;
+                var last = amount == doc.Subtotal - returnedAmount;
+                ret.Tax = last ? doc.Tax - returnedTax : doc.Subtotal == 0 ? 0 : Money.Round(doc.Tax * amount / doc.Subtotal, decimals);
+                // Owner decision 17 Oct 2026: a return gives back the bill's deduction in proportion (the last return the rest), so a
+                // full return cancels the whole bill; the limit is the remaining payable plus the returned share of the deduction.
+                ret.Deduction = last ? doc.Deduction - returnedDeduction : doc.Subtotal == 0 ? 0 : Money.Round(doc.Deduction * amount / doc.Subtotal, decimals);
+                ret.Total = amount + ret.Tax - ret.Deduction;
                 if (ret.Total > doc.RemainingAmount)
                 {
                     var over = ret.Total - doc.RemainingAmount;
@@ -106,8 +110,9 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
     }
 
     /// <summary>
-    /// Mirror entry of the returned share: bill return — Dr the supplier's control account (total), Cr the line accounts (amount split by line
-    /// amounts) and sales tax input; receivable return — Dr the line accounts and sales tax output, Cr the customer's control account.
+    /// Mirror entry of the returned share: bill return — Dr the supplier's control account (total, net of the deduction share) and "Supplier
+    /// deductions" (the returned deduction share), Cr the line accounts (amount split by line amounts) and sales tax input; receivable return —
+    /// Dr the line accounts and sales tax output, Cr the customer's control account.
     /// </summary>
     public PostingRequest BuildEntry(ApArReturn ret, ApArDocument doc, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName, int decimals)
     {
@@ -119,6 +124,7 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
         var shares = EInvoiceDocumentBuilder.Split(ret.Amount, lines.Select(l => l.Amount).ToList(), decimals);
         var result = new List<PostingLine>();
         if (bill) result.Add(new PostingLine(null, controlAccountId, ret.Total, 0, null, party));
+        if (bill && ret.Deduction > 0) result.Add(PostingLine.DebitKey(PostingKeys.SupplierDeductions, ret.Deduction));
         for (var i = 0; i < lines.Count; i++)
         {
             if (shares[i] == 0) continue;
@@ -216,12 +222,12 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
         ArgumentNullException.ThrowIfNull(q);
         var k = ApArRules.Kind(kind);
         var rows = await MasterDataSupport.Sort(Filter(k, q), q.Sort, SortFields, "-returnDate").ThenByDescending(x => x.Id).Take(SheetData.MaxRows)
-            .Select(x => new { x.Number, x.ReturnDate, Party = x.Document.Party.Name, Doc = x.Document.Number, x.Amount, x.Tax, x.Total, x.Reason, x.Status })
+            .Select(x => new { x.Number, x.ReturnDate, Party = x.Document.Party.Name, Doc = x.Document.Number, x.Amount, x.Tax, x.Deduction, x.Total, x.Reason, x.Status })
             .ToListAsync(ct).ConfigureAwait(false);
         string[] headers = En
-            ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Document", "Amount", "Tax", "Total", "Reason", "Status"]
-            : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المستند", "المبلغ", "الضريبة", "الإجمالي", "السبب", "الحالة"];
-        var data = rows.Select(x => (IReadOnlyList<object?>)[x.Number, x.ReturnDate, x.Party, x.Doc, x.Amount, x.Tax, x.Total, x.Reason, x.Status]).ToList();
+            ? ["Number", "Date", k == ApArCodes.SupplierBill ? "Supplier" : "Customer", "Document", "Amount", "Tax", "Deduction", "Total", "Reason", "Status"]
+            : ["الرقم", "التاريخ", k == ApArCodes.SupplierBill ? "المورد" : "العميل", "المستند", "المبلغ", "الضريبة", "الخصم", "الإجمالي", "السبب", "الحالة"];
+        var data = rows.Select(x => (IReadOnlyList<object?>)[x.Number, x.ReturnDate, x.Party, x.Doc, x.Amount, x.Tax, x.Deduction, x.Total, x.Reason, x.Status]).ToList();
         return await CashExport.FileAsync(k == ApArCodes.SupplierBill ? "payable-returns" : "receivable-returns", format, headers, data, sheets, exporter, ct).ConfigureAwait(false);
     }
 
@@ -253,7 +259,7 @@ internal static class ReturnsReader
         return new ApArReturnResponse(support.Token<ApArReturn>(x.R.PublicId), x.R.Number, x.DocumentKind, new DocRef(support.Token<ApArDocument>(x.DocPid), x.DocNumber),
             new Ref(support.Token<ApArParty>(x.PartyPid), x.PartyName), x.R.ReturnDate, x.R.Amount, x.R.Tax, x.R.Total, x.R.Reason, x.R.Status,
             x.EntryPid is Guid g ? new DocRef(support.Token<JournalEntry>(g), x.EntryNumber) : null, x.Pending, x.EStatus, x.R.VoidReason,
-            DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.R.RowVersion));
+            DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.R.RowVersion), x.R.Deduction);
     }
 }
 

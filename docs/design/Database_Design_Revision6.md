@@ -82,5 +82,12 @@ Data: every existing receipt with an `InvoiceId` was copied as one allocation of
 
 Posting: the bill's entry credits the new posting key `ACC.SupplierDeductions` with Σ deductions (reference data only — `acc.PostingKeyMappings` rows; the chart template adds account 4105 "Supplier deductions income" and maps it).
 
+## 6. Returns give back the deduction (owner decision of 17 Oct 2026) — migration `Rev6_ReturnDeductions`
+`acc.ApArReturns`:
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Deduction | DECIMAL(18,3) | NOT NULL | 0 (`DF_ApArReturns_Deduction`) | new; the returned share of the bill's deductions (bill deduction × amount ÷ subtotal, the last return takes the rest); `CK_ApArReturns_Deduction` `[Deduction] >= 0 AND [Deduction] <= [Amount]`; Total = Amount + Tax − Deduction (application rule) |
+
 ## Items without database changes
 Item 5 (trial balance tree), item 6 (account statement of several accounts, general ledger screen removed) and item 8 (OpenAPI) change no table.

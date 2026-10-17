@@ -21,6 +21,8 @@ public class ApArReturn : AuditableEntity, ITenantScoped, ICompanyScoped, ICashD
     public decimal Amount { get; set; }
     /// <summary>Sales tax amount.</summary>
     public decimal Tax { get; set; }
+    /// <summary>Returned share of the bill's deductions (owner decision 17 Oct 2026); Total = Amount + Tax − Deduction.</summary>
+    public decimal Deduction { get; set; }
     /// <summary>Amount + Tax.</summary>
     public decimal Total { get; set; }
     /// <summary>Reason text.</summary>

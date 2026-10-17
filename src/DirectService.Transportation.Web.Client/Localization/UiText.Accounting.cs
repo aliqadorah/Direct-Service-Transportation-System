@@ -33,6 +33,8 @@ public static partial class UiText
         ["ap.deductionKeyMissing"] = ("لم يُحفظ المستند: فيه خصم، و«خصومات الموردين» غير مربوطة بحساب. اربطها ثم احفظ مجدداً.", "Not saved: the bill has a deduction and “Supplier deductions” is not mapped to an account. Map it, then save again."),
         ["ap.openMapping"] = ("فتح ربط الحسابات", "Open account mapping"),
         ["ap.askMapping"] = ("اطلب من مسؤول الإعدادات ربطها في «ربط الحسابات».", "Ask a settings administrator to map it in Account mapping."),
+        ["ap.deductionReturned"] = ("الخصم المسترد", "Deduction returned"),
+        ["ap.returnDeductionNote"] = ("يُسترد معه من خصم الفاتورة بالنسبة نفسها: نحو {0}. المرتجع الكامل يلغي الفاتورة كلها مع خصمها.", "It also gives back the same share of the bill's deduction: about {0}. A full return cancels the whole bill with its deduction."),
         ["ap.deductionOver"] = ("أكبر من مبلغ السطر", "More than the line amount"),
         ["ap.deductionHelp"] = ("المستحق للمورد = المبلغ + الضريبة − الخصم؛ الضريبة على المبلغ كاملاً. يُقيَّد الخصم دائناً في «خصومات الموردين».", "Payable to the supplier = amount + tax − deduction; tax is on the full amount. The deduction is credited to “Supplier deductions”."),
         ["rep.treeTools"] = ("عرض الشجرة", "Tree view"),

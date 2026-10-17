@@ -99,7 +99,7 @@ public sealed record ApArReturnRequest(string? DocumentId, DateOnly? ReturnDate,
 
 public sealed record ApArReturnResponse(
     string Id, string Number, string Kind, DocRef Document, Ref Party, DateOnly ReturnDate, decimal Amount, decimal Tax, decimal Total, string Reason, string Status,
-    DocRef? JournalEntry, bool PostingPending, string? EInvoiceStatus, string? VoidReason, DateTime CreatedAt, string RowVersion);
+    DocRef? JournalEntry, bool PostingPending, string? EInvoiceStatus, string? VoidReason, DateTime CreatedAt, string RowVersion, decimal Deduction = 0);
 
 public sealed record ApArReturnDetails(ApArReturnResponse Return, string AmountInWords, IReadOnlyList<HistoryEntry> History);
 

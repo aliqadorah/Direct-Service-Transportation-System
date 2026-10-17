@@ -79,6 +79,7 @@
                                 <GridColumn TItem="ApArReturnResponse" Title="@L["doc.number"]" Value="r => r.Number" Ltr="true" />
                                 <GridColumn TItem="ApArReturnResponse" Title="@L["trip.date"]" Value="r => Fmt.Date(r.ReturnDate, Shell.DateFormat)" Ltr="true" />
                                 <GridColumn TItem="ApArReturnResponse" Title="@L["ui.reason"]" Value="r => r.Reason" Clip="true" />
+                                @if (_d.Returns.Any(x => x.Deduction > 0)) {<GridColumn TItem="ApArReturnResponse" Title="@L["ap.deductionReturned"]" Value="@(r => r.Deduction == 0 ? null : Fmt.Money(r.Deduction))" Numeric="true" />}
                                 <GridColumn TItem="ApArReturnResponse" Title="@L["inv.total"]" Value="r => Fmt.Money(r.Total)" Numeric="true" />
                                 <GridColumn TItem="ApArReturnResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@BillingStatus.Document(context.Status)" /></Template></GridColumn>
                             </Columns>
@@ -127,6 +128,11 @@
             <ErrorSummary Extra="_retExtra" />
             <DateField @bind-Value="_ret.ReturnDate" Label="@L["trip.date"]" Required="true" />
             <NumberField @bind-Value="_ret.Amount" Label="@L["ap.returnAmount"]" Required="true" Min="0.001m" Help="@L["ap.returnHelp"]" />
+            @if (_d is { Document.Deduction: > 0 } bill && bill.Document.Subtotal > 0)
+            {
+                @* Owner decision 17 Oct 2026: a return also gives back its share of the bill's deduction (estimate; the server rounds the last return). *@
+                <Banner Tone="Tone.Info" Text="@L.F("ap.returnDeductionNote", Fmt.Money(Math.Round(bill.Document.Deduction * (_ret.Amount ?? 0) / bill.Document.Subtotal, 3)))" />
+            }
             <TextField @bind-Value="_ret.Reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" />
         </EditForm>
     </ChildContent>

@@ -15,6 +15,7 @@ internal sealed class ApArReturnConfiguration : IEntityTypeConfiguration<ApArRet
         {
             t.HasCheckConstraint("CK_ApArReturns_Amount", "[Amount] > 0");
             t.HasCheckConstraint("CK_ApArReturns_Tax", "[Tax] >= 0");
+            t.HasCheckConstraint("CK_ApArReturns_Deduction", "[Deduction] >= 0 AND [Deduction] <= [Amount]");
             t.HasCheckConstraint("CK_ApArReturns_Status", "[Status] IN ('Posted','Void')");
             t.HasCheckConstraint("CK_ApArReturns_VoidReason_VoidedBy_VoidedAt", "[Status] <> 'Void' OR ([VoidReason] IS NOT NULL AND [VoidedBy] IS NOT NULL AND [VoidedAt] IS NOT NULL)");
             t.HasCheckConstraint("CK_ApArReturns_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
@@ -172,6 +173,15 @@ internal sealed class ApArReturnConfiguration : IEntityTypeConfiguration<ApArRet
             .HasColumnOrder(24)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6 (owner decision 17 Oct 2026): the returned share of a supplier bill's deductions.
+        builder.Property(e => e.Deduction)
+            .HasColumnName("Deduction")
+            .HasColumnType("decimal(18,3)")
+            .HasColumnOrder(25)
+            .HasPrecision(18, 3)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
 
         builder.HasIndex(new[] { "PublicId" }, "UX_ApArReturns_PublicId")
             .IsUnique()

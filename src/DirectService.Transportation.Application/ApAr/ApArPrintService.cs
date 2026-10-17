@@ -128,6 +128,7 @@ public sealed class ApArPrintService(IAppDbContext db, IRequestContext ctx, Mast
             + Field(L("السبب", "Reason"), E(r.Reason))
             + Field(L("المبلغ", "Amount"), N(M(r.Amount)))
             + Field(L("الضريبة", "Tax"), N(M(r.Tax)))
+            + (r.Deduction > 0 ? Field(L("الخصم المسترد", "Deduction returned"), N(M(-r.Deduction))) : string.Empty)
             + Field(L("الإجمالي", "Total"), N(M(r.Total)))
             + Field(L("المبلغ كتابة", "Amount in words"), E(d.AmountInWords))
             + "</div>" + (string.IsNullOrEmpty(qrText) ? string.Empty : $"<div class=\"qr\">{qr.Svg(qrText)}</div>") + "</div>"

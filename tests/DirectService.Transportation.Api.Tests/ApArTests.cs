@@ -359,4 +359,45 @@ public sealed class ApArTests(ApiFactory f)
         var status = await ReadAsync<AccountingStatusResponse>(await o.Client.GetAsync(U(o, "/accounting/status")));
         Assert.True(status.PostingReady);   // the optional key never blocks posting
     }
+
+    /// <summary>Owner decision 17 Oct 2026: a return gives back its share of the bill's deduction; a full return cancels the whole bill.</summary>
+    [Fact]
+    public async Task Returns_on_a_bill_with_deductions_give_back_the_deduction_in_proportion()
+    {
+        var w = await WorldAsync(f);
+        var o = w.Owner;
+        var supplier = await SupplierAsync(w);
+        // 1000 (deduction 100) + 500 at 16 %: tax 240, payable 1640.
+        var bill = (await ReadAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 1000m, 16m, null, 100m), new ApArLineRequest("Parts", w.Accounts["5104"].Id, 500m, 16m, null)], null)))).Document;
+
+        // 600 of 1500 = 40 %: tax 96, deduction 40, the payable falls by 656.
+        var first = (await ReadAsync<ApArReturnDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/returns"), new ApArReturnRequest(bill.Id, Today, 600m, "Short delivery", null)))).Return;
+        Assert.Equal((600m, 96m, 40m, 656m), (first.Amount, first.Tax, first.Deduction, first.Total));
+        var entry = await EntryAsync(f, "ApArReturn");
+        var ids = entry.Lines.Select(l => l.AccountId).ToList();
+        var codes = await f.DbAsync(db => db.Set<Account>().IgnoreQueryFilters().Where(a => ids.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Code));
+        Assert.Equal(40m, entry.Lines.Single(l => codes[l.AccountId] == "4105").Debit);
+        Assert.Equal(656m, entry.Lines.Single(l => codes[l.AccountId] == "2101").Debit);
+        Assert.Equal(entry.TotalDebit, entry.TotalCredit);
+        Assert.Equal(984m, (await ReadAsync<ApArDocumentDetails>(await o.Client.GetAsync(U(o, $"/apar/bills/{bill.Id}")))).Document.RemainingAmount);
+
+        // The rest (900): the last return takes the remaining tax and deduction exactly; the bill is fully cancelled.
+        var rest = (await ReadAsync<ApArReturnDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/returns"), new ApArReturnRequest(bill.Id, Today, 900m, "Rest", null)))).Return;
+        Assert.Equal((144m, 60m, 984m), (rest.Tax, rest.Deduction, rest.Total));
+        var after = (await ReadAsync<ApArDocumentDetails>(await o.Client.GetAsync(U(o, $"/apar/bills/{bill.Id}")))).Document;
+        Assert.Equal((0m, 1640m), (after.RemainingAmount, after.ReturnedAmount));
+
+        // Voiding a return restores its net amount on the bill.
+        var restNow = await ReadAsync<ApArReturnDetails>(await o.Client.GetAsync(U(o, $"/apar/returns/{rest.Id}")));
+        await (await o.Client.PostAsJsonAsync(U(o, $"/apar/returns/{rest.Id}/void"), new CashVoidRequest("Entered by mistake", restNow.Return.RowVersion))).EnsureOkAsync();
+        Assert.Equal(984m, (await ReadAsync<ApArDocumentDetails>(await o.Client.GetAsync(U(o, $"/apar/bills/{bill.Id}")))).Document.RemainingAmount);
+
+        // A full return in one go cancels the whole bill including its deduction.
+        var bill2 = (await ReadAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 100m, 0m, null, 30m)], null)))).Document;
+        Assert.Equal(70m, bill2.Total);   // deduction larger than the tax: refused before this decision
+        var full = (await ReadAsync<ApArReturnDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/returns"), new ApArReturnRequest(bill2.Id, Today, 100m, "Cancelled", null)))).Return;
+        Assert.Equal((30m, 70m), (full.Deduction, full.Total));
+    }
 }

@@ -6494,3 +6494,32 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017141251_Rev6_ReturnDeductions'
+)
+BEGIN
+    ALTER TABLE [acc].[ApArReturns] ADD [Deduction] decimal(18,3) NOT NULL CONSTRAINT [DF_ApArReturns_Deduction] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017141251_Rev6_ReturnDeductions'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[ApArReturns] ADD CONSTRAINT [CK_ApArReturns_Deduction] CHECK ([Deduction] >= 0 AND [Deduction] <= [Amount])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017141251_Rev6_ReturnDeductions'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017141251_Rev6_ReturnDeductions', N'10.0.12');
+END;
+
+COMMIT;
+GO
+
