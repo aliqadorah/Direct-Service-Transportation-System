@@ -19,3 +19,12 @@ Constraints and indexes:
 - `UX_Users_NormalizedUserName` UNIQUE, filter `[IsDeleted] = 0 AND [NormalizedUserName] IS NOT NULL` — usernames unique platform-wide.
 
 Audit: the new columns are audited like the others (`NormalizedUserName` hidden from readers); new audit actions `CreatedWithPassword`, `PasswordSetByAdmin`, `PasswordChanged`. Personal-data erasure (SEC-19) and tenant deletion clear `UserName` / `NormalizedUserName`.
+
+## 2. "Require 2FA for all users" (item 2) — migration `Rev6_RequireTwoFactor`
+`core.Tenants`:
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| RequireTwoFactor | BIT | NOT NULL | 0 (`DF_Tenants_RequireTwoFactor`) | new; changed by the Owner (core.tenant.manage) with the other sign-in security settings; when 1, every user of the tenant without two-step verification must set it up at the next sign-in. Platform staff (no tenant) always need it |
+
+Audited with the tenant's other settings (action `SettingChange`).

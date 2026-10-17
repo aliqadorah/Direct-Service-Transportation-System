@@ -2,9 +2,12 @@ namespace DirectService.Transportation.Contracts.Platform;
 
 public sealed record TenantResponse(
     string Name, string Status, string PlanCode, string PlanName, DateTime? TrialEndsAt, DateTime? CurrentPeriodEnd,
-    int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string RowVersion);
+    int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string RowVersion,
+    bool RequireTwoFactor = false);
 
-public sealed record TenantSecurityRequest(int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string? RowVersion);
+/// <summary>Tenant sign-in security (Owner only); <paramref name="RequireTwoFactor"/>: every user must use two-step verification (revision 6).</summary>
+public sealed record TenantSecurityRequest(int PasswordMinLength, bool PasswordRequireLetter, bool PasswordRequireDigit, int SessionIdleTimeoutMinutes, string? RowVersion,
+    bool RequireTwoFactor = false);
 
 public sealed record CompanyResponse(string Id, string Name, string? NameEn, string Status, bool IsDemo, DateTime CreatedAt, string RowVersion);
 public sealed record CreateCompanyRequest(string Name, string? NameEn);

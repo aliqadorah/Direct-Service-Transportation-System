@@ -64,6 +64,9 @@ internal static class AuthEndpoints
         auth.MapPost("/2fa/setup", async (TwoFactorCodeRequest r, HttpContext http, AuthFlow flow, CancellationToken ct) =>
             TypedResults.Ok(await flow.CompleteSetupAsync(http, r.Code, ct).ConfigureAwait(false)));
 
+        auth.MapPost("/2fa/skip", async (HttpContext http, AuthFlow flow, CancellationToken ct) =>
+            TypedResults.Ok(await flow.SkipSetupAsync(http, ct).ConfigureAwait(false)));
+
         auth.MapPost("/2fa/verify", async (TwoFactorCodeRequest r, HttpContext http, AuthFlow flow, CancellationToken ct) =>
             TypedResults.Ok(await flow.VerifyAsync(http, r.Code, r.RecoveryCode, ct).ConfigureAwait(false)));
 
@@ -98,6 +101,7 @@ internal static class AuthEndpoints
     private static async Task<SignInResponse> ResponseAsync(SignInNextStep next, AuthFlow flow, CancellationToken ct) => next switch
     {
         SignInNextStep.TwoFactorSetup => new SignInResponse("twoFactorSetup"),
+        SignInNextStep.TwoFactorOffer => new SignInResponse("twoFactorOffer"),
         SignInNextStep.ChangePassword => new SignInResponse("changePassword"),
         SignInNextStep.None => new SignInResponse("done", await flow.ProfileAsync(ct).ConfigureAwait(false)),
         _ => new SignInResponse("twoFactor"),

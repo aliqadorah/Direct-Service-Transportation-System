@@ -6272,3 +6272,24 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017113752_Rev6_RequireTwoFactor'
+)
+BEGIN
+    ALTER TABLE [core].[Tenants] ADD [RequireTwoFactor] bit NOT NULL CONSTRAINT [DF_Tenants_RequireTwoFactor] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017113752_Rev6_RequireTwoFactor'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017113752_Rev6_RequireTwoFactor', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

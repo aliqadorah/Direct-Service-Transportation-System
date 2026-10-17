@@ -84,7 +84,8 @@ public sealed class AdministrationTests(ApiFactory f)
         var again = f.NewClient();
         await again.UseAntiforgeryAsync();
         var signIn = await again.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(user.Email, ApiHelpers.Password));
-        Assert.Equal("twoFactorSetup", (await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+        // Revision 6: 2FA is optional unless the tenant requires it, so after a reset the user signs in and may set it up again later.
+        Assert.Equal("done", (await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
 
         await (await owner.Client.PostAsJsonAsync(U(owner, $"/users/{user.Me.Id}/disable"), new ReasonRequest("On leave"))).EnsureOkAsync();
         var list = await owner.Client.GetFromJsonAsync<PagedResult<UserListItem>>(U(owner, "/users"));

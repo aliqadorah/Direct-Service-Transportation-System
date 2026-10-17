@@ -9,7 +9,10 @@ public sealed record EmailRequest(string Email);
 /// <summary>Sign-in: <paramref name="Login"/> is the email or the username (revision 6); <paramref name="Email"/> is still accepted for older clients.</summary>
 public sealed record SignInRequest(string? Email, string Password, string? Login = null);
 
-/// <summary>Next step after a correct password: "twoFactor", "twoFactorSetup", "changePassword" or "done" (signed in; <paramref name="Me"/> set).</summary>
+/// <summary>
+/// Next step after a correct password: "twoFactor", "twoFactorSetup" (required), "twoFactorOffer" (first sign-in; set up or POST /auth/2fa/skip),
+/// "changePassword" or "done" (signed in; <paramref name="Me"/> set).
+/// </summary>
 public sealed record SignInResponse(string Next, MeResponse? Me = null);
 
 /// <summary>The forced new password at sign-in (stage "changePassword").</summary>

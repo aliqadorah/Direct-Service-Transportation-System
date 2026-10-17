@@ -33,5 +33,7 @@ public class Tenant : AuditableEntity
     public bool PasswordRequireDigit { get; set; } = true;
     /// <summary>Inactive sessions expire after this many minutes (FR-176).</summary>
     public short SessionIdleTimeoutMinutes { get; set; } = 30;
+    /// <summary>Every user of the tenant must use two-step verification (revision 6; Owner only, default off).</summary>
+    public bool RequireTwoFactor { get; set; }
     public Plan Plan { get; set; } = null!;
 }

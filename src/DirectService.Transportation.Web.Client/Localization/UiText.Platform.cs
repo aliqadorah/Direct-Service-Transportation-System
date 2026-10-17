@@ -84,6 +84,8 @@ public static partial class UiText
         ["ten.passwordMinHelp"] = ("من 8 إلى 64 حرفاً.", "8 to 64 characters."),
         ["ten.requireLetter"] = ("تتطلب حرفاً واحداً على الأقل", "Require at least one letter"),
         ["ten.requireDigit"] = ("تتطلب رقماً واحداً على الأقل", "Require at least one digit"),
+        ["ten.require2fa"] = ("إلزام كل المستخدمين بالتحقق بخطوتين", "Require two-step verification for all users"),
+        ["ten.require2faHelp"] = ("عند التفعيل، يُطلب من كل مستخدم لم يفعّله إعداده عند دخوله التالي. موظفو المنصة يستخدمونه دائماً.", "When on, every user without it must set it up at their next sign-in. Platform staff always use it."),
         ["ten.idle"] = ("مهلة الخمول", "Idle timeout"),
         ["ten.idleHelp"] = ("يُطلب الدخول من جديد بعد هذه المدة دون نشاط (5 إلى 1,440 دقيقة).", "Users sign in again after this long without activity (5 to 1,440 minutes)."),
         ["ten.minutes"] = ("دقيقة", "min"),

@@ -19,6 +19,7 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
     public const string StageVerify = "verify";
     public const string StageSetup = "setup";
     public const string StagePassword = "password";
+    public const string StageOffer = "offer";
 
     /// <summary>
     /// Checks the password (<paramref name="login"/> = email or username) and issues the partial sign-in for the next step; with no
@@ -36,9 +37,9 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
     /// <summary>The forced password change (stage "password"); returns the step after it.</summary>
     public async Task<SignInNextStep> ChangePasswordAsync(HttpContext http, string? newPassword, CancellationToken ct)
     {
-        var user = await MfaUserAsync(http, StagePassword).ConfigureAwait(false);
+        var (user, _) = await MfaUserAsync(http, StagePassword).ConfigureAwait(false);
         await auth.ChangeRequiredPasswordAsync(user, newPassword, ct).ConfigureAwait(false);
-        var next = await AuthService.SecondStepAsync(user, ct).ConfigureAwait(false);
+        var next = await auth.SecondStepAsync(user, ct).ConfigureAwait(false);
         await ContinueAsync(http, user, next, ct).ConfigureAwait(false);
         return next;
     }
@@ -48,10 +49,14 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
     {
         if (next == SignInNextStep.None)
         {
+            await auth.CompleteWithoutSecondFactorAsync(user, skippedOffer: false, ct).ConfigureAwait(false);
             await CompleteAsync(http, user, ct).ConfigureAwait(false);
             return;
         }
-        var stage = next switch { SignInNextStep.TwoFactorSetup => StageSetup, SignInNextStep.ChangePassword => StagePassword, _ => StageVerify };
+        var stage = next switch
+        {
+            SignInNextStep.TwoFactorSetup => StageSetup, SignInNextStep.TwoFactorOffer => StageOffer, SignInNextStep.ChangePassword => StagePassword, _ => StageVerify,
+        };
         await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, stage, user.SecurityStamp)).ConfigureAwait(false);
     }
 
@@ -78,28 +83,39 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
         return result.Succeeded ? result.Principal?.FindFirstValue(AppClaims.Stage) : null;
     }
 
-    /// <summary>Authenticator key and URI for the set-up stage (creating the key changes the security stamp: the partial cookie is re-issued).</summary>
+    /// <summary>
+    /// Authenticator key and URI for the set-up stage, required or offered (creating the key changes the security stamp: the partial cookie
+    /// is re-issued at the same stage).
+    /// </summary>
     public async Task<TwoFactorSetupResponse> SetupAsync(HttpContext http)
     {
-        var user = await MfaUserAsync(http, StageSetup).ConfigureAwait(false);
+        var (user, stage) = await MfaUserAsync(http, StageSetup, StageOffer).ConfigureAwait(false);
         var setup = await auth.GetAuthenticatorSetupAsync(user).ConfigureAwait(false);
-        await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, StageSetup, user.SecurityStamp)).ConfigureAwait(false);
+        await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, stage, user.SecurityStamp)).ConfigureAwait(false);
         return new TwoFactorSetupResponse(setup.SharedKey, setup.AuthenticatorUri);
     }
 
     /// <summary>Confirms the authenticator with a code, signs in, and returns the one-time recovery codes.</summary>
     public async Task<RecoveryCodesResponse> CompleteSetupAsync(HttpContext http, string? code, CancellationToken ct)
     {
-        var user = await MfaUserAsync(http, StageSetup).ConfigureAwait(false);
+        var (user, _) = await MfaUserAsync(http, StageSetup, StageOffer).ConfigureAwait(false);
         var codes = await auth.CompleteAuthenticatorSetupAsync(user, code ?? string.Empty, ct).ConfigureAwait(false);
         var profile = await CompleteAsync(http, user, ct).ConfigureAwait(false);
         return new RecoveryCodesResponse(codes, profile);
     }
 
+    /// <summary>"Skip for now" on the offered set-up (revision 6): signs in without 2FA — refused when 2FA is required by then.</summary>
+    public async Task<MeResponse> SkipSetupAsync(HttpContext http, CancellationToken ct)
+    {
+        var (user, _) = await MfaUserAsync(http, StageOffer).ConfigureAwait(false);
+        await auth.CompleteWithoutSecondFactorAsync(user, skippedOffer: true, ct).ConfigureAwait(false);
+        return await CompleteAsync(http, user, ct).ConfigureAwait(false);
+    }
+
     /// <summary>Verifies the authenticator code or a recovery code and signs in.</summary>
     public async Task<MeResponse> VerifyAsync(HttpContext http, string? code, string? recoveryCode, CancellationToken ct)
     {
-        var user = await MfaUserAsync(http, StageVerify).ConfigureAwait(false);
+        var (user, _) = await MfaUserAsync(http, StageVerify).ConfigureAwait(false);
         await auth.VerifySecondFactorAsync(user, code, recoveryCode, ct).ConfigureAwait(false);
         return await CompleteAsync(http, user, ct).ConfigureAwait(false);
     }
@@ -114,18 +130,19 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
         await http.SignOutAsync(AuthSchemes.Mfa).ConfigureAwait(false);
     }
 
-    /// <summary>The user of the partial (password-verified) sign-in, at the expected stage, with an unchanged security stamp.</summary>
-    private async Task<User> MfaUserAsync(HttpContext http, string stage)
+    /// <summary>The user of the partial (password-verified) sign-in, at one of the expected stages, with an unchanged security stamp.</summary>
+    private async Task<(User User, string Stage)> MfaUserAsync(HttpContext http, params string[] stages)
     {
         ArgumentNullException.ThrowIfNull(http);
         var result = await http.AuthenticateAsync(AuthSchemes.Mfa).ConfigureAwait(false);
         var p = result.Principal;
-        if (!result.Succeeded || p is null || p.FindFirstValue(AppClaims.Stage) != stage)
+        var stage = p?.FindFirstValue(AppClaims.Stage);
+        if (!result.Succeeded || p is null || stage is null || !stages.Contains(stage, StringComparer.Ordinal))
             throw new AppException(ErrorCodes.TwoFactorRequired, StatusCodes.Status401Unauthorized);
         var user = await users.FindByIdAsync(p.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty).ConfigureAwait(false);
         if (user is null || user.Status != "Active" || user.SecurityStamp != p.FindFirstValue(AppClaims.SecurityStamp))
             throw new AppException(ErrorCodes.TwoFactorRequired, StatusCodes.Status401Unauthorized);
-        return user;
+        return (user, stage);
     }
 
     /// <summary>Creates the server-side session, issues the application cookie and returns the profile.</summary>

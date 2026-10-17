@@ -15,6 +15,9 @@ public enum SignInNextStep
     /// <summary>2FA is required and not set up yet: set up the authenticator app before anything else.</summary>
     TwoFactorSetup,
 
+    /// <summary>First sign-in without 2FA where it is not required (revision 6): set-up offered with "Skip for now".</summary>
+    TwoFactorOffer,
+
     /// <summary>The administrator asked for a new password (created or reset by the administrator): choose one first.</summary>
     ChangePassword,
 
@@ -28,8 +31,9 @@ public sealed record AuthenticatorSetup(string SharedKey, string AuthenticatorUr
 /// <summary>
 /// Sign-in with email or username + password, then two-factor authentication (SEC-01, SEC-02, FR-175, FR-177). Lockout: 5 failed
 /// attempts (password or code) → 15 minutes, the same for every user. Every attempt is audited (FR-188: sign-in and failed sign-in).
-/// Revision 6 (owner change request 15 Oct 2026): a user created by an administrator with a username signs in without 2FA and may be
-/// asked to choose a new password first; platform staff always need 2FA. The API layer turns the results into cookies.
+/// Revision 6 (owner change requests 15 Oct 2026): 2FA is required of platform staff (always) and of every user of a tenant with
+/// "Require 2FA for all users"; others are offered the set-up at their first sign-in ("Skip for now") and may turn it on later. A user
+/// created by an administrator may have to choose a new password first. The API layer turns the results into cookies.
 /// </summary>
 public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChangeContext changes, IDataScope scope, TimeProvider clock)
 {
@@ -67,20 +71,50 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         return (user, user.MustChangePassword ? SignInNextStep.ChangePassword : await SecondStepAsync(user, ct).ConfigureAwait(false));
     }
 
-    /// <summary>The step after the password (and after a forced password change): code, required set-up, or none.</summary>
-    public static Task<SignInNextStep> SecondStepAsync(User user, CancellationToken ct)
+    /// <summary>The step after the password (and after a forced password change): code, required set-up, offered set-up, or none.</summary>
+    public async Task<SignInNextStep> SecondStepAsync(User user, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        _ = ct;
-        if (user.TwoFactorEnabledAt is not null) return Task.FromResult(SignInNextStep.TwoFactor);
-        return Task.FromResult(RequiresTwoFactor(user) ? SignInNextStep.TwoFactorSetup : SignInNextStep.None);
+        if (user.TwoFactorEnabledAt is not null) return SignInNextStep.TwoFactor;
+        if (await RequiresTwoFactorAsync(user, ct).ConfigureAwait(false)) return SignInNextStep.TwoFactorSetup;
+        // Offered once, at the first sign-in of a user who signs in with their email (sign-up, invitation); a user created by an
+        // administrator with a username is not asked (the administrator chose; the profile recommends it).
+        return user.LastSignInAt is null && user.UserName is null ? SignInNextStep.TwoFactorOffer : SignInNextStep.None;
     }
 
-    /// <summary>Platform staff always need 2FA; so do users who sign in with their email. A user created with a username does not.</summary>
-    public static bool RequiresTwoFactor(User user)
+    /// <summary>Platform staff always need 2FA, without exception; tenant users when their tenant requires it for all users.</summary>
+    public async Task<bool> RequiresTwoFactorAsync(User user, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return user.IsPlatformStaff || user.UserName is null;
+        if (RequiresTwoFactor(user, tenantRequires: false)) return true;
+        var required = await db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == user.TenantId).Select(t => t.RequireTwoFactor)
+            .SingleOrDefaultAsync(ct).ConfigureAwait(false);
+        return RequiresTwoFactor(user, required);
+    }
+
+    /// <summary>The rule itself: platform staff, or the tenant's "Require 2FA for all users".</summary>
+    public static bool RequiresTwoFactor(User user, bool tenantRequires)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return user.IsPlatformStaff || user.TenantId is null || tenantRequires;
+    }
+
+    /// <summary>A sign-in that ends without a code (no 2FA required, or the offered set-up skipped): audited, failure counter cleared.</summary>
+    public async Task CompleteWithoutSecondFactorAsync(User user, bool skippedOffer, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        if (user.TwoFactorEnabledAt is not null || await RequiresTwoFactorAsync(user, ct).ConfigureAwait(false))
+            throw new AppException(ErrorCodes.TwoFactorRequired, 401);   // checked again at the last moment (the tenant may require it now)
+        if (skippedOffer)
+        {
+            using (scope.Use(user.TenantId, null, user.Id))
+            {
+                changes.SetAction(user, "TwoFactorSkipped");
+                user.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+        }
+        await RecordSuccessAsync(user, ct).ConfigureAwait(false);
     }
 
     /// <summary>

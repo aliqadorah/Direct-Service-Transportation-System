@@ -58,7 +58,7 @@
         {
             SignInNextStep.None => LocalUrl(ReturnUrl),
             SignInNextStep.ChangePassword => Href("/change-password", LocalUrl(ReturnUrl)),
-            SignInNextStep.TwoFactorSetup => Href("/two-factor/setup", LocalUrl(ReturnUrl)),
+            SignInNextStep.TwoFactorSetup or SignInNextStep.TwoFactorOffer => Href("/two-factor/setup", LocalUrl(ReturnUrl)),
             _ => Href("/two-factor", LocalUrl(ReturnUrl)),
         });
     }

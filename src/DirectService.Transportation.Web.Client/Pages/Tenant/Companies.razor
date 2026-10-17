@@ -37,6 +37,7 @@
                     <ToggleField @bind-Value="_sec.RequireLetter" Label="@L["ten.requireLetter"]" />
                     <ToggleField @bind-Value="_sec.RequireDigit" Label="@L["ten.requireDigit"]" />
                 </div>
+                <ToggleField @bind-Value="_sec.RequireTwoFactor" Label="@L["ten.require2fa"]" Help="@L["ten.require2faHelp"]" />
                 <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
             </EditForm>
         }
@@ -144,6 +145,7 @@
         _sec = new SecurityModel
         {
             PasswordMinLength = t.PasswordMinLength, RequireLetter = t.PasswordRequireLetter, RequireDigit = t.PasswordRequireDigit, IdleMinutes = t.SessionIdleTimeoutMinutes,
+            RequireTwoFactor = t.RequireTwoFactor,
         };
         _secCtx = new EditContext(_sec);
     }
@@ -156,7 +158,7 @@
         try
         {
             var t = await Api.PutAsync<TenantResponse>("api/v1/tenant/security",
-                new TenantSecurityRequest(_sec.PasswordMinLength ?? 8, _sec.RequireLetter, _sec.RequireDigit, _sec.IdleMinutes ?? 30, _tenant.RowVersion));
+                new TenantSecurityRequest(_sec.PasswordMinLength ?? 8, _sec.RequireLetter, _sec.RequireDigit, _sec.IdleMinutes ?? 30, _tenant.RowVersion, _sec.RequireTwoFactor));
             ShowSecurity(t);
             Toasts.Success(L["set.saved"]);
         }
@@ -249,5 +251,6 @@
         public bool RequireLetter { get; set; }
         public bool RequireDigit { get; set; }
         public int? IdleMinutes { get; set; }
+        public bool RequireTwoFactor { get; set; }
     }
 }

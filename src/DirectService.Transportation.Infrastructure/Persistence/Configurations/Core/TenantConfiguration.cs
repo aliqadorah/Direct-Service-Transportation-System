@@ -170,6 +170,14 @@ internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasColumnOrder(23)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6: "Require 2FA for all users" (owner change request 15 Oct 2026).
+        builder.Property(e => e.RequireTwoFactor)
+            .HasColumnName("RequireTwoFactor")
+            .HasColumnType("bit")
+            .HasColumnOrder(24)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
 
         builder.HasIndex(new[] { "PublicId" }, "UX_Tenants_PublicId")
             .IsUnique()

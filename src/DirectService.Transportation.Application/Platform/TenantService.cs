@@ -18,16 +18,16 @@ namespace DirectService.Transportation.Application.Platform;
 /// </summary>
 public sealed class TenantService(
     IAppDbContext db, IRequestContext ctx, IChangeContext changes, CompanyProvisioningService provisioning,
-    AccessService access, IUrlTokenService tokens)
+    AccessService access, IUrlTokenService tokens, SessionService? sessions = null)
 {
     public async Task<TenantResponse> GetAsync(CancellationToken ct)
     {
         var t = await db.Set<Tenant>().AsNoTracking().Where(x => x.Id == ctx.TenantId)
             .Select(x => new { x.Name, x.Status, x.Plan.Code, x.Plan.NameAr, x.Plan.NameEn, x.TrialEndsAt, x.CurrentPeriodEnd,
-                x.PasswordMinLength, x.PasswordRequireLetter, x.PasswordRequireDigit, x.SessionIdleTimeoutMinutes, x.RowVersion })
+                x.PasswordMinLength, x.PasswordRequireLetter, x.PasswordRequireDigit, x.SessionIdleTimeoutMinutes, x.RowVersion, x.RequireTwoFactor })
             .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.NotFound();
         return new TenantResponse(t.Name, t.Status, t.Code, ctx.Language == "en" ? t.NameEn : t.NameAr, t.TrialEndsAt, t.CurrentPeriodEnd,
-            t.PasswordMinLength, t.PasswordRequireLetter, t.PasswordRequireDigit, t.SessionIdleTimeoutMinutes, Convert.ToBase64String(t.RowVersion));
+            t.PasswordMinLength, t.PasswordRequireLetter, t.PasswordRequireDigit, t.SessionIdleTimeoutMinutes, Convert.ToBase64String(t.RowVersion), t.RequireTwoFactor);
     }
 
     public async Task<TenantResponse> UpdateSecurityAsync(TenantSecurityRequest r, CancellationToken ct)
@@ -43,8 +43,17 @@ public sealed class TenantService(
         t.PasswordRequireLetter = r.PasswordRequireLetter;
         t.PasswordRequireDigit = r.PasswordRequireDigit;
         t.SessionIdleTimeoutMinutes = (short)r.SessionIdleTimeoutMinutes;
+        var turnedOn = r.RequireTwoFactor && !t.RequireTwoFactor;
+        t.RequireTwoFactor = r.RequireTwoFactor;   // users without 2FA set it up at their next sign-in (revision 6)
         changes.SetAction(t, "SettingChange");
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (turnedOn && sessions is not null)
+        {
+            // Security review (revision 6): "at their next sign-in" starts now — sessions of users without 2FA end (except this one).
+            var without = await db.Set<User>().Where(u => u.TenantId == t.Id && u.TwoFactorEnabledAt == null && !u.IsDeleted).Select(u => u.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var id in without) await sessions.RevokeAllAsync(id, "Two-step verification required for all users", ctx.SessionId, ct).ConfigureAwait(false);
+        }
         return await GetAsync(ct).ConfigureAwait(false);
     }
 

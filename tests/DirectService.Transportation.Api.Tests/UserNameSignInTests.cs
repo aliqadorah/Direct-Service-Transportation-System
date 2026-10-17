@@ -247,19 +247,4 @@ public sealed class UserNameSignInTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
         Assert.Equal("done", (await PasswordStepAsync(userName, NewPassword)).Response.Next);
     }
-
-    [Fact]
-    public async Task Email_users_still_need_2FA_and_staff_always_do()
-    {
-        // An Owner who signed up with an email is asked to set up 2FA at the first sign-in (helper asserts "twoFactorSetup").
-        var owner = await f.SignUpOwnerAsync();
-        Assert.False(string.IsNullOrEmpty(owner.AuthenticatorKey));
-        await f.DbAsync(async db =>
-        {
-            var u = await db.Set<User>().IgnoreQueryFilters().SingleAsync(x => x.Email == owner.Email);
-            Assert.True(Application.Identity.AuthService.RequiresTwoFactor(u));
-            Assert.True(Application.Identity.AuthService.RequiresTwoFactor(new User { IsPlatformStaff = true, UserName = "staff" }));
-            return true;
-        });
-    }
 }

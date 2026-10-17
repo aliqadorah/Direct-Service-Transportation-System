@@ -213,6 +213,27 @@ public sealed class PlatformPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "/tenant/security" && r.Body!.Contains("\"rowVersion\":\"RV1\"", StringComparison.Ordinal)));
     }
 
+    /// <summary>Revision 6 item 2: "Require two-step verification for all users" — off by default, saved with the security settings.</summary>
+    [Fact]
+    public void Tenant_security_turns_on_require_2fa_for_all_users()
+    {
+        Respond("/tenant/companies", Array.Empty<CompanyResponse>());
+        var tenant = new TenantResponse("Tenant", "Active", "PRO", "Professional", null, null, 10, true, true, 30, "RV1");
+        Respond("/tenant/security", tenant);
+        Respond("/tenant", tenant);
+        var cut = Render<Companies>();
+        cut.WaitForAssertion(() => Assert.Contains(L["ten.security"], cut.Markup));
+        cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(L["ten.require2fa"], cut.Markup));
+        Assert.Contains(L["ten.require2faHelp"], cut.Markup);
+        var toggle = cut.FindAll("[role=switch]").Single(s => s.ParentElement!.TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)
+            || (s.GetAttribute("aria-labelledby") is { } id && cut.Find("#" + id).TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)));
+        Assert.Equal("false", toggle.GetAttribute("aria-checked"));
+        toggle.Click();
+        cut.Find("form").Submit();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "/tenant/security" && r.Body!.Contains("\"requireTwoFactor\":true", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void Support_approval_sends_a_window_of_the_chosen_length()
     {

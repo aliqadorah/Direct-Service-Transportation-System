@@ -5898,6 +5898,12 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnOrder(1)
                         .HasDefaultValueSql("NEWID()", "DF_Tenants_PublicId");
 
+                    b.Property<bool>("RequireTwoFactor")
+                        .HasColumnType("bit")
+                        .HasColumnName("RequireTwoFactor")
+                        .HasColumnOrder(24)
+                        .HasDefaultValueSql("0", "DF_Tenants_RequireTwoFactor");
+
                     b.Property<DateTime?>("RetentionEndsAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("RetentionEndsAt")

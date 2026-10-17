@@ -1,5 +1,7 @@
 @page "/two-factor/setup"
-@* SCR-05 two-factor set-up (FR-177): QR code and manual key, confirm with a first code, then the ten one-time recovery codes (shown once). *@
+@* SCR-05 two-factor set-up (FR-177): QR code and manual key, confirm with a first code, then the ten one-time recovery codes (shown once).
+   Revision 6: required (platform staff, or the tenant requires it for all users) or offered at the first sign-in with "Skip for now" and a clear
+   recommendation to turn it on. *@
 @inherits AccountPage
 @using DirectService.Transportation.Application.Abstractions
 @using DirectService.Transportation.Contracts.Identity
@@ -25,8 +27,9 @@
 }
 else
 {
-    <AuthCard Title="@L["acct.setupTitle"]" Lead="@L["acct.setupLead"]">
+    <AuthCard Title="@L["acct.setupTitle"]" Lead="@L[_optional ? "acct.setupLeadOptional" : "acct.setupLead"]">
         <ChildContent>
+            @if (_optional) {<Banner Tone="Tone.Warn" Icon="shield" Text="@L["acct.setupRecommend"]" />}
             <EditForm Model="Input" FormName="two-factor-setup" OnSubmit="Submit" class="stack" method="post">
                 <ProblemValidator @ref="_problems" />
                 @if (_setup is not null)
@@ -44,8 +47,15 @@ else
                            inputmode="numeric" pattern="[0-9 ]*" class="num" style="font-size:20px;letter-spacing:.3em;text-align:center" />
                 <Btn Type="submit" Primary="true" Text="@L["acct.setupSubmit"]" Class="w100" />
             </EditForm>
+            @if (_optional)
+            {
+                <form method="post" @formname="two-factor-skip" @onsubmit="Skip" class="stack">
+                    <AntiforgeryToken />
+                    <Btn Type="submit" Ghost="true" Text="@L["acct.setupSkip"]" Class="w100" />
+                </form>
+            }
         </ChildContent>
-        <Foot>@L["acct.setupNote"]</Foot>
+        <Foot>@L[_optional ? "acct.setupNoteOptional" : "acct.setupNote"]</Foot>
     </AuthCard>
 }
 
@@ -56,6 +66,7 @@ else
     private ProblemValidator? _problems;
     private TwoFactorSetupResponse? _setup;
     private IReadOnlyList<string>? _codes;
+    private bool _optional;
 
     [SupplyParameterFromForm] private CodeInput Input { get; set; } = default!;
     [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
@@ -65,7 +76,9 @@ else
     protected override async Task OnInitializedAsync()
     {
         Input ??= new();   // before the first await: the page renders while waiting
-        if (await AuthFlow.StageAsync(Http) != AuthFlow.StageSetup) { Go(Href("/sign-in", LocalUrl(ReturnUrl))); return; }
+        var stage = await AuthFlow.StageAsync(Http);
+        if (stage is not (AuthFlow.StageSetup or AuthFlow.StageOffer)) { Go(Href("/sign-in", LocalUrl(ReturnUrl))); return; }
+        _optional = stage == AuthFlow.StageOffer;
         // The key is created once and kept until confirmed, so reloading the page shows the same QR code.
         _setup = await Flow.SetupAsync(Http);
     }
@@ -88,6 +101,21 @@ else
             _problems?.Show(Problem(e) with { Field = "code" });
             Input.Code = null;
         }
+    }
+
+    /// <summary>"Skip for now": signs in without 2FA (refused — back to sign-in — if 2FA became required meanwhile).</summary>
+    private async Task Skip()
+    {
+        try
+        {
+            await Flow.SkipSetupAsync(Http, Http.RequestAborted);
+        }
+        catch (AppException)
+        {
+            Go(Href("/sign-in", LocalUrl(ReturnUrl)));
+            return;
+        }
+        Go(LocalUrl(ReturnUrl));
     }
 
     private static string Grouped(string key) => string.Join(' ', Enumerable.Range(0, (key.Length + 3) / 4).Select(i => key.Substring(i * 4, Math.Min(4, key.Length - i * 4))));

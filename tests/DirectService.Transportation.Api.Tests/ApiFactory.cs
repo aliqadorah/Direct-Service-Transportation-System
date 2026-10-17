@@ -175,6 +175,8 @@ public static class ApiHelpers
 {
     public const string Password = "Passw0rd-Test";
 
+    private static readonly string[] FirstSetupSteps = ["twoFactorSetup", "twoFactorOffer"];
+
     public static async Task UseAntiforgeryAsync(this HttpClient client)
     {
         var t = await client.GetFromJsonAsync<AntiforgeryResponse>("/api/v1/auth/antiforgery");
@@ -196,13 +198,13 @@ public static class ApiHelpers
         return await f.SignInFirstTimeAsync(client, email, Password);
     }
 
-    /// <summary>Password step + mandatory 2FA set-up (first sign-in).</summary>
+    /// <summary>Password step + 2FA set-up at the first sign-in (required, or offered with "Skip for now" since revision 6).</summary>
     public static async Task<SignedInUser> SignInFirstTimeAsync(this ApiFactory f, HttpClient client, string email, string password)
     {
         _ = f;
         var signIn = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(email, password));
         await signIn.EnsureOkAsync();
-        Assert.Equal("twoFactorSetup", (await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+        Assert.Contains((await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.Next, FirstSetupSteps);
         var setup = await client.GetFromJsonAsync<TwoFactorSetupResponse>("/api/v1/auth/2fa/setup");
         var done = await client.PostAsJsonAsync("/api/v1/auth/2fa/setup", new TwoFactorCodeRequest(Totp.Code(setup!.SharedKey), null));
         await done.EnsureOkAsync();
