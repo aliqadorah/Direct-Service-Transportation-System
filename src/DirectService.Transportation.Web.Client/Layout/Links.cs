@@ -77,6 +77,9 @@ public static class Links
             "pending-postings" => "accounting/automatic?tab=pending",
             "einvoice-submissions" => "e-invoicing",
             "journal-entry" => $"accounting/journal/{id}",
+            "supplier-bill" => $"accounting/payables/{id}",
+            "apar-return" => $"accounting/apar-returns/{id}",
+            "apar-payment" => $"accounting/apar-payments/{id}",
             _ => null,
         };
         if (route is null || route.EndsWith('/')) return null;   // a record link without its id

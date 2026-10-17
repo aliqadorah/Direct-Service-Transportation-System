@@ -3,6 +3,8 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Ledger;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Transportation.Contracts.ApAr;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
@@ -45,6 +47,8 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         new("margin", "RPT-10", "operational", "تحليل الهامش", "Margin analysis", null, ["from", "to", "groupBy"], PermissionKeys.TripsView),
         new("monthly-summary", "RPT-11", "operational", "الملخص الشهري", "Monthly summary", null, ["from", "to"], PermissionKeys.TripsView),
         new("customer-statement", "RPT-12", "financial", "كشف حساب عميل", "Customer statement", null, ["customer", "from", "to"], PermissionKeys.InvView, Required: ["customer"]),
+        // Owner decision 17 Oct 2026: a supplier statement like the customer statement, with amount, tax, deduction and net.
+        new("supplier-statement", "RPT-24", "financial", "كشف حساب مورد", "Supplier statement", null, ["supplier", "from", "to"], PermissionKeys.AcctApar, Required: ["supplier"]),
         new("driver-statement", "RPT-13", "financial", "كشف حساب سائق", "Driver statement", "/drivers/{driver}/statement", ["driver", "from", "to"], PermissionKeys.DrvView),
         new("partner-statement", "RPT-14", "financial", "كشف حساب شريك", "Partner statement", "/partners/{partner}/statement", ["partner", "from", "to"], PermissionKeys.DrvView),
         new("account-statement", "RPT-15", "financial", "كشف حساب أستاذ", "Ledger account statement", "/accounting/reports/account-statement", ["account", "from", "to"], PermissionKeys.AcctView),
@@ -83,6 +87,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             "margin" => await MarginAsync(def, title, q, ct).ConfigureAwait(false),
             "monthly-summary" => await MonthlyAsync(def, title, q, ct).ConfigureAwait(false),
             "customer-statement" => await CustomerStatementAsync(def, title, q, ct).ConfigureAwait(false),
+            "supplier-statement" => await SupplierStatementAsync(def, title, q, ct).ConfigureAwait(false),
             "driver-balances" => await DriverBalancesAsync(def, title, q, ct).ConfigureAwait(false),
             "partner-balances" => await PartnerBalancesAsync(def, title, q, ct).ConfigureAwait(false),
             _ => throw Fail.NotFound(),
@@ -459,6 +464,62 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
              C("credit", "دائن", "Credit", "money"), C("balance", "الرصيد", "Balance", "money")],
             rows, [null, null, L("الإجمالي والرصيد الختامي", "Totals and closing balance"), events.Sum(e => e.Debit), events.Sum(e => e.Credit), running],
             L("مقبوضات غير مخصصة حتى نهاية الفترة: ", "Unapplied receipts up to the period end: ") + Accounting.Money.Format(unapplied), false);
+    }
+
+    // ============================================================ RPT-24 supplier statement (owner decision 17 Oct 2026)
+
+    /// <summary>
+    /// A supplier's bills (amount, tax, deduction, net = payable), returns (the same, negative) and payments (net only), with the running
+    /// balance owed to the supplier, the opening balance before the period and totals.
+    /// </summary>
+    private async Task<ReportResult> SupplierStatementAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q.Supplier)) throw Fail.Field("supplier", ErrorCodes.ValidationRequired, "supplier");
+        var supplier = await support.FindAsync<ApArParty>(q.Supplier, ct).ConfigureAwait(false);
+        if (supplier.PartyRole != "Supplier") throw Fail.Field("supplier", ErrorCodes.ValidationFormat, "supplier");
+        var f = await FiltersAsync(q, ct).ConfigureAwait(false);
+        var bills = db.Set<ApArDocument>().AsNoTracking().Where(x => x.PartyId == supplier.Id && x.DocumentKind == ApArCodes.SupplierBill && x.Status == ApArCodes.Posted);
+        var returns = db.Set<ApArReturn>().AsNoTracking().Where(x => x.Document.PartyId == supplier.Id && x.Document.DocumentKind == ApArCodes.SupplierBill && x.Status == ApArCodes.Posted);
+        var payments = db.Set<ApArPayment>().AsNoTracking().Where(x => x.Document.PartyId == supplier.Id && x.Document.DocumentKind == ApArCodes.SupplierBill && x.Status == CashCodes.Active);
+        var opening = await bills.Where(x => x.DocumentDate < f.From).SumAsync(x => x.Total, ct).ConfigureAwait(false)
+            - await returns.Where(x => x.ReturnDate < f.From).SumAsync(x => x.Total, ct).ConfigureAwait(false)
+            - await payments.Where(x => x.PaymentDate < f.From).SumAsync(x => x.Amount, ct).ConfigureAwait(false);
+        var events = (await bills.Where(x => x.DocumentDate >= f.From && x.DocumentDate <= f.To)
+                .Select(x => new { x.Id, x.PublicId, x.Number, Date = x.DocumentDate, Kind = "bill", x.Reference, Amount = (decimal?)x.Subtotal, Tax = (decimal?)x.Tax, Deduction = (decimal?)x.Deduction, Net = x.Total })
+                .ToListAsync(ct).ConfigureAwait(false))
+            .Concat(await returns.Where(x => x.ReturnDate >= f.From && x.ReturnDate <= f.To)
+                .Select(x => new { x.Id, x.PublicId, x.Number, Date = x.ReturnDate, Kind = "return", Reference = (string?)x.Document.Number, Amount = (decimal?)(-x.Amount), Tax = (decimal?)(-x.Tax), Deduction = (decimal?)(-x.Deduction), Net = -x.Total })
+                .ToListAsync(ct).ConfigureAwait(false))
+            .Concat(await payments.Where(x => x.PaymentDate >= f.From && x.PaymentDate <= f.To)
+                .Select(x => new { x.Id, x.PublicId, x.Number, Date = x.PaymentDate, Kind = "payment", Reference = (string?)x.Document.Number, Amount = (decimal?)null, Tax = (decimal?)null, Deduction = (decimal?)null, Net = -x.Amount })
+                .ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(e => e.Date).ThenBy(e => e.Kind == "bill" ? 0 : 1).ThenBy(e => e.Id).ToList();
+        var running = opening;
+        var rows = new List<ResultRow> { new([f.From, null, L("رصيد افتتاحي", "Opening balance"), null, null, null, null, opening], null) };
+        foreach (var e in events)
+        {
+            running += e.Net;
+            var label = e.Kind switch
+            {
+                "bill" => L("فاتورة مورد", "Supplier bill") + (e.Reference is null ? string.Empty : " · " + e.Reference),
+                "return" => L("مرتجع مشتريات", "Purchase return") + " · " + e.Reference,
+                _ => L("دفعة", "Payment") + " · " + e.Reference,
+            };
+            var link = e.Kind switch
+            {
+                "bill" => new DrillLink("supplier-bill", support.Token<ApArDocument>(e.PublicId), null),
+                "return" => new DrillLink("apar-return", support.Token<ApArReturn>(e.PublicId), null),
+                _ => new DrillLink("apar-payment", support.Token<ApArPayment>(e.PublicId), null),
+            };
+            rows.Add(new ResultRow([e.Date, e.Number, label, e.Amount, e.Tax, e.Deduction, e.Net, running], link));
+        }
+        var filters = PeriodFilters(f);
+        filters.Insert(0, new(L("المورد", "Supplier"), supplier.Name));
+        return new ReportResult(d.Key, title, filters,
+            [C("date", "التاريخ", "Date", "date"), C("document", "المستند", "Document"), C("description", "البيان", "Description"), C("amount", "المبلغ", "Amount", "money"),
+             C("tax", "الضريبة", "Tax", "money"), C("deduction", "الخصم", "Deduction", "money"), C("net", "الصافي", "Net", "money"), C("balance", "الرصيد المستحق", "Balance owed", "money")],
+            rows, [null, null, L("الإجمالي والرصيد الختامي", "Totals and closing balance"), events.Sum(e => e.Amount ?? 0), events.Sum(e => e.Tax ?? 0),
+                events.Sum(e => e.Deduction ?? 0), events.Sum(e => e.Net), running], null, false);
     }
 
     // ============================================================ RPT-19 / RPT-20 balances

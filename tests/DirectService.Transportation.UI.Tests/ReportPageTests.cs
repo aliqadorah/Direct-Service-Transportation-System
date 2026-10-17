@@ -31,6 +31,21 @@ public sealed class ReportPageTests : PageTestBase
         Assert.Empty(Services.GetRequiredService<ToastService>().Items);
     }
 
+    /// <summary>Owner decision 17 Oct 2026: the supplier statement (RPT-24) has a supplier picker, required before it runs.</summary>
+    [Fact]
+    public void Supplier_statement_asks_for_its_supplier()
+    {
+        var supplierStatement = new ReportCatalogEntry("supplier-statement", "RPT-24", "financial", "كشف حساب مورد", null, ["supplier", "from", "to"], ["supplier"]);
+        Respond("reports/catalog", new[] { supplierStatement });
+        Respond("apar/parties/options", new[] { new Contracts.ApAr.ApArPartyOption("Supplier", "s1", "المناصير", null, 30) });
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/reports/financial?report=supplier-statement");
+        var cut = Render<ReportsCatalog>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(L["rep.supplier"], cut.Markup));
+        cut.FindAll("button").Single(b => b.TextContent.Trim() == L["rep.run"]).Click();
+        cut.WaitForAssertion(() => Assert.Contains(L.F("ui.requiredField", L["rep.supplier"]), Text(cut)));
+        Assert.DoesNotContain(Requests, r => r.Path.StartsWith("reports/standard", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void A_filter_refused_by_the_server_is_marked_on_its_field_not_shown_as_could_not_load()
     {

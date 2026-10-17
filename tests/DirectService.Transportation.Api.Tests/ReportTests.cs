@@ -87,7 +87,7 @@ public sealed class ReportTests(ApiFactory f)
         var o = w.Owner;
         Assert.Equal(191.750m, w.Trips[1].Revenue);
         var catalog = await ReadAsync<List<ReportCatalogEntry>>(await o.Client.GetAsync(U(o, "/reports/catalog")));
-        Assert.Equal(23, catalog.Count);                                           // RPT-01 … RPT-23 for an Owner
+        Assert.Equal(24, catalog.Count);                                           // RPT-01 … RPT-24 for an Owner (RPT-24 supplier statement, 17 Oct 2026)
         Assert.Equal("/apar/ageing/receivables", catalog.Single(c => c.Code == "RPT-17").Path);
         // The customer statement cannot run without its customer: the screen checks it first (owner feedback 13 Oct 2026, RPT-12).
         Assert.Equal(["customer"], catalog.Single(c => c.Code == "RPT-12").Required);

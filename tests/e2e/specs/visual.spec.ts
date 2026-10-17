@@ -8,7 +8,7 @@ import { BASE_URL, ROOT, WEBHOOK_SECRET } from "../support/env";
 import { totp } from "../support/totp";
 import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
-import { button } from "../support/ui";
+import { button, pick } from "../support/ui";
 import { open, VisualRun, wanted } from "../support/visual";
 import { addTrip, buildWorld, today, type World } from "../support/world";
 
@@ -68,6 +68,8 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
     { role: "Supplier", name: "Visual supplier / مورد", taxNumber: null, phone: null, address: null, controlAccountId: code("2101"), paymentTermsDays: 30, clientId: null, rowVersion: null });
   const bill = await api<{ document: { id: string } }>(page, "POST", c(company, "apar/bills"), { partyId: supplier.id, documentDate: today(), reference: "DED-1",
     lines: [{ description: "Haulage / نقل", accountId: code("5103"), amount: 1000, taxRate: 16, deduction: 100 }, { description: "Parts / قطع", accountId: code("5104"), amount: 500, taxRate: 16 }] });
+  // Owner decision 17 Oct 2026: a return on that bill gives back its share of the deduction.
+  const billReturn = await api<{ return: { id: string } }>(page, "POST", c(company, "apar/returns"), { documentId: bill.document.id, returnDate: today(), amount: 300, reason: "Visual return / مرتجع" });
   const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
   return {
@@ -79,6 +81,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
       draft: draft.id,
       statement: statementAccounts,
       bill: bill.document.id,
+      billReturn: billReturn.return.id,
       advance: await first("advances", (j) => j.page.items),
     },
   };
@@ -95,7 +98,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     "partner-accounts", "partner-accounts/payments", "partner-accounts/payments/new",
     "accounting/chart", "accounting/chart/import", "accounting/opening-balances", "accounting/journal", "accounting/journal/new", "accounting/journal/import",
     ids.journal ? `accounting/journal/${ids.journal}` : null, ids.draft ? `accounting/journal/drafts/${ids.draft}` : null, "accounting/automatic", "accounting/statement", ids.statement ? `accounting/statement?accounts=${ids.statement}` : null, "accounting/trial-balance",
-    "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", ids.bill ? `accounting/payables/${ids.bill}` : null, "accounting/receivables", "accounting/receivables/new",
+    "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", ids.bill ? `accounting/payables/${ids.bill}` : null, ids.billReturn ? `accounting/apar-returns/${ids.billReturn}` : null, "accounting/receivables", "accounting/receivables/new",
     "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
     "reports/operational", "reports/financial", "reports/builder", "reports/saved",
     "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, `masters/drivers/${w.driver}/edit`, "masters/customers", "masters/partners",
@@ -148,7 +151,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
     const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
     {
-      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s", bill: "b" };
+      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s", bill: "b", billReturn: "br" };
       const w = { driver: "d" } as World;
       const any = companyRoutes("x", w, ids).some((r) => wanted(r.replace("/c/x", "") || "dashboard")) || companyStates(ids, w).some((x) => wanted(x.name, x.route));
       test.skip(!any, "not among VISUAL_ONLY");
@@ -316,6 +319,10 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
     // Customer statement (RPT-12) shown without its required customer: the field marked, one message.
     { name: "financial#customer-statement-required", route: "reports/financial?report=customer-statement", act: async (p, t) => {
       await button(p.locator("main"), t("rep.run")).click(); await expect(p.locator("main [aria-invalid=true]").first()).toBeVisible(); } },
+    // Supplier statement (RPT-24, owner decision 17 Oct 2026): the visual supplier's bill, return and deduction columns.
+    { name: "financial#supplier-statement", route: "reports/financial?report=supplier-statement", act: async (p, t) => {
+      await pick(p.locator("main"), t("rep.supplier"), "Visual supplier"); await button(p.locator("main"), t("rep.run")).click();
+      await expect(p.locator("main table tbody tr").nth(1)).toBeVisible(); } },
     // Readable history and audit log (owner feedback 14 Oct 2026, DT-188): a trip's history (created, added to an invoice, invoiced), a
     // journal entry's history (posted with its lines), the audit log as read by everyone and with an administrator's technical details.
     { name: "history#trip", route: `trips/${ids.invoicedTrip ?? ids.trip}`, act: async (p) => {

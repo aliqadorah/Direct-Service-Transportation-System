@@ -34,7 +34,7 @@ public sealed record ReportCatalogEntry(string Key, string Code, string Group, s
 /// </summary>
 public sealed record StandardReportQuery(
     DateOnly? From, DateOnly? To, DateOnly? AsOf, string? Customer, string? Driver, string? Partner, string? LoadingSite, string? UnloadingSite, string? Material,
-    string? GroupBy, string? Side);
+    string? GroupBy, string? Side, string? Supplier = null);
 
 // ------------------------------------------------------------------ report builder (FR-143 … FR-147)
 

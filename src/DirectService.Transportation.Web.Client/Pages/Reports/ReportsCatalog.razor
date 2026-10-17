@@ -11,6 +11,7 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 @inject TripLookups Lookups
+@inject AccountingLookups AccLookups
 @inject Downloads Files
 @inject NavigationManager Nav
 
@@ -57,6 +58,7 @@
                 @if (Has("to")) {<DateField @bind-Value="_q.To" Label="@L["trip.to"]" FieldClass="w160" />}
                 @if (Has("asOf")) {<DateField @bind-Value="_q.AsOf" Label="@L["rep.asOf"]" FieldClass="w160" />}
                 @if (Has("customer")) {<ComboField TValue="string?" @bind-Value="_q.Customer" Options="Lookups.Customers" Label="@L["trip.customer"]" Required="@Needs("customer")" Placeholder="@(Needs("customer") ? L["ui.choose"] : L["tar.all"])" FieldClass="w220" />}
+                @if (Has("supplier")) {<ComboField TValue="string?" @bind-Value="_q.Supplier" Options="_suppliers" Label="@L["rep.supplier"]" Required="@Needs("supplier")" Placeholder="@L["ui.choose"]" FieldClass="w220" />}
                 @if (Has("driver")) {<ComboField TValue="string?" @bind-Value="_q.Driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["trip.driver"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
                 @if (Has("partner")) {<ComboField TValue="string?" @bind-Value="_q.Partner" Options="Lookups.Partners" Label="@L["md.partner"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
                 @if (Has("loadingSite")) {<ComboField TValue="string?" @bind-Value="_q.LoadingSite" Options="Lookups.LoadingSites" Label="@L["trip.loading"]" Placeholder="@L["tar.all"]" FieldClass="w200" />}
@@ -94,6 +96,7 @@
     private ReportResult? _result;
     private ReconciliationReport? _reconciliation;
     private QueryModel _q = new();
+    private IReadOnlyList<Option<string?>> _suppliers = [];
     private EditContext _ctx = new(new QueryModel());
     private ProblemValidator? _problems;
     /// <summary>A required filter is still empty: the report waits for it (nothing was asked of the server).</summary>
@@ -118,6 +121,10 @@
     {
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         try { _catalog = await Api.GetAsync<IReadOnlyList<ReportCatalogEntry>>(Api.C("reports/catalog")); } catch (ApiException) { _catalog = []; }
+        if (_catalog.Any(c => c.Parameters.Contains("supplier")))
+        {
+            try { _suppliers = (await AccLookups.PartiesAsync("Supplier")).Select(p => new Option<string?>(p.Id, p.Name, p.TaxNumber)).ToList(); } catch (ApiException) { }
+        }
         if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["report"] is { Length: > 0 } key && Entries.FirstOrDefault(e => e.Key == key) is { } e) await Select(e);
     }
 
@@ -164,7 +171,7 @@
         void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v)); }
         string? D(DateOnly? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         Add("from", D(_q.From)); Add("to", D(_q.To)); Add("asOf", D(_q.AsOf));
-        Add("customer", _q.Customer); Add("driver", _q.Driver); Add("partner", _q.Partner);
+        Add("customer", _q.Customer); Add("driver", _q.Driver); Add("partner", _q.Partner); Add("supplier", _q.Supplier);
         Add("loadingSite", _q.LoadingSite); Add("unloadingSite", _q.UnloadingSite); Add("material", _q.Material);
         Add("groupBy", _q.GroupBy); Add("side", _q.Side);
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
@@ -213,7 +220,7 @@
 
     private string? Value(string parameter) => parameter switch
     {
-        "customer" => _q.Customer, "driver" => _q.Driver, "partner" => _q.Partner, "loadingSite" => _q.LoadingSite, "unloadingSite" => _q.UnloadingSite,
+        "customer" => _q.Customer, "supplier" => _q.Supplier, "driver" => _q.Driver, "partner" => _q.Partner, "loadingSite" => _q.LoadingSite, "unloadingSite" => _q.UnloadingSite,
         "material" => _q.Material, "groupBy" => _q.GroupBy, "side" => _q.Side,
         "from" => _q.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
         "to" => _q.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
@@ -223,7 +230,7 @@
 
     private static string FilterLabel(string parameter) => parameter switch
     {
-        "customer" => "trip.customer", "driver" => "trip.driver", "partner" => "md.partner", "loadingSite" => "trip.loading", "unloadingSite" => "trip.unloading",
+        "customer" => "trip.customer", "supplier" => "rep.supplier", "driver" => "trip.driver", "partner" => "md.partner", "loadingSite" => "trip.loading", "unloadingSite" => "trip.unloading",
         "material" => "trip.material", "groupBy" => "rep.groupBy", "side" => "rep.side", "from" => "trip.from", "to" => "trip.to", _ => "rep.asOf",
     };
 
@@ -234,7 +241,7 @@
     {
         try
         {
-            var q = new StandardReportQuery(_q.From, _q.To, _q.AsOf, _q.Customer, _q.Driver, _q.Partner, _q.LoadingSite, _q.UnloadingSite, _q.Material, _q.GroupBy, _q.Side);
+            var q = new StandardReportQuery(_q.From, _q.To, _q.AsOf, _q.Customer, _q.Driver, _q.Partner, _q.LoadingSite, _q.UnloadingSite, _q.Material, _q.GroupBy, _q.Side, _q.Supplier);
             await Api.PostAsync<ExportJobResponse>(Api.C("exports"), new { Kind = "standard", Key = _selected!.Key, Query = q, From = _q.From, To = _q.To, Format = "xlsx" });
             Toasts.Success(L["rep.backgroundQueued"]);
         }
@@ -247,6 +254,7 @@
         public DateOnly? To { get; set; }
         public DateOnly? AsOf { get; set; }
         public string? Customer { get; set; }
+        public string? Supplier { get; set; }
         public string? Driver { get; set; }
         public string? Partner { get; set; }
         public string? LoadingSite { get; set; }

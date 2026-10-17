@@ -400,4 +400,33 @@ public sealed class ApArTests(ApiFactory f)
         var full = (await ReadAsync<ApArReturnDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/returns"), new ApArReturnRequest(bill2.Id, Today, 100m, "Cancelled", null)))).Return;
         Assert.Equal((30m, 70m), (full.Deduction, full.Total));
     }
+
+    /// <summary>Owner decision 17 Oct 2026: the supplier statement — amount, tax, deduction and net per document, running balance, totals, export.</summary>
+    [Fact]
+    public async Task Supplier_statement_shows_amount_tax_deduction_net_and_the_balance_owed()
+    {
+        var w = await WorldAsync(f);
+        var o = w.Owner;
+        var supplier = await SupplierAsync(w);
+        var bill = (await ReadAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, "S-1",
+            [new ApArLineRequest("Haulage", w.Accounts["5103"].Id, 1000m, 16m, null, 100m)], null)))).Document;   // net 1060
+        await ReadAsync<ApArReturnDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/returns"), new ApArReturnRequest(bill.Id, Today, 500m, "Half", null)));   // −530
+        await (await o.Client.PostAsJsonAsync(U(o, "/apar/payments"), new ApArPaymentRequest(bill.Id, Today, 200m, "Cash", w.CashBox, null, null, 0, null))).EnsureOkAsync();
+
+        var q = $"supplier={Uri.EscapeDataString(supplier.Id)}&from={Today:yyyy-MM-dd}&to={Today:yyyy-MM-dd}";
+        var r = await ReadAsync<Contracts.Reports.ReportResult>(await o.Client.GetAsync(U(o, $"/reports/standard/supplier-statement?{q}")));
+        Assert.Equal(["date", "document", "description", "amount", "tax", "deduction", "net", "balance"], r.Columns.Select(c => c.Key));
+        Assert.Equal(4, r.Rows.Count);   // opening, bill, return, payment
+        decimal V(int row, int col) => ((System.Text.Json.JsonElement)r.Rows[row].Values[col]!).GetDecimal();
+        Assert.Equal((1000m, 160m, 100m, 1060m, 1060m), (V(1, 3), V(1, 4), V(1, 5), V(1, 6), V(1, 7)));
+        Assert.Equal((-500m, -80m, -50m, -530m, 530m), (V(2, 3), V(2, 4), V(2, 5), V(2, 6), V(2, 7)));
+        Assert.Equal((-200m, 330m), (V(3, 6), V(3, 7)));
+        decimal T(int col) => ((System.Text.Json.JsonElement)r.Totals![col]!).GetDecimal();
+        Assert.Equal((500m, 80m, 50m, 330m, 330m), (T(3), T(4), T(5), T(6), T(7)));
+        Assert.Equal(330m, (await ReadAsync<ApArDocumentDetails>(await o.Client.GetAsync(U(o, $"/apar/bills/{bill.Id}")))).Document.RemainingAmount);
+
+        var csv = System.Text.Encoding.UTF8.GetString(await (await o.Client.GetAsync(U(o, $"/reports/standard/supplier-statement/export?{q}&format=csv"))).Content.ReadAsByteArrayAsync());
+        Assert.Contains("Deduction", csv, StringComparison.Ordinal);
+        Assert.Equal("validation.failed", await (await o.Client.GetAsync(U(o, "/reports/standard/supplier-statement"))).ProblemCodeAsync());
+    }
 }
