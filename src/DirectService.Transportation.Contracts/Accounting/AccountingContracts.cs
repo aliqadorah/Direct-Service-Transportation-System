@@ -115,24 +115,43 @@ public sealed record PartyResponse(string Module, string Type, string? Id, strin
 
 public sealed record JournalLineRequest(string? AccountId, decimal Debit, decimal Credit, string? CostCentreId, PartyRequest? Party, string? Note);
 
-public sealed record ManualEntryRequest(DateOnly? EntryDate, string? Description, IReadOnlyList<JournalLineRequest>? Lines, string? RowVersion);
+/// <summary>A manual entry; <paramref name="Reference"/> is the free-text reference (المرجع, up to 100 characters, revision 6).</summary>
+public sealed record ManualEntryRequest(DateOnly? EntryDate, string? Description, IReadOnlyList<JournalLineRequest>? Lines, string? RowVersion,
+    string? Reference = null);
+
+/// <summary>A journal draft (revision 6): no number, not posted; posted later through <c>POST …/journal-entries/drafts/{id}/post</c>.</summary>
+public sealed record JournalDraftResponse(
+    string Id, DateOnly? EntryDate, string? Description, string? Reference, IReadOnlyList<JournalDraftLineResponse> Lines,
+    decimal TotalDebit, decimal TotalCredit, DateTime CreatedAt, string? CreatedBy, string RowVersion);
+
+/// <summary>A draft line as entered (account, cost centre and party may still be missing).</summary>
+public sealed record JournalDraftLineResponse(AccountRef? Account, decimal Debit, decimal Credit, Ref? CostCentre, PartyResponse? Party, string? Note);
 
 public sealed record VoidRequest(string? Reason, string? RowVersion);
 
-/// <summary>Journal list filters (FR-102, FR-115). Months are YYYY-MM; status: Posted, Reversed, Void.</summary>
+/// <summary>An action on a record that only needs its row version (optimistic concurrency).</summary>
+public sealed record RowVersionRequest(string? RowVersion);
+
+/// <summary>
+/// Journal list filters (FR-102, FR-115). Months are YYYY-MM; status: Posted, Reversed, Void, or Draft (revision 6: drafts only; with no
+/// status, drafts are listed first). <paramref name="Search"/> matches the number, the description or the reference.
+/// </summary>
 public sealed record JournalQuery(
     string? PeriodFrom, string? PeriodTo, string? Number, string? AccountId, string? CostCentreId, string? PartyType, string? PartyId,
-    bool? Manual, string? Status, string? SourceType, int Page = 1, int PageSize = 50);
+    bool? Manual, string? Status, string? SourceType, int Page = 1, int PageSize = 50, string? Search = null);
 
+/// <summary>A row of the journal list; a draft (Status "Draft") has no number and its <paramref name="Id"/> is the draft's.</summary>
 public sealed record JournalEntrySummary(
     string Id, string Number, DateOnly EntryDate, string PeriodMonth, string Description, string SourceModule, string? SourceType,
-    bool IsManual, string Status, decimal TotalDebit, decimal TotalCredit, string? ReversesEntryNumber, string? ReversedByEntryNumber);
+    bool IsManual, string Status, decimal TotalDebit, decimal TotalCredit, string? ReversesEntryNumber, string? ReversedByEntryNumber,
+    string? Reference = null);
 
 public sealed record JournalEntryResponse(
     string Id, string Number, DateOnly EntryDate, string PeriodMonth, string Description, string SourceModule, string? SourceType,
     SourceDocumentRef? Source, bool IsManual, string Status, decimal TotalDebit, decimal TotalCredit,
     EntryLinkRef? ReversesEntry, EntryLinkRef? ReversedByEntry, string? VoidReason, DateTime? VoidedAt, string? VoidedBy,
-    string? ExportBatchNo, DateTime CreatedAt, string? CreatedBy, IReadOnlyList<JournalLineResponse> Lines, string RowVersion);
+    string? ExportBatchNo, DateTime CreatedAt, string? CreatedBy, IReadOnlyList<JournalLineResponse> Lines, string RowVersion,
+    string? Reference = null);
 
 public sealed record EntryLinkRef(string Id, string Number);
 
@@ -146,7 +165,7 @@ public sealed record JournalLineResponse(
 public sealed record JournalVoucherResponse(
     string CompanyName, string? CompanyNameEn, string Number, DateOnly EntryDate, string Description, string Status,
     IReadOnlyList<JournalLineResponse> Lines, decimal TotalDebit, decimal TotalCredit, string CurrencyCode,
-    string AmountInWordsAr, string AmountInWordsEn, IReadOnlyList<string> Signatures);
+    string AmountInWordsAr, string AmountInWordsEn, IReadOnlyList<string> Signatures, string? Reference = null);
 
 // ---------------------------------------------------------------- pending postings (FR-101)
 

@@ -44,6 +44,7 @@ public static class AuditVocabulary
         ["TRN.EInvoiceSubmission"] = E("إرسال فاتورة إلكترونية", "E-invoice submission", "الإرسال الإلكتروني", "the e-invoice submission"),
         ["ACC.Account"] = E("حساب", "Account", "الحساب", "account"),
         ["ACC.JournalEntry"] = E("قيد يومية", "Journal entry", "القيد", "journal entry"),
+        ["ACC.JournalDraft"] = E("مسودة قيد", "Journal draft", "مسودة القيد", "journal draft"),
         ["ACC.EntryLine"] = E("سطر قيد", "Journal line", "سطر القيد", "the journal line"),
         ["ACC.CashBox"] = E("صندوق", "Cash box", "الصندوق", "cash box"),
         ["ACC.BankAccount"] = E("حساب بنكي", "Bank account", "الحساب البنكي", "bank account"),
@@ -243,7 +244,7 @@ public static class AuditVocabulary
         "ExportBatchId", "JournalEntryId", "PeriodMonth", "SourceModule", "SourceType", "SourceId", "IsManual", "IcvCounter", "Icv", "UniqueId",
         "DocumentVersion", "Attempts", "LastAttemptAt", "LastSignInAt", "LastSeenAt", "LastActivityAt", "FailedSignInCount", "RequestPayload",
         "ResponsePayload", "QrCode", "IncomeSourceSequence", "TruckPlateAtSave", "RateMonth", "InvoiceLineId", "DocumentId", "CreditNoteId",
-        "AttachmentsCount", "AcquiredAt", "Definition", "Columns", "Labels", "Signatures", "AnnexColumns", "Options", "EmailConfirmedAt",
+        "AttachmentsCount", "AcquiredAt", "Definition", "Columns", "Labels", "Signatures", "AnnexColumns", "Options", "Lines", "EmailConfirmedAt",
         "TwoFactorEnabledAt", "OccurredAt", "Grouping", "IsPlatformStaff", "UserId", "OwnerUserId", "Specificity", "ResolvedAt",
     };
 

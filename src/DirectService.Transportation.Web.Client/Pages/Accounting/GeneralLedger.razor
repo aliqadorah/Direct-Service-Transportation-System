@@ -57,6 +57,7 @@ else
                                 </Template>
                             </GridColumn>
                             <GridColumn TItem="LedgerLine" Title="@L["je.description"]" Value="l => l.Note ?? l.Description" Clip="true" />
+                            <GridColumn TItem="LedgerLine" Title="@L["je.reference"]" Value="l => l.Reference" Clip="true" />
                             @if (r.Account.Id != null && _lines.Any(l => l.Account.Id != r.Account.Id)) {<GridColumn TItem="LedgerLine" Title="@L["je.account"]" Value="l => l.Account.Code" Ltr="true" />}
                             <GridColumn TItem="LedgerLine" Title="@L["je.party"]" Value="l => l.Party?.Name" Clip="true" />
                             <GridColumn TItem="LedgerLine" Title="@L["je.debit"]" Value="@(l => l.Debit == 0 ? null : Fmt.Money(l.Debit))" Numeric="true" />

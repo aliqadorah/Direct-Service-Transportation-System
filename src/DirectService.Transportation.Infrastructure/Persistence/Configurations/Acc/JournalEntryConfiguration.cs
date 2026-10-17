@@ -203,6 +203,14 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
             .HasColumnOrder(29)
             .IsRequired(true)
             .IsRowVersion();
+        // Revision 6: Reference / المرجع (owner change request 15 Oct 2026).
+        builder.Property(e => e.Reference)
+            .HasColumnName("Reference")
+            .HasColumnType("nvarchar(100)")
+            .HasColumnOrder(30)
+            .IsUnicode(true)
+            .HasMaxLength(100)
+            .IsRequired(false);
 
         builder.HasIndex(new[] { "PublicId" }, "UX_JournalEntries_PublicId")
             .IsUnique()

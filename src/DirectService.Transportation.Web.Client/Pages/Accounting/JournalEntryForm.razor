@@ -1,10 +1,12 @@
 @page "/c/{Company}/accounting/journal/new"
 @page "/c/{Company}/accounting/journal/{Id}/edit"
+@page "/c/{Company}/accounting/journal/drafts/{DraftId}"
 @*
   SCR-32 journal entry (FR-106, FR-111…113, D-05): date, description, lines with account (postable), debit or credit, cost centre, party —
   required on control accounts and of the account's party type (customer, supplier, driver, partner) — and a note. Totals and the difference
   are shown while typing; the API refuses unbalanced entries, closed periods and missing parties. Editing a posted manual entry reverses it
-  and posts the corrected entry.
+  and posts the corrected entry. Revision 6: Reference / المرجع (free text, 100) next to the description; "Save as draft" keeps the entry without
+  a JV number and without posting — a draft opens here again to be edited, deleted or posted (number and period lock apply at posting).
 *@
 @inject Api Api
 @inject Loc L
@@ -18,18 +20,24 @@
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        <PageHeader Title="@(_existing is null ? L["nav.newJournal"] : L.F("je.edit", _existing.Number))" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
-            <Actions><Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
+        <PageHeader Title="@(_existing is not null ? L.F("je.edit", _existing.Number) : _draft is not null ? L["je.draftTitle"] : L["nav.newJournal"])" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
+            <Actions>
+                @if (_draft is not null) {<Btn Danger="true" Ghost="true" Icon="trash" Text="@L["je.deleteDraft"]" Disabled="!CanSave" OnClick="() => _deleting = true" />}
+                @if (_existing is null) {<Btn Icon="save" Text="@L["je.saveDraft"]" Busy="_savingDraft" Disabled="!CanSave" OnClick="SaveDraft" />}
+                <Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" />
+            </Actions>
         </PageHeader>
+        @if (_draft is not null) {<Banner Tone="Tone.Info" Icon="info" Text="@L["je.draftHelp"]" />}
         @if (_existing is not null) {<Banner Tone="Tone.Info" Text="@L.F("je.editHelp", _existing.Number)" />}
         @if (_existing is not null) {<RecordLockGuard EntityType="ACC.JournalEntry" Id="@_existing.Id" OnState="h => _lockedBy = h" />}
         <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
             <ProblemValidator @ref="_problems" />
             <ErrorSummary @ref="_summary" Extra="_extra" />
             <section class="box pad" style="flex:none">
-                <div class="fg" style="grid-template-columns:200px 1fr">
+                <div class="fg" style="grid-template-columns:200px minmax(0,2fr) minmax(0,1fr)">
                     <DateField @bind-Value="_m.EntryDate" Label="@L["trip.date"]" Required="true" />
                     <TextField @bind-Value="_m.Description" Label="@L["je.description"]" Required="true" MaxLength="500" />
+                    <TextField @bind-Value="_m.Reference" Label="@L["je.reference"]" MaxLength="100" />
                 </div>
             </section>
             <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
@@ -89,11 +97,15 @@
         </EditForm>
     </ChildContent>
 </StateView>
+<ConfirmDialog @bind-Open="_deleting" Title="@L["je.deleteDraft"]" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["je.deleteDraftText"]" Busy="_saving" Error="@_deleteError" OnConfirm="_ => DeleteDraft()" />
 
 @code {
     private readonly Model _m = new();
     private EditContext _ctx = default!;
     private JournalEntryResponse? _existing;
+    private JournalDraftResponse? _draft;
+    private bool _savingDraft, _deleting;
+    private string? _deleteError;
     private IReadOnlyList<Option<string?>> _accounts = [];
     private readonly Dictionary<string, IReadOnlyList<Option<string?>>> _parties = new(StringComparer.Ordinal);
     private LoadState _state = LoadState.Loading;
@@ -105,10 +117,11 @@
 
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string? Id { get; set; }
+    [Parameter] public string? DraftId { get; set; }
 
     private decimal Debit => _m.Lines.Sum(l => l.Debit ?? 0);
     private decimal Credit => _m.Lines.Sum(l => l.Credit ?? 0);
-    private bool CanSave => !_saving && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
+    private bool CanSave => !_saving && !_savingDraft && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
 
     private IReadOnlyList<Option<string?>> PartyOptions(string? type) => type is null ? [] : _parties.GetValueOrDefault(type) ?? [];
 
@@ -130,6 +143,7 @@
                 _existing = await Api.GetAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}"));
                 _m.EntryDate = _existing.EntryDate;
                 _m.Description = _existing.Description;
+                _m.Reference = _existing.Reference;
                 _m.RowVersion = _existing.RowVersion;
                 _m.Lines = _existing.Lines.Select(l => new LineModel
                 {
@@ -137,6 +151,11 @@
                     Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
                     PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
                 }).ToList();
+            }
+            else if (DraftId is not null)
+            {
+                _draft = await Api.GetAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(DraftId)}"));
+                ShowDraft(_draft);
             }
             else
             {
@@ -167,6 +186,74 @@
     private async Task<IReadOnlyList<Option<string?>>> SearchDrivers(string text, CancellationToken ct) =>
         (await Transport.SearchDriversAsync(text, ct)).Select(o => new Option<string?>($"Driver|{o.Value}", o.Text, o.Sub)).ToList();
 
+    private void ShowDraft(JournalDraftResponse d)
+    {
+        _m.EntryDate = d.EntryDate;
+        _m.Description = d.Description;
+        _m.Reference = d.Reference;
+        _m.RowVersion = d.RowVersion;
+        _m.Lines = d.Lines.Select(l => new LineModel
+        {
+            AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+            Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
+            PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
+        }).ToList();
+        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel());
+    }
+
+    private ManualEntryRequest Request()
+    {
+        var lines = _m.Lines.Where(l => l.AccountId is not null || l.Debit is not null || l.Credit is not null).Select(l =>
+        {
+            PartyRequest? party = null;
+            if (l.Party?.Split('|') is [var type, var id]) party = new PartyRequest(type, id);
+            return new JournalLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, party, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim());
+        }).ToList();
+        return new ManualEntryRequest(_m.EntryDate, _m.Description?.Trim(), lines, _m.RowVersion, string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim());
+    }
+
+    /// <summary>"Save as draft": no number, nothing posted; the page stays on the draft so work can continue.</summary>
+    private async Task SaveDraft()
+    {
+        if (!CanSave) return;
+        _savingDraft = true;
+        _extra = null;
+        try
+        {
+            var req = Request();
+            var d = _draft is null
+                ? await Api.PostAsync<JournalDraftResponse>(Api.C("accounting/journal-entries/drafts"), req)
+                : await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
+            var isNew = _draft is null;
+            _draft = d;
+            _m.RowVersion = d.RowVersion;
+            Toasts.Success(L["je.draftSaved"]);
+            if (isNew) Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/drafts/{d.Id}"), replace: true);
+        }
+        catch (ApiException e)
+        {
+            if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            if (_summary is not null) await _summary.FocusAsync();
+        }
+        finally { _savingDraft = false; }
+    }
+
+    private async Task DeleteDraft()
+    {
+        if (_draft is null) return;
+        _saving = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}/delete"), new RowVersionRequest(_m.RowVersion));
+            _deleting = false;
+            Toasts.Success(L["je.draftDeleted"]);
+            Nav.NavigateTo(NavModel.Href(Company, "accounting/journal"));
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _saving = false; }
+    }
+
     private async Task Save()
     {
         if (!CanSave) return;
@@ -174,16 +261,22 @@
         _extra = null;
         try
         {
-            var lines = _m.Lines.Where(l => l.AccountId is not null || l.Debit is not null || l.Credit is not null).Select(l =>
+            var req = Request();
+            JournalEntryResponse r;
+            if (_draft is not null)
             {
-                PartyRequest? party = null;
-                if (l.Party?.Split('|') is [var type, var id]) party = new PartyRequest(type, id);
-                return new JournalLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, party, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim());
-            }).ToList();
-            var req = new ManualEntryRequest(_m.EntryDate, _m.Description?.Trim(), lines, _m.RowVersion);
-            var r = _existing is null
-                ? await Api.PostAsync<JournalEntryResponse>(Api.C("accounting/journal-entries"), req)
-                : await Api.PutAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(_existing.Id)}"), req);
+                // A draft posts with what is on the screen: save it, then post it (full checks, number and period lock now).
+                var saved = await Api.PutAsync<JournalDraftResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(_draft.Id)}"), req);
+                _draft = saved;
+                _m.RowVersion = saved.RowVersion;
+                r = await Api.PostAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/drafts/{Uri.EscapeDataString(saved.Id)}/post"), new RowVersionRequest(saved.RowVersion));
+            }
+            else
+            {
+                r = _existing is null
+                    ? await Api.PostAsync<JournalEntryResponse>(Api.C("accounting/journal-entries"), req)
+                    : await Api.PutAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(_existing.Id)}"), req);
+            }
             Toasts.Success(L.F(_existing is null ? "je.posted" : "je.reposted", r.Number, _existing?.Number ?? ""));
             Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{r.Id}"));
         }
@@ -199,6 +292,7 @@
     {
         public DateOnly? EntryDate { get; set; }
         public string? Description { get; set; }
+        public string? Reference { get; set; }
         public List<LineModel> Lines { get; set; } = [];
         public string? RowVersion { get; set; }
     }

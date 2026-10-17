@@ -33,6 +33,7 @@ public static class VoucherHtml
          .Append(N(Fmt.Date(v.EntryDate, dateFormat))).Append("</div>");
         if (v.Status == "Void") b.Append("<div class=\"void\">").Append(E(l["st.void"])).Append("</div>");
         b.Append("<p><b>").Append(E(l["je.description"])).Append(":</b> ").Append(E(v.Description)).Append("</p>");
+        if (!string.IsNullOrEmpty(v.Reference)) b.Append("<p><b>").Append(E(l["je.reference"])).Append(":</b> ").Append(E(v.Reference)).Append("</p>");
         b.Append("<table><thead><tr><th>#</th><th>").Append(E(l["je.account"])).Append("</th><th>").Append(E(l["je.costCentre"])).Append("</th><th>")
          .Append(E(l["je.party"])).Append("</th><th>").Append(E(l["drv.note"])).Append("</th><th class=\"n\">").Append(E(l["je.debit"])).Append("</th><th class=\"n\">")
          .Append(E(l["je.credit"])).Append("</th></tr></thead><tbody>");

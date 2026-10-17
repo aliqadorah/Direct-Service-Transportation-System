@@ -2,7 +2,8 @@
 @*
   SCR-31 journal list (FR-111…115, FR-102): views All / Manual / Automatic / Reversed or void, period (months), number, account, cost centre and
   status filters, party and source-document filters (FR-102), links to the entry, its source document and its reversal; Excel / CSV / PDF export (FR-115). Users with acct.je.view but not acct.acct.view see the
-  automatic entries only (DT-32).
+  automatic entries only (DT-32). Revision 6: Reference column; search by number, description or reference; drafts (no number) under the
+  "Drafts" view and first in "All" — a draft opens in the entry form.
 *@
 @inject Api Api
 @inject Loc L
@@ -12,7 +13,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
-<LiveRefresh EntityTypes="@(["ACC.JournalEntry"])" OnChange="Load" />
+<LiveRefresh EntityTypes="@(["ACC.JournalEntry", "ACC.JournalDraft"])" OnChange="Load" />
 @if (!AutomaticOnly)
 {
 <PageHeader Title="@L["nav.journal"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"])])">
@@ -25,7 +26,7 @@
     </Actions>
 </PageHeader>
 }
-<ListShell Label="@L["nav.journal"]" Views="@(AutomaticOnly ? null : Views)" View="@_view" ViewChanged="SetView" Search="@_number" SearchPlaceholder="@L["je.number"]" OnSearch="Search"
+<ListShell Label="@L["nav.journal"]" Views="@(AutomaticOnly ? null : Views)" View="@_view" ViewChanged="SetView" Search="@_number" SearchPlaceholder="@L["je.searchHint"]" OnSearch="Search"
            Exports="@(FullList ? ["xlsx", "csv", "pdf"] : [])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="book" EmptyTitle="@L["je.none"]" EmptyText="@L["je.noneText"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_page" PageSize="_size" Total="_result?.TotalCount" OnPage="Go" OnPageSize="Size">
@@ -44,12 +45,13 @@
     </Filters>
     <ChildContent>
         <DataGrid TItem="JournalEntrySummary" Items="_result!.Items" Key="e => e.Id" Caption="@L["nav.journal"]" OnRowClick="Open"
-                  RowClass="@(e => e.Status == "Posted" ? null : "void")">
+                  RowClass="@(e => e.Status is "Posted" or JournalStatus.Draft ? null : "void")">
             <Columns>
-                <GridColumn TItem="JournalEntrySummary" Title="@L["doc.number"]" Value="e => e.Number" Ltr="true" />
+                <GridColumn TItem="JournalEntrySummary" Title="@L["doc.number"]" Value="@(e => e.Status == JournalStatus.Draft ? "—" : e.Number)" Ltr="true" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["trip.date"]" Value="e => Fmt.Date(e.EntryDate, Shell.DateFormat)" Ltr="true" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["je.source"]" Value="@(e => e.IsManual ? L["je.manual"] : L["je.src." + (e.SourceType ?? "Opening")])" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
+                <GridColumn TItem="JournalEntrySummary" Title="@L["je.reference"]" Value="e => e.Reference" Clip="true" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["je.reversal"]"
                             Value="@(e => e.ReversedByEntryNumber is { } r ? L.F("je.reversedBy", r) : e.ReversesEntryNumber is { } o ? L.F("je.reverses", o) : null)" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["inv.amount"]" Value="e => Fmt.Money(e.TotalDebit)" Numeric="true" />
@@ -82,7 +84,7 @@
     private bool FullList => Shell.Can(PermissionKeys.AcctView);
 
     private IReadOnlyList<TabItem> Views => FullList
-        ? [new("all", L["ml.all"]), new("manual", L["je.manualView"]), new("auto", L["je.autoView"]), new("Reversed", L["st.reversed"]), new("Void", L["st.void"])]
+        ? [new("all", L["ml.all"]), new("manual", L["je.manualView"]), new("auto", L["je.autoView"]), new(JournalStatus.Draft, L["je.draftsView"]), new("Reversed", L["st.reversed"]), new("Void", L["st.void"])]
         : [new("all", L["nav.automatic"])];
 
     private bool Filtered => _number is not null || _from is not null || _to is not null || _account is not null || _costCentre is not null || _party is not null || _source is not null;
@@ -126,13 +128,13 @@
         void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) p.Add(k + "=" + Uri.EscapeDataString(v.Trim())); }
         Add("periodFrom", _from);
         Add("periodTo", _to);
-        Add("number", _number);
+        Add("search", _number);
         Add("accountId", _account);
         Add("costCentreId", _costCentre);
         if (_party?.Split('|') is [var partyType, var partyId]) { Add("partyType", partyType); Add("partyId", partyId); }
         Add("sourceType", _source);
         Add("manual", AutomaticOnly && FullList ? "false" : _view switch { "manual" => "true", "auto" => "false", _ => null });
-        Add("status", _view is "Reversed" or "Void" ? _view : null);
+        Add("status", _view is "Reversed" or "Void" or JournalStatus.Draft ? _view : null);
         if (paged) { Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture)); Add("pageSize", _size.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
     }
@@ -158,5 +160,6 @@
     private Task ClearAll() { _number = _from = _to = _account = _costCentre = _party = _source = null; _partyOption = null; _page = 1; return Load(); }
     private Task Export(string format) => Files.SaveAsync(Api.C("accounting/journal-entries/export" + Query(false)), format);
 
-    private void Open(JournalEntrySummary e) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{e.Id}"));
+    private void Open(JournalEntrySummary e) =>
+        Nav.NavigateTo(NavModel.Href(Company, e.Status == JournalStatus.Draft ? $"accounting/journal/drafts/{e.Id}" : $"accounting/journal/{e.Id}"));
 }

@@ -21,7 +21,9 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
 {
     public const string EntityType = "ACC.JournalEntry";
 
-    private static readonly string[] RefAliases = ["EntryRef", "Entry ref", "Reference", "رقم القيد المرجعي", "مرجع القيد"];
+    private static readonly string[] RefAliases = ["EntryRef", "Entry ref", "رقم القيد المرجعي", "مرجع القيد"];
+    /// <summary>The entry's free-text reference (المرجع, revision 6) — not the grouping key above.</summary>
+    private static readonly string[] ReferenceAliases = ["Reference", "المرجع"];
     private static readonly string[] DateAliases = ["Date", "Entry date", "التاريخ", "تاريخ القيد"];
     private static readonly string[] DescriptionAliases = ["Description", "البيان", "الوصف"];
     private static readonly string[] AccountAliases = ["AccountCode", "Account code", "Account", "رمز الحساب", "الحساب"];
@@ -48,7 +50,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
     private const long Ambiguous = -1;
 
     private sealed record Line(int Row, string Ref, DateOnly? Date, string? Description, long? AccountId, decimal Debit, decimal Credit,
-        long? CostCentreId, PostingParty? Party, string? Note);
+        long? CostCentreId, PostingParty? Party, string? Note, string? Reference = null);
 
     public async Task<ImportPreview> PreviewAsync(Stream content, string fileName, long length, CancellationToken ct) =>
         (await AnalyseAsync(content, fileName, length, ct).ConfigureAwait(false)).Preview;
@@ -75,7 +77,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         int refCol = sheet.Column(RefAliases), date = sheet.Column(DateAliases), desc = sheet.Column(DescriptionAliases),
             account = sheet.Column(AccountAliases), debit = sheet.Column(DebitAliases), credit = sheet.Column(CreditAliases),
             centre = sheet.Column(CentreAliases), partyType = sheet.Column(PartyTypeAliases), party = sheet.Column(PartyAliases),
-            note = sheet.Column(NoteAliases);
+            note = sheet.Column(NoteAliases), referenceCol = sheet.Column(ReferenceAliases);
         ImportParse.RequireColumns(sheet, (refCol, RefAliases[0]), (date, DateAliases[0]), (desc, DescriptionAliases[0]),
             (account, AccountAliases[0]), (debit, DebitAliases[0]), (credit, CreditAliases[0]));
 
@@ -101,6 +103,8 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
                 p.Add(s.RowNumber, reference, ErrorCodes.PeriodClosed, dt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), AccountingCodes.Month(dt));
             var description = TextNormalizer.CleanText(s[desc]);
             if (description is null || description.Length > PostingEngine.DescriptionMax) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("description"), s[desc]);
+            var entryReference = referenceCol < 0 ? null : TextNormalizer.CleanText(s[referenceCol]);
+            if (entryReference is { Length: > PostingEngine.ReferenceMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("reference"), entryReference[..20]);
 
             long? accountId = null;
             var code = TextNormalizer.CleanCode(s[account]);
@@ -145,7 +149,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             }
             var noteText = TextNormalizer.CleanText(s[note]);
             if (noteText is { Length: > PostingEngine.NoteMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("note"), noteText[..20]);
-            lines.Add(new Line(s.RowNumber, reference ?? string.Empty, entryDate, description, accountId, d, cr, centreId, postingParty, noteText));
+            lines.Add(new Line(s.RowNumber, reference ?? string.Empty, entryDate, description, accountId, d, cr, centreId, postingParty, noteText, entryReference));
         }
 
         // Entry-level rules: same date and description on every line, at least two lines, balanced (BR-033).
@@ -153,7 +157,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         foreach (var group in lines.Where(l => l.Ref.Length > 0).GroupBy(l => l.Ref, StringComparer.Ordinal))
         {
             var first = group.First();
-            foreach (var l in group.Skip(1).Where(l => l.Date != first.Date || l.Description != first.Description))
+            foreach (var l in group.Skip(1).Where(l => l.Date != first.Date || l.Description != first.Description || (l.Reference is not null && l.Reference != first.Reference)))
                 p.Add(l.Row, l.Ref, ErrorCodes.ImportInvalid, Label("sameEntry"), l.Ref);
             if (group.Count() < 2) p.Add(first.Row, first.Ref, ErrorCodes.JournalMinLines);
             var dr = group.Sum(l => l.Debit);
@@ -165,7 +169,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             if (first.Date is DateOnly entryDate && first.Description is not null)
             {
                 entries.Add(new PostingRequest(entryDate, first.Description, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true,
-                    group.Select(l => new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, l.Party, l.Note)).ToList()));
+                    group.Select(l => new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, l.Party, l.Note)).ToList(), first.Reference));
             }
         }
         var preview = p.Preview(lines.Select(l => (l.Row, (string?)l.Ref)).ToList());
@@ -213,8 +217,10 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         (false, "party") => "الطرف",
         (true, "note") => "note",
         (false, "note") => "الملاحظة",
-        (true, "sameEntry") => "date/description (must match the entry's first line)",
-        (false, "sameEntry") => "التاريخ/البيان (يجب أن يطابق السطر الأول من القيد)",
+        (true, "reference") => "reference",
+        (false, "reference") => "المرجع",
+        (true, "sameEntry") => "date/description/reference (must match the entry's first line)",
+        (false, "sameEntry") => "التاريخ/البيان/المرجع (يجب أن يطابق السطر الأول من القيد)",
         _ => field,
     };
 }

@@ -1865,6 +1865,139 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalDraft", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(10)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_JournalDrafts_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(11);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(17);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(15);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(16);
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("Description")
+                        .HasColumnOrder(5);
+
+                    b.Property<DateOnly?>("EntryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("EntryDate")
+                        .HasColumnOrder(4);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(14)
+                        .HasDefaultValueSql("0", "DF_JournalDrafts_IsDeleted");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("Lines")
+                        .HasColumnOrder(7);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_JournalDrafts_PublicId");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Reference")
+                        .HasColumnOrder(6);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(18);
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<decimal>("TotalCredit")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("TotalCredit")
+                        .HasColumnOrder(9);
+
+                    b.Property<decimal>("TotalDebit")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("TotalDebit")
+                        .HasColumnOrder(8);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(12);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(13);
+
+                    b.HasKey("Id")
+                        .HasName("PK_JournalDrafts");
+
+                    b.HasIndex(new[] { "CompanyId" }, "IX_JournalDrafts_CompanyId")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_JournalDrafts_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("JournalDrafts", "acc", t =>
+                        {
+                            t.HasCheckConstraint("CK_JournalDrafts_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_JournalDrafts_Lines", "ISJSON([Lines]) = 1");
+                        });
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -1960,6 +2093,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("PublicId")
                         .HasColumnOrder(1)
                         .HasDefaultValueSql("NEWID()", "DF_JournalEntries_PublicId");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Reference")
+                        .HasColumnOrder(30);
 
                     b.Property<long?>("ReversedByEntryId")
                         .HasColumnType("bigint")
@@ -11332,6 +11472,41 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("CostCentre");
 
                     b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalDraft", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_JournalDrafts_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_JournalDrafts_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_JournalDrafts_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_JournalDrafts_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_JournalDrafts_Users_UpdatedBy");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalEntry", b =>

@@ -28,3 +28,24 @@ Audit: the new columns are audited like the others (`NormalizedUserName` hidden 
 | RequireTwoFactor | BIT | NOT NULL | 0 (`DF_Tenants_RequireTwoFactor`) | new; changed by the Owner (core.tenant.manage) with the other sign-in security settings; when 1, every user of the tenant without two-step verification must set it up at the next sign-in. Platform staff (no tenant) always need it |
 
 Audited with the tenant's other settings (action `SettingChange`).
+
+## 3. Journal entry Reference and drafts (item 3) — migration `Rev6_JournalReferenceAndDrafts`
+`acc.JournalEntries`:
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Reference | NVARCHAR(100) | NULL | — | new; free-text reference (المرجع) next to the description; copied to a reversal entry |
+
+New table `acc.JournalDrafts` (company-scoped, audited, soft delete): a manual journal entry saved as a draft — no JV number, not posted, never in a balance or report; posting creates the entry through the posting engine and removes the draft in the same transaction.
+
+| Column | Type | Null | Default | Rules |
+|---|---|---|---|---|
+| Id | BIGINT IDENTITY | NOT NULL | — | PK `PK_JournalDrafts` |
+| PublicId | UNIQUEIDENTIFIER | NOT NULL | NEWID() | `UX_JournalDrafts_PublicId` |
+| TenantId / CompanyId | BIGINT | NOT NULL | — | FK to core.Tenants / core.Companies; `IX_JournalDrafts_CompanyId` (filter `[IsDeleted] = 0`) |
+| EntryDate | DATE | NULL | — | intended entry date (required at posting) |
+| Description | NVARCHAR(500) | NULL | — | required at posting |
+| Reference | NVARCHAR(100) | NULL | — | |
+| Lines | NVARCHAR(MAX) | NOT NULL | — | JSON array (account id, debit, credit, cost centre id, party type + id, note); `CK_JournalDrafts_Lines` ISJSON |
+| TotalDebit / TotalCredit | DECIMAL(18,3) | NOT NULL | — | as entered (may differ while drafting) |
+| CreatedAt … RowVersion | standard audit, soft-delete and row-version columns | | | `CK_JournalDrafts_DeletedAt_DeletedBy_DeleteReason` |

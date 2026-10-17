@@ -116,7 +116,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     }
 
     private sealed record LineRow(long Id, DateOnly Date, Guid EntryPid, string Number, string Description, string Module, string? SourceType, long? SourceId, long AccountId,
-        string? PartyType, long? PartyId, Guid? CcPid, string? CcCode, string? CcName, string? Note, decimal Debit, decimal Credit);
+        string? PartyType, long? PartyId, Guid? CcPid, string? CcCode, string? CcName, string? Note, decimal Debit, decimal Credit, string? Reference);
 
     internal async Task<LedgerReport> LedgerOfAsync(Account account, LedgerQuery q, CancellationToken ct, int? all = null)
     {
@@ -161,7 +161,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     private static IQueryable<LineRow> Project(IQueryable<EntryLine> q) => q.Select(l => new LineRow(l.Id, l.JournalEntry.EntryDate, l.JournalEntry.PublicId, l.JournalEntry.Number,
         l.JournalEntry.Description, l.JournalEntry.SourceModule, l.JournalEntry.SourceType, l.JournalEntry.SourceId, l.AccountId, l.PartyType, l.PartyId,
         l.CostCentre != null ? l.CostCentre.PublicId : null, l.CostCentre != null ? l.CostCentre.Code : null, l.CostCentre != null ? l.CostCentre.Name : null, l.Note,
-        l.Debit, l.Credit));
+        l.Debit, l.Credit, l.JournalEntry.Reference));
 
     /// <summary>Entry, source document, account, party and cost-centre references for a page of lines.</summary>
     private async Task<Func<LineRow, decimal, LedgerLine>> DescribeAsync(IReadOnlyList<LineRow> rows, Dictionary<long, Node> tree, CancellationToken ct)
@@ -173,7 +173,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 : r.SourceType is null ? null : new SourceDocumentRef(r.Module, r.SourceType, null, null),
             chart.Ref(tree[r.AccountId].Account),
             r.PartyType is not null && r.PartyId is long pid && partyNames.TryGetValue((r.PartyType, pid), out var p) ? p : null,
-            r.CcPid is Guid g ? new Ref(support.Token<CostCentre>(g), r.CcCode + " " + r.CcName) : null, r.Note, r.Debit, r.Credit, balance);
+            r.CcPid is Guid g ? new Ref(support.Token<CostCentre>(g), r.CcCode + " " + r.CcName) : null, r.Note, r.Debit, r.Credit, balance, r.Reference);
     }
 
     /// <summary>All lines of a ledger query (exports), at most 20,000.</summary>

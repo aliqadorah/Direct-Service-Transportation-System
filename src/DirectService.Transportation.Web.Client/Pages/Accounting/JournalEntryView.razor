@@ -88,6 +88,7 @@
         new(L["trip.date"], Fmt.Date(e.EntryDate, Shell.DateFormat)),
         new(L["je.period"], e.PeriodMonth),
         new(L["je.description"], e.Description),
+        new(L["je.reference"], e.Reference ?? "—"),
         e.Source is { } s && Links.ForSource(Company, s.Type, s.Id) is { } href
             ? new(L["je.source"], null, @<a href="@href"><bdi>@(s.Number ?? L["je.src." + s.Type])</bdi></a>)
             : new(L["je.source"], e.IsManual ? L["je.manual"] : e.Source?.Number ?? L["je.src." + (e.SourceType ?? "Opening")]),

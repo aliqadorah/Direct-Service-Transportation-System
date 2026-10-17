@@ -83,6 +83,7 @@ public sealed class JournalExportService(IAppDbContext db, INumberingService num
                 date = e.EntryDate,
                 period = e.PeriodMonth,
                 description = e.Description,
+                reference = e.Reference,
                 sourceModule = e.SourceModule,
                 sourceType = e.SourceType,
                 sourceNumber = e.Source?.Number,
@@ -111,12 +112,12 @@ public sealed class JournalExportService(IAppDbContext db, INumberingService num
     {
         string[] headers =
         [
-            "BatchNo", "EntryNumber", "EntryDate", "Period", "Description", "SourceModule", "SourceType", "SourceNumber", "IsManual", "Status",
+            "BatchNo", "EntryNumber", "EntryDate", "Period", "Description", "Reference", "SourceModule", "SourceType", "SourceNumber", "IsManual", "Status",
             "Reverses", "LineNo", "AccountCode", "AccountName", "Debit", "Credit", "CostCentre", "PartyType", "PartyName", "Note",
         ];
         var rows = entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)
         [
-            batchNo, e.Number, e.EntryDate, e.PeriodMonth, e.Description, e.SourceModule, e.SourceType, e.Source?.Number, e.IsManual, e.Status,
+            batchNo, e.Number, e.EntryDate, e.PeriodMonth, e.Description, e.Reference, e.SourceModule, e.SourceType, e.Source?.Number, e.IsManual, e.Status,
             e.ReversesEntry?.Number, l.LineNo, l.Account.Code, l.Account.NameAr, l.Debit, l.Credit, l.CostCentre?.Name, l.Party?.Type, l.Party?.Name,
             l.Note,
         ]));

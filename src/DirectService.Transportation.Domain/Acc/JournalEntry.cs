@@ -19,6 +19,8 @@ public class JournalEntry : AuditableEntity, ITenantScoped, ICompanyScoped
     public string PeriodMonth { get; set; } = string.Empty;
     /// <summary>Entry narration.</summary>
     public string Description { get; set; } = string.Empty;
+    /// <summary>Free-text reference (المرجع) next to the narration, up to 100 characters (revision 6; manual entries).</summary>
+    public string? Reference { get; set; }
     /// <summary>Module that owns the source document.</summary>
     public string SourceModule { get; set; } = string.Empty;
     /// <summary>Type of source document within the module.</summary>

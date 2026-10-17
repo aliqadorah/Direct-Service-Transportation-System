@@ -13,9 +13,10 @@ namespace DirectService.Transportation.Contracts.Ledger;
 public sealed record LedgerQuery(string? Account, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party, int Page = 1, int PageSize = 200);
 
 /// <summary>One movement with its running balance (debit − credit); drill-down to the entry and to its source document.</summary>
+/// <summary>A ledger / statement line; <paramref name="Reference"/> is the entry's reference (المرجع, revision 6).</summary>
 public sealed record LedgerLine(
     DateOnly Date, EntryLinkRef Entry, string Description, SourceDocumentRef? Source, AccountRef Account, PartyResponse? Party, Ref? CostCentre, string? Note,
-    decimal Debit, decimal Credit, decimal Balance);
+    decimal Debit, decimal Credit, decimal Balance, string? Reference = null);
 
 /// <summary>Opening, movements (paged; running balance continues across pages), totals for the whole period and closing balance; balances are debit − credit.</summary>
 public sealed record LedgerReport(

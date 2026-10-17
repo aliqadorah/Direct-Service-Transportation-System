@@ -61,6 +61,8 @@ public static class AccountingCodes
     public const string Posted = "Posted";
     public const string Reversed = "Reversed";
     public const string Void = "Void";
+    /// <summary>A journal draft in the journal list (revision 6; acc.JournalDrafts, never an entry status).</summary>
+    public const string Draft = "Draft";
 
     public const string ModuleTrn = "TRN";
     public const string ModuleAcc = "ACC";

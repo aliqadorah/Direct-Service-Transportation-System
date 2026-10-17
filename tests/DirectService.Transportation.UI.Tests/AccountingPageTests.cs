@@ -58,6 +58,40 @@ public sealed class AccountingPageTests : PageTestBase
         Assert.DoesNotContain(L.F("je.lineParty", 1), cut.Markup);
     }
 
+    /// <summary>Revision 6 item 3: Reference next to the description; "Save as draft" sends the entry to the drafts endpoint, not the journal.</summary>
+    [Fact]
+    public void Journal_form_saves_a_draft_with_the_reference()
+    {
+        var draft = new JournalDraftResponse("d1", new DateOnly(2026, 10, 17), "إيجار", "R-9", [], 0, 0, DateTime.UtcNow, "أنا", "RV");
+        Respond("accounting/journal-entries/drafts", draft);
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/accounting/journal/new");
+        var cut = Render<JournalEntryForm>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains(L["je.reference"], cut.Markup));
+        var reference = cut.FindAll("label").Single(l => l.TextContent.Trim() == L["je.reference"]).GetAttribute("for");
+        cut.Find("#" + reference).Change("R-9");
+        cut.FindAll("button").Single(b => b.TextContent.Contains(L["je.saveDraft"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-entries/drafts"));
+        Assert.Contains("\"reference\":\"R-9\"", Requests.Single(r => r.Method == "POST" && r.Path == "accounting/journal-entries/drafts").Body!, StringComparison.Ordinal);
+        Assert.DoesNotContain(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-entries");
+    }
+
+    /// <summary>Revision 6 item 3: a draft row has no number, shows the Draft tag and the reference, and opens in the entry form.</summary>
+    [Fact]
+    public void Journal_list_shows_drafts_and_opens_them_in_the_form()
+    {
+        Respond("accounting/journal-entries", new PagedResult<JournalEntrySummary>(
+        [
+            new JournalEntrySummary("d1", "", new DateOnly(2026, 10, 17), "2026-10", "إيجار", "ACC", "Manual", true, "Draft", 250, 250, null, null, "R-9"),
+            new JournalEntrySummary("e1", "JV-00001", new DateOnly(2026, 10, 16), "2026-10", "اتصالات", "ACC", "Manual", true, "Posted", 20, 20, null, null, null),
+        ], 1, 50, 2));
+        var cut = Render<JournalList>(p => p.Add(x => x.Company, Company));
+        cut.WaitForAssertion(() => Assert.Contains("R-9", cut.Markup));
+        Assert.Contains(L["st.draft"], cut.Markup);
+        Assert.Contains(cut.FindAll("[role=tab]"), t => t.TextContent.Contains(L["je.draftsView"], StringComparison.Ordinal));
+        cut.FindAll("tbody tr")[0].Click();
+        Assert.EndsWith($"/c/{Company}/accounting/journal/drafts/d1", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Trial_balance_highlights_a_mismatch()
     {

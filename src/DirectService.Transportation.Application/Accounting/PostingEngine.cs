@@ -26,7 +26,7 @@ public sealed record PostingLine(string? PostingKey, long? AccountId, decimal De
 
 /// <summary>An entry to post (FR-097): date = source document date (BR-034), description, source link, lines.</summary>
 public sealed record PostingRequest(DateOnly EntryDate, string Description, string SourceModule, string? SourceType, long? SourceId,
-    bool IsManual, IReadOnlyList<PostingLine> Lines);
+    bool IsManual, IReadOnlyList<PostingLine> Lines, string? Reference = null);
 
 /// <summary>
 /// The posting engine (PRD 8.6, ADR-09). Every method runs inside the caller's transaction so the document, its entry,
@@ -43,6 +43,9 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     IChangeContext changes, TimeProvider clock, Collaboration.NotificationService? notifications = null, ILogger<PostingEngine>? log = null)
 {
     public const int DescriptionMax = 500;
+
+    /// <summary>Reference / المرجع of an entry (revision 6).</summary>
+    public const int ReferenceMax = 100;
     public const int NoteMax = 300;
     private const string Savepoint = "before_posting";
 
@@ -89,7 +92,9 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         RequireTransaction();
         var decimals = await CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var description = Common.TextNormalizer.CleanText(request.Description);
-        new Validator().Require("description", description).MaxLength("description", description, DescriptionMax).ThrowIfInvalid();
+        var reference = Common.TextNormalizer.CleanText(request.Reference);
+        new Validator().Require("description", description).MaxLength("description", description, DescriptionMax)
+            .MaxLength("reference", reference, ReferenceMax).ThrowIfInvalid();
         if (request.Lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
 
         var automatic = !request.IsManual && request.SourceType != AccountingCodes.SourceOpening;
@@ -157,6 +162,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             EntryDate = request.EntryDate,
             PeriodMonth = AccountingCodes.Month(request.EntryDate),
             Description = description!,
+            Reference = Common.TextNormalizer.CleanText(request.Reference),
             SourceModule = request.SourceModule,
             SourceType = request.SourceType,
             SourceId = request.SourceId,
@@ -279,6 +285,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             EntryDate = original.EntryDate,
             PeriodMonth = original.PeriodMonth,
             Description = Truncate(description, DescriptionMax),
+            Reference = original.Reference,
             SourceModule = original.SourceModule,
             SourceType = original.SourceType,
             SourceId = original.SourceId,

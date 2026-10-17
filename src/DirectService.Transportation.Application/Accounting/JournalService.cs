@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Automatic entries change only through their source document (FR-112).
 /// </summary>
 public sealed class JournalService(IAppDbContext db, PostingEngine engine, PartyResolver parties, PostingSources sources,
-    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, ReportExporter exporter)
+    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, ReportExporter exporter, JournalDraftService drafts)
 {
     public const string EntityType = "ACC.JournalEntry";
 
@@ -79,6 +79,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         new Validator()
             .Check(r.EntryDate is not null, "entryDate", ErrorCodes.ValidationRequired)
             .Require("description", r.Description)
+            .MaxLength("reference", TextNormalizer.CleanText(r.Reference), PostingEngine.ReferenceMax)
             .Check(lines.Count <= 500, "lines", ErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         if (lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
@@ -101,7 +102,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             var party = await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false);
             posting.Add(new PostingLine(null, accountId, l.Debit, l.Credit, centreId, party, l.Note));
         }
-        return new PostingRequest(r.EntryDate!.Value, r.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true, posting);
+        return new PostingRequest(r.EntryDate!.Value, r.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true, posting, r.Reference);
     }
 
     private async Task<Dictionary<string, long>> IdsAsync<T>(IEnumerable<string?> tokenList, CancellationToken ct) where T : Domain.Common.AuditableEntity
@@ -123,25 +124,50 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
 
     // ------------------------------------------------------------ queries
 
-    /// <summary>Journal list (FR-115) or, with <paramref name="automaticOnly"/>, the automatic-entries list (FR-102).</summary>
+    /// <summary>
+    /// Journal list (FR-115) or, with <paramref name="automaticOnly"/>, the automatic-entries list (FR-102). Revision 6: drafts (no number,
+    /// not posted) are listed under the Draft filter and, with no status chosen, before the entries (filters that drafts cannot match —
+    /// number, source type, automatic — leave them out).
+    /// </summary>
     public async Task<PagedResult<JournalEntrySummary>> ListAsync(JournalQuery q, bool automaticOnly, CancellationToken ct)
     {
-        var query = await FilterAsync(q, automaticOnly, ct).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(q);
         var page = new PageRequest(q.Page, q.PageSize);
-        var total = await query.CountAsync(ct).ConfigureAwait(false);
-        var rows = await query.OrderByDescending(e => e.EntryDate).ThenByDescending(e => e.Id)
-            .Skip(page.Skip).Take(page.SafePageSize)
+        var withDrafts = !automaticOnly && q.Manual != false && string.IsNullOrWhiteSpace(q.Number)
+            && (string.IsNullOrWhiteSpace(q.SourceType) || q.SourceType == AccountingCodes.SourceManual) && q.Status is null or AccountingCodes.Draft;
+        IReadOnlyList<JournalEntrySummary> draftRows = [];
+        if (withDrafts)
+        {
+            long? accountId = string.IsNullOrEmpty(q.AccountId) ? null
+                : await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == tokens.Decode<Account>(q.AccountId)).Select(a => (long?)a.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? -1;
+            long? centreId = string.IsNullOrEmpty(q.CostCentreId) ? null
+                : await db.Set<CostCentre>().AsNoTracking().Where(c => c.PublicId == tokens.Decode<CostCentre>(q.CostCentreId)).Select(c => (long?)c.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? -1;
+            (string, long)? party = q.PartyType is not null && !string.IsNullOrEmpty(q.PartyId)
+                ? (q.PartyType, await parties.IdOfAsync(q.PartyType, q.PartyId, ct).ConfigureAwait(false) ?? -1) : null;
+            draftRows = await drafts.ListAsync(q, accountId, centreId, party, ct).ConfigureAwait(false);
+        }
+        if (q.Status == AccountingCodes.Draft)
+            return new PagedResult<JournalEntrySummary>(draftRows.Skip(page.Skip).Take(page.SafePageSize).ToList(), page.SafePage, page.SafePageSize, draftRows.Count);
+
+        var query = await FilterAsync(q, automaticOnly, ct).ConfigureAwait(false);
+        var entryTotal = await query.CountAsync(ct).ConfigureAwait(false);
+        // Drafts first, then the entries: the page is a slice of that sequence.
+        var fromDrafts = draftRows.Skip(page.Skip).Take(page.SafePageSize).ToList();
+        var entrySkip = Math.Max(0, page.Skip - draftRows.Count);
+        var entryTake = page.SafePageSize - fromDrafts.Count;
+        var rows = entryTake <= 0 ? [] : await query.OrderByDescending(e => e.EntryDate).ThenByDescending(e => e.Id)
+            .Skip(entrySkip).Take(entryTake)
             .Select(e => new
             {
                 e.PublicId, e.Number, e.EntryDate, e.PeriodMonth, e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status,
-                e.TotalDebit, e.TotalCredit,
+                e.TotalDebit, e.TotalCredit, e.Reference,
                 Reverses = e.ReversesEntry == null ? null : e.ReversesEntry.Number,
                 ReversedBy = e.ReversedByEntry == null ? null : e.ReversedByEntry.Number,
             })
             .ToListAsync(ct).ConfigureAwait(false);
-        var items = rows.Select(e => new JournalEntrySummary(tokens.Encode<JournalEntry>(e.PublicId), e.Number, e.EntryDate, e.PeriodMonth,
-            e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status, e.TotalDebit, e.TotalCredit, e.Reverses, e.ReversedBy)).ToList();
-        return new PagedResult<JournalEntrySummary>(items, page.SafePage, page.SafePageSize, total);
+        var items = fromDrafts.Concat(rows.Select(e => new JournalEntrySummary(tokens.Encode<JournalEntry>(e.PublicId), e.Number, e.EntryDate, e.PeriodMonth,
+            e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status, e.TotalDebit, e.TotalCredit, e.Reverses, e.ReversedBy, e.Reference))).ToList();
+        return new PagedResult<JournalEntrySummary>(items, page.SafePage, page.SafePageSize, entryTotal + draftRows.Count);
     }
 
     /// <summary>The filtered entries with their lines (journal export, FR-104), oldest first.</summary>
@@ -165,14 +191,14 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         string L(string ar, string e) => en ? e : ar;
         ReportColumn[] columns =
         [
-            new(L("الرقم", "Number")), new(L("التاريخ", "Date"), ReportValue.Date), new(L("البيان", "Description")), new(L("المصدر", "Source")),
+            new(L("الرقم", "Number")), new(L("التاريخ", "Date"), ReportValue.Date), new(L("البيان", "Description")), new(L("المرجع", "Reference")), new(L("المصدر", "Source")),
             new(L("يدوي", "Manual")), new(L("الحالة", "Status")), new(L("السطر", "Line"), ReportValue.Number), new(L("رمز الحساب", "Account code")),
             new(L("الحساب", "Account")), new(L("مدين", "Debit"), ReportValue.Money), new(L("دائن", "Credit"), ReportValue.Money), new(L("مركز الكلفة", "Cost centre")),
             new(L("الطرف", "Party")), new(L("ملاحظة", "Note")),
         ];
         var rows = entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)
         [
-            e.Number, e.EntryDate, e.Description, e.Source is null ? null : $"{e.Source.Type} {e.Source.Number}".Trim(), e.IsManual, e.Status,
+            e.Number, e.EntryDate, e.Description, e.Reference, e.Source is null ? null : $"{e.Source.Type} {e.Source.Number}".Trim(), e.IsManual, e.Status,
             l.LineNo, l.Account.Code, en ? l.Account.NameEn ?? l.Account.NameAr : l.Account.NameAr, l.Debit, l.Credit, l.CostCentre?.Name,
             l.Party?.Name, l.Note,
         ])).ToList();
@@ -189,7 +215,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         new Validator()
             .Check(q.PeriodFrom is null || AccountingCodes.IsMonth(q.PeriodFrom), "periodFrom")
             .Check(q.PeriodTo is null || AccountingCodes.IsMonth(q.PeriodTo), "periodTo")
-            .Check(q.Status is null || q.Status is AccountingCodes.Posted or AccountingCodes.Reversed or AccountingCodes.Void, "status")
+            .Check(q.Status is null || q.Status is AccountingCodes.Posted or AccountingCodes.Reversed or AccountingCodes.Void or AccountingCodes.Draft, "status")
             .Check(q.PartyType is null || PartyResolver.Types.Contains(q.PartyType), "partyType")
             .ThrowIfInvalid();
         var query = db.Set<JournalEntry>().AsNoTracking();
@@ -203,6 +229,11 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             query = query.Where(e => e.Number.Contains(number));
         }
         if (q.Status is not null) query = query.Where(e => e.Status == q.Status);
+        if (TextNormalizer.CleanText(q.Search) is { } search)
+        {
+            var code = TextNormalizer.CleanCode(search) ?? search;
+            query = query.Where(e => e.Number.Contains(code) || e.Description.Contains(search) || (e.Reference != null && e.Reference.Contains(search)));
+        }
         if (!string.IsNullOrWhiteSpace(q.SourceType)) query = query.Where(e => e.SourceType == q.SourceType);
         if (!string.IsNullOrEmpty(q.AccountId))
         {
@@ -231,7 +262,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         return await GetByIdAsync(id, ct).ConfigureAwait(false);
     }
 
-    private async Task<JournalEntryResponse> GetByIdAsync(long id, CancellationToken ct) =>
+    public async Task<JournalEntryResponse> GetByIdAsync(long id, CancellationToken ct) =>
         (await DetailsAsync([id], ct).ConfigureAwait(false)).Single();
 
     private async Task<IReadOnlyList<JournalEntryResponse>> DetailsAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
@@ -282,7 +313,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
                 x.ReversedBy is null ? null : new EntryLinkRef(tokens.Encode<JournalEntry>(x.ReversedBy.PublicId), x.ReversedBy.Number),
                 e.VoidReason, e.VoidedAt, x.VoidedBy, x.BatchNo, e.CreatedAt,
                 e.CreatedBy is long cb ? creators.GetValueOrDefault(cb) : null,
-                byEntry.GetValueOrDefault(e.Id) ?? [], Convert.ToBase64String(e.RowVersion));
+                byEntry.GetValueOrDefault(e.Id) ?? [], Convert.ToBase64String(e.RowVersion), e.Reference);
         }).ToList();
     }
 
@@ -297,6 +328,6 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             entry.Lines, entry.TotalDebit, entry.TotalCredit, company.CurrencyCode,
             AmountInWords.Arabic(entry.TotalDebit, company.CurrencyCode, company.CurrencyDecimals),
             AmountInWords.English(entry.TotalDebit, company.CurrencyCode, company.CurrencyDecimals),
-            CompanyProvisioningService.DefaultSignatures);
+            CompanyProvisioningService.DefaultSignatures, entry.Reference);
     }
 }

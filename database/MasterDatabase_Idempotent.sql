@@ -6293,3 +6293,76 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017121155_Rev6_JournalReferenceAndDrafts'
+)
+BEGIN
+    ALTER TABLE [acc].[JournalEntries] ADD [Reference] nvarchar(100) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017121155_Rev6_JournalReferenceAndDrafts'
+)
+BEGIN
+    CREATE TABLE [acc].[JournalDrafts] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_JournalDrafts_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [EntryDate] date NULL,
+        [Description] nvarchar(500) NULL,
+        [Reference] nvarchar(100) NULL,
+        [Lines] nvarchar(max) NOT NULL,
+        [TotalDebit] decimal(18,3) NOT NULL,
+        [TotalCredit] decimal(18,3) NOT NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_JournalDrafts_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_JournalDrafts_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_JournalDrafts] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_JournalDrafts_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_JournalDrafts_Lines] CHECK (ISJSON([Lines]) = 1),
+        CONSTRAINT [FK_JournalDrafts_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_JournalDrafts_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_JournalDrafts_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_JournalDrafts_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_JournalDrafts_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017121155_Rev6_JournalReferenceAndDrafts'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_JournalDrafts_CompanyId] ON [acc].[JournalDrafts] ([CompanyId]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017121155_Rev6_JournalReferenceAndDrafts'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_JournalDrafts_PublicId] ON [acc].[JournalDrafts] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261017121155_Rev6_JournalReferenceAndDrafts'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261017121155_Rev6_JournalReferenceAndDrafts', N'10.0.12');
+END;
+
+COMMIT;
+GO
+
