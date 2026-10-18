@@ -167,6 +167,7 @@ public static class AuditVocabulary
         // Users and access
         ["SignIn"] = A("تسجيل دخول", "Signed in", "تسجيل الدخول", "signed in"),
         ["SignInFailed"] = A("محاولة دخول فاشلة", "Failed sign-in", "محاولة دخول فاشلة لـ{r}", "failed sign-in for {r}"),
+        ["SignInLocked"] = A("قفل الدخول", "Sign-in locked", "قفل الدخول لـ{r} بعد محاولات فاشلة", "locked sign-in for {r} after failed attempts"),
         ["EmailVerified"] = A("تأكيد البريد", "Email verified", "تأكيد البريد الإلكتروني لـ{r}", "verified the email of {r}"),
         ["PasswordReset"] = A("إعادة تعيين كلمة المرور", "Password reset", "إعادة تعيين كلمة المرور لـ{r}", "reset the password of {r}"),
         ["CreatedWithPassword"] = A("إنشاء مستخدم باسم مستخدم", "User created with a username", "إنشاء {r} باسم مستخدم وكلمة مرور", "created {r} with a username and password"),
@@ -243,7 +244,7 @@ public static class AuditVocabulary
     public static readonly IReadOnlySet<string> Hidden = new HashSet<string>(StringComparer.Ordinal)
     {
         "Id", "TenantId", "CompanyId", "PublicId", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "RowVersion", "IsDeleted", "DeletedAt",
-        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
+        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "ReceiptNoSearch", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
         "VoidedBy", "VoidedAt", "ApprovedAt", "ClosedBy", "ClosedAt", "ExportedBy", "ExportedAt", "ImportedBy", "ImportedAt", "ImportBatchId",
         "ExportBatchId", "JournalEntryId", "PeriodMonth", "SourceModule", "SourceType", "SourceId", "IsManual", "IcvCounter", "Icv", "UniqueId",
         "DocumentVersion", "Attempts", "LastAttemptAt", "LastSignInAt", "LastSeenAt", "LastActivityAt", "FailedSignInCount", "RequestPayload",

@@ -18,7 +18,7 @@ internal static class ApiSummaries
         ["GET /api/v1/auth/2fa/setup"] = "Get the authenticator key for the required or offered two-factor set-up (FR-177)",
         ["POST /api/v1/auth/2fa/skip"] = "Skip the offered two-factor set-up for now and start the session (refused when 2FA is required)",
         ["POST /api/v1/auth/2fa/setup"] = "Complete two-factor set-up; returns the one-time recovery codes",
-        ["POST /api/v1/auth/2fa/verify"] = "Verify the authenticator code or a recovery code and start the session",
+        ["POST /api/v1/auth/2fa/verify"] = "Verify the authenticator code or a recovery code and start the session (or continue to a required password change)",
         ["POST /api/v1/auth/sign-out"] = "Sign out and end the server session",
         ["POST /api/v1/auth/password-reset/request"] = "Request a password reset email",
         ["POST /api/v1/auth/password-reset/confirm"] = "Set a new password with the reset link token",

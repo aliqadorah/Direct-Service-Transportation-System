@@ -137,7 +137,7 @@ public sealed class AdministrationTests(ApiFactory f)
         var viewer = roles!.Single(x => x.Name == PresetRoles.Viewer);
 
         var foreign = await owner.Client.PostAsJsonAsync(U(owner, "/invitations"), new InviteRequest(other.Email, viewer.Id));
-        Assert.Equal("user.emailInUse", await foreign.ProblemCodeAsync()); // A-18
+        Assert.Equal("user.notAvailable", await foreign.ProblemCodeAsync()); // A-18, generic answer (DT-203)
 
         var email = $"inv-{Guid.NewGuid():N}@example.test";
         await (await owner.Client.PostAsJsonAsync(U(owner, "/invitations"), new InviteRequest(email, viewer.Id))).EnsureOkAsync();

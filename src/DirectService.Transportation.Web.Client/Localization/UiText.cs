@@ -157,6 +157,8 @@ public static partial class UiText
         ["acct.verifyConfirm"] = ("تأكيد البريد", "Confirm email"),
         ["acct.verifyDone"] = ("تم تأكيد بريدك الإلكتروني.", "Your email address is confirmed."),
         ["acct.verifyContinue"] = ("المتابعة: تسجيل الدخول", "Continue: sign in"),
+        ["acct.verifySignIn"] = ("أضاف مسؤول النظام هذا البريد إلى حساب. لتأكيده، سجّل الدخول باسم المستخدم الخاص بهذا الحساب، وستعود إلى هذه الصفحة لتأكيده.", "An administrator added this email address to an account. To confirm it, sign in with that account's username; you will come back to this page to confirm it."),
+        ["acct.verifySignInGo"] = ("تسجيل الدخول للتأكيد", "Sign in to confirm"),
         ["acct.linkInvalid"] = ("الرابط غير صالح أو منتهي الصلاحية.", "The link is not valid or has expired."),
         ["acct.resend"] = ("إعادة إرسال الرابط", "Send the link again"),
         ["acct.resendNote"] = ("يمكن إعادة الإرسال مرة كل دقيقة.", "You can resend once a minute."),

@@ -4,6 +4,7 @@
 @inherits AccountPage
 @using DirectService.Transportation.Application.Abstractions
 @using DirectService.Transportation.Application.Identity
+@using DirectService.Transportation.Contracts.Errors
 @inject AccountService Accounts
 
 <AuthCard Title="@L["acct.verifyTitle"]" Lead="@(_state == State.Ready ? L["acct.verifyLead"] : null)">
@@ -12,6 +13,11 @@
         case State.Done:
             <Banner Tone="Tone.Ok" Text="@L["acct.verifyDone"]" />
             <a class="btn pri w100" href="@Href("/sign-in")">@L["acct.verifyContinue"]</a>
+            break;
+        case State.SignIn:
+            @* DT-203: an email an administrator entered is confirmed only by its user, signed in; sign-in returns here. *@
+            <Banner Tone="Tone.Info" Icon="lock" Text="@L["acct.verifySignIn"]" />
+            <a class="btn pri w100" href="@Href("/sign-in", SelfUrl)">@L["acct.verifySignInGo"]</a>
             break;
         case State.Sent:
             <Banner Tone="Tone.Info" Text="@L["acct.resent"]" Live="true" />
@@ -39,13 +45,15 @@
     // Form models: bound from the posted form, or new on a GET.
     protected override void OnParametersSet() { Confirm ??= new(); Resend ??= new(); }
 
-    private enum State { Ready, Done, Invalid, Sent }
+    private enum State { Ready, Done, Invalid, Sent, SignIn }
 
     private State _state;
     private ProblemValidator? _problems;
 
     [SupplyParameterFromQuery(Name = "u")] private string? UserToken { get; set; }
     [SupplyParameterFromQuery(Name = "t")] private string? LinkToken { get; set; }
+
+    private string SelfUrl => $"/verify-email?u={Uri.EscapeDataString(UserToken ?? "")}&t={Uri.EscapeDataString(LinkToken ?? "")}";
     [SupplyParameterFromForm(FormName = "verify")] private ConfirmInput Confirm { get; set; } = default!;
     [SupplyParameterFromForm(FormName = "resend")] private ResendInput Resend { get; set; } = default!;
 
@@ -60,6 +68,10 @@
         {
             await Accounts.VerifyEmailAsync(UserToken!, LinkToken!, Http.RequestAborted);
             _state = State.Done;
+        }
+        catch (AppException e) when (e.Code == ErrorCodes.VerifySignInRequired)
+        {
+            _state = State.SignIn;
         }
         catch (AppException)
         {

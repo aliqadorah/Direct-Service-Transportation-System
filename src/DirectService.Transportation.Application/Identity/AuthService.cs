@@ -29,13 +29,17 @@ public enum SignInNextStep
 public sealed record AuthenticatorSetup(string SharedKey, string AuthenticatorUri);
 
 /// <summary>
-/// Sign-in with email or username + password, then two-factor authentication (SEC-01, SEC-02, FR-175, FR-177). Lockout: 5 failed
-/// attempts (password or code) → 15 minutes, the same for every user. Every attempt is audited (FR-188: sign-in and failed sign-in).
+/// Sign-in with email or username + password, then two-factor authentication (SEC-01, SEC-02, FR-175, FR-177). Lockout (owner decision
+/// 18 Oct 2026, DT-204): 5 failed attempts (password or code) from one IP address → that address is blocked for the account for 15
+/// minutes (<see cref="SignInThrottle"/>); 20 from any source → the account is locked for 15 minutes (backstop). While blocked or locked
+/// the answer is the ordinary failure (never "locked"), so it reveals neither the lock nor the account. Every attempt is audited (FR-188)
+/// and so is every lock ("SignInLocked", with the address).
 /// Revision 6 (owner change requests 15 Oct 2026): 2FA is required of platform staff (always) and of every user of a tenant with
 /// "Require 2FA for all users"; others are offered the set-up at their first sign-in ("Skip for now") and may turn it on later. A user
 /// created by an administrator may have to choose a new password first. The API layer turns the results into cookies.
 /// </summary>
-public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChangeContext changes, IDataScope scope, TimeProvider clock)
+public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChangeContext changes, IDataScope scope, TimeProvider clock,
+    SignInThrottle throttle, IRequestContext ctx)
 {
     public const string Issuer = "Direct Service Transportation";
 
@@ -50,14 +54,16 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
             throw new AppException(ErrorCodes.SignInFailed, 401);
         }
 
-        if (await users.IsLockedOutAsync(user).ConfigureAwait(false))
-            throw new AppException(ErrorCodes.SignInLocked, 423, null, MinutesLeft(user));
+        if (await IsLockedAsync(user).ConfigureAwait(false))
+        {
+            // The ordinary failure, at the cost of a real check (DT-204): neither the answer nor the time tells that a lock exists.
+            new PasswordHasher<User>().HashPassword(new User(), password ?? string.Empty);
+            throw new AppException(ErrorCodes.SignInFailed, 401);
+        }
 
         if (!await users.CheckPasswordAsync(user, password ?? string.Empty).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            if (await users.IsLockedOutAsync(user).ConfigureAwait(false))
-                throw new AppException(ErrorCodes.SignInLocked, 423, null, MinutesLeft(user));
             throw new AppException(ErrorCodes.SignInFailed, 401);
         }
 
@@ -68,7 +74,9 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
             throw new AppException(ErrorCodes.EmailNotConfirmed, 403);
         await EnsureTenantAllowsSignInAsync(user, ct).ConfigureAwait(false);
 
-        return (user, user.MustChangePassword ? SignInNextStep.ChangePassword : await SecondStepAsync(user, ct).ConfigureAwait(false));
+        // DT-205: with 2FA the code comes first; the forced password change follows it (AuthFlow.VerifyAsync).
+        return (user, user.MustChangePassword && user.TwoFactorEnabledAt is null
+            ? SignInNextStep.ChangePassword : await SecondStepAsync(user, ct).ConfigureAwait(false));
     }
 
     /// <summary>The step after the password (and after a forced password change): code, required set-up, offered set-up, or none.</summary>
@@ -139,8 +147,7 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
     public async Task ChangePasswordAsync(User user, string? currentPassword, string? newPassword, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (await users.IsLockedOutAsync(user).ConfigureAwait(false))
-            throw new AppException(ErrorCodes.SignInLocked, 423, null, MinutesLeft(user));
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
         if (!await users.CheckPasswordAsync(user, currentPassword ?? string.Empty).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
@@ -173,8 +180,7 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
     public async Task VerifySecondFactorAsync(User user, string? code, string? recoveryCode, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (await users.IsLockedOutAsync(user).ConfigureAwait(false))
-            throw new AppException(ErrorCodes.SignInLocked, 423, null, MinutesLeft(user));
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw new AppException(ErrorCodes.TwoFactorInvalid, 401, "code");   // DT-204
 
         bool ok;
         if (!string.IsNullOrWhiteSpace(recoveryCode))
@@ -191,8 +197,6 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         if (!ok)
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            if (await users.IsLockedOutAsync(user).ConfigureAwait(false))
-                throw new AppException(ErrorCodes.SignInLocked, 423, null, MinutesLeft(user));
             throw new AppException(ErrorCodes.TwoFactorInvalid, 401, "code");
         }
         await RecordSuccessAsync(user, ct).ConfigureAwait(false);
@@ -234,18 +238,34 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         }
     }
 
+    /// <summary>Blocked for this address (per account + IP) or locked for everyone (the per-account backstop).</summary>
+    private async Task<bool> IsLockedAsync(User user) =>
+        throttle.IsBlocked(user.Id, ctx.IpAddress) || await users.IsLockedOutAsync(user).ConfigureAwait(false);
+
     private async Task RecordFailureAsync(User user, string action, CancellationToken ct)
     {
+        var sourceBlocked = throttle.RecordFailure(user.Id, ctx.IpAddress);
         using (scope.Use(user.TenantId, null, null))
         {
+            var wasLocked = user.LockedUntil > clock.GetUtcNow().UtcDateTime;
             changes.SetAction(user, action);
             await users.AccessFailedAsync(user).ConfigureAwait(false);
+            var accountLocked = !wasLocked && user.LockedUntil > clock.GetUtcNow().UtcDateTime;
+            if (sourceBlocked || accountLocked)
+            {
+                // Every lock is audited (DT-204): which one, from which address (the audit row also carries the request's address).
+                changes.SetAction(user, "SignInLocked",
+                    accountLocked ? $"Account locked for everyone after {SignInThrottle.PerAccountLimit} failed attempts (from {ctx.IpAddress ?? "?"})"
+                                  : $"Blocked for address {ctx.IpAddress ?? "?"} after {SignInThrottle.PerSourceLimit} failed attempts");
+                user.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
         }
-        _ = ct;
     }
 
     private async Task RecordSuccessAsync(User user, CancellationToken ct)
     {
+        throttle.Reset(user.Id, ctx.IpAddress);
         using (scope.Use(user.TenantId, null, user.Id))
         {
             changes.SetAction(user, "SignIn");
@@ -274,9 +294,6 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
                 break;
         }
     }
-
-    private int MinutesLeft(User user) =>
-        user.LockedUntil is { } until ? Math.Max(1, (int)Math.Ceiling((until - clock.GetUtcNow().UtcDateTime).TotalMinutes)) : 15;
 
     private static string Clean(string? code) => Common.TextNormalizer.DigitsOnly(code);
 }

@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<GrantGuard>();
         services.AddScoped<SessionService>();
         services.AddScoped<AuthService>();
+        services.AddSingleton<SignInThrottle>();   // DT-204: failed sign-ins per account + IP
         services.AddScoped<AccountService>();
         services.AddScoped<MeService>();
         services.AddScoped<UserAdminService>();

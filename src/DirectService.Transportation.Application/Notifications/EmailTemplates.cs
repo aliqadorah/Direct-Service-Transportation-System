@@ -16,6 +16,13 @@ public static class EmailTemplates
         $"Hello {E(name)},<br>Please verify your email address to finish creating your Direct Service Transportation account.",
         "تأكيد البريد", "Verify email", link, nameof(VerifyEmail));
 
+    /// <summary>An email an administrator entered for a username user: confirmed only while that user is signed in (DT-203).</summary>
+    public static EmailMessage VerifyAddedEmail(string to, string name, string userName, string link) => Build(to,
+        "تأكيد البريد الإلكتروني — Verify your email",
+        $"مرحباً {E(name)}،<br>أضاف مسؤول النظام هذا البريد إلى حسابك ({E(userName)}) في Direct Service Transportation. سجّل الدخول باسم المستخدم أولاً، ثم افتح الرابط لتأكيده. إن لم يكن هذا حسابك فتجاهل هذه الرسالة.",
+        $"Hello {E(name)},<br>An administrator added this email address to your Direct Service Transportation account ({E(userName)}). Sign in with your username first, then open the link to confirm it. If this is not your account, ignore this email.",
+        "تأكيد البريد", "Verify email", link, nameof(VerifyEmail));
+
     public static EmailMessage PasswordReset(string to, string name, string link) => Build(to,
         "إعادة تعيين كلمة المرور — Reset your password",
         $"مرحباً {E(name)}،<br>طُلبت إعادة تعيين كلمة المرور لحسابك. إن لم تطلب ذلك فتجاهل هذه الرسالة.",

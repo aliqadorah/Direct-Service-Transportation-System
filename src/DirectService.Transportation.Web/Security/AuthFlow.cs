@@ -20,6 +20,8 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
     public const string StageSetup = "setup";
     public const string StagePassword = "password";
     public const string StageOffer = "offer";
+    /// <summary>DT-205: the forced password change of a user with 2FA comes after the code; the sign-in completes after the change.</summary>
+    public const string StagePasswordAfterCode = "password-2fa";
 
     /// <summary>
     /// Checks the password (<paramref name="login"/> = email or username) and issues the partial sign-in for the next step; with no
@@ -37,8 +39,13 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
     /// <summary>The forced password change (stage "password"); returns the step after it.</summary>
     public async Task<SignInNextStep> ChangePasswordAsync(HttpContext http, string? newPassword, CancellationToken ct)
     {
-        var (user, _) = await MfaUserAsync(http, StagePassword).ConfigureAwait(false);
+        var (user, stage) = await MfaUserAsync(http, StagePassword, StagePasswordAfterCode).ConfigureAwait(false);
         await auth.ChangeRequiredPasswordAsync(user, newPassword, ct).ConfigureAwait(false);
+        if (stage == StagePasswordAfterCode)
+        {
+            await CompleteAsync(http, user, ct).ConfigureAwait(false);   // the code was checked before the change
+            return SignInNextStep.None;
+        }
         var next = await auth.SecondStepAsync(user, ct).ConfigureAwait(false);
         await ContinueAsync(http, user, next, ct).ConfigureAwait(false);
         return next;
@@ -112,12 +119,21 @@ public sealed class AuthFlow(AuthService auth, UserManager<User> users, SessionS
         return await CompleteAsync(http, user, ct).ConfigureAwait(false);
     }
 
-    /// <summary>Verifies the authenticator code or a recovery code and signs in.</summary>
-    public async Task<MeResponse> VerifyAsync(HttpContext http, string? code, string? recoveryCode, CancellationToken ct)
+    /// <summary>
+    /// Verifies the authenticator code or a recovery code and signs in — or, when an administrator asked for a new password, continues to
+    /// the forced change (owner decision 18 Oct 2026, DT-205: the code first, then the new password).
+    /// </summary>
+    public async Task<SignInNextStep> VerifyAsync(HttpContext http, string? code, string? recoveryCode, CancellationToken ct)
     {
         var (user, _) = await MfaUserAsync(http, StageVerify).ConfigureAwait(false);
         await auth.VerifySecondFactorAsync(user, code, recoveryCode, ct).ConfigureAwait(false);
-        return await CompleteAsync(http, user, ct).ConfigureAwait(false);
+        if (user.MustChangePassword)
+        {
+            await http.SignInAsync(AuthSchemes.Mfa, AuthSetup.MfaPrincipal(user.PublicId, StagePasswordAfterCode, user.SecurityStamp)).ConfigureAwait(false);
+            return SignInNextStep.ChangePassword;
+        }
+        await CompleteAsync(http, user, ct).ConfigureAwait(false);
+        return SignInNextStep.None;
     }
 
     /// <summary>Revokes the server session and removes both cookies.</summary>

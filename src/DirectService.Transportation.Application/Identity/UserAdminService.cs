@@ -17,7 +17,7 @@ namespace DirectService.Transportation.Application.Identity;
 /// </summary>
 public sealed class UserAdminService(
     IAppDbContext db, IRequestContext ctx, IChangeContext changes, AccessService access, SessionService sessions,
-    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard, Platform.PlanLimits? limits = null)
+    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard, SignInThrottle throttle, Platform.PlanLimits? limits = null)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
 
@@ -73,8 +73,10 @@ public sealed class UserAdminService(
         if (!policy.IsSatisfiedBy(r.Password)) throw AccountService.PolicyError(policy);
         // P-07 first: a tenant at its user limit must not be able to probe which usernames/emails exist without creating anyone (DT-202).
         if (limits is not null) await limits.EnsureUserAsync(tenantId, ct).ConfigureAwait(false);
-        if (await users.FindByNameAsync(userName!).ConfigureAwait(false) is not null) throw Fail.Field("userName", ErrorCodes.UserNameInUse);
-        if (mail is not null && await users.FindByEmailAsync(mail).ConfigureAwait(false) is not null) throw Fail.Field("email", ErrorCodes.EmailInUse);
+        // Owner decision 18 Oct 2026 (DT-203): one generic "not available" answer for a taken username or email (any tenant), never which.
+        if (await users.FindByNameAsync(userName!).ConfigureAwait(false) is not null
+            || (mail is not null && await users.FindByEmailAsync(mail).ConfigureAwait(false) is not null))
+            throw Fail.Conflict(ErrorCodes.NotAvailable);
 
         var user = await db.InTransactionAsync(async c =>
         {
@@ -89,7 +91,7 @@ public sealed class UserAdminService(
             if (!created.Succeeded)
             {
                 if (created.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode)) throw AccountService.PolicyError(policy);
-                if (created.Errors.Any(e => e.Code is "DuplicateUserName")) throw Fail.Field("userName", ErrorCodes.UserNameInUse);
+                if (created.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail")) throw Fail.Conflict(ErrorCodes.NotAvailable);
                 throw Fail.Rule(ErrorCodes.ValidationFailed);
             }
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = u.Id, CompanyId = ctx.CompanyId!.Value, RoleId = role.Id });
@@ -117,6 +119,7 @@ public sealed class UserAdminService(
         user.MustChangePassword = r.MustChangePassword;
         user.LockedUntil = null;
         user.FailedSignInCount = 0;
+        throttle.ResetAll(user.Id);   // DT-204: every address's block too
         var token = await users.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
         var result = await users.ResetPasswordAsync(user, token, r.Password).ConfigureAwait(false);   // new security stamp
         if (!result.Succeeded) throw AccountService.PolicyError(policy);
@@ -166,6 +169,7 @@ public sealed class UserAdminService(
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
         user.LockedUntil = null;
         user.FailedSignInCount = 0;
+        throttle.ResetAll(user.Id);   // DT-204: every address's block too
         changes.SetAction(user, "Unlock");
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }

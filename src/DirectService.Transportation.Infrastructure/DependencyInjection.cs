@@ -50,8 +50,8 @@ public static class DependencyInjection
                 o.Password.RequireUppercase = false;
                 o.Password.RequireNonAlphanumeric = false;
                 o.Password.RequiredUniqueChars = 1;
-                // FR-175: 5 failed sign-ins → 15-minute lock.
-                o.Lockout.MaxFailedAccessAttempts = 5;
+                // FR-175 / DT-204: per-account backstop — 20 failed attempts from any source → 15-minute lock (5 per account + IP: SignInThrottle).
+                o.Lockout.MaxFailedAccessAttempts = SignInThrottle.PerAccountLimit;
                 o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                 o.Lockout.AllowedForNewUsers = true;
             })

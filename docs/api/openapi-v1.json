@@ -524,7 +524,7 @@
         "tags": [
           "Authentication"
         ],
-        "summary": "Verify the authenticator code or a recovery code and start the session",
+        "summary": "Verify the authenticator code or a recovery code and start the session (or continue to a required password change)",
         "operationId": "postAuth2faVerify",
         "requestBody": {
           "content": {
@@ -542,7 +542,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MeResponse"
+                  "$ref": "#/components/schemas/SignInResponse"
                 }
               }
             }

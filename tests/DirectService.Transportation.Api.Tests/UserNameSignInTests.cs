@@ -131,10 +131,10 @@ public sealed class UserNameSignInTests(ApiFactory f)
         var other = await f.SignUpOwnerAsync();
         var dup = await other.Client.PostAsJsonAsync(U(other, "/users"),
             new CreateUserRequest("X", userName.ToUpperInvariant(), null, ApiHelpers.Password, await RoleAsync(other, PresetRoles.Viewer)));
-        Assert.Equal("user.userNameInUse", await dup.ErrorCodeAsync());
+        Assert.Equal((HttpStatusCode.Conflict, "user.notAvailable"), (dup.StatusCode, await dup.ErrorCodeAsync()));   // DT-203: generic, never which
         var usedEmail = await other.Client.PostAsJsonAsync(U(other, "/users"),
             new CreateUserRequest("X", NewUserName(), owner.Email, ApiHelpers.Password, await RoleAsync(other, PresetRoles.Viewer)));
-        Assert.Equal("user.emailInUse", await usedEmail.ErrorCodeAsync());
+        Assert.Equal((HttpStatusCode.Conflict, "user.notAvailable"), (usedEmail.StatusCode, await usedEmail.ErrorCodeAsync()));
         var weak = await other.Client.PostAsJsonAsync(U(other, "/users"),
             new CreateUserRequest("X", NewUserName(), null, "weak", await RoleAsync(other, PresetRoles.Viewer)));
         Assert.Equal("auth.passwordPolicy", await weak.ErrorCodeAsync());
@@ -178,10 +178,22 @@ public sealed class UserNameSignInTests(ApiFactory f)
         await (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(email))).EnsureOkAsync();
         Assert.Equal(before, f.Emails.Count);
         Assert.Equal("user.emailNotVerified", await (await owner.Client.PostAsync(U(owner, $"/users/{user.Id}/password-reset"), null)).ErrorCodeAsync());
-        Assert.Equal("done", (await PasswordStepAsync(userName, ApiHelpers.Password)).Response.Next);   // sign-in does not wait for it
+        var (session, signedIn) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        Assert.Equal("done", signedIn.Next);   // sign-in does not wait for it
+
+        // Owner decision 18 Oct 2026 (DT-203): whoever holds the link cannot verify it without being signed in as the user —
+        // neither anonymously nor as another user (the Owner); the user's own session confirms it and stays signed in.
+        var anonymous = await anon.PostAsJsonAsync("/api/v1/auth/verify-email", new LinkTokenRequest(verify["u"], verify["t"]));
+        Assert.Equal((HttpStatusCode.Forbidden, "auth.verifySignIn"), (anonymous.StatusCode, await anonymous.ErrorCodeAsync()));
+        Assert.Equal("auth.verifySignIn",
+            await (await owner.Client.PostAsJsonAsync("/api/v1/auth/verify-email", new LinkTokenRequest(verify["u"], verify["t"]))).ErrorCodeAsync());
+        await (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(email))).EnsureOkAsync();
+        Assert.Equal(before, f.Emails.Count);   // still nothing sent
+        await session.UseAntiforgeryAsync();
+        await (await session.PostAsJsonAsync("/api/v1/auth/verify-email", new LinkTokenRequest(verify["u"], verify["t"]))).EnsureOkAsync();
+        await (await session.GetAsync("/api/v1/me/")).EnsureOkAsync();   // still signed in
 
         // Verified: the reset email goes out.
-        await (await anon.PostAsJsonAsync("/api/v1/auth/verify-email", new LinkTokenRequest(verify["u"], verify["t"]))).EnsureOkAsync();
         await (await anon.PostAsJsonAsync("/api/v1/auth/password-reset/request", new EmailRequest(email))).EnsureOkAsync();
         Assert.True(f.Emails.LinkParameters(email, "PasswordReset").ContainsKey("t"));
     }
@@ -228,13 +240,51 @@ public sealed class UserNameSignInTests(ApiFactory f)
     public async Task Username_users_get_the_same_lockout()
     {
         var owner = await f.SignUpOwnerAsync();
-        var (userName, _) = await CreateAsync(owner, mustChange: false);
+        var (userName, user) = await CreateAsync(owner, mustChange: false);
         var client = f.NewClient();
+        client.DefaultRequestHeaders.Add("X-Test-Client-IP", "10.40.0.1");
         await client.UseAntiforgeryAsync();
         for (var i = 0; i < 5; i++)
             await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, "Wrong-pass-1", userName));
         var locked = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, userName));
-        Assert.Equal((HttpStatusCode)423, locked.StatusCode);
+        Assert.Equal((HttpStatusCode.Unauthorized, "auth.signInFailed"), (locked.StatusCode, await locked.ErrorCodeAsync()));   // DT-204: ordinary answer
+
+        // The administrator's unlock clears the address blocks too.
+        await (await owner.Client.PostAsync(U(owner, $"/users/{user.Id}/unlock"), null)).EnsureOkAsync();
+        var again = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(null, ApiHelpers.Password, userName));
+        Assert.Equal("done", (await again.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+    }
+
+    /// <summary>
+    /// Owner decision 18 Oct 2026 (DT-205): a user with 2FA whom an administrator gave a new password enters the code first, then chooses
+    /// the new password; the change step cannot be reached with the password alone.
+    /// </summary>
+    [Fact]
+    public async Task With_2FA_the_code_comes_before_the_forced_password_change()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var (userName, user) = await CreateAsync(owner, mustChange: false);
+        var (session, _) = await PasswordStepAsync(userName, ApiHelpers.Password);
+        await session.UseAntiforgeryAsync();
+        var setup = await session.GetFromJsonAsync<TwoFactorSetupResponse>("/api/v1/me/2fa/setup");
+        await session.UseAntiforgeryAsync();
+        await (await session.PostAsJsonAsync("/api/v1/me/2fa/setup", new TwoFactorCodeRequest(Totp.Code(setup!.SharedKey), null))).EnsureOkAsync();
+        await (await owner.Client.PostAsJsonAsync(U(owner, $"/users/{user.Id}/set-password"), new SetPasswordRequest(NewPassword))).EnsureOkAsync();
+
+        var (client, first) = await PasswordStepAsync(userName, NewPassword);
+        Assert.Equal("twoFactor", first.Next);   // not "changePassword"
+        var early = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest("An0ther-Passw0rd"));
+        Assert.Equal(HttpStatusCode.Unauthorized, early.StatusCode);   // the password alone does not reach the change
+
+        var code = await client.PostAsJsonAsync("/api/v1/auth/2fa/verify", new TwoFactorCodeRequest(Totp.Code(setup.SharedKey), null));
+        Assert.Equal("changePassword", (await code.Content.ReadFromJsonAsync<SignInResponse>())!.Next);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/me/")).StatusCode);   // no session before the change
+        var changed = await client.PostAsJsonAsync("/api/v1/auth/change-password", new NewPasswordRequest("An0ther-Passw0rd"));
+        var done = (await changed.Content.ReadFromJsonAsync<SignInResponse>())!;
+        Assert.Equal("done", done.Next);   // signed in without a second code
+        Assert.NotNull(done.Me);
+        await client.UseAntiforgeryAsync();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/me/")).StatusCode);
     }
 
     [Fact]

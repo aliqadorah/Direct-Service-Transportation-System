@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,25 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             s.AddSingleton<IEmailSender>(Emails);
             s.RemoveAll<IRealtimeNotifier>();
             s.AddSingleton<IRealtimeNotifier>(Live);
+            s.AddTransient<IStartupFilter, TestClientIpFilter>();
         });
+    }
+
+    /// <summary>Test host only: the "X-Test-Client-IP" header sets the connection's address (sign-in lockout per account + IP, DT-204).</summary>
+    private sealed class TestClientIpFilter : IStartupFilter
+    {
+        public const string Header = "X-Test-Client-IP";
+
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((http, nextMiddleware) =>
+            {
+                if (http.Request.Headers.TryGetValue(Header, out var ip) && System.Net.IPAddress.TryParse(ip.ToString(), out var address))
+                    http.Connection.RemoteIpAddress = address;
+                return nextMiddleware(http);
+            });
+            next(app);
+        };
     }
 
     public async ValueTask InitializeAsync()

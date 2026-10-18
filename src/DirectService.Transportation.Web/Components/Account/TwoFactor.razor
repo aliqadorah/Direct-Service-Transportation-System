@@ -2,6 +2,7 @@
 @* SCR-01 second step (FR-177): authenticator code, or a one-time recovery code. Only reachable after a correct password. *@
 @inherits AccountPage
 @using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
 @using DirectService.Transportation.Web.Security
 @inject AuthFlow Flow
 
@@ -57,9 +58,10 @@
             _problems?.Show(missing);
             return;
         }
+        SignInNextStep next;
         try
         {
-            await Flow.VerifyAsync(Http, Recovery ? null : Input.Code!.Replace(" ", "", StringComparison.Ordinal), Recovery ? Input.RecoveryCode!.Trim() : null, Http.RequestAborted);
+            next = await Flow.VerifyAsync(Http, Recovery ? null : Input.Code!.Replace(" ", "", StringComparison.Ordinal), Recovery ? Input.RecoveryCode!.Trim() : null, Http.RequestAborted);
         }
         catch (AppException e)
         {
@@ -69,7 +71,8 @@
             Input.Code = null;
             return;
         }
-        Go(LocalUrl(ReturnUrl));
+        // DT-205: an administrator asked for a new password — chosen after the code.
+        Go(next == SignInNextStep.ChangePassword ? Href("/change-password", LocalUrl(ReturnUrl)) : LocalUrl(ReturnUrl));
     }
 
     private sealed class CodeInput

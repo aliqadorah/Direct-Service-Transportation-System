@@ -5,6 +5,7 @@ import { api, c } from "../support/api";
 import { companyOf, signUp, submitForm, useLanguage, waitForApp, type Account, type Lang } from "../support/auth";
 import { createHmac } from "node:crypto";
 import { BASE_URL, ROOT, WEBHOOK_SECRET } from "../support/env";
+import { linkFromMail } from "../support/mail";
 import { totp } from "../support/totp";
 import { staffSignIn } from "../support/staff";
 import { texts } from "../support/text";
@@ -132,7 +133,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
 
 for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — account pages (${lang})`, async ({ page }) => {
-    test.skip(!wanted("account", "/sign-in", "/sign-up", "two-factor", "change-password"), "not among VISUAL_ONLY");
+    test.skip(!wanted("account", "/sign-in", "/sign-up", "two-factor", "change-password", "verify-email"), "not among VISUAL_ONLY");
     test.setTimeout(20 * 60_000);
     const run = new VisualRun(lang, "account");
     for (const route of ["/sign-in", "/sign-up", "/forgot-password"]) {
@@ -164,6 +165,30 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await submitForm(page, "sign-in");
     await expect(page).toHaveURL(/change-password/);
     await run.check(page, "change-password");
+    // Owner decisions of 18 Oct 2026: the ordinary failure message on the sign-in page (also while an address is blocked, DT-204) and
+    // the verification page of an administrator-entered email asking to sign in first (DT-203).
+    await page.context().clearCookies();
+    await page.goto(`/sign-in?lang=${lang}`);
+    await page.locator('[name="Input.Email"]').fill(userName);
+    await page.locator('[name="Input.Password"]').fill("Wrong-passw0rd");
+    await submitForm(page, "sign-in");
+    await expect(page.locator(".errsum, .banner").first()).toBeVisible();
+    await run.check(page, "sign-in#failed");
+    await page.goto(`/sign-in?lang=${lang}`);
+    await page.locator('[name="Input.Email"]').fill(account.email);
+    await page.locator('[name="Input.Password"]').fill(account.password);
+    await submitForm(page, "sign-in");
+    await page.locator('[name="Input.Code"]').fill(totp(account.key!));
+    await submitForm(page, "two-factor");
+    await waitForApp(page);
+    const mailUser = `vis.m${Date.now().toString(36)}`, mail = `${mailUser}@e2e.test`;
+    await api(page, "POST", c(company, "users"), { fullName: "Visual mail user", userName: mailUser, email: mail, password: account.password,
+      role: roles.find((r) => r.name === "Viewer")!.id, mustChangePassword: false });
+    await page.context().clearCookies();
+    await page.goto(`${await linkFromMail(mail, "VerifyEmail")}&lang=${lang}`);
+    await submitForm(page, "verify");
+    await expect(page.locator('a.btn.pri[href*="/sign-in"]')).toBeVisible();
+    await run.check(page, "verify-email#sign-in");
     run.assertClean();
   });
 

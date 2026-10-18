@@ -51,7 +51,7 @@ public sealed class InvitationService(
         var existing = await users.FindByEmailAsync(address!).ConfigureAwait(false);
         if (existing is not null)
         {
-            if (existing.TenantId != ctx.TenantId) throw Fail.Conflict(ErrorCodes.EmailInUse);
+            if (existing.TenantId != ctx.TenantId) throw Fail.Conflict(ErrorCodes.NotAvailable);   // DT-203: generic answer
             var hasRole = await db.Set<UserCompanyRole>().AnyAsync(x => x.UserId == existing.Id && x.CompanyId == ctx.CompanyId, ct).ConfigureAwait(false);
             if (hasRole) throw Fail.Conflict(ErrorCodes.DuplicateKey, address!);
         }
@@ -115,7 +115,7 @@ public sealed class InvitationService(
         ArgumentNullException.ThrowIfNull(r);
         var inv = await ByLinkTokenAsync(r.Token, ct).ConfigureAwait(false);
         if (inv is null || !IsUsable(inv)) throw Fail.Rule(ErrorCodes.TokenInvalid);
-        if (await users.FindByEmailAsync(inv.Email).ConfigureAwait(false) is not null) throw Fail.Conflict(ErrorCodes.EmailInUse);
+        if (await users.FindByEmailAsync(inv.Email).ConfigureAwait(false) is not null) throw Fail.Conflict(ErrorCodes.NotAvailable);
         var fullName = TextNormalizer.CleanText(r.FullName);
         new Validator().Require("fullName", fullName).MaxLength("fullName", fullName, 150).Require("password", r.Password).ThrowIfInvalid();
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, inv.TenantId, ct).ConfigureAwait(false);

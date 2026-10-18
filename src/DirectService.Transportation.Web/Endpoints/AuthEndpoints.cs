@@ -68,7 +68,7 @@ internal static class AuthEndpoints
             TypedResults.Ok(await flow.SkipSetupAsync(http, ct).ConfigureAwait(false)));
 
         auth.MapPost("/2fa/verify", async (TwoFactorCodeRequest r, HttpContext http, AuthFlow flow, CancellationToken ct) =>
-            TypedResults.Ok(await flow.VerifyAsync(http, r.Code, r.RecoveryCode, ct).ConfigureAwait(false)));
+            TypedResults.Ok(await ResponseAsync(await flow.VerifyAsync(http, r.Code, r.RecoveryCode, ct).ConfigureAwait(false), flow, ct).ConfigureAwait(false)));   // DT-205: "done" or "changePassword"
 
         auth.MapPost("/sign-out", async (HttpContext http, AuthFlow flow, CancellationToken ct) =>
         {

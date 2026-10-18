@@ -66,7 +66,7 @@ public sealed class IdentityTests(ApiFactory f)
         await client.UseAntiforgeryAsync();
         var r = await client.PostAsJsonAsync("/api/v1/auth/sign-up", new SignUpRequest("X", owner.Email, ApiHelpers.Password, "Other org", true, "en"));
         Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
-        Assert.Equal("user.emailInUse", await r.ProblemCodeAsync());
+        Assert.Equal("user.notAvailable", await r.ProblemCodeAsync());   // generic answer (DT-203)
     }
 
     [Fact]
@@ -94,29 +94,67 @@ public sealed class IdentityTests(ApiFactory f)
         Assert.Equal("auth.twoFactorInvalid", await wrong.ProblemCodeAsync());
     }
 
+    /// <summary>
+    /// Owner decision 18 Oct 2026 (DT-204): five failures from one address block that address for the account for 15 minutes — with the
+    /// ordinary "sign-in failed" answer, never "locked" — while the owner still signs in from another address; the block is audited.
+    /// </summary>
     [Fact]
-    public async Task Five_failed_sign_ins_lock_the_account_for_15_minutes()
+    public async Task Five_failed_sign_ins_from_one_address_block_only_that_address_with_the_ordinary_answer()
     {
         var owner = await f.SignUpOwnerAsync();
-        var client = f.NewClient();
-        await client.UseAntiforgeryAsync();
-        for (var i = 0; i < 4; i++)
+        var attacker = await ClientFromAsync("10.20.0.1");
+        for (var i = 0; i < 5; i++)
         {
-            var bad = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, "wrong-password-1"));
-            Assert.Equal(HttpStatusCode.Unauthorized, bad.StatusCode);
+            var bad = await attacker.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, "wrong-password-1"));
+            Assert.Equal((HttpStatusCode.Unauthorized, "auth.signInFailed"), (bad.StatusCode, await bad.ProblemCodeAsync()));
         }
-        var fifth = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, "wrong-password-1"));
-        Assert.Equal((HttpStatusCode)423, fifth.StatusCode);
-        var correct = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, ApiHelpers.Password));
-        Assert.Equal((HttpStatusCode)423, correct.StatusCode);
+        var blocked = await attacker.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, ApiHelpers.Password));
+        Assert.Equal((HttpStatusCode.Unauthorized, "auth.signInFailed"), (blocked.StatusCode, await blocked.ProblemCodeAsync()));   // right password, same answer
+        Assert.DoesNotContain("lock", await blocked.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+
+        var owners = await ClientFromAsync("10.20.0.2");
+        var mine = await owners.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, ApiHelpers.Password));
+        Assert.Equal("twoFactor", (await mine.Content.ReadFromJsonAsync<SignInResponse>())!.Next);   // not locked out by someone else
+        await f.DbAsync(async db =>
+        {
+            var u = await db.Set<User>().IgnoreQueryFilters(AllFilters).SingleAsync(x => x.Email == owner.Email);
+            Assert.Null(u.LockedUntil);   // the account itself is not locked (backstop: 20)
+            var locks = await db.Set<AuditLog>().IgnoreQueryFilters().Where(a => a.EntityType == "CORE.User" && a.EntityId == u.Id && a.Action == "SignInLocked").ToListAsync();
+            Assert.Equal("10.20.0.1", Assert.Single(locks).IpAddress);
+            Assert.True(await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityId == u.Id && a.Action == "SignInFailed") >= 5);
+            return true;
+        });
+    }
+
+    /// <summary>DT-204 backstop: 20 failures from any addresses lock the account for everyone, with the ordinary answer; audited.</summary>
+    [Fact]
+    public async Task Twenty_failures_from_several_addresses_lock_the_account_for_everyone()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        for (var source = 1; source <= 4; source++)
+        {
+            var c = await ClientFromAsync($"10.30.0.{source}");
+            for (var i = 0; i < 5; i++) await c.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, "wrong-password-1"));
+        }
+        var fresh = await ClientFromAsync("10.30.0.99");
+        var refused = await fresh.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(owner.Email, ApiHelpers.Password));
+        Assert.Equal((HttpStatusCode.Unauthorized, "auth.signInFailed"), (refused.StatusCode, await refused.ProblemCodeAsync()));
         await f.DbAsync(async db =>
         {
             var u = await db.Set<User>().IgnoreQueryFilters(AllFilters).SingleAsync(x => x.Email == owner.Email);
             Assert.InRange((u.LockedUntil!.Value - DateTime.UtcNow).TotalMinutes, 14, 15.1);
-            var failures = await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityType == "CORE.User" && a.EntityId == u.Id && a.Action == "SignInFailed");
-            Assert.True(failures >= 5);
+            // Three address blocks, then the 20th failure blocks the fourth address and locks the account: one audit row for that attempt.
+            Assert.Equal(4, await db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.EntityId == u.Id && a.Action == "SignInLocked"));
             return true;
         });
+    }
+
+    private async Task<HttpClient> ClientFromAsync(string ip)
+    {
+        var c = f.NewClient();
+        c.DefaultRequestHeaders.Add("X-Test-Client-IP", ip);
+        await c.UseAntiforgeryAsync();
+        return c;
     }
 
     [Fact]

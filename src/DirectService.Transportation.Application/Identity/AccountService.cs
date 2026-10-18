@@ -30,7 +30,9 @@ public sealed class AccountService(
     IUrlTokenService urlTokens,
     IEmailSender email,
     TimeProvider clock,
-    IOptions<AppOptions> options)
+    IOptions<AppOptions> options,
+    IRequestContext ctx,
+    SignInThrottle throttle)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
 
@@ -50,7 +52,7 @@ public sealed class AccountService(
         if (!PasswordPolicy.Default.IsSatisfiedBy(r.Password))
             throw PolicyError(PasswordPolicy.Default);
         if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null)
-            throw Fail.Conflict(ErrorCodes.EmailInUse);
+            throw Fail.Conflict(ErrorCodes.NotAvailable);   // DT-203: generic answer
 
         var now = clock.GetUtcNow().UtcDateTime;
         var lang = r.Language is "en" ? "en" : "ar";
@@ -115,7 +117,9 @@ public sealed class AccountService(
         if (user.Email is null) return;   // a user created with a username and no email (revision 6)
         var token = await users.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
         var link = Link("verify-email", urlTokens.Encode<User>(user.PublicId), token);
-        await email.SendAsync(EmailTemplates.VerifyEmail(user.Email, user.FullName, link), ct).ConfigureAwait(false);
+        await email.SendAsync(user.UserName is { } name
+            ? EmailTemplates.VerifyAddedEmail(user.Email, user.FullName, name, link)
+            : EmailTemplates.VerifyEmail(user.Email, user.FullName, link), ct).ConfigureAwait(false);
     }
 
     /// <summary>Anonymous resend; always succeeds silently (does not reveal whether the email exists).</summary>
@@ -126,15 +130,23 @@ public sealed class AccountService(
             await SendVerificationAsync(user, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Confirms the email of the link. Owner decision 18 Oct 2026 (DT-203): an email entered by an administrator (a user created with a
+    /// username) is confirmed only while that user is signed in — whoever receives a mistyped address cannot verify it and then reset the
+    /// password. Self-registered and invited users chose their own address and sign in with it, so their link works before sign-in.
+    /// </summary>
     public async Task VerifyEmailAsync(string userToken, string token, CancellationToken ct)
     {
         var user = await FindByTokenAsync(userToken, ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.TokenInvalid);
         if (user.EmailConfirmedAt is not null) return;
+        var adminEntered = user.UserName is not null;
+        if (adminEntered && ctx.UserId != user.Id) throw new AppException(ErrorCodes.VerifySignInRequired, 403);
         using var _ = scope.Use(user.TenantId, null, user.Id);
         changes.SetAction(user, "EmailVerified");
         var ok = await users.ConfirmEmailAsync(user, token ?? string.Empty).ConfigureAwait(false);
         if (!ok.Succeeded) throw Fail.Rule(ErrorCodes.TokenInvalid);
-        await users.UpdateSecurityStampAsync(user).ConfigureAwait(false); // single-use link (SEC-04)
+        // Single-use link (SEC-04). A signed-in user keeps their session: the confirmed email already makes the link a no-op.
+        if (!adminEntered) await users.UpdateSecurityStampAsync(user).ConfigureAwait(false);
     }
 
     // ---------------------------------------------------------------- password reset
@@ -173,6 +185,7 @@ public sealed class AccountService(
         }
         user.FailedSignInCount = 0;
         user.LockedUntil = null;
+        throttle.ResetAll(user.Id);   // DT-204: every address's block too
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         await sessions.RevokeAllAsync(user.Id, "Password reset", null, ct).ConfigureAwait(false);
     }
@@ -217,6 +230,6 @@ public sealed class AccountService(
 
     private static AppException ToAppException(IdentityResult result, PasswordPolicy policy) =>
         result.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode) ? PolicyError(policy)
-        : result.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(ErrorCodes.EmailInUse)
+        : result.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(ErrorCodes.NotAvailable)
         : Fail.Rule(ErrorCodes.ValidationFailed);
 }
