@@ -571,7 +571,7 @@ public static class HelpTopics
         new("journal-templates", "Rev. 6",
             new("نماذج القيود",
                 "حفظ قيد يتكرر كنموذج (البيان والمرجع والحسابات ومراكز التكلفة وبيان الأسطر والمبالغ اختيارياً)، واستخدامه لملء قيد جديد.",
-                "صلاحية «ترحيل القيود» (المحاسب والمسؤول والمالك).",
+                "صلاحية «إنشاء القيود اليدوية وتعديلها وإلغاؤها، واستيراد القيود» (acc.acct.post) — وهي نفسها صلاحية حفظ المسودات والترحيل.",
                 [
                     "المحاسبة ← قيد جديد: أدخل البيان والمرجع والأسطر، ثم «حفظ كنموذج». اكتب اسم النموذج واختر «حفظ المبالغ أيضاً» أو أزل الاختيار، ثم «حفظ».",
                     "لاستخدامه: في «قيد جديد» اختر «استخدام نموذج» ثم النموذج؛ أو من المحاسبة ← نماذج القيود اختر «استخدام» في سطره.",
@@ -585,7 +585,7 @@ public static class HelpTopics
                 ]),
             new("Journal templates",
                 "Keeping an entry you make often as a template (description, Reference, accounts, cost centres, line descriptions, optionally the amounts) and using it to fill a new entry.",
-                "Users who may post journal entries (accountants, administrators, owners).",
+                "The permission “Create, edit and void manual journal entries; import entries” (acc.acct.post) — the same one that saves drafts and posts.",
                 [
                     "Accounting → New journal entry: enter the description, Reference and lines, then “Save as template”. Type the template name, tick or clear “Save the amounts too”, then “Save”.",
                     "To use it: on New journal entry choose “Use template”, then the template; or in Accounting → Journal templates choose “Use” on its row.",
@@ -604,7 +604,7 @@ public static class HelpTopics
                 "كل من يملك صلاحية محاسبية؛ يرى كل مستخدم الأرقام والتذكيرات التي يستطيع فتحها فقط.",
                 [
                     "المحاسبة ← لوحة المحاسبة (أول صفحة في المحاسبة). اختر الشهر والسنة أعلى الصفحة؛ الافتراضي الشهر الحالي.",
-                    "الأرقام: النقد والبنوك والذمم المدينة والدائنة في نهاية الشهر (أو اليوم للشهر الحالي)، والإيرادات والمصروفات وصافي الربح للشهر ومن بداية السنة، واستخدام موازنة المصروفات إن وُجدت موازنة معتمدة.",
+                    "الأرقام: النقد والبنوك والذمم المدينة، والمستحق للموردين والسائقين والشركاء (كل منها برابط إلى حساباته ومعه الإجمالي)، في نهاية الشهر (أو اليوم للشهر الحالي)، والإيرادات والمصروفات وصافي الربح للشهر ومن بداية السنة، واستخدام موازنة المصروفات إن وُجدت موازنة معتمدة.",
                     "الرسمان: الإيرادات مقابل المصروفات لآخر 12 شهراً، وأعمار الذمم المدينة.",
                     "التذكيرات تُحسب تلقائياً، ولكل منها عدد ورابط يفتح القائمة المعنية: مسودات القيود، والترحيلات المعلّقة، والأشهر السابقة المفتوحة، وفواتير العملاء المتأخرة، وفواتير الموردين المستحقة خلال 7 أيام، والفواتير الإلكترونية المرفوضة، وأسطر الموازنة فوق 100%، والمقبوضات غير المخصصة، و«خصومات الموردين» غير المربوطة.",
                     "الروابط السريعة: كشف الحساب، وميزان المراجعة، وكشف حساب مورد، والموازنة مقابل الفعلي.",
@@ -619,7 +619,7 @@ public static class HelpTopics
                 "Everyone with an accounting permission; each user sees only the figures and reminders they can open.",
                 [
                     "Accounting → Accounting dashboard (the first page under Accounting). Choose the month and year at the top; the default is the current month.",
-                    "Figures: cash and banks, receivables and payables at the end of the month (today for the current month), revenue, expenses and net profit of the month and of the year to date, and the expense budget used when an approved budget exists.",
+                    "Figures: cash and banks, receivables, and what is owed to suppliers, drivers and partners (each linking to its accounts, with the total), at the end of the month (today for the current month), revenue, expenses and net profit of the month and of the year to date, and the expense budget used when an approved budget exists.",
                     "Charts: revenue vs expenses of the last 12 months, and the receivables ageing.",
                     "Reminders are computed automatically, each with a count and a link to the list: draft journal entries, pending automatic postings, previous months still open, overdue customer invoices, supplier bills due in the next 7 days, rejected e-invoices, budget lines over 100%, receipts not fully allocated, and “Supplier deductions” not mapped.",
                     "Quick links: account statement, trial balance, supplier statement and Budget vs Actual.",

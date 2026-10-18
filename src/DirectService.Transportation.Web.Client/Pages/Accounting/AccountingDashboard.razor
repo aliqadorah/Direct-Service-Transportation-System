@@ -80,6 +80,25 @@
                 }
             </div>
             <div class="stack">
+                @if (d.Figures?.Payables is { } owed)
+                {
+                    @* Owner decision 18 Oct 2026: what is owed to suppliers, drivers and partners, each linking to its accounts page, with the total. *@
+                    <Box Title="@L["adash.owedTitle"]" NoPad="true">
+                        <table class="grid">
+                            <caption class="sr-only">@L["adash.owedTitle"]</caption>
+                            <tbody>
+                                @foreach (var (key, amount, route) in OwedLines(owed))
+                                {
+                                    <tr>
+                                        <td><a href="@NavModel.Href(Company, route)">@L[key]</a></td>
+                                        <td class="n"><bdi class="num">@Fmt.Money(amount)</bdi></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot><tr><td>@L["ui.total"]</td><td class="n"><bdi class="num">@Fmt.Money(owed.Total)</bdi></td></tr></tfoot>
+                        </table>
+                    </Box>
+                }
                 <Box Title="@L["adash.reminders"]" NoPad="true">
                     @if (d.Reminders.Count == 0)
                     {
@@ -166,11 +185,21 @@
         var asOf = L.F("adash.asOf", Fmt.Date(d.MonthTo, Shell.DateFormat));
         if (f.CashAndBank is decimal cash) list.Add(new Figure(L["adash.cash"], Fmt.Money(cash), asOf));
         if (f.Receivables is decimal rec) list.Add(new Figure(L["adash.receivables"], Fmt.Money(rec), asOf));
-        if (f.Payables is decimal pay) list.Add(new Figure(L["adash.payables"], Fmt.Money(pay), asOf));
+        if (f.Payables is { } pay) list.Add(new Figure(L["adash.payables"], Fmt.Money(pay.Total), asOf));
         if (d.Budget is { } b)
             list.Add(new Figure(L["adash.budgetUsage"], b.ExpenseUsedPercent is decimal p ? Fmt.Percent(p, 1) : "—",
                 L.F("adash.budgetNote", b.BudgetName, Fmt.Percent(b.YearElapsedPercent, 1))));
         return list;
+    }
+
+    /// <summary>The lines of what is owed the user may open: suppliers (payables list), drivers (driver accounts), partners (partner accounts).</summary>
+    private static IReadOnlyList<(string Key, decimal Amount, string Route)> OwedLines(Payables p)
+    {
+        var lines = new List<(string, decimal, string)>();
+        if (p.Suppliers is decimal s) lines.Add(("adash.owedSuppliers", s, "accounting/payables"));
+        if (p.Drivers is decimal d) lines.Add(("adash.owedDrivers", d, "driver-accounts"));
+        if (p.Partners is decimal pt) lines.Add(("adash.owedPartners", pt, "partner-accounts"));
+        return lines;
     }
 
     private IReadOnlyList<Figure> Result(PeriodResult r) =>

@@ -20,13 +20,14 @@ namespace DirectService.Transportation.Application.Accounting;
 
 /// <summary>
 /// The accounting dashboard (لوحة المحاسبة; revision 6 part B, owner change request 15 Oct 2026), first page under Accounting. For a month (default
-/// the current one): cash and bank balances, receivables and payables (open documents, as the ageing reports), revenue, expenses and net
+/// the current one): cash and bank balances, receivables (open documents, as the ageing report), what is owed to suppliers, drivers and
+/// partners (owner decision 18 Oct 2026), revenue, expenses and net
 /// profit of the month and of the year to date, budget usage of the approved budget; revenue vs expenses of the last 12 months; receivables
 /// ageing; and reminders computed from the data, each with a count and the screen it opens. Every part appears only with a permission that
 /// opens it; everything is of the company in the address (company switch).
 /// </summary>
 public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, AgeingService ageing,
-    BudgetReportService budgets, TimeProvider clock)
+    BudgetReportService budgets, Reports.StandardReportService reports, TimeProvider clock)
 {
     /// <summary>Bills due within this many days are reminded.</summary>
     public const int DueSoonDays = 7;
@@ -61,9 +62,10 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
         var ageingReader = Any(PermissionKeys.AcctApar, PermissionKeys.AcctView, PermissionKeys.ReportsView);
         AccountingFigures? figures = null;
         AgeingBuckets? receivablesAgeing = null;
-        if (ledgerReader || ageingReader)
+        var partyReader = Any(PermissionKeys.DrvView);
+        if (ledgerReader || ageingReader || partyReader)
         {
-            decimal? cash = null, receivables = null, unapplied = null, payables = null;
+            decimal? cash = null, receivables = null, unapplied = null, suppliers = null, drivers = null, partners = null;
             PeriodResult? monthResult = null, ytd = null;
             if (ledgerReader)
             {
@@ -77,8 +79,17 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
                 receivables = r.Totals.Total;
                 unapplied = r.Totals.Unapplied;
                 receivablesAgeing = r.Totals;
-                payables = (await ageing.AgeingAsync("payables", monthTo, ct).ConfigureAwait(false)).Totals.Total;
+                suppliers = (await ageing.AgeingAsync("payables", monthTo, ct).ConfigureAwait(false)).Totals.Total;
             }
+            if (partyReader)
+            {
+                // The totals of the driver and partner balance reports (RPT-19 net due, RPT-20 balance due): what the account pages show.
+                var asOf = new Contracts.Reports.StandardReportQuery(null, null, monthTo, null, null, null, null, null, null, null, null);
+                drivers = Last((await reports.RunAsync("driver-balances", asOf, ct).ConfigureAwait(false)).Totals);
+                partners = Last((await reports.RunAsync("partner-balances", asOf, ct).ConfigureAwait(false)).Totals);
+            }
+            var payables = suppliers is null && drivers is null && partners is null
+                ? null : new Payables(suppliers, drivers, partners, (suppliers ?? 0) + (drivers ?? 0) + (partners ?? 0));
             figures = new AccountingFigures(cash, receivables, unapplied, payables, monthResult, ytd);
         }
         var trend = ledgerReader ? await TrendAsync(monthFrom, ct).ConfigureAwait(false) : null;
@@ -88,6 +99,8 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
     }
 
     // ------------------------------------------------------------ figures
+
+    private static decimal Last(IReadOnlyList<object?>? totals) => totals is { Count: > 0 } t && t[^1] is decimal d ? d : 0;
 
     private async Task<PeriodResult> ResultAsync(DateOnly from, DateOnly to, CancellationToken ct)
     {

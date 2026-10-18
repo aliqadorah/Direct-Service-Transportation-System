@@ -71,7 +71,7 @@ public sealed class AccountingDashboardTests(ApiFactory f)
         d = await DashboardAsync(o.Client, o);
         Assert.Equal(2320m, d.Figures!.Receivables);
         Assert.Equal(2320m, d.ReceivablesAgeing!.Days31To60);
-        Assert.Equal(500m, d.Figures.Payables);
+        Assert.Equal((500m, 0m, 0m, 500m), (d.Figures.Payables!.Suppliers, d.Figures.Payables.Drivers, d.Figures.Payables.Partners, d.Figures.Payables.Total));
         Assert.Equal((200m, 300m + 500m, 400.0m), (d.Budget!.ExpenseBudget, d.Budget.ExpenseActual, d.Budget.ExpenseUsedPercent));   // 800 of 200
         Assert.Equal(4000m, d.Budget.RevenueBudget);
         Assert.Equal("Plan", d.Budget.BudgetName);
@@ -170,6 +170,39 @@ public sealed class AccountingDashboardTests(ApiFactory f)
         // Mapping the key and closing nothing else: the deductions reminder goes away.
         await (await o.Client.PutAsJsonAsync(U(o, "/accounting/posting-keys/ACC.SupplierDeductions"), new PostingKeyRequest(a["4105"].Id))).EnsureOkAsync();
         Assert.DoesNotContain((await DashboardAsync(o.Client, o)).Reminders, x => x.Key == AccountingReminderKeys.DeductionsUnmapped);
+    }
+
+    /// <summary>Owner decision 18 Oct 2026: what is owed to suppliers, drivers and partners, as their account pages show it, with the total.</summary>
+    [Fact]
+    public async Task Owed_to_suppliers_drivers_and_partners_with_the_total_by_permission()
+    {
+        var w = await CashTests.WorldAsync(f);
+        var o = w.Owner;
+        var a = (await o.Client.GetFromJsonAsync<List<AccountResponse>>(U(o, "/accounting/accounts")))!.ToDictionary(x => x.Code);
+        await w.Trip("OWE-1", w.Driver, null);                    // own driver: a wage owed
+        await w.Trip("OWE-2", w.PartnerDriver, w.Partner.Id);     // partner's truck: a partner cost owed
+        await (await o.Client.PostAsJsonAsync(U(o, "/advances"), new { driverId = w.Driver.Id, advanceDate = D(Today.AddDays(-1)), amount = 5m, paymentMethod = "Cash", cashBoxId = w.CashBox }))
+            .EnsureOkAsync();
+        var supplier = await OkAsync<ApArPartyResponse>(await o.Client.PostAsJsonAsync(U(o, "/apar/parties"),
+            new ApArPartyRequest("Supplier", "Fuel Co", "100200300", null, null, a["2101"].Id, 30, null, null)));
+        await OkAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"),
+            new ApArDocumentRequest(supplier.Id, null, Today.AddDays(-1), null, null, [new ApArLineRequest("Diesel", a["5103"].Id, 400m, 0m, null)], null)));
+
+        decimal Total(Contracts.Reports.ReportResult r) => ((System.Text.Json.JsonElement)r.Totals![^1]!).GetDecimal();
+        var drivers = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/driver-balances?asOf={D(Today)}")))!);
+        var partners = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/partner-balances?asOf={D(Today)}")))!);
+        Assert.True(drivers > 0 && partners > 0);
+
+        var p = (await DashboardAsync(o.Client, o)).Figures!.Payables!;
+        Assert.Equal((400m, drivers, partners, 400m + drivers + partners), (p.Suppliers, p.Drivers, p.Partners, p.Total));
+
+        // Driver-accounts rights only: drivers and partners, not suppliers; accounting rights only: suppliers, not drivers and partners.
+        var driverDesk = await MemberAsync(f, o, PermissionKeys.DrvView, PermissionKeys.JeView);
+        var pd = (await DashboardAsync(driverDesk, o)).Figures!.Payables!;
+        Assert.Equal(((decimal?)null, drivers, partners, drivers + partners), (pd.Suppliers, pd.Drivers, pd.Partners, pd.Total));
+        var accountant = await MemberAsync(f, o, PermissionKeys.AcctView);
+        var pa = (await DashboardAsync(accountant, o)).Figures!.Payables!;
+        Assert.Equal((400m, (decimal?)null, (decimal?)null, 400m), (pa.Suppliers, pa.Drivers, pa.Partners, pa.Total));
     }
 
     [Fact]

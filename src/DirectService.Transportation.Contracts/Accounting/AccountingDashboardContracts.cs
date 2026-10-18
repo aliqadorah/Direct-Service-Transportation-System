@@ -13,7 +13,14 @@ public sealed record AccountingDashboardResponse(int Year, int Month, DateOnly M
     BudgetUsage? Budget, IReadOnlyList<MonthAmounts>? Trend, AgeingBuckets? ReceivablesAgeing, IReadOnlyList<AccountingReminder> Reminders, DateTime GeneratedAt);
 
 /// <summary>Key figures; a figure the user may not see is null.</summary>
-public sealed record AccountingFigures(decimal? CashAndBank, decimal? Receivables, decimal? ReceivablesUnapplied, decimal? Payables, PeriodResult? Month, PeriodResult? YearToDate);
+public sealed record AccountingFigures(decimal? CashAndBank, decimal? Receivables, decimal? ReceivablesUnapplied, Payables? Payables, PeriodResult? Month, PeriodResult? YearToDate);
+
+/// <summary>
+/// What is owed (owner decision 18 Oct 2026, DT-200): to suppliers (open supplier bills, as the payables ageing), to drivers (net due of the
+/// driver accounts, RPT-19) and to partners (balance due of the partner accounts, RPT-20); a line the user may not open is null; the total
+/// is the sum of the lines shown.
+/// </summary>
+public sealed record Payables(decimal? Suppliers, decimal? Drivers, decimal? Partners, decimal Total);
 
 /// <summary>Revenue, expenses and net profit (revenue − expenses) of a period, from the posted ledger.</summary>
 public sealed record PeriodResult(decimal Revenue, decimal Expenses, decimal NetProfit);

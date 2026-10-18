@@ -13,7 +13,7 @@ namespace DirectService.Transportation.UI.Tests;
 public sealed class AccountingDashboardPageTests : PageTestBase
 {
     internal static AccountingDashboardResponse Full() => new(2026, 10, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 17), new DateOnly(2026, 1, 1),
-        new AccountingFigures(5400, 2320, 0, 500, new PeriodResult(1000, 300, 700), new PeriodResult(12000, 9000, 3000)),
+        new AccountingFigures(5400, 2320, 0, new Payables(500, 120, 80, 700), new PeriodResult(1000, 300, 700), new PeriodResult(12000, 9000, 3000)),
         new BudgetUsage("b1", "موازنة 2026", 10000, 9000, 90, 15000, 12000, 80, 79.5m),
         Enumerable.Range(1, 12).Select(m => new MonthAmounts($"{(m < 3 ? 2025 : 2026)}-{((m + 9) % 12) + 1:00}", m * 100, m * 50)).ToList(),
         new AgeingBuckets(1000, 500, 320, 0, 500, 2320, 0),
@@ -42,6 +42,11 @@ public sealed class AccountingDashboardPageTests : PageTestBase
         Assert.Contains($"/c/{Company}/reports/financial?report=supplier-statement", cut.Markup);
         Assert.Contains($"/c/{Company}/accounting/trial-balance", cut.Markup);
         Assert.Contains("table class=\"sr-only\"", cut.Markup);       // chart values for screen readers
+        // Owner decision 18 Oct 2026: owed to suppliers, drivers and partners, each linking to its accounts page, with the total.
+        Assert.Contains(Fmt.Money(700), text);
+        Assert.Contains($"/c/{Company}/driver-accounts", cut.Markup);
+        Assert.Contains($"/c/{Company}/partner-accounts", cut.Markup);
+        Assert.Contains($"href=\"/c/{Company}/accounting/payables\"", cut.Markup);
     }
 
     [Fact]
@@ -63,6 +68,7 @@ public sealed class AccountingDashboardPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(L["adash.noReminders"], cut.Markup));
         Assert.Empty(cut.FindAll(".ch-trend"));
         Assert.DoesNotContain(L["adash.cash"], cut.Markup);
+        Assert.DoesNotContain(L["adash.owedTitle"], cut.Markup);
     }
 
     [Fact]

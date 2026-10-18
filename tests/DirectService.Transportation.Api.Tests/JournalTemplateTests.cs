@@ -98,5 +98,10 @@ public sealed class JournalTemplateTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(U(o, "/accounting/journal-templates"))).StatusCode);
         var poster = await MemberAsync(f, o, PermissionKeys.AcctPost);
         Assert.Equal(["Mine"], (await poster.GetFromJsonAsync<List<JournalTemplateSummary>>(U(o, "/accounting/journal-templates")))!.Select(x => x.Name));
+        // Owner decision 18 Oct 2026: the permission that creates and edits entries (and saves drafts) also saves and uses templates.
+        await (await poster.PostAsJsonAsync(U(o, "/accounting/journal-templates"),
+            new JournalTemplateRequest("Theirs", null, null, [new JournalTemplateLineRequest(a["5202"].Id, 0, 0, null, null)]))).EnsureOkAsync();
+        await (await poster.PostAsJsonAsync(U(o, "/accounting/journal-drafts"),
+            new ManualEntryRequest(Today, "From a template", [new JournalLineRequest(a["5202"].Id, 10, 0, null, null, null)], null))).EnsureOkAsync();
     }
 }

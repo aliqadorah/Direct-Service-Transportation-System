@@ -31,10 +31,13 @@ public sealed class CashTests(ApiFactory f)
 
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3)).AddDays(-1);
 
-    private sealed record World(SignedInUser Owner, CustomerResponse Customer, PartnerResponse Partner, DriverResponse Driver, DriverResponse PartnerDriver,
+    internal sealed record World(SignedInUser Owner, CustomerResponse Customer, PartnerResponse Partner, DriverResponse Driver, DriverResponse PartnerDriver,
         string CashBox, string Bank, Func<string, DriverResponse, string?, Task<TripResponse>> Trip);
 
-    private async Task<World> WorldAsync()
+    private Task<World> WorldAsync() => WorldAsync(f);
+
+    /// <summary>A company with customer, partner, own and partner drivers, tariffs and rates, and a trip maker (also used by the accounting dashboard tests).</summary>
+    internal static async Task<World> WorldAsync(ApiFactory f)
     {
         var o = await f.SignUpOwnerAsync();
         var c = o.Client;
