@@ -23,12 +23,32 @@ public sealed class GrantGuard(IAppDbContext db, IRequestContext ctx, AccessServ
         if (keys.Any(k => !ctx.HasPermission(k))) throw Fail.Forbidden();
     }
 
-    /// <summary>The caller may act on the target user only if the target is not above the caller.</summary>
-    public async Task EnsureCanManageUserAsync(long targetUserId, CancellationToken ct)
+    /// <summary>
+    /// The caller may act on the target user only if the target is not above the caller anywhere: in every company where the target has a
+    /// role, the caller must manage users and hold every permission the target holds there (security review 18 Oct 2026, DT-202 — otherwise
+    /// an administrator of one company could set the password of a user who has a role in another company and sign in with that access).
+    /// With accountWide false (changing the role in, or removing from, the current company only): the target must not be
+    /// Owner-level anywhere and must hold no permission here that the caller lacks.
+    /// </summary>
+    public Task EnsureCanManageUserAsync(long targetUserId, CancellationToken ct) => EnsureCanManageUserAsync(targetUserId, true, ct);
+
+    /// <inheritdoc cref="EnsureCanManageUserAsync(long, CancellationToken)"/>
+    public async Task EnsureCanManageUserAsync(long targetUserId, bool accountWide, CancellationToken ct)
     {
         if (ctx.HasPermission(PermissionKeys.TenantManage)) return;
-        var grants = await access.GrantsAsync(targetUserId, ct).ConfigureAwait(false);
-        if (grants.Any(g => g.Permissions.Contains(PermissionKeys.TenantManage))) throw Fail.Forbidden();
+        var callerId = ctx.UserId ?? throw Fail.Forbidden();
+        var mine = (await access.GrantsAsync(callerId, ct).ConfigureAwait(false)).ToDictionary(g => g.CompanyId);
+        foreach (var g in await access.GrantsAsync(targetUserId, ct).ConfigureAwait(false))
+        {
+            if (!accountWide && g.CompanyId != ctx.CompanyId)
+            {
+                if (g.Permissions.Contains(PermissionKeys.TenantManage)) throw Fail.Forbidden();
+                continue;
+            }
+            if (!mine.TryGetValue(g.CompanyId, out var m) || !m.Permissions.Contains(PermissionKeys.UsersManage)
+                || g.Permissions.Any(k => !m.Permissions.Contains(k)))
+                throw Fail.Forbidden();
+        }
     }
 
     /// <summary>Permission keys of a role (by id).</summary>

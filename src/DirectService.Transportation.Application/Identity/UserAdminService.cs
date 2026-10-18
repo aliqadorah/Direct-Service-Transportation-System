@@ -71,9 +71,10 @@ public sealed class UserAdminService(
         var tenantId = ctx.TenantId ?? throw Fail.Forbidden();
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, tenantId, ct).ConfigureAwait(false);
         if (!policy.IsSatisfiedBy(r.Password)) throw AccountService.PolicyError(policy);
+        // P-07 first: a tenant at its user limit must not be able to probe which usernames/emails exist without creating anyone (DT-202).
+        if (limits is not null) await limits.EnsureUserAsync(tenantId, ct).ConfigureAwait(false);
         if (await users.FindByNameAsync(userName!).ConfigureAwait(false) is not null) throw Fail.Field("userName", ErrorCodes.UserNameInUse);
         if (mail is not null && await users.FindByEmailAsync(mail).ConfigureAwait(false) is not null) throw Fail.Field("email", ErrorCodes.EmailInUse);
-        if (limits is not null) await limits.EnsureUserAsync(tenantId, ct).ConfigureAwait(false);   // P-07
 
         var user = await db.InTransactionAsync(async c =>
         {
@@ -128,7 +129,7 @@ public sealed class UserAdminService(
 
     public async Task AssignRoleAsync(string userToken, string roleToken, CancellationToken ct)
     {
-        var (user, link) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        var (user, link) = await TargetAsync(userToken, accountWide: false, ct).ConfigureAwait(false);
         var role = await RoleByTokenAsync(roleToken, ct).ConfigureAwait(false);
         if (link.RoleId == role.Id) return;
         guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // no escalation (SR-01)
@@ -144,7 +145,7 @@ public sealed class UserAdminService(
     public async Task RemoveFromCompanyAsync(string userToken, string reason, CancellationToken ct)
     {
         RequireReason(reason);
-        var (user, link) = await TargetAsync(userToken, ct).ConfigureAwait(false);
+        var (user, link) = await TargetAsync(userToken, accountWide: false, ct).ConfigureAwait(false);
         await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: link.CompanyId, ct).ConfigureAwait(false);
         await EnsureUserManagerKeptAsync(link.CompanyId, user.Id, ct).ConfigureAwait(false);
         link.DeleteReason = reason;
@@ -248,13 +249,15 @@ public sealed class UserAdminService(
     }
 
     /// <summary>The target user must hold a role in the current company; otherwise 404.</summary>
-    private async Task<(User User, UserCompanyRole Link)> TargetAsync(string userToken, CancellationToken ct)
+    private Task<(User User, UserCompanyRole Link)> TargetAsync(string userToken, CancellationToken ct) => TargetAsync(userToken, true, ct);
+
+    private async Task<(User User, UserCompanyRole Link)> TargetAsync(string userToken, bool accountWide, CancellationToken ct)
     {
         var publicId = tokens.Decode<User>(userToken) ?? throw Fail.NotFound();
         var link = await db.Set<UserCompanyRole>().Include(r => r.User)
             .SingleOrDefaultAsync(r => r.CompanyId == ctx.CompanyId && r.User.PublicId == publicId && !r.User.IsDeleted, ct).ConfigureAwait(false)
             ?? throw Fail.NotFound();
-        await guard.EnsureCanManageUserAsync(link.UserId, ct).ConfigureAwait(false); // Owner-level users only by Owners (SR-01)
+        await guard.EnsureCanManageUserAsync(link.UserId, accountWide, ct).ConfigureAwait(false); // never a user above the caller (SR-01, DT-202)
         return (link.User, link);
     }
 
