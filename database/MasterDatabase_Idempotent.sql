@@ -6757,3 +6757,51 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018070410_Rev6_PostJournalEntries'
+)
+BEGIN
+    EXEC(N'UPDATE [core].[Permissions] SET [DescriptionAr] = N''إعداد القيود اليدوية: حفظ المسودات وتعديلها، واستخدام نماذج القيود وإدارتها (الترحيل يحتاج صلاحية «ترحيل القيود اليومية»)'', [DescriptionEn] = N''Prepare manual journal entries: save and edit drafts, use and manage entry templates (posting needs “Post journal entries”)''
+    WHERE [Id] = CAST(14 AS bigint);
+    SELECT @@ROWCOUNT');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018070410_Rev6_PostJournalEntries'
+)
+BEGIN
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'Id', N'CreatedAt', N'CreatedBy', N'DeleteReason', N'DeletedAt', N'DeletedBy', N'DescriptionAr', N'DescriptionEn', N'GroupName', N'IsDeleted', N'PermissionKey', N'PublicId', N'UpdatedAt', N'UpdatedBy') AND [object_id] = OBJECT_ID(N'[core].[Permissions]'))
+        SET IDENTITY_INSERT [core].[Permissions] ON;
+    EXEC(N'INSERT INTO [core].[Permissions] ([Id], [CreatedAt], [CreatedBy], [DeleteReason], [DeletedAt], [DeletedBy], [DescriptionAr], [DescriptionEn], [GroupName], [IsDeleted], [PermissionKey], [PublicId], [UpdatedAt], [UpdatedBy])
+    VALUES (CAST(26 AS bigint), ''2026-10-08T00:00:00.000Z'', NULL, NULL, NULL, NULL, N''ترحيل القيود اليومية: ترحيل القيود اليدوية والمسودات، وتعديل القيود المرحّلة وإلغاؤها، واستيراد القيود'', N''Post journal entries: post manual entries and drafts, edit and void posted entries, import entries'', ''Accounting'', CAST(0 AS bit), ''acc.acct.postentry'', ''7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a26'', NULL, NULL)');
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'Id', N'CreatedAt', N'CreatedBy', N'DeleteReason', N'DeletedAt', N'DeletedBy', N'DescriptionAr', N'DescriptionEn', N'GroupName', N'IsDeleted', N'PermissionKey', N'PublicId', N'UpdatedAt', N'UpdatedBy') AND [object_id] = OBJECT_ID(N'[core].[Permissions]'))
+        SET IDENTITY_INSERT [core].[Permissions] OFF;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018070410_Rev6_PostJournalEntries'
+)
+BEGIN
+    INSERT INTO [core].[RolePermissions] ([TenantId], [RoleId], [PermissionId])
+    SELECT rp.[TenantId], rp.[RoleId], 26
+    FROM [core].[RolePermissions] rp
+    WHERE rp.[PermissionId] = 14 AND rp.[IsDeleted] = 0
+      AND NOT EXISTS (SELECT 1 FROM [core].[RolePermissions] x WHERE x.[RoleId] = rp.[RoleId] AND x.[PermissionId] = 26 AND x.[IsDeleted] = 0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018070410_Rev6_PostJournalEntries'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261018070410_Rev6_PostJournalEntries', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

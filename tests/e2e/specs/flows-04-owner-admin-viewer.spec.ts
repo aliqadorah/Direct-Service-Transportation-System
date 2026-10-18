@@ -50,7 +50,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await field(modal, t("acc.nameAr")).fill(label);
     await field(modal, t("fld.key")).fill(`container${lang}`);
     await button(modal, t("ui.save")).click();
-    await expect(page.getByRole("cell", { name: label })).toBeVisible();
+    await expect(page.getByRole("cell", { name: label, exact: true })).toBeVisible();   // exact: the order arrows (DT-186) name the field too
     await page.goto(`/c/${company}/trips/new`);
     await expect(page.getByRole("textbox", { name: label })).toBeVisible();
 

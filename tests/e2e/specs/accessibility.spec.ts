@@ -88,6 +88,8 @@ for (const lang of ["ar", "en"] as Lang[]) {
       journal ? `accounting/journal/${journal}` : null, "accounting/automatic", "accounting/statement", "accounting/trial-balance",
       "accounting/profit-loss", "accounting/balance-sheet", "accounting/payables", "accounting/payables/new", "accounting/receivables", "accounting/receivables/new",
       "accounting/cash-banks", "accounting/cost-centres", "accounting/periods", "accounting/maintenance",
+      // Revision 6 part B (added in the release regression of 18 Oct 2026).
+      "accounting/dashboard", "accounting/budgets", "accounting/budget-vs-actual", "accounting/journal-templates",
       "reports/operational", "reports/financial", "reports/builder", "reports/saved",
       "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, "masters/customers", "masters/partners", "masters/materials",
       "masters/loading-sites", "masters/unloading-sites", "masters/ownership-types", "masters/tariffs", "masters/monthly-rates", "masters/import/customers",
