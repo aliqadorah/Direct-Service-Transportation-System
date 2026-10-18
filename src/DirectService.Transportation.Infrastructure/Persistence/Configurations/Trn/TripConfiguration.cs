@@ -372,6 +372,16 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
         builder.HasIndex(new[] { "CompanyId", "ReceiptNoKey" }, "UX_TRN_Trips_CompanyId_ReceiptNoKey")
             .IsUnique()
             .HasFilter("[IsDeleted] = 0");
+        // DT-206: receipt-number search (LIKE '%…%') over a narrow binary-collation index per company.
+        builder.Property(e => e.ReceiptNoSearch)
+            .HasColumnName("ReceiptNoSearch")
+            .HasColumnType("nvarchar(30)")
+            .IsUnicode(true)
+            .HasMaxLength(30)
+            .HasComputedColumnSql("[ReceiptNoKey] COLLATE Latin1_General_100_BIN2", stored: true);
+        builder.HasIndex(new[] { "CompanyId", "ReceiptNoSearch" }, "IX_TRN_Trips_ReceiptNoSearch")
+            .IncludeProperties("Status")
+            .HasFilter("[IsDeleted] = 0");
         builder.HasIndex(new[] { "CompanyId", "TripDate" }, "IX_TRN_Trips_Date")
             .IncludeProperties("Status");
         builder.HasIndex(new[] { "CompanyId", "CustomerId", "Status" }, "IX_TRN_Trips_Unbilled")

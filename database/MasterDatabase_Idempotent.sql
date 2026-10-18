@@ -6805,3 +6805,32 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018092900_Rev6_ReceiptNoSearch'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Trips] ADD [ReceiptNoSearch] AS [ReceiptNoKey] COLLATE Latin1_General_100_BIN2 PERSISTED');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018092900_Rev6_ReceiptNoSearch'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_Trips_ReceiptNoSearch] ON [trn].[TRN_Trips] ([CompanyId], [ReceiptNoSearch]) INCLUDE ([Status]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018092900_Rev6_ReceiptNoSearch'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261018092900_Rev6_ReceiptNoSearch', N'10.0.12');
+END;
+
+COMMIT;
+GO
+

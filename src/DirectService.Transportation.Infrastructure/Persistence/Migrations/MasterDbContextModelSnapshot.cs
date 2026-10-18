@@ -11239,6 +11239,14 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("ReceiptNoKey")
                         .HasColumnOrder(5);
 
+                    b.Property<string>("ReceiptNoSearch")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(30)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("ReceiptNoSearch")
+                        .HasComputedColumnSql("[ReceiptNoKey] COLLATE Latin1_General_100_BIN2", true);
+
                     b.Property<decimal>("Revenue")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)")
@@ -11381,6 +11389,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.HasIndex(new[] { "MaterialId" }, "IX_TRN_Trips_MaterialId");
 
                     b.HasIndex(new[] { "PartnerId" }, "IX_TRN_Trips_PartnerId");
+
+                    b.HasIndex(new[] { "CompanyId", "ReceiptNoSearch" }, "IX_TRN_Trips_ReceiptNoSearch")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "CompanyId", "ReceiptNoSearch" }, "IX_TRN_Trips_ReceiptNoSearch"), new[] { "Status" });
 
                     b.HasIndex(new[] { "SettlementId" }, "IX_TRN_Trips_SettlementId");
 

@@ -15,6 +15,11 @@ public class Trip : AuditableEntity, ITenantScoped, ICompanyScoped
     public string ReceiptNo { get; set; } = string.Empty;
     /// <summary>ReceiptNo normalised (upper-case, spaces removed) for uniqueness.</summary>
     public string ReceiptNoKey { get; set; } = string.Empty;
+    /// <summary>
+    /// ReceiptNoKey with a binary collation (persisted computed column, owner decision 18 Oct 2026, DT-206): the "any part of the receipt
+    /// number" search compares it byte by byte — about four times faster than the Arabic linguistic collation over 500,000 trips (NFR-01).
+    /// </summary>
+    public string? ReceiptNoSearch { get; private set; }
     /// <summary>Trip date.</summary>
     public DateOnly TripDate { get; set; }
     /// <summary>Loading date; its month selects the monthly driver rate.</summary>

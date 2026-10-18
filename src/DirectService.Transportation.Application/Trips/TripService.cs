@@ -569,7 +569,8 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         if (MasterDataSupport.SearchText(q) is not { } text) return query;
         var key = TextNormalizer.Key(text).Replace("[", "[[]", StringComparison.Ordinal).Replace("%", "[%]", StringComparison.Ordinal).Replace("_", "[_]", StringComparison.Ordinal);
         var pattern = $"%{key}%";
-        var matching = query.Where(t => EF.Functions.Like(t.ReceiptNoKey, pattern));
+        // DT-206: the binary-collation copy of the key (indexed per company); the key is already upper-case with ASCII digits.
+        var matching = query.Where(t => EF.Functions.Like(t.ReceiptNoSearch!, pattern));
         var ids = await matching.Select(t => t.Id).Take(5001).ToListAsync(ct).ConfigureAwait(false);
         return ids.Count <= 5000 ? db.Set<Trip>().AsNoTracking().Where(t => ids.Contains(t.Id)) : matching;
     }
