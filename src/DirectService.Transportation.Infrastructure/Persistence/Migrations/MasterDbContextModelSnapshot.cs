@@ -5645,8 +5645,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         {
                             Id = 14L,
                             CreatedAt = new DateTime(2026, 10, 8, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DescriptionAr = "إنشاء القيود اليدوية وتعديلها وإلغاؤها، واستيراد القيود",
-                            DescriptionEn = "Create, edit and void manual journal entries; import entries",
+                            DescriptionAr = "إعداد القيود اليدوية: حفظ المسودات وتعديلها، واستخدام نماذج القيود وإدارتها (الترحيل يحتاج صلاحية «ترحيل القيود اليومية»)",
+                            DescriptionEn = "Prepare manual journal entries: save and edit drafts, use and manage entry templates (posting needs “Post journal entries”)",
                             GroupName = "Accounting",
                             IsDeleted = false,
                             PermissionKey = "acc.acct.post",
@@ -5783,6 +5783,18 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             IsDeleted = false,
                             PermissionKey = "acc.budget.approve",
                             PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25"),
+                            RowVersion = new byte[0]
+                        },
+                        new
+                        {
+                            Id = 26L,
+                            CreatedAt = new DateTime(2026, 10, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DescriptionAr = "ترحيل القيود اليومية: ترحيل القيود اليدوية والمسودات، وتعديل القيود المرحّلة وإلغاؤها، واستيراد القيود",
+                            DescriptionEn = "Post journal entries: post manual entries and drafts, edit and void posted entries, import entries",
+                            GroupName = "Accounting",
+                            IsDeleted = false,
+                            PermissionKey = "acc.acct.postentry",
+                            PublicId = new Guid("7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a26"),
                             RowVersion = new byte[0]
                         });
                 });

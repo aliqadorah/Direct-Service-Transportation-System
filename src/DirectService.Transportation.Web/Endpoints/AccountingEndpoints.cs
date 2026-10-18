@@ -181,23 +181,23 @@ internal static class AccountingEndpoints
         g.MapGet("/{entry}/voucher", async (string entry, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.VoucherAsync(entry, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (ManualEntryRequest r, JournalService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.CreateManualAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+            TypedResults.Ok(await svc.CreateManualAsync(r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapPut("/{entry}", async (string entry, ManualEntryRequest r, JournalService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.EditManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+            TypedResults.Ok(await svc.EditManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapPost("/{entry}/void", async (string entry, VoidRequest r, JournalService svc, CancellationToken ct) =>
-            TypedResults.Ok(await svc.VoidManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+            TypedResults.Ok(await svc.VoidManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
-            File(await svc.TemplateAsync("journal-entries", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost);
+            File(await svc.TemplateAsync("journal-entries", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapPost("/import/preview", async (IFormFile file, JournalImportService svc, CancellationToken ct) =>
         {
             await using var s = file.OpenReadStream();
             return TypedResults.Ok(await svc.PreviewAsync(s, file.FileName, file.Length, ct).ConfigureAwait(false));
-        }).RequirePermission(PermissionKeys.AcctPost).DisableAntiforgery().Upload();
+        }).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry).DisableAntiforgery().Upload();
         g.MapPost("/import", async (IFormFile file, JournalImportService svc, CancellationToken ct) =>
         {
             await using var s = file.OpenReadStream();
             return TypedResults.Ok(await svc.ImportAsync(s, file.FileName, file.Length, ct).ConfigureAwait(false));
-        }).RequirePermission(PermissionKeys.AcctPost).DisableAntiforgery().Upload();
+        }).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry).DisableAntiforgery().Upload();
     }
 
     /// <summary>Revision 6: journal drafts — saved without a number, posted later (the number and the period lock apply at posting).</summary>
@@ -216,7 +216,7 @@ internal static class AccountingEndpoints
         }).RequirePermission(PermissionKeys.AcctPost);
         g.MapPost("/{draft}/post", async (string draft, RowVersionRequest r, JournalDraftService drafts, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetByIdAsync(await drafts.PostAsync(draft, r.RowVersion, ct).ConfigureAwait(false), ct).ConfigureAwait(false)))
-            .RequirePermission(PermissionKeys.AcctPost);
+            .RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
     }
 
     /// <summary>Revision 6 part B: journal entry templates — saved from and used on the new entry screen; list, edit (rename), delete. acct.post.</summary>

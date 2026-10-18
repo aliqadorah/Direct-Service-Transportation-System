@@ -141,3 +141,6 @@ New table `acc.JournalTemplates` (company-scoped, audited, soft delete): a journ
 
 ## B3. Accounting dashboard — no new table
 The dashboard reads the existing tables. One new `cfg.CompanySettings` key (no schema change): `ACC.SupplierDeductionAttempted` = the last date (company time, yyyy-MM-dd) a supplier bill with a deduction was refused because "Supplier deductions" is not mapped; the reminder "Supplier deductions not mapped" shows while bills with deductions exist or such a refusal happened in the last 30 days.
+
+## B4. Separate "Post journal entries" permission (owner request 18 Oct 2026, DT-201) — migration `Rev6_PostJournalEntries`
+Reference data only, no schema change. New permission key 26 `acc.acct.postentry` (group Accounting): post manual entries and drafts, edit and void posted entries, import entries. Key 14 `acc.acct.post` is re-described as "Prepare manual journal entries: save and edit drafts, use and manage entry templates". Data step: every role (preset or custom) that holds key 14 receives key 26, so no existing user loses posting; owners remove it from roles that should only prepare entries. Presets: Owner, Administrator and Accountant hold both.

@@ -115,6 +115,7 @@ public static partial class UiText
         ["je.draftsView"] = ("المسودات", "Drafts"),
         ["je.saveDraft"] = ("حفظ كمسودة", "Save as draft"),
         ["je.draftTitle"] = ("مسودة قيد", "Journal draft"),
+        ["je.prepareOnly"] = ("يمكنك حفظ القيد كمسودة. يرحّله مستخدم لديه صلاحية «ترحيل القيود اليومية».", "You can save this entry as a draft. A user with the “Post journal entries” permission posts it."),
         ["je.draftHelp"] = ("مسودة: بلا رقم قيد ولا تُرحَّل ولا تدخل في أي رصيد. يُعطى الرقم وتُفحص الفترة عند الترحيل.", "A draft: no entry number, not posted and not part of any balance. The number is given and the period checked when it is posted."),
         ["je.draftSaved"] = ("حُفظت المسودة.", "Draft saved."),
         ["je.deleteDraft"] = ("حذف المسودة", "Delete draft"),

@@ -571,7 +571,7 @@ public static class HelpTopics
         new("journal-templates", "Rev. 6",
             new("نماذج القيود",
                 "حفظ قيد يتكرر كنموذج (البيان والمرجع والحسابات ومراكز التكلفة وبيان الأسطر والمبالغ اختيارياً)، واستخدامه لملء قيد جديد.",
-                "صلاحية «إنشاء القيود اليدوية وتعديلها وإلغاؤها، واستيراد القيود» (acc.acct.post) — وهي نفسها صلاحية حفظ المسودات والترحيل.",
+                "صلاحية «إعداد القيود اليدوية» (acc.acct.post) — وهي نفسها صلاحية حفظ المسودات. الترحيل يحتاج أيضاً صلاحية «ترحيل القيود اليومية» (acc.acct.postentry).",
                 [
                     "المحاسبة ← قيد جديد: أدخل البيان والمرجع والأسطر، ثم «حفظ كنموذج». اكتب اسم النموذج واختر «حفظ المبالغ أيضاً» أو أزل الاختيار، ثم «حفظ».",
                     "لاستخدامه: في «قيد جديد» اختر «استخدام نموذج» ثم النموذج؛ أو من المحاسبة ← نماذج القيود اختر «استخدام» في سطره.",
@@ -585,7 +585,7 @@ public static class HelpTopics
                 ]),
             new("Journal templates",
                 "Keeping an entry you make often as a template (description, Reference, accounts, cost centres, line descriptions, optionally the amounts) and using it to fill a new entry.",
-                "The permission “Create, edit and void manual journal entries; import entries” (acc.acct.post) — the same one that saves drafts and posts.",
+                "The permission “Prepare manual journal entries” (acc.acct.post) — the same one that saves drafts. Posting also needs “Post journal entries” (acc.acct.postentry).",
                 [
                     "Accounting → New journal entry: enter the description, Reference and lines, then “Save as template”. Type the template name, tick or clear “Save the amounts too”, then “Save”.",
                     "To use it: on New journal entry choose “Use template”, then the template; or in Accounting → Journal templates choose “Use” on its row.",

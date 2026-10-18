@@ -1,7 +1,8 @@
 namespace DirectService.Transportation.Contracts.Security;
 
 /// <summary>
-/// The 22 permission keys of PRD 3.4, namespaced per owner decision D-01 (module prefix + PRD key), and the three budget keys of revision 6.
+/// The 22 permission keys of PRD 3.4, namespaced per owner decision D-01 (module prefix + PRD key), the three budget keys of revision 6 and the journal
+/// posting key (DT-201).
 /// The UI shows the PRD names (<see cref="PrdName"/>).
 /// </summary>
 public static class PermissionKeys
@@ -32,12 +33,14 @@ public static class PermissionKeys
     public const string BudgetView = "acc.budget.view";
     public const string BudgetManage = "acc.budget.manage";
     public const string BudgetApprove = "acc.budget.approve";
+    // Owner request 18 Oct 2026 (DT-201): posting manual journal entries is its own key; acct.post alone prepares (drafts, templates).
+    public const string AcctPostEntry = "acc.acct.postentry";
 
     public static readonly IReadOnlyList<string> All =
     [
         TripsView, TripsEdit, TripsVoid, InvView, InvIssue, InvVoid, RcptManage, DrvView, DrvAdvance,
         DrvSettle, JeView, JeExport, AcctView, AcctPost, AcctApar, AcctSetup, AcctMaint, ReportsView,
-        MastersManage, SettingsManage, UsersManage, TenantManage, BudgetView, BudgetManage, BudgetApprove,
+        MastersManage, SettingsManage, UsersManage, TenantManage, BudgetView, BudgetManage, BudgetApprove, AcctPostEntry,
     ];
 
     /// <summary>PRD 3.4 name of a namespaced key, e.g. "trn.trips.view" → "trips.view".</summary>
@@ -64,6 +67,7 @@ public static class PresetRoles
                 PermissionKeys.RcptManage, PermissionKeys.DrvView, PermissionKeys.DrvAdvance, PermissionKeys.DrvSettle,
                 PermissionKeys.JeView, PermissionKeys.JeExport, PermissionKeys.AcctView, PermissionKeys.AcctPost,
                 PermissionKeys.AcctApar, PermissionKeys.ReportsView, PermissionKeys.BudgetView, PermissionKeys.BudgetManage,
+                PermissionKeys.AcctPostEntry,
             ],
             [Dispatcher] =
             [

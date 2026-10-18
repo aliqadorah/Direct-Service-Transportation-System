@@ -5,7 +5,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Seed;
 
 /// <summary>
 /// Platform-wide reference data defined by the PRD, seeded through EF Core migration seed data:
-/// the 22 permission keys (PRD 3.4, namespaced per owner decision D-01), the three budget keys (revision 6 part B) and the TRIAL plan
+/// the 22 permission keys (PRD 3.4, namespaced per owner decision D-01), the three budget keys (revision 6 part B), the journal posting key (DT-201) and the TRIAL plan
 /// (owner decision D-12; limits are placeholders the provider edits in the console).
 /// Per-tenant and per-company reference data (preset roles, built-in ownership type, settings,
 /// number sequences, invoice layouts) is created by the application when a tenant/company is created.
@@ -47,7 +47,8 @@ internal static class ReferenceDataSeed
             "عرض الأستاذ العام وميزان المراجعة والقوائم المالية وكشوف الحسابات",
             "View the general ledger, trial balance, financial statements and account statements"),
         (14, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a14", "acc.acct.post", "Accounting",
-            "إنشاء القيود اليدوية وتعديلها وإلغاؤها، واستيراد القيود", "Create, edit and void manual journal entries; import entries"),
+            "إعداد القيود اليدوية: حفظ المسودات وتعديلها، واستخدام نماذج القيود وإدارتها (الترحيل يحتاج صلاحية «ترحيل القيود اليومية»)",
+            "Prepare manual journal entries: save and edit drafts, use and manage entry templates (posting needs “Post journal entries”)"),
         (15, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a15", "acc.acct.apar", "Accounting",
             "إدارة مستندات الذمم الدائنة والمدينة ودفعاتها ومرتجعاتها", "Manage payable and receivable documents, payments and returns"),
         (16, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a16", "acc.acct.setup", "Accounting",
@@ -77,6 +78,10 @@ internal static class ReferenceDataSeed
             "Create, edit and import budgets, copy them from last year's actuals, delete drafts"),
         (25, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25", "acc.budget.approve", "Accounting",
             "اعتماد الموازنات وإعادتها إلى مسودة", "Approve budgets and return them to draft"),
+        // Owner request 18 Oct 2026 (DT-201): posting manual journal entries separated from preparing them.
+        (26, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a26", "acc.acct.postentry", "Accounting",
+            "ترحيل القيود اليومية: ترحيل القيود اليدوية والمسودات، وتعديل القيود المرحّلة وإلغاؤها، واستيراد القيود",
+            "Post journal entries: post manual entries and drafts, edit and void posted entries, import entries"),
     ];
 
     internal static void Apply(ModelBuilder modelBuilder)

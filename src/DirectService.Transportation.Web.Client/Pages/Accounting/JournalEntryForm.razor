@@ -30,10 +30,11 @@
                     <Btn Icon="copy" Text="@L["tpl.saveAs"]" Disabled="!CanSave" OnClick="AskTemplateName" />
                 }
                 @if (_draft is not null) {<Btn Danger="true" Ghost="true" Icon="trash" Text="@L["je.deleteDraft"]" Disabled="!CanSave" OnClick="() => _deleting = true" />}
-                @if (_existing is null) {<Btn Icon="save" Text="@L["je.saveDraft"]" Busy="_savingDraft" Disabled="!CanSave" OnClick="SaveDraft" />}
-                <Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" />
+                @if (_existing is null) {<Btn Primary="!MayPost" Shortcut="@(MayPost ? null : "Ctrl S")" Icon="save" Text="@L["je.saveDraft"]" Busy="_savingDraft" Disabled="!CanSave" OnClick="SaveDraft" />}
+                @if (MayPost) {<Btn Primary="true" Text="@L[_existing is null ? "je.post" : "je.repost"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="Save" />}
             </Actions>
         </PageHeader>
+        @if (!MayPost && _existing is null) {<Banner Tone="Tone.Info" Icon="info" Text="@L["je.prepareOnly"]" />}
         @if (_draft is not null) {<Banner Tone="Tone.Info" Icon="info" Text="@L["je.draftHelp"]" />}
         @if (_existing is not null) {<Banner Tone="Tone.Info" Text="@L.F("je.editHelp", _existing.Number)" />}
         @if (_existing is not null) {<RecordLockGuard EntityType="ACC.JournalEntry" Id="@_existing.Id" OnState="h => _lockedBy = h" />}
@@ -174,6 +175,8 @@
     private decimal Debit => _m.Lines.Sum(l => l.Debit ?? 0);
     private decimal Credit => _m.Lines.Sum(l => l.Credit ?? 0);
     private bool CanSave => !_saving && !_savingDraft && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
+    // DT-201: posting (new entry, draft, edit of a posted entry) needs "Post journal entries"; acct.post alone saves drafts and templates.
+    private bool MayPost => Shell.Can(PermissionKeys.AcctPostEntry);
 
     private IReadOnlyList<Option<string?>> PartyOptions(string? type) => type is null ? [] : _parties.GetValueOrDefault(type) ?? [];
 
@@ -309,6 +312,11 @@
 
     private async Task Save()
     {
+        if (!MayPost)
+        {
+            if (_existing is null) await SaveDraft();   // Enter in the form of a preparer saves the draft
+            return;
+        }
         if (!CanSave) return;
         _saving = true;
         _extra = null;

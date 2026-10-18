@@ -20,7 +20,7 @@
     <Actions>
         @if (Shell.Can(PermissionKeys.AcctPost))
         {
-            <Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "accounting/journal/import")" />
+            @if (Shell.Can(PermissionKeys.AcctPostEntry)) {<Btn Icon="import" Text="@L["ml.import"]" Href="@NavModel.Href(Company, "accounting/journal/import")" />}
             <Btn Primary="true" Icon="plus" Text="@L["nav.newJournal"]" Href="@NavModel.Href(Company, "accounting/journal/new")" />
         }
     </Actions>

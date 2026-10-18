@@ -334,7 +334,7 @@ public sealed class DataRulesTests(DatabaseFixture db)
         await using (ctx)
         {
             var keys = await ctx.Set<Permission>().AsNoTracking().Select(p => p.PermissionKey).ToListAsync(Ct);
-            Assert.Equal(25, keys.Count);   // 22 of PRD 3.4 + 3 budget keys (revision 6 part B)
+            Assert.Equal(26, keys.Count);   // 22 of PRD 3.4 + 3 budget keys (revision 6 part B) + acct.postentry (DT-201)
             Assert.Contains("trn.trips.view", keys);
             Assert.Contains("acc.acct.maint", keys);
             Assert.Contains("core.tenant.manage", keys);

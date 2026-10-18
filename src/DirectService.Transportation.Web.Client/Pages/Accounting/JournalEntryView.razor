@@ -13,7 +13,7 @@
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        @{ var e = _e!; var editable = e.IsManual && e.Status == "Posted" && e.ReversesEntry is null && Shell.Can(PermissionKeys.AcctPost); }
+        @{ var e = _e!; var editable = e.IsManual && e.Status == "Posted" && e.ReversesEntry is null && Shell.Can(PermissionKeys.AcctPost) && Shell.Can(PermissionKeys.AcctPostEntry); }
         <PageHeader Title="@e.Number" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
             <Badges><StatusTag Status="@JournalStatus.Tag(e.Status)" /><Badge Tone="Tone.Mute" Text="@(e.IsManual ? L["je.manual"] : L["je.src." + (e.SourceType ?? "Opening")])" /></Badges>
             <Actions>
