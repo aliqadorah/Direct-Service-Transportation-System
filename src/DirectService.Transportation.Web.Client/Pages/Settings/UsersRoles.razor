@@ -162,7 +162,7 @@
             <EditForm EditContext="_newCtx" OnSubmit="CreateUser" id="new-user" class="stack" novalidate>
                 <ProblemValidator @ref="_newProblems" />
                 <ErrorSummary @ref="_newSummary" Extra="_newExtra" />
-                <TextField Id="new-name" @bind-Value="_new.FullName" Label="@L["acct.fullName"]" Required="true" MaxLength="150" />
+                <TextField Id="new-name" @bind-Value="_new.FullName" Label="@L["md.fullName"]" Required="true" MaxLength="150" />
                 <TextField Id="new-username" @bind-Value="_new.UserName" Label="@L["usr.userName"]" Required="true" Ltr="true" MaxLength="50" Autocomplete="off" Help="@L["usr.userNameHelp"]" />
                 <TextField Id="new-email" @bind-Value="_new.Email" Label="@L["usr.emailOptional"]" Type="email" Ltr="true" MaxLength="150" />
                 <TextField Id="new-password" @bind-Value="_new.Password" Label="@L["acct.password"]" Type="password" Ltr="true" Required="true" MaxLength="128" Autocomplete="new-password" BindOnInput="true" />
@@ -450,7 +450,7 @@
     {
         if (_busy) return;
         // Client checks first (the same rules as the server), each on its field.
-        var errors = Required(("fullName", _new.FullName, "acct.fullName"), ("userName", _new.UserName, "usr.userName"),
+        var errors = Required(("fullName", _new.FullName, "md.fullName"), ("userName", _new.UserName, "usr.userName"),
             ("password", _new.Password, "acct.password"), ("role", _new.Role, "usr.role"));
         if (!string.IsNullOrWhiteSpace(_new.UserName) && !ValidUserName(_new.UserName.Trim()))
             errors.Add(new ApiFieldError("userName", "user.userNameFormat", L["usr.userNameFormat"]));
