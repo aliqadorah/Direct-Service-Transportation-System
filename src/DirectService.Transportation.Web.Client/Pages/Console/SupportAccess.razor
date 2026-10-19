@@ -34,7 +34,7 @@
         <ListFrame Label="@L["nav.supportAccess"]">
             <DataGrid TItem="SupportAccessResponse" Items="_rows" Key="r => r.Id" Caption="@L["nav.supportAccess"]">
                 <Columns>
-                    <GridColumn TItem="SupportAccessResponse" Title="@L["con.tenant"]" Value="r => r.Tenant" />
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["con.tenant"]" Value="r => Subscriber(r)" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.reason"]" Value="r => r.Reason" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.from"]" Value="r => Fmt.DateTime(r.StartsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
@@ -108,6 +108,9 @@
         _requesting = true;
         return Task.CompletedTask;
     }
+
+    /// <summary>A request's subscriber as "name · owner email", so two subscribers with the same name are told apart in the list (DT-219).</summary>
+    internal static string Subscriber(SupportAccessResponse r) => r.OwnerEmail is null ? r.Tenant : $"{r.Tenant} · {r.OwnerEmail}";
 
     /// <summary>The text of one result: name · owner email · plan · signed-up date; a match through another user's email is named below it.</summary>
     internal string Text(SupportTenantOption t) =>

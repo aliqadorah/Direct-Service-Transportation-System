@@ -412,6 +412,8 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     {
         var rows = await q.OrderByDescending(g => g.Id).Take(200)
             .Select(g => new { G = g, Tenant = db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).FirstOrDefault(),
+                OwnerEmail = db.Set<UserCompanyRole>().IgnoreQueryFilters().Where(r => r.TenantId == g.TenantId && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active")
+                    .OrderBy(r => r.Id).Select(r => r.User.Email).FirstOrDefault(),
                 Requester = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy).Select(u => u.FullName).FirstOrDefault(), Decider = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.ApprovedBy).Select(u => u.FullName).FirstOrDefault() })
             .ToListAsync(ct).ConfigureAwait(false);
         var refusals = await SupportAccessService.RefusalReasonsAsync(db, null, rows.Where(x => x.G.Status == LifecycleCodes.Rejected).Select(x => x.G.Id).ToList(), ct)
@@ -419,7 +421,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var now = Now;
         return rows.Select(x => new SupportAccessResponse(support.Token<SupportAccessGrant>(x.G.PublicId), x.Tenant ?? string.Empty, x.Requester ?? string.Empty, x.G.Reason,
             x.G.Status == LifecycleCodes.Approved && x.G.EndsAt <= now ? LifecycleCodes.Expired : x.G.Status, Utc(x.G.StartsAt), Utc(x.G.EndsAt), x.Decider,
-            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion), refusals.GetValueOrDefault(x.G.Id))).ToList();
+            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion), refusals.GetValueOrDefault(x.G.Id), x.OwnerEmail)).ToList();
     }
 
     /// <summary>

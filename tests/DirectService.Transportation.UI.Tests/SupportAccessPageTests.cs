@@ -92,7 +92,7 @@ public sealed class SupportAccessPageTests : PageTestBase
     {
         var starts = new DateTime(2026, 10, 19, 12, 0, 0, DateTimeKind.Utc);
         Console([
-            Pending with { Id = "g1", Status = "Approved", StartsAt = starts, EndsAt = starts.AddDays(1), DecidedBy = "Ali Ali" },
+            Pending with { Id = "g1", Status = "Approved", StartsAt = starts, EndsAt = starts.AddDays(1), DecidedBy = "Ali Ali", OwnerEmail = "aliabdelqader311@gmail.com" },
             Pending with { Id = "g2", Status = "Rejected", DecidedBy = "Ali Ali", DecisionReason = "Not needed now" },
         ]);
         var cut = Render<SupportAccess>();
@@ -101,6 +101,7 @@ public sealed class SupportAccessPageTests : PageTestBase
         Assert.Contains(Fmt(starts), approved, StringComparison.Ordinal);
         Assert.Contains(Fmt(starts.AddDays(1)), approved, StringComparison.Ordinal);
         Assert.Contains("Ali Ali", approved, StringComparison.Ordinal);
+        Assert.Contains("Ali Transportation · aliabdelqader311@gmail.com", approved, StringComparison.Ordinal);   // DT-219
         var refused = cut.FindAll("tbody tr")[1].TextContent;
         Assert.Contains(L["st.refused"], refused, StringComparison.Ordinal);
         Assert.Contains("Not needed now", refused, StringComparison.Ordinal);

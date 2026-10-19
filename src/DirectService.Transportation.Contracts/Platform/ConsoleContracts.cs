@@ -106,9 +106,12 @@ public sealed record SupportAccessRequest(string? TenantId, string? Reason);
 /// <summary>An approval: explicit times, or (from the screen) a length in <see cref="Hours"/> starting now on the server's clock.</summary>
 public sealed record SupportApprovalRequest(DateTime? StartsAt, DateTime? EndsAt, string? Reason, int? Hours = null);
 
-/// <summary>A support request or window; <see cref="DecisionReason"/> is the Owner's reason for a refusal (owner testing 19 Oct 2026).</summary>
+/// <summary>
+/// A support request or window; <see cref="DecisionReason"/> is the Owner's reason for a refusal (owner testing 19 Oct 2026); <see cref="OwnerEmail"/>
+/// (provider console only) tells same-named subscribers apart (DT-219).
+/// </summary>
 public sealed record SupportAccessResponse(string Id, string Tenant, string RequestedBy, string Reason, string Status, DateTime? StartsAt, DateTime? EndsAt, string? DecidedBy,
-    DateTime CreatedAt, string RowVersion, string? DecisionReason = null);
+    DateTime CreatedAt, string RowVersion, string? DecisionReason = null, string? OwnerEmail = null);
 
 /// <summary>
 /// A subscriber found for a support request (owner testing 19 Oct 2026, DT-214): enough to tell two subscribers with the same name apart —

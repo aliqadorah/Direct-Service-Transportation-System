@@ -83,6 +83,7 @@ public sealed class SupportAccessTests(ApiFactory f)
         var row = await ConsoleRowAsync(staff, requested.Id);
         Assert.Equal("Approved", row.Status);
         Assert.Equal(owner.Me.FullName, row.DecidedBy);
+        Assert.Equal(owner.Email, row.OwnerEmail);   // DT-219: "name · owner email" in the console list
         Assert.Equal(TimeSpan.FromHours(24), row.EndsAt!.Value - row.StartsAt!.Value);
         Assert.InRange(row.StartsAt.Value, DateTime.UtcNow.AddMinutes(-5), DateTime.UtcNow.AddMinutes(1));
         Assert.Contains("approved", f.Emails.Last(staff.Email, "SupportDecision").TextBody, StringComparison.Ordinal);
