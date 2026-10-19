@@ -44,6 +44,7 @@
                         <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                         <GridColumn TItem="SupportAccessResponse" Title="@L["ten.decidedBy"]" Value="@(r => r.DecidedBy ?? "—")" />
                         <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@Status(context)" /></Template></GridColumn>
+                        <GridColumn TItem="SupportAccessResponse" Title="@L["ten.refusal"]" Value="@(r => r.DecisionReason ?? "")" />
                         <GridColumn TItem="SupportAccessResponse" Title="@L["profile.action"]" HideTitle="true">
                             <Template>
                                 @if (context.Status == LifecycleCodes.Approved && context.EndsAt > DateTime.UtcNow)
@@ -83,7 +84,7 @@
     private int _hours = 24;
 
     private IReadOnlyList<Option<int>> Durations =>
-        new[] { 1, 2, 4, 8, 24, 48, 72, 168 }.Select(h => new Option<int>(h, h < 24 ? L.F("ten.hours", h) : L.F("ten.days", h / 24))).ToList();
+        new[] { 1, 2, 4, 8, 24, 48, 72, 168 }.Select(h => new Option<int>(h, h < 24 ? L.F("ten.hours", h) : h == 24 ? L["ten.day"] : L.F("ten.days", h / 24))).ToList();
 
     protected override Task OnInitializedAsync() => Load();
 
@@ -100,8 +101,22 @@
 
     internal static string Status(SupportAccessResponse r) => r.Status switch
     {
-        LifecycleCodes.Requested => "requested", LifecycleCodes.Approved => "approved", LifecycleCodes.Rejected => "rejected", _ => "expired",
+        LifecycleCodes.Requested => "requested", LifecycleCodes.Approved => "approved", LifecycleCodes.Rejected => "refused", _ => "expired",
     };
+
+    /// <summary>
+    /// A failed decision shows the server's specific, translated message (owner testing 19 Oct 2026, DT-213). When the request is gone or
+    /// already decided (404/422/409) the list is read again, so the screen never keeps offering a decision that cannot be made.
+    /// </summary>
+    private async Task Failed(ApiException e)
+    {
+        _error = e.Problem.Detail ?? L["ten.decisionFailed"];
+        if (e.Problem.Status is 404 or 409 or 422 && e.Problem.Errors is not { Count: > 0 })
+        {
+            try { _rows = await Api.GetAsync<IReadOnlyList<SupportAccessResponse>>("api/v1/tenant/support-access"); }
+            catch (ApiException) { /* the message above already explains the failure */ }
+        }
+    }
 
     private void Ask(SupportAccessResponse g, bool approve)
     {
@@ -126,7 +141,7 @@
             var ends = _rows.FirstOrDefault(r => r.Id == id)?.EndsAt;
             Toasts.Success(L.F("ten.approved", Fmt.DateTime(ends?.ToLocalTime(), Shell.DateFormat)));
         }
-        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        catch (ApiException e) { await Failed(e); }
         finally { _busy = false; }
     }
 
@@ -141,7 +156,7 @@
             _rejecting = false;
             Toasts.Success(L["ten.rejected"]);
         }
-        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        catch (ApiException e) { await Failed(e); }
         finally { _busy = false; }
     }
 
@@ -153,7 +168,7 @@
             _rows = await Api.PostAsync<IReadOnlyList<SupportAccessResponse>>($"api/v1/tenant/support-access/{Uri.EscapeDataString(g.Id)}/end", null);
             Toasts.Success(L["ten.ended"]);
         }
-        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        catch (ApiException e) { await Failed(e); Toasts.Error(_error!); _error = null; }
         finally { _busy = false; }
     }
 }

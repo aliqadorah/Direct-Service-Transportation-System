@@ -507,6 +507,7 @@ internal static class ApiSummaries
         ["POST /api/v1/platform/tenants/{tenant}/suspend"] = "Provider console: suspend a tenant (read-only, BR-010, audited)",
         ["POST /api/v1/platform/tenants/{tenant}/reactivate"] = "Provider console: reactivate a tenant (BR-011, audited)",
         ["GET /api/v1/platform/support-access"] = "Provider console: the staff member's support-access requests and windows (P-13)",
+        ["GET /api/v1/platform/support-access/tenants"] = "Provider console: subscribers for a support request, by name, owner email or any user's email, with what tells same-named ones apart (DT-214)",
         ["GET /api/v1/platform/support-access/companies"] = "Provider console: the companies open to the staff member now, inside approved support windows (read-only, BR-014)",
         ["POST /api/v1/platform/support-access"] ="Provider console: request support access to a tenant; its Owners decide (P-13, BR-014)",
         ["GET /api/v1/platform/announcements"] = "Provider console: all service announcements (P-14)",

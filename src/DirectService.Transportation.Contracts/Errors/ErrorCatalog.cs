@@ -238,7 +238,9 @@ public static class ErrorCatalog
         [ErrorCodes.RefundReference] = ("أدخل مرجع الاسترداد، مثل رقم الحوالة ({0} حرفاً على الأكثر).", "Enter the refund reference, such as the transfer number (at most {0} characters)."),
         [ErrorCodes.SubscriptionNotAwaitingPayment] = ("الفاتورة {0} ليست بانتظار الدفع؛ يُلغى فقط ما أُنشئ عند اختيار خطة ولم يُدفع.", "Invoice {0} is not awaiting payment; only an unpaid invoice created when a plan was chosen can be cancelled."),
         [ErrorCodes.SupportWindow] = ("نافذة الدعم يجب أن تبدأ قبل نهايتها وألا تتجاوز 7 أيام.", "The support window must start before it ends and last at most 7 days."),
-        [ErrorCodes.SupportNotRequested] = ("طلب الدعم {0} ليس بانتظار القرار.", "Support request {0} is not waiting for a decision."),
+        [ErrorCodes.SupportNotRequested] = ("طلب الوصول هذا لم يعد بانتظار القرار: تمت الموافقة عليه أو رفضه من قبل. حدّث القائمة.", "This access request is no longer waiting for a decision: it was already approved or refused. Refresh the list."),
+        [ErrorCodes.SupportRequestNotFound] = ("لم يُعثر على طلب الوصول هذا في اشتراككم؛ ربما سُحب أو حُذف. حدّث القائمة.", "This access request was not found in your subscription; it may have been withdrawn. Refresh the list."),
+        [ErrorCodes.SupportNotOpen] = ("نافذة الوصول هذه ليست مفتوحة الآن؛ انتهت أو أُنهيت من قبل. حدّث القائمة.", "This access window is not open now; it has ended or was already closed. Refresh the list."),
         [ErrorCodes.MaintenanceResetBlocked] = ("رُفضت إعادة الضبط الكاملة: {0}.", "Full reset refused: {0}."),
         // Report builder (owner feedback 13 Oct 2026): {0} is the setting as the side panel names it ("Grouping 1", "Measure 2", "Filter 1"…).
         [ErrorCodes.ReportSource] = ("اختر مصدر البيانات.", "Choose a data source."),
@@ -509,6 +511,8 @@ public static class ErrorCodes
     public const string RefundReference = "refund.reference";
     public const string SupportWindow = "support.window";
     public const string SupportNotRequested = "support.notRequested";
+    public const string SupportRequestNotFound = "support.requestNotFound";
+    public const string SupportNotOpen = "support.notOpen";
     public const string ReportSource = "report.source";
     public const string ReportDefinition = "report.definition";
     public const string ReportRowsNone = "report.rowsNone";

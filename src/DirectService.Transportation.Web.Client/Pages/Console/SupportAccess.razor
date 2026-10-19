@@ -40,6 +40,7 @@
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.decidedBy"]" Value="@(r => r.DecidedBy ?? "—")" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@SupportApprovals.Status(context)" /></Template></GridColumn>
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ten.refusal"]" Value="@(r => r.DecisionReason ?? "")" />
                 </Columns>
             </DataGrid>
         </ListFrame>
@@ -48,31 +49,42 @@
 
 <Modal @bind-Open="_requesting" Title="@L["con.requestSupport"]" Busy="_busy" Icon="shield">
     <ChildContent>
-        <div class="row" style="gap:6px;align-items:flex-end">
-            <div class="field" style="flex:1">
-                <label for="tenant-q">@L["con.findTenant"]</label>
-                <input id="tenant-q" class="input" maxlength="100" @bind="_find" @bind:event="oninput" @onkeydown="@(e => e.Key == "Enter" ? Find() : Task.CompletedTask)" />
+        @*
+          One searchable field (owner testing 19 Oct 2026, DT-214): subscriber name, owner email or any user's email. Each entry reads
+          "name · owner email · plan · signed up", so two subscribers with the same name are told apart; the chosen one is shown again below.
+        *@
+        <ComboField TValue="string?" @bind-Value="_tenant" OnSelected="Choose" SearchAsync="SearchTenants" Selected="_option"
+                    Label="@L["con.subscriber"]" Placeholder="@L["con.findSubscriber"]" Help="@L["con.findSubscriberHelp"]" Required="true" MaxShown="20"
+                    Id="support-tenant" />
+        @if (_chosen is { } t)
+        {
+            <div class="chosen-tenant" data-testid="chosen-tenant">
+                <p class="muted" style="margin:0 0 4px">@L["con.chosenSubscriber"]</p>
+                <KeyValues Columns="2" Items="@Details(t)" />
             </div>
-            <Btn Icon="search" Text="@L["ui.search"]" OnClick="Find" />
-        </div>
-        <SelectField TValue="string?" @bind-Value="_tenant" Options="_tenants" Empty="@L["ui.choose"]" Label="@L["con.tenant"]" Required="true" />
+        }
         <TextAreaField @bind-Value="_reason" Label="@L["ui.reason"]" Required="true" MaxLength="500" Rows="2" BindOnInput="true" />
         <p class="help" style="margin:0">@L["con.supportText"]</p>
         @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" Live="true" />}
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _requesting = false" />
-        <Btn Primary="true" Icon="send" Text="@L["con.sendRequest"]" Busy="_busy" Disabled="@(_tenant is null || string.IsNullOrWhiteSpace(_reason))" OnClick="Request" />
+        <Btn Primary="true" Icon="send" Text="@L["con.sendRequest"]" Busy="_busy" Disabled="@(!CanSend)" OnClick="Request" />
     </Footer>
 </Modal>
 
 @code {
     private IReadOnlyList<SupportAccessResponse> _rows = [];
     private IReadOnlyList<CompanyAccess> _open = [];
-    private IReadOnlyList<Option<string?>> _tenants = [];
+    private readonly Dictionary<string, SupportTenantOption> _found = new(StringComparer.Ordinal);
     private LoadState _state = LoadState.Loading;
-    private string? _reference, _find, _tenant, _reason, _error;
+    private string? _reference, _tenant, _reason, _error;
+    private SupportTenantOption? _chosen;
+    private Option<string?>? _option;
     private bool _requesting, _busy;
+
+    /// <summary>A request is sent only for one subscriber picked from the results and shown again — never for typed text or an unclear choice.</summary>
+    private bool CanSend => _chosen is not null && _tenant == _chosen.Id && !string.IsNullOrWhiteSpace(_reason);
 
     protected override Task OnInitializedAsync() => Load();
 
@@ -87,27 +99,66 @@
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
-    private async Task New()
+    private Task New()
     {
         _tenant = _reason = _error = null;
+        _chosen = null;
+        _option = null;
+        _found.Clear();
         _requesting = true;
-        await Find();
+        return Task.CompletedTask;
     }
 
-    private async Task Find()
+    /// <summary>The text of one result: name · owner email · plan · signed-up date; a match through another user's email is named below it.</summary>
+    internal string Text(SupportTenantOption t) =>
+        string.Join(" · ", t.Name, t.OwnerEmail ?? L["con.noOwner"], t.PlanName, Fmt.Date(t.SignedUpAt.ToLocalTime(), Shell.DateFormat));
+
+    private async Task<IReadOnlyList<Option<string?>>> SearchTenants(string text, CancellationToken ct)
     {
         try
         {
-            var q = string.IsNullOrWhiteSpace(_find) ? "" : "&q=" + Uri.EscapeDataString(_find.Trim());
-            var page = await Api.GetAsync<PagedResult<ConsoleTenantResponse>>("api/v1/platform/tenants?page=1&pageSize=50" + q);
-            _tenants = page.Items.Where(t => t.Status != LifecycleCodes.Deleted).Select(t => new Option<string?>(t.Id, t.Name, t.OwnerEmail)).ToList();
-            if (_tenants.All(t => t.Value != _tenant)) _tenant = null;
+            var q = string.IsNullOrWhiteSpace(text) ? "" : "?q=" + Uri.EscapeDataString(text.Trim());
+            var found = await Api.GetAsync<IReadOnlyList<SupportTenantOption>>("api/v1/platform/support-access/tenants" + q, ct);
+            foreach (var t in found) _found[t.Id] = t;
+            return found.Select(t => new Option<string?>(t.Id, Text(t), t.MatchedEmail is null ? null : L.F("con.matchedBy", t.MatchedEmail))).ToList();
         }
-        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        catch (ApiException e)
+        {
+            _error = e.Problem.Detail ?? L["ui.loadFailed"];
+            return [];
+        }
     }
+
+    private void Choose(Option<string?>? picked)
+    {
+        var token = picked?.Value;
+        _chosen = token is not null && _found.TryGetValue(token, out var t) ? t : null;
+        _option = _chosen is null ? null : new Option<string?>(_chosen.Id, Text(_chosen));
+        _error = null;
+    }
+
+    private IReadOnlyList<KeyValue> Details(SupportTenantOption t)
+    {
+        var items = new List<KeyValue>
+        {
+            new(L["con.subscriber"], t.Name),
+            new(L["con.owner"], t.OwnerEmail ?? L["con.noOwner"]),
+            new(L["con.plan"], $"{t.PlanName} ({t.PlanCode})"),
+            new(L["con.signedUp"], Fmt.Date(t.SignedUpAt.ToLocalTime(), Shell.DateFormat)),
+            new(L["ml.status"], L["st." + SubscriberStatus(t.Status)]),
+        };
+        if (t.MatchedEmail is not null) items.Add(new(L["con.matchedEmail"], t.MatchedEmail));
+        return items;
+    }
+
+    internal static string SubscriberStatus(string status) => status switch
+    {
+        "Trial" => "trial", "Active" => "active", "PastDue" => "pastDue", "Suspended" => "suspended", "Cancelled" => "cancelled", _ => "deleted",
+    };
 
     private async Task Request()
     {
+        if (!CanSend) return;
         _busy = true;
         _error = null;
         try

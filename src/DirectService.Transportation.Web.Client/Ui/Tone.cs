@@ -55,7 +55,7 @@ public static class Statuses
         ["draft"] = (Tone.Mute, "edit"), ["unpaid"] = (Tone.Info, "clock"), ["partial"] = (Tone.Warn, "clock"), ["partReturned"] = (Tone.Warn, "refresh"), ["closed"] = (Tone.Ok, "check"),
         ["posted"] = (Tone.Ok, "check"), ["pending"] = (Tone.Warn, "clock"), ["reversed"] = (Tone.Mute, "refresh"),
         ["active"] = (Tone.Ok, "check"), ["archived"] = (Tone.Mute, "archive"), ["open"] = (Tone.Ok, "check"), ["closedPeriod"] = (Tone.Mute, "lock"),
-        ["queued"] = (Tone.Info, "clock"), ["submitted"] = (Tone.Ok, "check"), ["rejected"] = (Tone.Err, "x"), ["notRequired"] = (Tone.Mute, null),
+        ["queued"] = (Tone.Info, "clock"), ["submitted"] = (Tone.Ok, "check"), ["rejected"] = (Tone.Err, "x"), ["refused"] = (Tone.Err, "x"),["notRequired"] = (Tone.Mute, null),
         ["mapped"] = (Tone.Ok, "check"), ["missing"] = (Tone.Err, "alert"), ["disabled"] = (Tone.Mute, "lock"), ["invited"] = (Tone.Info, "mail"),
         ["trial"] = (Tone.Info, "clock"), ["pastDue"] = (Tone.Warn, "alert"), ["suspended"] = (Tone.Err, "lock"), ["cancelled"] = (Tone.Mute, "x"),
         ["failed"] = (Tone.Err, "alert"), ["paid"] = (Tone.Ok, "check"), ["due"] = (Tone.Info, "clock"), ["awaitingPayment"] = (Tone.Mute, "clock"), ["requested"] = (Tone.Info, "clock"),

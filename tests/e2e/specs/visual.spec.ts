@@ -206,6 +206,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     const company = companyOf(page);
     const { w, ids } = await documents(page, company);
     if (wanted("/tenant/subscription")) await planChosen(page, lang);
+    if (wanted("/tenant/support-access")) await supportRequested(page, lang);
     for (const route of companyRoutes(company, w, ids)) {
       if (!wanted(route.replace(`/c/${company}`, "") || "dashboard")) continue;
       if (!(await open(page, route))) {
@@ -215,6 +216,11 @@ for (const lang of ["ar", "en"] as Lang[]) {
       await run.check(page, route.replace(`/c/${company}`, "") || "dashboard", { full: true });
     }
     await sweepStates(page, run, lang, company, states(company, w, ids));
+    // Owner testing 19 Oct 2026 (DT-213): the approve and refuse dialogs of the pending request made above (opened, never confirmed).
+    await sweepPopups(page, run, lang, company, [
+      { name: "tenant-support#approve", route: "/tenant/support-access", open: async (p, t) => { await button(p.locator("main"), t("ten.approve")).first().click(); } },
+      { name: "tenant-support#refuse", route: "/tenant/support-access", open: async (p, t) => { await button(p.locator("main"), t("ten.reject")).first().click(); } },
+    ]);
     run.assertClean();
   });
 }
@@ -250,6 +256,20 @@ async function planChosen(page: Page, lang: Lang): Promise<void> {
     await latePayment();
     // …and the current checkout, awaiting payment.
     await api(page, "POST", "/api/v1/tenant/subscription/checkout", { planId: plan.id });
+  } finally {
+    await staff.close();
+  }
+}
+
+/** A pending support access request from the provider for the signed-in tenant (owner testing 19 Oct 2026): the support page shows it. */
+async function supportRequested(page: Page, lang: Lang): Promise<void> {
+  const staff = await page.context().browser()!.newPage({ baseURL: BASE_URL, ignoreHTTPSErrors: true });
+  try {
+    await staffSignIn(staff, lang);
+    const me = await api<{ email: string }>(page, "GET", "/api/v1/me");
+    const found = await api<{ id: string; ownerEmail: string | null }[]>(staff, "GET", `/api/v1/platform/support-access/tenants?q=${encodeURIComponent(me.email)}`);
+    const tenant = found.find((x) => x.ownerEmail === me.email)!;
+    await api(staff, "POST", "/api/v1/platform/support-access", { tenantId: tenant.id, reason: lang === "ar" ? "فاتورة لا تُطبع" : "An invoice does not print" });
   } finally {
     await staff.close();
   }
@@ -546,6 +566,12 @@ for (const lang of ["ar", "en"] as Lang[]) {
         await p.locator("main table button").filter({ hasText: t("con.markRefunded") }).first().click(); } },
       { name: "console-announcements#new", route: "/console/announcements", open: header("con.newAnnouncement") },
       { name: "console-support#request", route: "/console/support-access", open: header("con.requestSupport") },
+      // DT-214: the searchable subscriber field with its results, then a chosen subscriber shown again before sending (nothing is sent).
+      { name: "console-support#results", route: "/console/support-access", open: async (p, t) => {
+        await header("con.requestSupport")(p, t); await p.locator("#support-tenant").click(); await expect(p.getByRole("option").first()).toBeVisible(); } },
+      { name: "console-support#chosen", route: "/console/support-access", open: async (p, t) => {
+        await header("con.requestSupport")(p, t); await p.locator("#support-tenant").click(); await p.getByRole("option").first().click();
+        await expect(p.locator("[data-testid=chosen-tenant]")).toBeVisible(); } },
     ]);
     run.assertClean();
   });

@@ -106,8 +106,16 @@ public sealed record SupportAccessRequest(string? TenantId, string? Reason);
 /// <summary>An approval: explicit times, or (from the screen) a length in <see cref="Hours"/> starting now on the server's clock.</summary>
 public sealed record SupportApprovalRequest(DateTime? StartsAt, DateTime? EndsAt, string? Reason, int? Hours = null);
 
+/// <summary>A support request or window; <see cref="DecisionReason"/> is the Owner's reason for a refusal (owner testing 19 Oct 2026).</summary>
 public sealed record SupportAccessResponse(string Id, string Tenant, string RequestedBy, string Reason, string Status, DateTime? StartsAt, DateTime? EndsAt, string? DecidedBy,
-    DateTime CreatedAt, string RowVersion);
+    DateTime CreatedAt, string RowVersion, string? DecisionReason = null);
+
+/// <summary>
+/// A subscriber found for a support request (owner testing 19 Oct 2026, DT-214): enough to tell two subscribers with the same name apart —
+/// owner email, plan, sign-up date, status — and, when the match came from another user's email, that email.
+/// </summary>
+public sealed record SupportTenantOption(string Id, string Name, string? OwnerEmail, string PlanCode, string PlanName, DateTime SignedUpAt, string Status,
+    string? MatchedEmail);
 
 // ------------------------------------------------------------------ announcements and health (5.5, P-14, P-15)
 

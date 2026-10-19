@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
+using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
@@ -10,6 +11,7 @@ using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DirectService.Transportation.Application.Platform;
@@ -17,32 +19,77 @@ namespace DirectService.Transportation.Application.Platform;
 /// <summary>
 /// Support access on the tenant side (5.5, BR-014, tenant.manage): the Owner sees the provider's requests and approves a time-limited window
 /// (at most 7 days, default 24 hours from now) or rejects; an approved window can be ended early. Every request made inside a window is
-/// written to the tenant's audit log (support session, read-only — D-13).
+/// written to the tenant's audit log (support session, read-only — D-13). The staff member who asked is emailed the decision (DT-215).
+/// Every query here names the signed-in tenant explicitly besides the tenant filter (owner testing 19 Oct 2026, DT-213: a nested
+/// IgnoreQueryFilters had switched the filter off for the whole list query, so another tenant's requests were listed).
 /// </summary>
-public sealed class SupportAccessService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, TimeProvider clock)
+public sealed partial class SupportAccessService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, TimeProvider clock,
+    IEmailSender email, IOptions<AppOptions> app, Microsoft.Extensions.Logging.ILogger<SupportAccessService> log)
 {
     public const int MaxWindowDays = 7;
 
+    /// <summary>Audit action of a refusal; its reason is the audit row's "_reason".</summary>
+    public const string RejectAction = "Reject";
+
+    public const string GrantEntity = "CORE.SupportAccessGrant";
+
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
+
+    private long TenantId => ctx.TenantId ?? throw Fail.Forbidden();
+
+    /// <summary>The signed-in tenant's requests only — never a query with ignored filters (see the class remarks).</summary>
+    private IQueryable<SupportAccessGrant> Mine => db.Set<SupportAccessGrant>().Where(g => g.TenantId == TenantId);
 
     public async Task<IReadOnlyList<SupportAccessResponse>> ListAsync(CancellationToken ct)
     {
-        var rows = await db.Set<SupportAccessGrant>().AsNoTracking().OrderByDescending(g => g.Id).Take(100)
-            .Select(g => new { G = g, Requester = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy).Select(u => u.FullName).FirstOrDefault(), Decider = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.ApprovedBy).Select(u => u.FullName).FirstOrDefault() })
+        var tenantId = TenantId;
+        var grants = await db.Set<SupportAccessGrant>().AsNoTracking().Where(g => g.TenantId == tenantId).OrderByDescending(g => g.Id).Take(100)
             .ToListAsync(ct).ConfigureAwait(false);
-        var tenant = await db.Set<Tenant>().AsNoTracking().Where(t => t.Id == ctx.TenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
+        // Staff and Owner names: a separate query by id (staff users have no tenant, so the user filter is lifted — only here).
+        var userIds = grants.Select(g => g.RequestedBy).Concat(grants.Where(g => g.ApprovedBy != null).Select(g => g.ApprovedBy!.Value)).Distinct().ToList();
+        var names = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName })
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct).ConfigureAwait(false);
+        var refusals = await RefusalReasonsAsync(db, tenantId, grants.Where(g => g.Status == LifecycleCodes.Rejected).Select(g => g.Id).ToList(), ct).ConfigureAwait(false);
+        var tenant = await db.Set<Tenant>().AsNoTracking().Where(t => t.Id == tenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
         var now = Now;
-        return rows.Select(x => new SupportAccessResponse(support.Token<SupportAccessGrant>(x.G.PublicId), tenant, x.Requester ?? string.Empty, x.G.Reason,
-            x.G.Status == LifecycleCodes.Approved && x.G.EndsAt <= now ? LifecycleCodes.Expired : x.G.Status,
-            x.G.StartsAt is DateTime s ? DateTime.SpecifyKind(s, DateTimeKind.Utc) : null, x.G.EndsAt is DateTime e ? DateTime.SpecifyKind(e, DateTimeKind.Utc) : null,
-            x.Decider, DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion))).ToList();
+        return grants.Select(g => new SupportAccessResponse(support.Token<SupportAccessGrant>(g.PublicId), tenant, names.GetValueOrDefault(g.RequestedBy) ?? string.Empty, g.Reason,
+            g.Status == LifecycleCodes.Approved && g.EndsAt <= now ? LifecycleCodes.Expired : g.Status,
+            g.StartsAt is DateTime s ? DateTime.SpecifyKind(s, DateTimeKind.Utc) : null, g.EndsAt is DateTime e ? DateTime.SpecifyKind(e, DateTimeKind.Utc) : null,
+            g.ApprovedBy is long by ? names.GetValueOrDefault(by) : null, DateTime.SpecifyKind(g.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(g.RowVersion),
+            refusals.GetValueOrDefault(g.Id))).ToList();
+    }
+
+    /// <summary>The Owner's reason of each refused request (from its "Reject" audit row; no schema change), by grant id.</summary>
+    internal static async Task<Dictionary<long, string>> RefusalReasonsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    {
+        if (grantIds.Count == 0) return [];
+        var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
+            .Where(a => a.EntityType == GrantEntity && a.Action == RejectAction && a.EntityId != null && grantIds.Contains(a.EntityId.Value)
+                && (tenantId == null || a.TenantId == tenantId))
+            .OrderBy(a => a.Id).Select(a => new { Id = a.EntityId!.Value, Reason = SqlJson.Value(a.NewValues, "$._reason") })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var result = new Dictionary<long, string>();
+        foreach (var r in rows.Where(r => !string.IsNullOrEmpty(r.Reason))) result[r.Id] = r.Reason!;
+        return result;
+    }
+
+    /// <summary>
+    /// The request named by the token, in the signed-in tenant only. A token of another tenant's request, a malformed or an unknown token all
+    /// answer the same specific 404 (SEC-22: nothing tells whether it exists elsewhere).
+    /// </summary>
+    private async Task<SupportAccessGrant> FindAsync(string token, CancellationToken ct)
+    {
+        var tenantId = TenantId;
+        var publicId = support.Decode<SupportAccessGrant>(token);
+        return (publicId is Guid pid ? await Mine.SingleOrDefaultAsync(g => g.PublicId == pid && g.TenantId == tenantId, ct).ConfigureAwait(false) : null)
+            ?? throw new AppException(ErrorCodes.SupportRequestNotFound, 404);
     }
 
     public async Task<IReadOnlyList<SupportAccessResponse>> ApproveAsync(string token, SupportApprovalRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var g = await support.FindAsync<SupportAccessGrant>(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested, g.Reason);
+        var g = await FindAsync(token, ct).ConfigureAwait(false);
+        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested);
         var starts = (r.StartsAt ?? Now).ToUniversalTime();
         // A length in hours (DT-157) is measured on the server's clock, never the browser's.
         var ends = (r.EndsAt ?? starts.AddHours(r.Hours is int h and > 0 ? h : 24)).ToUniversalTime();
@@ -53,26 +100,53 @@ public sealed class SupportAccessService(IAppDbContext db, IRequestContext ctx, 
         g.EndsAt = ends;
         changes.SetAction(g, "Approve", TextNormalizer.CleanText(r.Reason));
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await TellStaffAsync(g, null, ct).ConfigureAwait(false);
         return await ListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<SupportAccessResponse>> RejectAsync(string token, string? reason, CancellationToken ct)
     {
         var why = MasterIds.Reason(reason);
-        var g = await support.FindAsync<SupportAccessGrant>(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested, g.Reason);
+        var g = await FindAsync(token, ct).ConfigureAwait(false);
+        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested);
         g.Status = LifecycleCodes.Rejected;
         g.ApprovedBy = ctx.UserId;
-        changes.SetAction(g, "Reject", why);
+        changes.SetAction(g, RejectAction, why);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await TellStaffAsync(g, why, ct).ConfigureAwait(false);
         return await ListAsync(ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Emails the decision to the staff member who asked (staff have no in-app notifications: the console has no bell). The decision is already
+    /// saved; a failed email is logged and never undoes or hides it.
+    /// </summary>
+    private async Task TellStaffAsync(SupportAccessGrant g, string? refusal, CancellationToken ct)
+    {
+        try
+        {
+            var staff = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy && u.IsPlatformStaff && !u.IsDeleted && u.Email != null)
+                .Select(u => new { u.Email, u.FullName }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+            if (staff is null) return;
+            var tenant = await db.Set<Tenant>().AsNoTracking().Where(t => t.Id == g.TenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
+            var link = $"{app.Value.PublicBaseUrl.TrimEnd('/')}/console/support-access";
+            await email.SendAsync(EmailTemplates.SupportDecision(staff.Email!, staff.FullName, tenant, ctx.UserName ?? string.Empty,
+                g.StartsAt, g.EndsAt, refusal, link), ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogEmailFailed(log, g.Id, ex);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The decision on support request {GrantId} was saved, but the email to the staff member failed.")]
+    private static partial void LogEmailFailed(ILogger logger, long grantId, Exception exception);
 
     /// <summary>Ends an approved window now (the Owner can withdraw access at any time).</summary>
     public async Task<IReadOnlyList<SupportAccessResponse>> EndAsync(string token, CancellationToken ct)
     {
-        var g = await support.FindAsync<SupportAccessGrant>(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Approved || g.EndsAt <= Now) throw Fail.Rule(ErrorCodes.SupportNotRequested, g.Reason);
+        var g = await FindAsync(token, ct).ConfigureAwait(false);
+        if (g.Status != LifecycleCodes.Approved || g.EndsAt <= Now) throw Fail.Rule(ErrorCodes.SupportNotOpen);
         g.Status = LifecycleCodes.Expired;
         g.EndsAt = Now > g.StartsAt ? Now : g.StartsAt!.Value.AddSeconds(1);
         changes.SetAction(g, "End");

@@ -57,6 +57,26 @@ public static class EmailTemplates
         $"Hello {E(name)},<br>{E(inviterName)} invited you to join the platform team of Direct Service Transportation. Open the link to set your password, then set up two-step verification. The link works once and is valid for {hours} hours. If you did not expect this invitation, ignore it.",
         "قبول الدعوة", "Accept invitation", link, nameof(StaffInvitation));
 
+    /// <summary>
+    /// The tenant's Owner decided a support access request (owner testing 19 Oct 2026, DT-215): the staff member who asked is told the window
+    /// (UTC) and who approved it, or the refusal and its reason.
+    /// </summary>
+    public static EmailMessage SupportDecision(string to, string name, string tenant, string decider, DateTime? startsUtc, DateTime? endsUtc, string? refusal, string link)
+    {
+        static string T(DateTime? d) => d?.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+        return refusal is null
+            ? Build(to,
+                $"تمت الموافقة على طلب الوصول — Support access approved: {tenant}",
+                $"مرحباً {E(name)}،<br>وافق {E(decider)} على طلب الوصول إلى {E(tenant)}: نافذة للقراءة فقط من {T(startsUtc)} إلى {T(endsUtc)}.",
+                $"Hello {E(name)},<br>{E(decider)} approved your access request for {E(tenant)}: a read-only window from {T(startsUtc)} to {T(endsUtc)}.",
+                "فتح طلبات الوصول", "Open support access", link, nameof(SupportDecision))
+            : Build(to,
+                $"رُفض طلب الوصول — Support access refused: {tenant}",
+                $"مرحباً {E(name)}،<br>رفض {E(decider)} طلب الوصول إلى {E(tenant)}. السبب: {E(refusal)}",
+                $"Hello {E(name)},<br>{E(decider)} refused your access request for {E(tenant)}. Reason: {E(refusal)}",
+                "فتح طلبات الوصول", "Open support access", link, nameof(SupportDecision));
+    }
+
     private static EmailMessage Build(string to, string subject, string ar, string en, string buttonAr, string buttonEn, string link, string template)
     {
         var safeLink = WebUtility.HtmlEncode(link);

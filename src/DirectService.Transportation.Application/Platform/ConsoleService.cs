@@ -414,10 +414,52 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             .Select(g => new { G = g, Tenant = db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).FirstOrDefault(),
                 Requester = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy).Select(u => u.FullName).FirstOrDefault(), Decider = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.ApprovedBy).Select(u => u.FullName).FirstOrDefault() })
             .ToListAsync(ct).ConfigureAwait(false);
+        var refusals = await SupportAccessService.RefusalReasonsAsync(db, null, rows.Where(x => x.G.Status == LifecycleCodes.Rejected).Select(x => x.G.Id).ToList(), ct)
+            .ConfigureAwait(false);
         var now = Now;
         return rows.Select(x => new SupportAccessResponse(support.Token<SupportAccessGrant>(x.G.PublicId), x.Tenant ?? string.Empty, x.Requester ?? string.Empty, x.G.Reason,
             x.G.Status == LifecycleCodes.Approved && x.G.EndsAt <= now ? LifecycleCodes.Expired : x.G.Status, Utc(x.G.StartsAt), Utc(x.G.EndsAt), x.Decider,
-            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion))).ToList();
+            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion), refusals.GetValueOrDefault(x.G.Id))).ToList();
+    }
+
+    /// <summary>
+    /// Subscribers for a support request (owner testing 19 Oct 2026, DT-214): by subscriber name, the owner's email or any user's email (at
+    /// least 2 characters; empty = the newest). Owner-email matches come first, then name matches, then other users' emails; each option
+    /// carries what tells same-named subscribers apart (owner email, plan, sign-up date, status). Deleted subscribers are never offered.
+    /// </summary>
+    public async Task<IReadOnlyList<SupportTenantOption>> SupportTenantsAsync(string? q, CancellationToken ct)
+    {
+        _ = StaffId;
+        const int max = 20;
+        var text = MasterDataSupport.SearchText(q);
+        var tenants = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted && t.Status != LifecycleCodes.Deleted);
+        var owners = db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
+            .Where(r => !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted);
+        var shaped = tenants.Select(t => new
+        {
+            t.Id, t.PublicId, t.Name, t.Status, t.CreatedAt, t.Plan.Code, t.Plan.NameEn,
+            Owner = owners.Where(r => r.TenantId == t.Id).OrderBy(r => r.Id).Select(r => r.User.Email).FirstOrDefault(),
+        });
+        if (text is not null && text.Length < 2) return [];
+        var picked = text is null
+            ? (await shaped.OrderByDescending(t => t.Id).Take(max).ToListAsync(ct).ConfigureAwait(false)).Select(t => (t, Rank: 1, Matched: (string?)null)).ToList()
+            : [];
+        if (text is not null)
+        {
+            var byOwner = await shaped.Where(t => t.Owner != null && t.Owner.Contains(text)).OrderBy(t => t.Name).ThenBy(t => t.Id).Take(max).ToListAsync(ct).ConfigureAwait(false);
+            var byName = await shaped.Where(t => t.Name.Contains(text)).OrderBy(t => t.Name).ThenBy(t => t.Id).Take(max).ToListAsync(ct).ConfigureAwait(false);
+            var users = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email != null && u.Email.Contains(text))
+                .OrderBy(u => u.Email).Take(max).Select(u => new { TenantId = u.TenantId!.Value, u.Email }).ToListAsync(ct).ConfigureAwait(false);
+            var userTenantIds = users.Select(u => u.TenantId).Distinct().ToList();
+            var byUser = await shaped.Where(t => userTenantIds.Contains(t.Id)).ToListAsync(ct).ConfigureAwait(false);
+            picked = byOwner.Select(t => (t, Rank: 0, Matched: (string?)null))
+                .Concat(byName.Select(t => (t, Rank: 1, Matched: (string?)null)))
+                .Concat(byUser.OrderBy(t => t.Name).Select(t => (t, Rank: 2, Matched: (string?)users.First(u => u.TenantId == t.Id).Email)))
+                .GroupBy(x => x.t.Id).Select(g => g.OrderBy(x => x.Rank).First())
+                .OrderBy(x => x.Rank).ThenBy(x => x.t.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.t.Id).Take(max).ToList();
+        }
+        return picked.Select(x => new SupportTenantOption(support.Token<Tenant>(x.t.PublicId), x.t.Name, x.t.Owner, x.t.Code, x.t.NameEn,
+            DateTime.SpecifyKind(x.t.CreatedAt, DateTimeKind.Utc), x.t.Status, x.Matched == x.t.Owner ? null : x.Matched)).ToList();
     }
 
     /// <summary>A staff request for access to a tenant; its Owners are notified (FR-190) and decide.</summary>
