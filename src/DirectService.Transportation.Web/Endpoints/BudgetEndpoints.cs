@@ -21,7 +21,7 @@ internal static class BudgetEndpoints
             .RequirePermission(PermissionKeys.BudgetManage);
         g.MapGet("/account-options", async (BudgetService svc, CancellationToken ct) => TypedResults.Ok(await svc.AccountOptionsAsync(ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.BudgetView);
-        g.MapGet("/{budget}/import/template", async (string budget, BudgetImportService svc, CancellationToken ct) => File(await svc.TemplateAsync(ct).ConfigureAwait(false)))
+        g.MapGet("/{budget}/import/template", async (string budget, BudgetImportService svc, CancellationToken ct) => File(await svc.TemplateAsync(budget, ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.BudgetManage);
         g.MapGet("/{budget}", async (string budget, BudgetService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetAsync(budget, ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.BudgetView);

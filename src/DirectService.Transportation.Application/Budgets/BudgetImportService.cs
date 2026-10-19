@@ -44,8 +44,10 @@ public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, I
 
     // ------------------------------------------------------------ template
 
-    public async Task<GeneratedFile> TemplateAsync(CancellationToken ct)
+    /// <summary>The import template of a budget of this company; another company's or tenant's budget is not found (DT-218).</summary>
+    public async Task<GeneratedFile> TemplateAsync(string budgetToken, CancellationToken ct)
     {
+        _ = await support.FindAsync<Budget>(budgetToken, ct).ConfigureAwait(false);
         async Task<string> CodeOf(string type, string fallback) =>
             await db.Set<Account>().AsNoTracking().Where(a => a.AccountType == type && a.IsPostable && a.Status == AccountingCodes.Active && !a.Children.Any())
                 .OrderBy(a => a.Code).Select(a => a.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? fallback;
