@@ -656,6 +656,9 @@ public static partial class UiText
         ["shell.signOut"] = ("تسجيل الخروج", "Sign out"),
         ["shell.plan"] = ("الخطة: {0} · {1} مستخدماً", "Plan: {0} · {1} users"),
         ["shell.production"] = ("بيئة الإنتاج", "Production"),
+        ["shell.development"] = ("بيئة التطوير", "Development"),
+        ["shell.staging"] = ("بيئة ما قبل الإنتاج", "Staging"),
+        ["shell.environment"] = ("البيئة: {0}", "Environment: {0}"),
 
         // ---- menu (PRD groups, UX-11)
         ["nav.dashboard"] = ("لوحة المعلومات", "Dashboard"),

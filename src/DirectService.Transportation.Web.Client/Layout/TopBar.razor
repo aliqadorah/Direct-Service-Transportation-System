@@ -7,7 +7,10 @@
     <button type="button" class="btn ghost menu-toggle" aria-label="@L["shell.menu"]" aria-expanded="@(MenuOpen ? "true" : "false")" @onclick="OnMenu"><Icon Name="grid" /></button>
     @if (Provider)
     {
-        <Badge Tone="Tone.Mute" Icon="shield" Text="@L["shell.production"]" />
+        @if (EnvironmentBadge(Environment) is { } env)
+        {
+            <Badge Tone="env.Tone" Icon="shield" Text="@env.Text" />
+        }
     }
     else if (Companies.Count > 0)
     {
@@ -59,6 +62,22 @@
     [Parameter] public EventCallback<string> OnDensity { get; set; }
     [Parameter] public EventCallback<string> OnLanguage { get; set; }
     [Parameter] public EventCallback OnSignOut { get; set; }
+
+    /// <summary>The host's environment name (staff only, from /me); the badge is hidden until it is known.</summary>
+    [Parameter] public string? Environment { get; set; }
+
+    /// <summary>
+    /// The provider console's environment badge (owner testing 19 Oct 2026, DT-216): the host's real environment, never a fixed label —
+    /// Development locally, Staging, Production; any other name is shown as it is.
+    /// </summary>
+    internal (Tone Tone, string Text)? EnvironmentBadge(string? environment) => environment switch
+    {
+        null or "" => null,
+        "Production" => (Tone.Mute, L["shell.production"]),
+        "Staging" => (Tone.Warn, L["shell.staging"]),
+        "Development" => (Tone.Info, L["shell.development"]),
+        _ => (Tone.Info, L.F("shell.environment", environment)),
+    };
 
     private string? CurrentCompanyName => Companies.FirstOrDefault(c => c.Id == CurrentCompany) is { } c ? L.Pick(c.Name, c.NameEn) : null;
 }

@@ -45,7 +45,7 @@ public sealed record CompanyAccess(string Id, string Name, string? NameEn, strin
 public sealed record MeResponse(
     string Id, string FullName, string? Email, string LanguageCode, string DateFormat, string? DefaultCompany,
     bool IsPlatformStaff, string? TenantName, string? TenantStatus, IReadOnlyList<CompanyAccess> Companies,
-    string? UserName = null, bool TwoFactorEnabled = false);
+    string? UserName = null, bool TwoFactorEnabled = false, string? Environment = null);
 
 public sealed record PreferencesRequest(string LanguageCode, string? DefaultCompany, string DateFormat);
 public sealed record SessionResponse(string Id, DateTime CreatedAt, DateTime LastSeenAt, string? IpAddress, string? UserAgent, bool IsCurrent);

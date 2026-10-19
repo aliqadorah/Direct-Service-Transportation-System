@@ -24,7 +24,12 @@ internal static class AccountEndpoints
     public static void MapMeEndpoints(this RouteGroupBuilder api)
     {
         var me = api.MapGroup("/me").WithTags("Me").RequireAuthorization();
-        me.MapGet("/", async (MeService s, CancellationToken ct) => TypedResults.Ok(await s.GetAsync(ct).ConfigureAwait(false)));
+        // Platform staff see the host's real environment on the provider console's badge (owner testing 19 Oct 2026, DT-216); tenants never.
+        me.MapGet("/", async (MeService s, IHostEnvironment env, CancellationToken ct) =>
+        {
+            var m = await s.GetAsync(ct).ConfigureAwait(false);
+            return TypedResults.Ok(m.IsPlatformStaff ? m with { Environment = env.EnvironmentName } : m);
+        });
         me.MapPut("/preferences", async (PreferencesRequest r, MeService s, CancellationToken ct) =>
         {
             await s.UpdatePreferencesAsync(r, ct).ConfigureAwait(false);
