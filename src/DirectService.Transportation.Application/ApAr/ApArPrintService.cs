@@ -44,7 +44,7 @@ public sealed class ApArPrintService(IAppDbContext db, IRequestContext ctx, Mast
     private async Task<(string? TaxNumber, string? Phone, string? Address)> PartyAsync(string token, CancellationToken ct)
     {
         var g = support.Decode<ApArParty>(token);
-        var p = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().Where(x => x.PublicId == g && x.CompanyId == ctx.CompanyId)
+        var p = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => x.PublicId == g && x.CompanyId == ctx.CompanyId)
             .Select(x => new { x.TaxNumber, x.Phone, x.Address }).SingleAsync(ct).ConfigureAwait(false);
         return (p.TaxNumber, p.Phone, p.Address);
     }

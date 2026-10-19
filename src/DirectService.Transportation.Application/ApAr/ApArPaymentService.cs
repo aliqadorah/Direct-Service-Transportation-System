@@ -71,7 +71,7 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
                 changes.SetAction(doc, "Payment", payment.Number);
                 db.Set<ApArPayment>().Add(payment);
                 if (await support.SaveCreateAsync<ApArPayment>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
-                var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name })
+                var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name })
                     .SingleAsync(c).ConfigureAwait(false);
                 var entry = await posting.PostOrPendAsync(BuildEntry(payment, doc, party.ControlAccountId, party.Name, money.AccountId), c).ConfigureAwait(false);
                 payment.JournalEntryId = entry?.Id;
@@ -240,7 +240,7 @@ public sealed class ApArPaymentPostingHandler(IAppDbContext db, IUrlTokenService
     protected override async Task<PostingRequest?> EntryAsync(ApArPayment p, CancellationToken ct)
     {
         var doc = await _db.Set<ApArDocument>().AsNoTracking().SingleAsync(d => d.Id == p.DocumentId, ct).ConfigureAwait(false);
-        var party = await _db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().Where(x => x.Id == doc.PartyId).Select(x => new { x.ControlAccountId, x.Name }).SingleAsync(ct).ConfigureAwait(false);
+        var party = await _db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => x.Id == doc.PartyId).Select(x => new { x.ControlAccountId, x.Name }).SingleAsync(ct).ConfigureAwait(false);
         return payments.BuildEntry(p, doc, party.ControlAccountId, party.Name, await cash.AccountIdAsync(p.CashBoxId, p.BankAccountId, ct).ConfigureAwait(false));
     }
 }

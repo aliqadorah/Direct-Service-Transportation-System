@@ -236,12 +236,12 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         if (t.Status == Void) throw Fail.Rule(ErrorCodes.TripIsVoid, t.ReceiptNo);
         if (t.InvoiceId is long inv)
         {
-            var number = await db.Set<Invoice>().IgnoreQueryFilters().Where(i => i.Id == inv).Select(i => i.Number).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+            var number = await db.Set<Invoice>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(i => i.Id == inv).Select(i => i.Number).SingleOrDefaultAsync(ct).ConfigureAwait(false);
             throw Fail.Rule(ErrorCodes.TripInvoiced, t.ReceiptNo, number ?? (En ? "a draft invoice" : "مسودة فاتورة"));
         }
         if (t.SettlementId is long stl)
         {
-            var number = await db.Set<Settlement>().IgnoreQueryFilters().Where(x => x.Id == stl).Select(x => x.Number).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+            var number = await db.Set<Settlement>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => x.Id == stl).Select(x => x.Number).SingleOrDefaultAsync(ct).ConfigureAwait(false);
             throw Fail.Rule(ErrorCodes.TripSettled, t.ReceiptNo, number);
         }
     }
@@ -662,7 +662,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
     {
         var t = await support.FindAsync<Trip>(token, ct).ConfigureAwait(false);
         var response = await ResponseAsync(t.Id, ct).ConfigureAwait(false);
-        var driver = await db.Set<Driver>().AsNoTracking().IgnoreQueryFilters().SingleAsync(x => x.Id == t.DriverId, ct).ConfigureAwait(false);
+        var driver = await db.Set<Driver>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).SingleAsync(x => x.Id == t.DriverId, ct).ConfigureAwait(false);
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         var warnings = t.Status == Void ? [] : Warnings(new TripDraft(t.ReceiptNo, t.TripDate, t.LoadingDate, t.UnloadingDate, driver, t.FleetClass, null!, null!, null!, null!, null,
             t.LoadedWeight, t.UnloadedWeight, t.CustomerPrice, t.DriverRate, t.PartnerRate, t.Notes, null), t.UnloadedWeight, today);

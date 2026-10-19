@@ -89,8 +89,8 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
 
     /// <summary>The ledger account of a stored document's cash box or bank account.</summary>
     public async Task<long> AccountIdAsync(long? cashBoxId, long? bankAccountId, CancellationToken ct) => cashBoxId is long box
-        ? await db.Set<CashBox>().IgnoreQueryFilters().Where(b => b.Id == box).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false)
-        : await db.Set<BankAccount>().IgnoreQueryFilters().Where(b => b.Id == bankAccountId).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false);
+        ? await db.Set<CashBox>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(b => b.Id == box).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false)
+        : await db.Set<BankAccount>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(b => b.Id == bankAccountId).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false);
 
     public static PostingLine Debit(long accountId, decimal amount) => new(null, accountId, amount, 0);
 

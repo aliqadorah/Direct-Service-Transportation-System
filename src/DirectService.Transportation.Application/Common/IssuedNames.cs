@@ -25,7 +25,7 @@ public sealed class IssuedNames(IAppDbContext db, IRequestContext ctx)
         var key = "\"" + field + "\"";
         // The current company's rows only (master data belongs to one company); also lets IX_AuditLogs_Entity serve the query.
         var company = ctx.CompanyId ?? throw new InvalidOperationException("Issued names need a company context.");
-        var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
+        var rows = await db.Set<AuditLog>().AsNoTracking()
             .Where(a => a.CompanyId == company && a.EntityType == entityType && a.EntityId != null && ids.Contains(a.EntityId.Value) && a.OccurredAt > issuedAt
                 && (a.Action == ErasedRecords.EraseAction || (a.OldValues != null && a.OldValues.Contains(key))))
             .OrderBy(a => a.OccurredAt).ThenBy(a => a.Id)

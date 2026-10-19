@@ -82,7 +82,7 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
     private async Task<(Company Company, EInvoiceParty Buyer)> ApArPartiesAsync(long partyId, CancellationToken ct)
     {
         // By id: an archived or deleted party still appears on its documents.
-        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().SingleAsync(p => p.Id == partyId, ct).ConfigureAwait(false);
+        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).SingleAsync(p => p.Id == partyId, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == party.CompanyId, ct).ConfigureAwait(false);
         return (company, new EInvoiceParty(party.Name, TaxId(party.TaxNumber), NullIfEmpty(TextNormalizer.DigitsOnly(party.Phone)), null));
     }
@@ -101,7 +101,7 @@ public sealed class EInvoiceDocumentBuilder(IAppDbContext db)
     private async Task<(Company Company, Customer Buyer)> PartiesAsync(long customerId, CancellationToken ct)
     {
         // By id: an archived or deleted customer still appears on its documents.
-        var buyer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters().SingleAsync(c => c.Id == customerId, ct).ConfigureAwait(false);
+        var buyer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).SingleAsync(c => c.Id == customerId, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == buyer.CompanyId, ct).ConfigureAwait(false);
         return (company, buyer);
     }

@@ -403,7 +403,7 @@ internal static class ApArDocumentEntry
     public static async Task<PostingRequest> BuildAsync(IAppDbContext db, ApArDocumentService documents, ApArDocument d, CancellationToken ct)
     {
         var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == d.Id).OrderBy(l => l.Id).ToListAsync(ct).ConfigureAwait(false);
-        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().Where(p => p.Id == d.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);
+        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == d.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);
         return documents.BuildEntry(d, lines, party.ControlAccountId, party.Name);
     }
 }

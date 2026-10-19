@@ -37,6 +37,8 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
     <!-- Tests -->
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <!-- Source guard of the tenant filters (DT-217): syntax trees only. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Include="bunit" Version="2.11.3" />
     <!-- Code coverage for Microsoft.Testing.Platform (TST-12…14: coverage of domain and application) -->
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />

@@ -111,7 +111,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var stl = await support.FindAsync<Settlement>(token, ct).ConfigureAwait(false);
         var d = await settlements.DetailsAsync(stl.Id, ct).ConfigureAwait(false);
         var s = d.Settlement;
-        var plate = await db.Set<Driver>().IgnoreQueryFilters().Where(x => x.Id == stl.DriverId).Select(x => x.PlateNumber).SingleAsync(ct).ConfigureAwait(false);
+        var plate = await db.Set<Driver>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => x.Id == stl.DriverId).Select(x => x.PlateNumber).SingleAsync(ct).ConfigureAwait(false);
         var driverName = await names.OfAsync("TRN.Driver", stl.DriverId, "FullName", s.Driver.Name, stl.CreatedAt, ct).ConfigureAwait(false);   // FR-163
         var company = await CompanyAsync(ct).ConfigureAwait(false);
         var mark = await MarkAsync(SettlementService.EntityType, stl.Id, null, ct).ConfigureAwait(false);

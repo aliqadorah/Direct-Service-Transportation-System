@@ -32,7 +32,7 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var type = string.IsNullOrWhiteSpace(layoutType) ? inv.LayoutType : layoutType;
         var layout = await layouts.GetAsync(type, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
-        var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters().SingleAsync(c => c.Id == inv.CustomerId, ct).ConfigureAwait(false);
+        var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).SingleAsync(c => c.Id == inv.CustomerId, ct).ConfigureAwait(false);
         (details, customer.Name) = await AsIssuedAsync(inv, details, customer, ct).ConfigureAwait(false);
         var qrText = await db.Set<EInvoiceSubmission>().AsNoTracking().Where(s => s.InvoiceId == inv.Id && s.Status == "Submitted").OrderByDescending(s => s.Id)
             .Select(s => s.QrCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
@@ -49,7 +49,7 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var details = await credits.DetailsAsync(cn.Id, ct).ConfigureAwait(false);
         var inv = await db.Set<Invoice>().AsNoTracking().SingleAsync(i => i.Id == cn.InvoiceId, ct).ConfigureAwait(false);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
-        var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters().SingleAsync(c => c.Id == cn.CustomerId, ct).ConfigureAwait(false);
+        var customer = await db.Set<Customer>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).SingleAsync(c => c.Id == cn.CustomerId, ct).ConfigureAwait(false);
         customer.Name = await names.OfAsync("TRN.Customer", customer.Id, "Name", customer.Name, cn.CreatedAt, ct).ConfigureAwait(false);   // FR-163
         var layout = await layouts.GetAsync(InvoiceCodes.TaxInvoice, ct).ConfigureAwait(false);
         var qrText = await db.Set<EInvoiceSubmission>().AsNoTracking().Where(s => s.CreditNoteId == cn.Id && s.Status == "Submitted").OrderByDescending(s => s.Id)
@@ -68,7 +68,7 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         if (inv.ApprovedAt is not DateTime at) return (details, customer.Name);
         var customerName = await names.OfAsync("TRN.Customer", customer.Id, "Name", customer.Name, at, ct).ConfigureAwait(false);
         var trips = await db.Set<InvoiceLine>().AsNoTracking().Where(l => l.InvoiceId == inv.Id && l.TripId != null)
-            .Join(db.Set<Trip>().IgnoreQueryFilters(), l => l.TripId, t => (long?)t.Id, (l, t) => new { l.SortOrder, t.LoadingSiteId, t.UnloadingSiteId, t.MaterialId, t.DriverId })
+            .Join(db.Set<Trip>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]), l => l.TripId, t => (long?)t.Id, (l, t) => new { l.SortOrder, t.LoadingSiteId, t.UnloadingSiteId, t.MaterialId, t.DriverId })
             .ToListAsync(ct).ConfigureAwait(false);
         if (trips.Count == 0) return (details, customerName);
         var loading = await names.ManyAsync("TRN.LoadingSite", trips.Select(t => t.LoadingSiteId).Distinct().ToList(), "Name", at, ct).ConfigureAwait(false);

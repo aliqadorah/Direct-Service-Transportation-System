@@ -64,7 +64,9 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
             return cached;
         }
 
-        var row = await db.Set<UserSession>().IgnoreQueryFilters(TenantFilter)
+        // Before any tenant is known, by the unique token hash; every filter is lifted on purpose (the tenant sub-query lifted them for the whole
+        // query anyway, DT-217) and the row's own RevokedAt, expiry and user status decide below.
+        var row = await db.Set<UserSession>().IgnoreQueryFilters()
             .Where(s => s.TokenHash == hash)
             .Select(s => new
             {
@@ -111,7 +113,7 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
     {
         var now = clock.GetUtcNow().UtcDateTime;
         var staffIdle = options.Value.PlatformStaffIdleMinutes;
-        var stale = await db.Set<UserSession>().IgnoreQueryFilters(TenantFilter)
+        var stale = await db.Set<UserSession>().IgnoreQueryFilters()
             .Where(s => s.RevokedAt == null && (s.ExpiresAt <= now
                 || s.LastSeenAt.AddMinutes(db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == s.TenantId).Select(t => (int?)t.SessionIdleTimeoutMinutes).FirstOrDefault() ?? staffIdle) <= now))
             .OrderBy(s => s.Id).Take(batch)

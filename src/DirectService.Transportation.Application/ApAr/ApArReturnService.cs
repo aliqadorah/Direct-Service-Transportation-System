@@ -268,7 +268,7 @@ internal static class ApArReturnEntry
     public static async Task<PostingRequest> BuildAsync(IAppDbContext db, ApArReturnService returns, ApArReturn ret, ApArDocument doc, CancellationToken ct)
     {
         var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == doc.Id).OrderBy(l => l.Id).ToListAsync(ct).ConfigureAwait(false);
-        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters().Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);
+        var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);
         var decimals = await db.Set<Domain.Core.Company>().AsNoTracking().Where(c => c.Id == doc.CompanyId).Select(c => (int)c.CurrencyDecimals).SingleAsync(ct).ConfigureAwait(false);
         return returns.BuildEntry(ret, doc, lines, party.ControlAccountId, party.Name, decimals);
     }

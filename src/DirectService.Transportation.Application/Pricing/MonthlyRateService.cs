@@ -193,7 +193,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
         var m = MonthOrFail(month, "month");
         // Soft-deleted (cleared) rows keep their history: the soft-delete filter is lifted, the company filter applied explicitly.
         var companyId = ctx.CompanyId;
-        var query = db.Set<MonthlySiteRate>().IgnoreQueryFilters().AsNoTracking().Where(r => r.CompanyId == companyId && r.RateMonth == m);
+        var query = db.Set<MonthlySiteRate>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).AsNoTracking().Where(r => r.CompanyId == companyId && r.RateMonth == m);
         if (!string.IsNullOrWhiteSpace(loadingSite))
         {
             var site = await support.FindAsync<LoadingSite>(loadingSite, ct).ConfigureAwait(false);
