@@ -225,7 +225,15 @@ public sealed class AccountService(
     public static AppException PolicyError(PasswordPolicy p)
     {
         ArgumentNullException.ThrowIfNull(p);
-        return Fail.Field("password", ErrorCodes.PasswordPolicy, p.MinLength);
+        // DT-208: the message names exactly the rules of this organisation.
+        var code = (p.RequireLetter, p.RequireDigit) switch
+        {
+            (true, true) => ErrorCodes.PasswordPolicy,
+            (true, false) => ErrorCodes.PasswordPolicyLetter,
+            (false, true) => ErrorCodes.PasswordPolicyDigit,
+            _ => ErrorCodes.PasswordPolicyLength,
+        };
+        return Fail.Field("password", code, p.MinLength);
     }
 
     private static AppException ToAppException(IdentityResult result, PasswordPolicy policy) =>

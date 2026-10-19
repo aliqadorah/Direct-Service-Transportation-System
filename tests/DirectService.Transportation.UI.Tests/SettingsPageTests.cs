@@ -64,8 +64,8 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click();
         Assert.Contains(L["usr.createNote"], cut.Markup);
         Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)cut.Find(".dialog input[type=checkbox]")).IsChecked);
-        cut.Find("#new-name").Input("سامر");
-        cut.Find("#new-username").Input("samer.k");
+        cut.Find("#new-name").Change("سامر");
+        cut.Find("#new-username").Change("samer.k");
         cut.Find("#new-password").Input("Passw0rd-1");
         cut.FindAll(".dialog select").Single().Change("0");   // options are posted by index
         var create = cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal));

@@ -236,6 +236,13 @@ select.input { padding-inline-end: 4px; }
 .help { font-size: 12px; color: var(--muted); }
 .help.err { color: var(--err); display: flex; gap: var(--sp-2); align-items: center; }
 .help.err svg.ic { --ic: 13px; }
+/* DT-208: password rules under a password field, ticked while typing. */
+.pwrules { margin-top: calc(var(--sp-2) * -1); }
+.pwrules ul { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px var(--sp-4); font-size: 12px; color: var(--muted); }
+.pwrules li { display: flex; align-items: center; gap: 4px; }
+.pwrules li svg.ic { --ic: 12px; opacity: .3; }
+.pwrules li.met { color: var(--ok); }
+.pwrules li.met svg.ic { opacity: 1; }
 .src { font-size: var(--fs-xs); color: var(--primary); display: inline-flex; gap: var(--sp-2); align-items: center; }
 .src svg.ic { --ic: 12px; }
 .chk { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-md); cursor: pointer; }

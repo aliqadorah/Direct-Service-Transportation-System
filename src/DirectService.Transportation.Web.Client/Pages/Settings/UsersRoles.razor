@@ -156,68 +156,59 @@
 <Modal @bind-Open="_inviting" Title="@L["usr.addUser"]" Busy="_busy" Icon="plus">
     <ChildContent>
         <TabStrip Items="AddModes" Selected="@_addMode" SelectedChanged="SetAddMode" Label="@L["usr.addUser"]" />
+        @* DT-208: every server and client check lands on its field (ProblemValidator + ErrorSummary); the password rules are shown and ticked. *@
         @if (_addMode == "create")
         {
-            <div class="field">
-                <label for="new-name">@L["acct.fullName"] <span class="req" aria-hidden="true">*</span></label>
-                <input id="new-name" class="input" maxlength="150" @bind="_new.FullName" @bind:event="oninput" />
-            </div>
-            <div class="field">
-                <label for="new-username">@L["usr.userName"] <span class="req" aria-hidden="true">*</span></label>
-                <input id="new-username" class="input" dir="ltr" maxlength="50" autocomplete="off" @bind="_new.UserName" @bind:event="oninput" />
-                <div class="help">@L["usr.userNameHelp"]</div>
-            </div>
-            <div class="field">
-                <label for="new-email">@L["usr.emailOptional"]</label>
-                <input id="new-email" class="input" type="email" dir="ltr" maxlength="150" @bind="_new.Email" @bind:event="oninput" />
-            </div>
-            <div class="field">
-                <label for="new-password">@L["acct.password"] <span class="req" aria-hidden="true">*</span></label>
-                <input id="new-password" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_new.Password" @bind:event="oninput" />
-                <div class="help">@L["usr.passwordPolicyHelp"]</div>
-            </div>
-            <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
-            <CheckField @bind-Value="_new.MustChangePassword" Label="@L["usr.mustChange"]" />
-            <Banner Tone="Tone.Info" Text="@L["usr.createNote"]" />
+            <EditForm EditContext="_newCtx" OnSubmit="CreateUser" id="new-user" class="stack" novalidate>
+                <ProblemValidator @ref="_newProblems" />
+                <ErrorSummary @ref="_newSummary" Extra="_newExtra" />
+                <TextField Id="new-name" @bind-Value="_new.FullName" Label="@L["acct.fullName"]" Required="true" MaxLength="150" />
+                <TextField Id="new-username" @bind-Value="_new.UserName" Label="@L["usr.userName"]" Required="true" Ltr="true" MaxLength="50" Autocomplete="off" Help="@L["usr.userNameHelp"]" />
+                <TextField Id="new-email" @bind-Value="_new.Email" Label="@L["usr.emailOptional"]" Type="email" Ltr="true" MaxLength="150" />
+                <TextField Id="new-password" @bind-Value="_new.Password" Label="@L["acct.password"]" Type="password" Ltr="true" Required="true" MaxLength="128" Autocomplete="new-password" BindOnInput="true" />
+                <PasswordRules Policy="_policy" Password="@_new.Password" />
+                <SelectField TValue="string?" @bind-Value="_new.Role" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+                <CheckField @bind-Value="_new.MustChangePassword" Label="@L["usr.mustChange"]" />
+                <Banner Tone="Tone.Info" Text="@L["usr.createNote"]" />
+            </EditForm>
         }
         else
         {
-            <div class="field">
-                <label for="inv-email">@L["acct.email"] <span class="req" aria-hidden="true">*</span></label>
-                <input id="inv-email" class="input" type="email" dir="ltr" maxlength="200" @bind="_inviteEmail" @bind:event="oninput" />
-            </div>
-            <SelectField TValue="string?" @bind-Value="_inviteRole" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+            <EditForm EditContext="_invCtx" OnSubmit="Invite" id="invite-user" class="stack" novalidate>
+                <ProblemValidator @ref="_invProblems" />
+                <ErrorSummary @ref="_invSummary" Extra="_invExtra" />
+                <TextField Id="inv-email" @bind-Value="_inv.Email" Label="@L["acct.email"]" Type="email" Ltr="true" Required="true" MaxLength="200" />
+                <SelectField TValue="string?" @bind-Value="_inv.Role" Options="RoleOptions" Empty="@L["ui.choose"]" Label="@L["usr.role"]" Required="true" />
+            </EditForm>
         }
-        @if (_inviteError is not null) {<Banner Tone="Tone.Err" Text="@_inviteError" />}
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _inviting = false" />
         @if (_addMode == "create")
         {
-            <Btn Primary="true" Icon="check" Text="@L["usr.create"]" Busy="_busy" OnClick="CreateUser"
-                 Disabled="@(string.IsNullOrWhiteSpace(_new.FullName) || string.IsNullOrWhiteSpace(_new.UserName) || string.IsNullOrEmpty(_new.Password) || _inviteRole is null)" />
+            <Btn Primary="true" Icon="check" Text="@L["usr.create"]" Busy="_busy" OnClick="CreateUser" />
         }
         else
         {
-            <Btn Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" Disabled="@(string.IsNullOrWhiteSpace(_inviteEmail) || _inviteRole is null)" OnClick="Invite" />
+            <Btn Primary="true" Icon="send" Text="@L["usr.send"]" Busy="_busy" OnClick="Invite" />
         }
     </Footer>
 </Modal>
 
 <Modal @bind-Open="_settingPassword" Title="@L.F("usr.setPasswordFor", _user?.FullName ?? "")" Busy="_busy" Icon="lock">
     <ChildContent>
-        <div class="field">
-            <label for="set-password">@L["acct.newPassword"] <span class="req" aria-hidden="true">*</span></label>
-            <input id="set-password" class="input" type="password" dir="ltr" maxlength="128" autocomplete="new-password" @bind="_setPassword" @bind:event="oninput" />
-            <div class="help">@L["usr.passwordPolicyHelp"]</div>
-        </div>
-        <CheckField @bind-Value="_setMustChange" Label="@L["usr.mustChange"]" />
-        <Banner Tone="Tone.Info" Text="@L["usr.setPasswordNote"]" />
-        @if (_setError is not null) {<Banner Tone="Tone.Err" Text="@_setError" />}
+        <EditForm EditContext="_setCtx" OnSubmit="SetPassword" id="set-password-form" class="stack" novalidate>
+            <ProblemValidator @ref="_setProblems" />
+            <ErrorSummary @ref="_setSummary" Extra="_setExtra" />
+            <TextField Id="set-password" @bind-Value="_set.Password" Label="@L["acct.newPassword"]" Type="password" Ltr="true" Required="true" MaxLength="128" Autocomplete="new-password" BindOnInput="true" />
+            <PasswordRules Policy="_policy" Password="@_set.Password" />
+            <CheckField @bind-Value="_set.MustChangePassword" Label="@L["usr.mustChange"]" />
+            <Banner Tone="Tone.Info" Text="@L["usr.setPasswordNote"]" />
+        </EditForm>
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _settingPassword = false" />
-        <Btn Primary="true" Icon="lock" Text="@L["usr.setPassword"]" Busy="_busy" Disabled="@string.IsNullOrEmpty(_setPassword)" OnClick="SetPassword" />
+        <Btn Primary="true" Icon="lock" Text="@L["usr.setPassword"]" Busy="_busy" OnClick="SetPassword" />
     </Footer>
 </Modal>
 
@@ -229,13 +220,11 @@
     private IReadOnlyList<InvitationResponse> _invitations = [];
     private LoadState _state = LoadState.Loading;
     private string? _dummy = null;
-    private string? _reference, _q, _action, _actError, _roleError, _inviteEmail, _inviteRole, _inviteError;
+    private string? _reference, _q, _action, _actError, _roleError;
     private int _page = 1, _version, _roleSelectKey;
     private UserListItem? _user;
-    private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting, _settingPassword, _setMustChange = true;
+    private bool _userOpen, _asking, _busy, _roleOpen, _deletingRole, _inviting, _settingPassword;
     private string _addMode = "invite";
-    private string? _setPassword, _setError;
-    private NewUserModel _new = new();
     private RoleModel _role = new();
 
     [Parameter] public string Company { get; set; } = "";
@@ -397,61 +386,138 @@
         finally { _busy = false; }
     }
 
-    private void OpenAdd()
+    // ------------------------------------------------------------ add user, set password (DT-208: errors on their fields)
+
+    private NewUserModel _new = new();
+    private InviteModel _inv = new();
+    private SetPasswordModel _set = new();
+    private EditContext _newCtx = new(new NewUserModel()), _invCtx = new(new InviteModel()), _setCtx = new(new SetPasswordModel());
+    private ProblemValidator? _newProblems, _invProblems, _setProblems;
+    private ErrorSummary? _newSummary, _invSummary, _setSummary;
+    private IReadOnlyList<string>? _newExtra, _invExtra, _setExtra;
+    private PasswordPolicyResponse? _policy;
+
+    private async Task LoadPolicy()
     {
-        _inviteEmail = null;
-        _inviteRole = null;
-        _inviteError = null;
+        if (_policy is not null) return;
+        try { _policy = await Api.GetAsync<PasswordPolicyResponse>(Api.C("users/password-policy")); } catch (ApiException) { }
+    }
+
+    private async Task OpenAdd()
+    {
         _new = new NewUserModel();
+        _inv = new InviteModel();
+        _newCtx = new EditContext(_new);
+        _invCtx = new EditContext(_inv);
+        _newExtra = _invExtra = null;
         _inviting = true;
+        await LoadPolicy();
     }
 
     private Task SetAddMode(string mode)
     {
         _addMode = mode;
-        _inviteError = null;
+        _newExtra = _invExtra = null;
         return Task.CompletedTask;
+    }
+
+    /// <summary>Shows a client or server problem on the fields of a form; what has no field goes to the summary.</summary>
+    private static async Task<IReadOnlyList<string>?> ShowAsync(ApiProblem problem, ProblemValidator? problems, ErrorSummary? summary)
+    {
+        var other = problems?.Show(problem);
+        if (summary is not null) await summary.FocusAsync();
+        return other is null ? null : [other];
+    }
+
+    /// <summary>"… is required" on each empty field.</summary>
+    private List<ApiFieldError> Required(params (string Field, string? Value, string LabelKey)[] fields) =>
+        fields.Where(f => string.IsNullOrWhiteSpace(f.Value)).Select(f => new ApiFieldError(f.Field, "validation.required", L.F("ui.requiredField", L[f.LabelKey]))).ToList();
+
+    /// <summary>The password rules still missing, in the reader's language (null when the policy is met or not loaded).</summary>
+    private string? MissingRules(string? password)
+    {
+        if (_policy is null || string.IsNullOrEmpty(password)) return null;
+        var missing = PasswordRules.Missing(_policy, password).Select(r => r switch
+        {
+            PasswordRules.Rule.Length => L.F("usr.ruleLength", _policy.MinLength),
+            PasswordRules.Rule.Letter => L["usr.ruleLetter"],
+            _ => L["usr.ruleDigit"],
+        }).ToList();
+        return missing.Count == 0 ? null : L.F("usr.passwordNeeds", string.Join(L.Language == "ar" ? "، " : "; ", missing));
     }
 
     private async Task CreateUser()
     {
+        if (_busy) return;
+        // Client checks first (the same rules as the server), each on its field.
+        var errors = Required(("fullName", _new.FullName, "acct.fullName"), ("userName", _new.UserName, "usr.userName"),
+            ("password", _new.Password, "acct.password"), ("role", _new.Role, "usr.role"));
+        if (!string.IsNullOrWhiteSpace(_new.UserName) && !ValidUserName(_new.UserName.Trim()))
+            errors.Add(new ApiFieldError("userName", "user.userNameFormat", L["usr.userNameFormat"]));
+        if (!string.IsNullOrWhiteSpace(_new.Email) && !ValidEmail(_new.Email.Trim()))
+            errors.Add(new ApiFieldError("email", "validation.format", L["usr.emailFormat"]));
+        if (MissingRules(_new.Password) is { } needs) errors.Add(new ApiFieldError("password", "auth.passwordPolicy", needs));
+        if (errors.Count > 0)
+        {
+            _newExtra = await ShowAsync(new ApiProblem { Status = 400, Errors = errors }, _newProblems, _newSummary);
+            return;
+        }
         _busy = true;
-        _inviteError = null;
+        _newExtra = null;
         try
         {
             await Api.PostAsync<UserListItem>(Api.C("users"), new CreateUserRequest(_new.FullName!.Trim(), _new.UserName!.Trim(),
-                string.IsNullOrWhiteSpace(_new.Email) ? null : _new.Email.Trim(), _new.Password!, _inviteRole!, _new.MustChangePassword));
+                string.IsNullOrWhiteSpace(_new.Email) ? null : _new.Email.Trim(), _new.Password!, _new.Role!, _new.MustChangePassword));
             _inviting = false;
             Toasts.Success(L.F("usr.created", _new.UserName ?? ""));
             _tab = "users";
             await Load();
         }
-        catch (ApiException e) { _inviteError = e.Problem.Detail; }
+        catch (ApiException e) { _newExtra = await ShowAsync(e.Problem, _newProblems, _newSummary); }
         finally { _busy = false; }
     }
 
-    private void OpenSetPassword()
+    private async Task OpenSetPassword()
     {
-        _setPassword = null;
-        _setError = null;
-        _setMustChange = true;
+        _set = new SetPasswordModel();
+        _setCtx = new EditContext(_set);
+        _setExtra = null;
         _settingPassword = true;
+        await LoadPolicy();
     }
 
     private async Task SetPassword()
     {
-        if (_user is null) return;
+        if (_user is null || _busy) return;
+        var errors = Required(("password", _set.Password, "acct.newPassword"));
+        if (MissingRules(_set.Password) is { } needs) errors.Add(new ApiFieldError("password", "auth.passwordPolicy", needs));
+        if (errors.Count > 0)
+        {
+            _setExtra = await ShowAsync(new ApiProblem { Status = 400, Errors = errors }, _setProblems, _setSummary);
+            return;
+        }
         _busy = true;
-        _setError = null;
+        _setExtra = null;
         try
         {
-            await Api.PostAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/set-password"), new SetPasswordRequest(_setPassword!, _setMustChange));
+            await Api.PostAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/set-password"), new SetPasswordRequest(_set.Password!, _set.MustChangePassword));
             _settingPassword = false;
             Toasts.Success(L.F("usr.passwordSet", _user.FullName));
             await Refresh();
         }
-        catch (ApiException e) { _setError = e.Problem.Detail; }
+        catch (ApiException e) { _setExtra = await ShowAsync(e.Problem, _setProblems, _setSummary); }
         finally { _busy = false; }
+    }
+
+    /// <summary>The server's username rule (3–50 characters: English letters, digits, . _ -).</summary>
+    private static bool ValidUserName(string v) =>
+        v.Length is >= 3 and <= 50 && v.All(ch => ch is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '.' or '_' or '-');
+
+    /// <summary>A plain shape check (the server checks the address fully): no spaces, something@domain.tld.</summary>
+    private static bool ValidEmail(string v)
+    {
+        var at = v.IndexOf('@', StringComparison.Ordinal);
+        return !v.Contains(' ', StringComparison.Ordinal) && at > 0 && v.IndexOf('.', at) > at + 1 && !v.EndsWith('.');
     }
 
     private sealed class NewUserModel
@@ -460,22 +526,44 @@
         public string? UserName { get; set; }
         public string? Email { get; set; }
         public string? Password { get; set; }
+        public string? Role { get; set; }
+        public bool MustChangePassword { get; set; } = true;
+    }
+
+    private sealed class InviteModel
+    {
+        public string? Email { get; set; }
+        public string? Role { get; set; }
+    }
+
+    private sealed class SetPasswordModel
+    {
+        public string? Password { get; set; }
         public bool MustChangePassword { get; set; } = true;
     }
 
     private async Task Invite()
     {
+        if (_busy) return;
+        var errors = Required(("email", _inv.Email, "acct.email"), ("role", _inv.Role, "usr.role"));
+        if (!string.IsNullOrWhiteSpace(_inv.Email) && !ValidEmail(_inv.Email.Trim()))
+            errors.Add(new ApiFieldError("email", "validation.format", L["usr.emailFormat"]));
+        if (errors.Count > 0)
+        {
+            _invExtra = await ShowAsync(new ApiProblem { Status = 400, Errors = errors }, _invProblems, _invSummary);
+            return;
+        }
         _busy = true;
-        _inviteError = null;
+        _invExtra = null;
         try
         {
-            await Api.PostAsync<InvitationResponse>(Api.C("invitations"), new InviteRequest(_inviteEmail!.Trim(), _inviteRole!));
+            await Api.PostAsync<InvitationResponse>(Api.C("invitations"), new InviteRequest(_inv.Email!.Trim(), _inv.Role!));
             _inviting = false;
-            Toasts.Success(L.F("usr.invited", _inviteEmail));
+            Toasts.Success(L.F("usr.invited", _inv.Email));
             _tab = "invitations";
             await Load();
         }
-        catch (ApiException e) { _inviteError = e.Problem.Detail; }
+        catch (ApiException e) { _invExtra = await ShowAsync(e.Problem, _invProblems, _invSummary); }
         finally { _busy = false; }
     }
 

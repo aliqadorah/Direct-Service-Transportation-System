@@ -53,6 +53,9 @@ public sealed record UserListItem(
 /// </summary>
 public sealed record CreateUserRequest(string FullName, string UserName, string? Email, string Password, string Role, bool MustChangePassword = true);
 
+/// <summary>The tenant's password rules (FR-175), shown under password fields and checked while typing (owner feedback 18 Oct 2026, DT-208).</summary>
+public sealed record PasswordPolicyResponse(int MinLength, bool RequireLetter, bool RequireDigit);
+
 /// <summary>An administrator sets a new password for a user created with a username (the only reset for users without email).</summary>
 public sealed record SetPasswordRequest(string Password, bool MustChangePassword = true);
 

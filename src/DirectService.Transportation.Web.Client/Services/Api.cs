@@ -168,7 +168,7 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
             if (res.Content.Headers.ContentType?.MediaType is "application/problem+json" or "application/json")
             {
                 var p = await res.Content.ReadFromJsonAsync<ApiProblem>(Json, ct).ConfigureAwait(false);
-                if (p is not null) return p with { Status = p.Status == 0 ? (int)res.StatusCode : p.Status };
+                if (p is not null) return Specific(p with { Status = p.Status == 0 ? (int)res.StatusCode : p.Status });
             }
         }
         catch (JsonException) { }
@@ -183,3 +183,13 @@ public sealed class ApiException(ApiProblem problem) : Exception(problem?.Detail
 }
 
 public sealed record ApiFile(string Name, string ContentType, byte[] Bytes);
+
+    /// <summary>
+    /// A validation answer's own detail only says "correct the highlighted fields"; a screen that shows the detail in a banner or toast
+    /// (no field to highlight) must show the field messages themselves (owner feedback 18 Oct 2026, DT-208). Forms with a
+    /// ProblemValidator still place each message on its field from <see cref="ApiProblem.Errors"/>.
+    /// </summary>
+    internal static ApiProblem Specific(ApiProblem p) =>
+        p.Errors is { Count: > 0 } errors && errors.Select(e => e.Message).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct(StringComparer.Ordinal).ToList() is { Count: > 0 } messages
+            ? p with { Detail = string.Join(" ", messages) }
+            : p;

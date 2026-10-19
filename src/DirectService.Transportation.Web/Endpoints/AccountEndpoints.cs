@@ -105,6 +105,8 @@ internal static class AccountEndpoints
             TypedResults.Ok(await s.ListAsync(q.Search, q.ToPage(), ct).ConfigureAwait(false)));
         users.MapPost("/", async (CreateUserRequest r, UserAdminService s, CancellationToken ct) =>
             TypedResults.Ok(await s.CreateWithPasswordAsync(r, ct).ConfigureAwait(false)));
+        users.MapGet("/password-policy", async (UserAdminService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.PasswordPolicyAsync(ct).ConfigureAwait(false)));   // DT-208: rules shown under the password field
         users.MapPost("/{user}/set-password", async (string user, SetPasswordRequest r, UserAdminService s, CancellationToken ct) =>
         { await s.SetPasswordAsync(user, r, ct).ConfigureAwait(false); return TypedResults.NoContent(); });
         users.MapPut("/{user}/role", async (string user, AssignRoleRequest r, UserAdminService s, CancellationToken ct) =>

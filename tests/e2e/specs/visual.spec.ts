@@ -279,6 +279,18 @@ function companyPopups(ids: Record<string, string | null>, w: World, roleName: s
   return [
     { name: "users#add-invite", route: "settings/users", open: header("usr.addUser") },
     { name: "users#add-create", route: "settings/users", open: async (p, t) => { await header("usr.addUser")(p, t); await p.locator(".dialog").getByRole("tab", { name: t("usr.modeCreate") }).click(); } },
+    // Owner testing 18 Oct 2026 (DT-208): the owner's entries with a 7-character password, submitted — errors on their fields, rules shown.
+    { name: "users#add-create-errors", route: "settings/users", open: async (p, t) => {
+      await header("usr.addUser")(p, t);
+      const d = p.locator(".dialog");
+      await d.getByRole("tab", { name: t("usr.modeCreate") }).click();
+      await d.locator("#new-name").fill("Viewer - مطلع");
+      await d.locator("#new-username").fill("Viewer0");
+      await d.locator("#new-password").fill("Abcdef1");
+      await d.getByRole("combobox", { name: t("usr.role") }).selectOption({ index: 1 });
+      await button(p, t("usr.create")).click();
+      await expect(d.locator('[aria-invalid="true"]').first()).toBeVisible();
+    } },
     { name: "users#role-new", route: "settings/users", open: header("usr.newRole") },
     { name: "users#role-preset", route: "settings/users", open: async (p, t) => { await rolesTab(p, t); await firstRow(p); } },
     { name: "users#role-custom", route: "settings/users", open: customRole },

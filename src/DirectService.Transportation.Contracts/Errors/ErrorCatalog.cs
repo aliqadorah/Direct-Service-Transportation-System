@@ -32,7 +32,11 @@ public static class ErrorCatalog
         [ErrorCodes.EmailNotConfirmed] = ("يرجى تأكيد بريدك الإلكتروني أولاً.", "Please verify your email address first."),
         [ErrorCodes.TwoFactorInvalid] = ("رمز التحقق غير صحيح.", "The verification code is incorrect."),
         [ErrorCodes.TwoFactorRequired] = ("يلزم إكمال التحقق بخطوتين.", "Two-factor authentication must be completed."),
-        [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} أحرف على الأقل، مع الحروف والأرقام المطلوبة.", "The password does not meet your organisation's policy: at least {0} characters, with the required letters and digits."),
+        // DT-208: the message states the organisation's actual rules (one code per combination; {0} = minimum length).
+        [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل، منها حرف واحد ورقم واحد على الأقل.", "The password does not meet your organisation's policy: at least {0} characters, including at least one letter and one digit."),
+        [ErrorCodes.PasswordPolicyLetter] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل، منها حرف واحد على الأقل.", "The password does not meet your organisation's policy: at least {0} characters, including at least one letter."),
+        [ErrorCodes.PasswordPolicyDigit] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل، منها رقم واحد على الأقل.", "The password does not meet your organisation's policy: at least {0} characters, including at least one digit."),
+        [ErrorCodes.PasswordPolicyLength] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل.", "The password does not meet your organisation's policy: at least {0} characters."),
         [ErrorCodes.TokenInvalid] = ("الرابط غير صالح أو منتهي الصلاحية.", "The link is invalid or has expired."),
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
         [ErrorCodes.ApArDeductionNotAllowed] = ("الخصم متاح على أسطر فواتير الموردين فقط.", "A deduction is available on supplier-bill lines only."),
@@ -295,6 +299,9 @@ public static class ErrorCodes
     public const string TwoFactorInvalid = "auth.twoFactorInvalid";
     public const string TwoFactorRequired = "auth.twoFactorRequired";
     public const string PasswordPolicy = "auth.passwordPolicy";
+    public const string PasswordPolicyLetter = "auth.passwordPolicyLetter";
+    public const string PasswordPolicyDigit = "auth.passwordPolicyDigit";
+    public const string PasswordPolicyLength = "auth.passwordPolicyLength";
     public const string TokenInvalid = "auth.tokenInvalid";
     public const string EmailInUse = "user.emailInUse";
     public const string UserNameInUse = "user.userNameInUse";

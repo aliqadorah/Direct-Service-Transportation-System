@@ -21,6 +21,13 @@ public sealed class UserAdminService(
 {
     private static readonly string[] TenantFilter = ["Tenant"];
 
+    /// <summary>The tenant's password rules, for the "create user" and "set password" forms (DT-208).</summary>
+    public async Task<PasswordPolicyResponse> PasswordPolicyAsync(CancellationToken ct)
+    {
+        var p = await TenantPasswordValidator.GetPolicyAsync(db, ctx.TenantId ?? throw Fail.Forbidden(), ct).ConfigureAwait(false);
+        return new PasswordPolicyResponse(p.MinLength, p.RequireLetter, p.RequireDigit);
+    }
+
     public async Task<PagedResult<UserListItem>> ListAsync(string? search, PageRequest page, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(page);

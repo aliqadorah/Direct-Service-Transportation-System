@@ -47,6 +47,7 @@ internal static class ApiSummaries
         // Users, roles, invitations (core.users.manage)
         ["GET /api/v1/companies/{company}/users/"] = "List the company's users with their role",
         ["POST /api/v1/companies/{company}/users/"] = "Create a user with a username and password, without 2FA (revision 6)",
+        ["GET /api/v1/companies/{company}/users/password-policy"] = "The organisation's password rules (minimum length, letter, digit) for the user forms",
         ["POST /api/v1/companies/{company}/users/{user}/set-password"] = "Set a new password for a user created with a username (audited)",
         ["PUT /api/v1/companies/{company}/users/{user}/role"] = "Assign the user's role in this company",
         ["POST /api/v1/companies/{company}/users/{user}/remove"] = "Remove the user's access to this company",

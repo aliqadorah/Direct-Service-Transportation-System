@@ -58,6 +58,45 @@ public sealed class ReleaseRegressionTests(ApiFactory f)
         Assert.Contains(PermissionKeys.AcctPostEntry, roles.Single(r => r.Name == PresetRoles.Accountant).Permissions);
     }
 
+    /// <summary>
+    /// Owner testing 18 Oct 2026 (DT-208): "Add user" with a 7-character password showed no field. The organisation's rules are served to
+    /// the form, and the server's refusal names the password field with a message built from the policy (one per rule combination).
+    /// </summary>
+    [Fact]
+    public async Task Create_user_password_errors_name_the_field_and_the_organisation_rules()
+    {
+        var owner = await f.SignUpOwnerAsync();
+        var u = $"/api/v1/companies/{owner.CompanyId}/users";
+        Assert.Equal(new PasswordPolicyResponse(8, true, true), await owner.Client.GetFromJsonAsync<PasswordPolicyResponse>($"{u}/password-policy"));
+        var roles = (await owner.Client.GetFromJsonAsync<List<RoleResponse>>($"/api/v1/companies/{owner.CompanyId}/roles"))!;
+        var viewer = roles.Single(r => r.Name == PresetRoles.Viewer).Id;
+
+        async Task<(string? Code, string Body)> CreateAsync(string password)
+        {
+            var r = await owner.Client.PostAsJsonAsync(u, new CreateUserRequest("Viewer - مطلع", "v" + Guid.NewGuid().ToString("N")[..8], null, password, viewer, true));
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+            var body = await r.Content.ReadAsStringAsync();
+            Assert.Contains("\"field\":\"password\"", body, StringComparison.Ordinal);   // on the password field, not a page-level message
+            return (await r.ErrorCodeAsync(), body);
+        }
+
+        var (code, body) = await CreateAsync("Abcdef1");   // the owner's 7 characters
+        Assert.Equal("auth.passwordPolicy", code);
+        Assert.Contains("at least 8 characters, including at least one letter and one digit", body, StringComparison.Ordinal);
+
+        // A tenant policy without the letter rule: the message says exactly what applies.
+        var tenant = (await owner.Client.GetFromJsonAsync<TenantResponse>("/api/v1/tenant"))!;
+        await (await owner.Client.PutAsJsonAsync("/api/v1/tenant/security", new TenantSecurityRequest(10, false, true, 30, tenant.RowVersion))).EnsureOkAsync();
+        Assert.Equal(new PasswordPolicyResponse(10, false, true), await owner.Client.GetFromJsonAsync<PasswordPolicyResponse>($"{u}/password-policy"));
+        (code, body) = await CreateAsync("123456789");
+        Assert.Equal("auth.passwordPolicyDigit", code);
+        Assert.Contains("at least 10 characters, including at least one digit.", body, StringComparison.Ordinal);
+
+        // Users without users.manage cannot read the rules through this route.
+        var viewerClient = await MemberAsync(f, owner, PermissionKeys.TripsView);
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewerClient.GetAsync($"{u}/password-policy")).StatusCode);
+    }
+
     [Fact]
     public async Task Administrator_of_one_company_cannot_reset_a_user_who_has_a_role_in_another_company()
     {
