@@ -1,16 +1,49 @@
-@* Load failure with retry and the reference number to quote to support (the problem's trace id). *@
+@*
+  Load failure with retry and the reference number to quote to support (the problem's trace id). Owner feedback 18 Oct 2026 (DT-209): the
+  text says what happened — "connection lost" only when the server gave no answer, "you don't have permission" for 403, "something went
+  wrong on the server" (with the reference) for any other answer.
+*@
 @inject Loc L
+@inject IServiceProvider Services
 <div class="empty errstate" role="alert">
-    <div class="ei"><Icon Name="alert" /></div>
-    <h2><Tx Value="@(Title ?? L["ui.loadFailed"])" /></h2>
-    <p><Tx Value="@(Text ?? L["ui.loadFailedText"])" /></p>
-    @if (OnRetry.HasDelegate) {<div class="acts"><Btn Primary="true" Icon="refresh" Text="@L["ui.retry"]" OnClick="OnRetry" /></div>}
+    <div class="ei"><Icon Name="@(Kind == FailureKind.Forbidden ? "lock" : "alert")" /></div>
+    <h2><Tx Value="@(Title ?? DefaultTitle)" /></h2>
+    <p><Tx Value="@(Text ?? DefaultText)" /></p>
+    @if (OnRetry.HasDelegate && Kind != FailureKind.Forbidden) {<div class="acts"><Btn Primary="true" Icon="refresh" Text="@L["ui.retry"]" OnClick="OnRetry" /></div>}
     @if (Reference is not null) {<div class="help">@L["ui.trackingRef"] <bdi class="num">@Reference</bdi></div>}
 </div>
 
 @code {
+    public enum FailureKind { Unknown, Network, Forbidden, Server }
+
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Text { get; set; }
     [Parameter] public string? Reference { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
+
+    /// <summary>What the failed call says about itself (by its reference; see <see cref="Services.Api.FailureStatus"/>).</summary>
+    private FailureKind Kind => Classify((Services.GetService(typeof(Api)) as Api)?.FailureStatus(Reference));
+
+    public static FailureKind Classify(int? status) => status switch
+    {
+        null => FailureKind.Unknown,
+        0 => FailureKind.Network,
+        403 => FailureKind.Forbidden,
+        _ => FailureKind.Server,
+    };
+
+    private string DefaultTitle => Kind switch
+    {
+        FailureKind.Forbidden => L["ui.forbiddenTitle"],
+        FailureKind.Server => L["ui.serverErrorTitle"],
+        _ => L["ui.loadFailed"],
+    };
+
+    private string DefaultText => Kind switch
+    {
+        FailureKind.Network => L["ui.loadFailedText"],
+        FailureKind.Forbidden => L["ui.forbiddenText"],
+        FailureKind.Server => L["ui.serverErrorText"],
+        _ => L["ui.loadFailedRetry"],
+    };
 }

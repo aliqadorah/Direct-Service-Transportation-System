@@ -36,7 +36,8 @@ _Step 9, 11 Oct 2026. For developers and the people who will host the system. Ev
    `sqlcmd -S <server> -E -I -d DirectServiceMaster -i database/MasterDatabase_Idempotent.sql`
    (or, for development: `dotnet ef database update --project src/DirectService.Transportation.Infrastructure --startup-project src/DirectService.Transportation.Infrastructure`).
 3. Production: create the application login and run `database/90_ApplicationUser.sql` (read/write, `DENY DELETE` on business schemas, `DENY UPDATE` on the audit, maintenance and rate-history logs, no DDL). The host connects as that user, never as an administrator.
-4. Regenerate the script after a model change: `dotnet ef migrations script --idempotent --project src/DirectService.Transportation.Infrastructure --startup-project src/DirectService.Transportation.Infrastructure --output database/MasterDatabase_Idempotent.sql`. Do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities).
+4. **Version check at start-up (DT-209):** the host compares the database with the migrations of its version. In Development it applies any missing migration itself and logs which ones; in every other environment it refuses to start and names the missing migrations — apply step 2's script after every update, then start the application.
+5. Regenerate the script after a model change: `dotnet ef migrations script --idempotent --project src/DirectService.Transportation.Infrastructure --startup-project src/DirectService.Transportation.Infrastructure --output database/MasterDatabase_Idempotent.sql`. Do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities).
 
 ## 4. Configuration
 

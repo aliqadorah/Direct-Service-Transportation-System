@@ -138,7 +138,16 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
         // A retry after an antiforgery refresh rebuilds JSON bodies; uploads are buffered so they can be sent again.
         if (body is HttpContent content) req.Content = content is MultipartFormDataContent m ? await Clone(m).ConfigureAwait(false) : content;
         else if (body is not null) req.Content = JsonContent.Create(body, body.GetType(), options: Json);
-        var res = await http.SendAsync(req, ct).ConfigureAwait(false);
+        HttpResponseMessage res;
+        try
+        {
+            res = await http.SendAsync(req, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            // No answer at all (network down, server stopped): the only case that is a lost connection (DT-209).
+            throw Failed(new ApiProblem { Status = 0, Code = NetworkCode });
+        }
         if (res.IsSuccessStatusCode) return res;
 
         var problem = await ReadProblemAsync(res, ct).ConfigureAwait(false);
@@ -152,8 +161,33 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
         {
             nav.NavigateTo("sign-in?returnUrl=" + Uri.EscapeDataString("/" + nav.ToBaseRelativePath(nav.Uri)), forceLoad: true);
         }
-        throw new ApiException(problem);
+        throw Failed(problem);
     }
+
+    /// <summary>The code of a call that got no answer (status 0).</summary>
+    public const string NetworkCode = "network";
+
+    private readonly Dictionary<string, int> _failures = new(StringComparer.Ordinal);
+    private ApiProblem? _lastFailure;
+
+    /// <summary>Remembers the status of a failed call by its reference, so an error screen can tell what happened (DT-209).</summary>
+    private ApiException Failed(ApiProblem problem)
+    {
+        _lastFailure = problem;
+        if (problem.Reference is { } r)
+        {
+            if (_failures.Count > 100) _failures.Clear();
+            _failures[r] = problem.Status;
+        }
+        return new ApiException(problem);
+    }
+
+    /// <summary>
+    /// The HTTP status of the failed call with this reference (0 = no answer); without a reference, the last failure's status; null when
+    /// nothing failed.
+    /// </summary>
+    public int? FailureStatus(string? reference) =>
+        reference is not null && _failures.TryGetValue(reference, out var status) ? status : _lastFailure?.Status;
 
     private async Task LoadAntiforgeryAsync(CancellationToken ct)
     {
@@ -174,15 +208,6 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
         catch (JsonException) { }
         return new ApiProblem { Status = (int)res.StatusCode, Code = "http." + (int)res.StatusCode };
     }
-}
-
-/// <summary>A refused or failed API call; <see cref="Problem"/> carries the message in the user's language.</summary>
-public sealed class ApiException(ApiProblem problem) : Exception(problem?.Detail ?? problem?.Code)
-{
-    public ApiProblem Problem { get; } = problem ?? new ApiProblem();
-}
-
-public sealed record ApiFile(string Name, string ContentType, byte[] Bytes);
 
     /// <summary>
     /// A validation answer's own detail only says "correct the highlighted fields"; a screen that shows the detail in a banner or toast
@@ -193,3 +218,12 @@ public sealed record ApiFile(string Name, string ContentType, byte[] Bytes);
         p.Errors is { Count: > 0 } errors && errors.Select(e => e.Message).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct(StringComparer.Ordinal).ToList() is { Count: > 0 } messages
             ? p with { Detail = string.Join(" ", messages) }
             : p;
+}
+
+/// <summary>A refused or failed API call; <see cref="Problem"/> carries the message in the user's language.</summary>
+public sealed class ApiException(ApiProblem problem) : Exception(problem?.Detail ?? problem?.Code)
+{
+    public ApiProblem Problem { get; } = problem ?? new ApiProblem();
+}
+
+public sealed record ApiFile(string Name, string ContentType, byte[] Bytes);

@@ -28,6 +28,12 @@ public static partial class UiText
         ["ui.retry"] = ("إعادة المحاولة", "Try again"),
         ["ui.loadFailed"] = ("تعذّر تحميل البيانات", "The data could not be loaded"),
         ["ui.loadFailedText"] = ("انقطع الاتصال بالخادم أثناء التحميل. بياناتك محفوظة؛ أعد المحاولة.", "The connection to the server was lost while loading. Your data is safe; try again."),
+        // DT-209: the error screen says what happened.
+        ["ui.loadFailedRetry"] = ("أعد المحاولة. إن تكرر ذلك فأرسل الرقم المرجعي أدناه إلى الدعم.", "Try again. If it happens again, send the reference below to support."),
+        ["ui.serverErrorTitle"] = ("حدث خطأ في الخادم", "Something went wrong on the server"),
+        ["ui.serverErrorText"] = ("سُجّل الخطأ ولم يتغير شيء في بياناتك. أعد المحاولة؛ إن تكرر فأرسل الرقم المرجعي أدناه إلى الدعم.", "The error was recorded and none of your data changed. Try again; if it happens again, send the reference below to support."),
+        ["ui.forbiddenTitle"] = ("ليست لديك صلاحية", "You don't have permission"),
+        ["ui.forbiddenText"] = ("دورك لا يسمح بعرض هذه الصفحة. اطلب الصلاحية من مسؤول المستخدمين في شركتك.", "Your role does not allow you to see this page. Ask your company's user administrator for access."),
         ["ui.trackingRef"] = ("رقم المتابعة:", "Reference:"),
         ["ui.noData"] = ("لا توجد بيانات بعد", "No data yet"),
         ["ui.firstVisit"] = ("أول زيارة: القيم الافتراضية معروضة ولم يُعدّل شيء بعد.", "First visit: the default values are shown and nothing has been changed yet."),

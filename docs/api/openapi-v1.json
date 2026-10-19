@@ -2616,6 +2616,113 @@
         ]
       }
     },
+    "/api/v1/companies/{company}/users/password-policy": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "The organisation's password rules (minimum length, letter, digit) for the user forms",
+        "operationId": "getCompaniesUsersPasswordPolicy",
+        "parameters": [
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordPolicyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{company}/users/{user}/set-password": {
       "post": {
         "tags": [
@@ -72566,6 +72673,30 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PasswordPolicyResponse": {
+        "required": [
+          "minLength",
+          "requireLetter",
+          "requireDigit"
+        ],
+        "type": "object",
+        "properties": {
+          "minLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "requireLetter": {
+            "type": "boolean"
+          },
+          "requireDigit": {
+            "type": "boolean"
           }
         }
       },

@@ -174,6 +174,9 @@ app.MapRazorComponents<DirectService.Transportation.Web.Components.App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(DirectService.Transportation.Web.Client.Routes).Assembly);
 
+// DT-209: never serve with a database that lacks this version's migrations (Development applies them; elsewhere the host refuses).
+await DirectService.Transportation.Web.Pipeline.DatabaseVersion.EnsureCurrentAsync(app).ConfigureAwait(false);
+
 // Operations command (DT-131): `create-staff <email> <full name>` creates a platform staff account and e-mails a set-password link, then exits.
 if (args is ["create-staff", var staffEmail, .. var staffName])
 {
