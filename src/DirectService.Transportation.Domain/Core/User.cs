@@ -45,6 +45,11 @@ public class User : AuditableEntity, INullableTenantScoped
     public int FailedSignInCount { get; set; }
     /// <summary>Sign-in blocked until this UTC time.</summary>
     public DateTime? LockedUntil { get; set; }
+    /// <summary>
+    /// The 30-second time step of the last authenticator code accepted (Unix seconds / 30). A code is accepted only for a later step, so
+    /// one code can never be used twice (owner decision 19 Oct 2026, DT-212). Claimed by one conditional update in the token provider.
+    /// </summary>
+    public long? TwoFactorLastStep { get; set; }
     /// <summary>Last successful sign-in.</summary>
     public DateTime? LastSignInAt { get; set; }
     public Company? DefaultCompany { get; set; }

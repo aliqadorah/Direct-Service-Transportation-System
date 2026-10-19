@@ -92,7 +92,8 @@ public sealed partial class TwoFactorSettingsService(
         if (!cache.TryGetValue<PendingChange>(PendingKey(user.Id), out var pending) || pending is null
             || !string.Equals(pending.Stamp, user.SecurityStamp, StringComparison.Ordinal) || pending.SessionId != ctx.SessionId)
             throw Fail.Rule(ErrorCodes.TwoFactorChangeExpired);
-        if (!TotpCode.Verify(pending.Key, Common.TextNormalizer.DigitsOnly(code), clock.GetUtcNow()))
+        var step = TotpCode.MatchStep(pending.Key, Common.TextNormalizer.DigitsOnly(code), clock.GetUtcNow());
+        if (step is null)
         {
             if (Interlocked.Increment(ref pending.WrongCodes) >= MaxWrongCodes) cache.Remove(PendingKey(user.Id));
             await auth.RecordStepUpFailureAsync(user, ct).ConfigureAwait(false);   // counts towards the lockout like any wrong code
@@ -102,6 +103,7 @@ public sealed partial class TwoFactorSettingsService(
         {
             changes.SetAction(user, "TwoFactorAppChanged");
             await ((IUserAuthenticatorKeyStore<User>)store).SetAuthenticatorKeyAsync(user, pending.Key, ct).ConfigureAwait(false);
+            user.TwoFactorLastStep = step;   // DT-212: after the new key (which starts fresh): the confirming code cannot be used again
             await users.UpdateSecurityStampAsync(user).ConfigureAwait(false);   // saves; other sessions end
         }
         await sessions.RevokeAllAsync(user.Id, "Authenticator app changed", ctx.SessionId, ct).ConfigureAwait(false);   // at once, not after the 30-s cache

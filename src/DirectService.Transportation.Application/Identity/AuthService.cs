@@ -38,7 +38,7 @@ public sealed record AuthenticatorSetup(string SharedKey, string AuthenticatorUr
 /// "Require 2FA for all users"; others are offered the set-up at their first sign-in ("Skip for now") and may turn it on later. A user
 /// created by an administrator may have to choose a new password first. The API layer turns the results into cookies.
 /// </summary>
-public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChangeContext changes, IDataScope scope, TimeProvider clock,
+public sealed class AuthService(UserManager<User> users, IUserStore<User> store, IAppDbContext db, IChangeContext changes, IDataScope scope, TimeProvider clock,
     SignInThrottle throttle, IRequestContext ctx)
 {
     public const string Issuer = "Direct Service Transportation";
@@ -195,8 +195,7 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         // The code is checked only after the right password, so a wrong password never uses up a recovery code; the answer is the same.
         if (ok && !string.IsNullOrWhiteSpace(recoveryCode))
         {
-            ok = (await users.RedeemTwoFactorRecoveryCodeAsync(user, Common.TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim())
-                .ConfigureAwait(false)).Succeeded;
+            ok = await RedeemRecoveryCodeAsync(user, recoveryCode, ct).ConfigureAwait(false);
         }
         else if (ok)
         {
@@ -209,6 +208,15 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         }
         throttle.Reset(user.Id, ctx.IpAddress);
     }
+
+    /// <summary>
+    /// Spends one recovery code (DT-212): the store marks it used with one conditional update, so of simultaneous requests with the same code
+    /// exactly one succeeds. Identity's own redeem also saves the user row afterwards, which made the one success fail when parallel
+    /// failed attempts had changed that row; nothing on the user changes when a code is spent, so the store is called directly.
+    /// </summary>
+    private Task<bool> RedeemRecoveryCodeAsync(User user, string recoveryCode, CancellationToken ct) =>
+        ((IUserTwoFactorRecoveryCodeStore<User>)store).RedeemCodeAsync(user,
+            Common.TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim(), ct);
 
     /// <summary>A wrong code in a 2FA management step (e.g. confirming a new authenticator app) counts like any failed attempt (DT-204).</summary>
     public Task RecordStepUpFailureAsync(User user, CancellationToken ct)
@@ -226,8 +234,7 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         bool ok;
         if (!string.IsNullOrWhiteSpace(recoveryCode))
         {
-            ok = (await users.RedeemTwoFactorRecoveryCodeAsync(user, Common.TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim())
-                .ConfigureAwait(false)).Succeeded;
+            ok = await RedeemRecoveryCodeAsync(user, recoveryCode, ct).ConfigureAwait(false);
         }
         else
         {

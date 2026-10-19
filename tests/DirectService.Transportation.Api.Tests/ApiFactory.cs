@@ -150,10 +150,40 @@ public sealed partial class CapturingEmailSender : IEmailSender
 /// <summary>RFC 6238 TOTP (SHA-1, 30 s, 6 digits) as used by authenticator apps, for driving the real 2FA flow.</summary>
 public static class Totp
 {
+    private static readonly Dictionary<string, long> LastStep = new(StringComparer.Ordinal);
+    private static readonly Lock Gate = new();
+
+    /// <summary>
+    /// A fresh code, as the app shows it. The server accepts a code once only (DT-212) and the current step ±1, so each call uses a later
+    /// step than the previous call for the same key — the previous, current or next one; when all are used it waits for the next 30-second
+    /// step, like a person waiting for the app's next code. With <paramref name="at"/>: the code of that moment (no bookkeeping).
+    /// </summary>
     public static string Code(string base32Key, DateTimeOffset? at = null)
     {
+        if (at is { } moment) return CodeAt(base32Key, moment.ToUnixTimeSeconds() / 30);
+        while (true)
+        {
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+            lock (Gate)
+            {
+                // The server accepts now ± 1; the previous step only while it cannot expire on the way (more than 3 s left in this step).
+                var earliest = 30 - DateTimeOffset.UtcNow.ToUnixTimeSeconds() % 30 > 3 ? now - 1 : now;
+                var step = Math.Max(earliest, (LastStep.TryGetValue(base32Key, out var last) ? last : long.MinValue + 1) + 1);
+                if (step <= now + 1)
+                {
+                    LastStep[base32Key] = step;
+                    return CodeAt(base32Key, step);
+                }
+            }
+            Thread.Sleep(TimeSpan.FromSeconds((now + 1) * 30 - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0) + TimeSpan.FromMilliseconds(250));
+        }
+    }
+
+    /// <summary>The code of one time step (Unix seconds / 30).</summary>
+    public static string CodeAt(string base32Key, long step)
+    {
         var key = Base32Decode(base32Key);
-        var counter = (long)((at ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds() / 30);
+        var counter = step;
         var msg = BitConverter.GetBytes(counter);
         if (BitConverter.IsLittleEndian) Array.Reverse(msg);
 #pragma warning disable CA5350 // RFC 6238 authenticator codes are defined over HMAC-SHA1 (what authenticator apps use).

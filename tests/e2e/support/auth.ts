@@ -44,7 +44,7 @@ export async function firstSignIn(page: Page, account: Account, lang: Lang): Pro
   await passwordStep(page, account, lang);
   await expect(page).toHaveURL(/two-factor\/setup/);
   const key = ((await page.locator('form .num[dir="ltr"]').first().textContent()) ?? "").replace(/\s/g, "");
-  await page.locator('[name="Input.Code"]').fill(totp(key));
+  await page.locator('[name="Input.Code"]').fill(await totp(key));
   await submitForm(page, "two-factor-setup");
   await expect(page.locator('ul.num[dir="ltr"] li')).toHaveCount(10);   // ten recovery codes, shown once
   await page.locator("a.btn.pri.w100").click();
@@ -70,7 +70,7 @@ export async function useLanguage(page: Page, lang: Lang): Promise<void> {
 export async function signIn(page: Page, account: Account, lang: Lang): Promise<void> {
   await passwordStep(page, account, lang);
   await expect(page).toHaveURL(/two-factor/);
-  await page.locator('[name="Input.Code"]').fill(totp(account.key));
+  await page.locator('[name="Input.Code"]').fill(await totp(account.key));
   await submitForm(page, "two-factor");
   await waitForApp(page);
   await useLanguage(page, lang);

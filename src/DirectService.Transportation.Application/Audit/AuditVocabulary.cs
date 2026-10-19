@@ -248,7 +248,7 @@ public static class AuditVocabulary
     public static readonly IReadOnlySet<string> Hidden = new HashSet<string>(StringComparer.Ordinal)
     {
         "Id", "TenantId", "CompanyId", "PublicId", "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "RowVersion", "IsDeleted", "DeletedAt",
-        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "ReceiptNoSearch", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
+        "DeletedBy", "DeleteReason", "LineNo", "SortOrder", "ReceiptNoKey", "ReceiptNoSearch", "TwoFactorLastStep", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "SecurityStamp", "TokenHash", "CodeHash",
         "VoidedBy", "VoidedAt", "ApprovedAt", "ClosedBy", "ClosedAt", "ExportedBy", "ExportedAt", "ImportedBy", "ImportedAt", "ImportBatchId",
         "ExportBatchId", "JournalEntryId", "PeriodMonth", "SourceModule", "SourceType", "SourceId", "IsManual", "IcvCounter", "Icv", "UniqueId",
         "DocumentVersion", "Attempts", "LastAttemptAt", "LastSignInAt", "LastSeenAt", "LastActivityAt", "FailedSignInCount", "RequestPayload",

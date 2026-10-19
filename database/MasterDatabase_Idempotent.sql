@@ -6153,7 +6153,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261008105537_InitialMasterDatabase', N'10.0.12');
+    VALUES (N'20261008105537_InitialMasterDatabase', N'10.0.13');
 END;
 
 COMMIT;
@@ -6266,7 +6266,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017111652_Rev6_UserNameSignIn', N'10.0.12');
+    VALUES (N'20261017111652_Rev6_UserNameSignIn', N'10.0.13');
 END;
 
 COMMIT;
@@ -6287,7 +6287,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017113752_Rev6_RequireTwoFactor', N'10.0.12');
+    VALUES (N'20261017113752_Rev6_RequireTwoFactor', N'10.0.13');
 END;
 
 COMMIT;
@@ -6360,7 +6360,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017121155_Rev6_JournalReferenceAndDrafts', N'10.0.12');
+    VALUES (N'20261017121155_Rev6_JournalReferenceAndDrafts', N'10.0.13');
 END;
 
 COMMIT;
@@ -6443,7 +6443,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017122900_Rev6_ReceiptAllocations', N'10.0.12');
+    VALUES (N'20261017122900_Rev6_ReceiptAllocations', N'10.0.13');
 END;
 
 COMMIT;
@@ -6488,7 +6488,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017131559_Rev6_SupplierBillDeductions', N'10.0.12');
+    VALUES (N'20261017131559_Rev6_SupplierBillDeductions', N'10.0.13');
 END;
 
 COMMIT;
@@ -6517,7 +6517,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017141251_Rev6_ReturnDeductions', N'10.0.12');
+    VALUES (N'20261017141251_Rev6_ReturnDeductions', N'10.0.13');
 END;
 
 COMMIT;
@@ -6688,7 +6688,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017145631_Rev6_Budgets', N'10.0.12');
+    VALUES (N'20261017145631_Rev6_Budgets', N'10.0.13');
 END;
 
 COMMIT;
@@ -6751,7 +6751,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261017151850_Rev6_JournalTemplates', N'10.0.12');
+    VALUES (N'20261017151850_Rev6_JournalTemplates', N'10.0.13');
 END;
 
 COMMIT;
@@ -6799,7 +6799,7 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261018070410_Rev6_PostJournalEntries', N'10.0.12');
+    VALUES (N'20261018070410_Rev6_PostJournalEntries', N'10.0.13');
 END;
 
 COMMIT;
@@ -6828,7 +6828,28 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261018092900_Rev6_ReceiptNoSearch', N'10.0.12');
+    VALUES (N'20261018092900_Rev6_ReceiptNoSearch', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261019094417_Rev6_TwoFactorLastStep'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [TwoFactorLastStep] bigint NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261019094417_Rev6_TwoFactorLastStep'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261019094417_Rev6_TwoFactorLastStep', N'10.0.13');
 END;
 
 COMMIT;

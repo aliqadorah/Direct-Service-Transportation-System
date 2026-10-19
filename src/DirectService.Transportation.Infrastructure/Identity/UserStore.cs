@@ -186,6 +186,7 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
     public Task SetAuthenticatorKeyAsync(User user, string key, CancellationToken cancellationToken)
     {
         user.TwoFactorSecret = _secretProtector.Protect(System.Text.Encoding.UTF8.GetBytes(key));
+        user.TwoFactorLastStep = null;   // DT-212: "used once" is per key; a new key starts fresh
         return Task.CompletedTask;
     }
 
@@ -223,9 +224,13 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
         foreach (var c in codes)
         {
             if (hasher.VerifyHashedPassword(user, c.CodeHash, code) == PasswordVerificationResult.Failed) continue;
-            c.UsedAt = clock.GetUtcNow().UtcDateTime;
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return true;
+            // DT-212: spent with one conditional update — of two simultaneous requests with the same code only one changes the row.
+            var now = clock.GetUtcNow().UtcDateTime;
+            var spent = await db.Set<UserRecoveryCode>().IgnoreQueryFilters(TenantFilter)
+                .Where(x => x.Id == c.Id && x.UsedAt == null)
+                .ExecuteUpdateAsync(u => u.SetProperty(x => x.UsedAt, now), cancellationToken).ConfigureAwait(false);
+            db.Entry(c).State = EntityState.Detached;   // the tracked copy is stale now; never written back
+            return spent == 1;
         }
         return false;
     }

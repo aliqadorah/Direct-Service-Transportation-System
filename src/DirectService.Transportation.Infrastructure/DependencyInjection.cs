@@ -54,11 +54,14 @@ public static class DependencyInjection
                 o.Lockout.MaxFailedAccessAttempts = SignInThrottle.PerAccountLimit;
                 o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                 o.Lockout.AllowedForNewUsers = true;
+                // DT-212: authenticator codes work once (ReplaySafeAuthenticatorTokenProvider), for sign-in, set-up and the profile alike.
+                o.Tokens.AuthenticatorTokenProvider = ReplaySafeAuthenticatorTokenProvider.Name;
             })
             .AddUserStore<UserStore>()
             .AddPasswordValidator<TenantPasswordValidator>()
             .AddDefaultTokenProviders()
-            .AddTokenProvider<StaffInvitationTokenProvider>(Application.Platform.StaffService.InvitationTokenProvider);
+            .AddTokenProvider<StaffInvitationTokenProvider>(Application.Platform.StaffService.InvitationTokenProvider)
+            .AddTokenProvider<ReplaySafeAuthenticatorTokenProvider>(ReplaySafeAuthenticatorTokenProvider.Name);
         services.AddOptions<StaffInvitationTokenProviderOptions>();   // 48-hour staff invitation links (owner feedback 13 Oct 2026)
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(24)); // SEC-04
 

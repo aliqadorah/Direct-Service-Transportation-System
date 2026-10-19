@@ -143,6 +143,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnType("datetime2")
             .HasColumnOrder(17)
             .IsRequired(false);
+        builder.Property(e => e.TwoFactorLastStep)   // DT-212
+            .HasColumnName("TwoFactorLastStep")
+            .HasColumnType("bigint")
+            .HasColumnOrder(31)
+            .IsRequired(false);
         builder.Property(e => e.LastSignInAt)
             .HasColumnName("LastSignInAt")
             .HasColumnType("datetime2")

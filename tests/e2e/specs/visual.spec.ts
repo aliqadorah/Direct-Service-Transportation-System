@@ -36,7 +36,7 @@ async function enrol(page: Page, lang: Lang, run: VisualRun): Promise<Account> {
   await expect(page).toHaveURL(/two-factor\/setup/);
   await run.check(page, "two-factor-setup");
   const key = ((await page.locator('form .num[dir="ltr"]').first().textContent()) ?? "").replace(/\s/g, "");
-  await page.locator('[name="Input.Code"]').fill(totp(key));
+  await page.locator('[name="Input.Code"]').fill(await totp(key));
   await submitForm(page, "two-factor-setup");
   await expect(page.locator('ul.num[dir="ltr"] li')).toHaveCount(10);
   await run.check(page, "two-factor-recovery-codes");
@@ -150,7 +150,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await expect(page).toHaveURL(/two-factor/);
     await run.check(page, "two-factor");
     // Revision 6: a user created with a username and "must change password" → the forced password change page.
-    await page.locator('[name="Input.Code"]').fill(totp(account.key!));
+    await page.locator('[name="Input.Code"]').fill(await totp(account.key!));
     await submitForm(page, "two-factor");
     await waitForApp(page);
     const company = companyOf(page);
@@ -178,7 +178,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await page.locator('[name="Input.Email"]').fill(account.email);
     await page.locator('[name="Input.Password"]').fill(account.password);
     await submitForm(page, "sign-in");
-    await page.locator('[name="Input.Code"]').fill(totp(account.key!));
+    await page.locator('[name="Input.Code"]').fill(await totp(account.key!));
     await submitForm(page, "two-factor");
     await waitForApp(page);
     const mailUser = `vis.m${Date.now().toString(36)}`, mail = `${mailUser}@e2e.test`;

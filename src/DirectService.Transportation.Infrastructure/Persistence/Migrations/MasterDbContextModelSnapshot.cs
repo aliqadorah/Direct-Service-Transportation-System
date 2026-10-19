@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .UseCollation("Arabic_100_CI_AI_SC_UTF8")
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -6941,6 +6941,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("TwoFactorEnabledAt")
                         .HasColumnOrder(11);
+
+                    b.Property<long?>("TwoFactorLastStep")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TwoFactorLastStep")
+                        .HasColumnOrder(31);
 
                     b.Property<byte[]>("TwoFactorSecret")
                         .HasMaxLength(256)

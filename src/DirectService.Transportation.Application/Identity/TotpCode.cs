@@ -6,22 +6,32 @@ namespace DirectService.Transportation.Application.Identity;
 /// <summary>
 /// RFC 6238 time-based codes (6 digits, 30-second steps, HMAC-SHA1 — what authenticator apps and ASP.NET Core Identity use) for a key that
 /// is not stored yet: the new key of "Change authenticator app" is confirmed with a code from the new app before it replaces the old one
-/// (DT-210). The current step and one step either side are accepted (clock drift).
+/// (DT-210), and every stored authenticator code, through the replay-safe token provider (DT-212), which also needs the matched step.
+/// The current step and one step either side are accepted (clock drift).
 /// </summary>
-internal static class TotpCode
+public static class TotpCode
 {
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-    public static bool Verify(string base32Key, string? code, DateTimeOffset now)
+    public static bool Verify(string base32Key, string? code, DateTimeOffset now) => MatchStep(base32Key, code, now) is not null;
+
+    /// <summary>The time step (Unix seconds / 30) whose code this is — current, previous or next — or null. Every step is compared (no early exit).</summary>
+    public static long? MatchStep(string base32Key, string? code, DateTimeOffset now)
     {
-        if (string.IsNullOrEmpty(code) || code.Length != 6 || !code.All(char.IsAsciiDigit)) return false;
+        if (string.IsNullOrEmpty(code) || code.Length != 6 || !code.All(char.IsAsciiDigit)) return null;
         var key = FromBase32(base32Key);
         var step = now.ToUnixTimeSeconds() / 30;
-        var match = false;
+        long? matched = null;
         for (var i = -1; i <= 1; i++)
-            match |= CryptographicOperations.FixedTimeEquals(System.Text.Encoding.ASCII.GetBytes(Compute(key, step + i)), System.Text.Encoding.ASCII.GetBytes(code));
-        return match;
+        {
+            if (CryptographicOperations.FixedTimeEquals(System.Text.Encoding.ASCII.GetBytes(Compute(key, step + i)), System.Text.Encoding.ASCII.GetBytes(code)))
+                matched ??= step + i;
+        }
+        return matched;
     }
+
+    /// <summary>The current time step.</summary>
+    public static long StepOf(DateTimeOffset now) => now.ToUnixTimeSeconds() / 30;
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms",
         Justification = "RFC 6238 TOTP is defined with HMAC-SHA1 and authenticator apps use it (as ASP.NET Core Identity's authenticator provider does); HMAC-SHA1 is not weakened by SHA-1 collisions.")]

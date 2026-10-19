@@ -8,7 +8,7 @@ _Step 9, 11 Oct 2026. For developers and the people who will host the system. Ev
 |---|---|---|
 | .NET SDK | 10.0.401 (pinned in `global.json`, roll-forward latestFeature) | build, run, tests |
 | SQL Server | 2019 or later (developed on 2025 Developer), Windows or SQL authentication | the Master Database |
-| `dotnet-ef` | 10.0.12 (`dotnet tool install -g dotnet-ef --version 10.0.12`) | migrations, idempotent script |
+| `dotnet-ef` | 10.0.13 (`dotnet tool install -g dotnet-ef --version 10.0.13`; update an older one with `dotnet tool update -g dotnet-ef --version 10.0.13`) | migrations, idempotent script |
 | `sqlcmd` | any recent | database scripts (always pass `-I`: filtered indexes need QUOTED_IDENTIFIER ON) |
 | Chrome or Edge | current | PDF printing (headless Chromium, Q-08) and the E2E tests |
 | Node.js | 24 LTS (npm 11) | E2E tests (`tests/e2e`), OpenAPI lint |
