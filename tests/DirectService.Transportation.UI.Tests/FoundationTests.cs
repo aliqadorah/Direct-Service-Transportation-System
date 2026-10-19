@@ -149,7 +149,8 @@ public sealed class FoundationTests
     {
         var topics = Web.Client.Help.HelpTopics.All;
         Assert.Equal(Enumerable.Range(1, 14).Select(i => $"9.{i}"), topics.Take(14).Select(t => t.Prd));
-        Assert.All(topics.Skip(14), t => Assert.Equal("Rev. 6", t.Prd));   // owner change requests of 15 Oct 2026, part B
+        // Owner change requests of 15 Oct 2026, part B ("Rev. 6"), and owner-feedback pages named by their requirements (DT-210: "FR-176/178").
+        Assert.All(topics.Skip(14), t => Assert.True(t.Prd == "Rev. 6" || t.Prd.StartsWith("FR-", StringComparison.Ordinal), t.Key));
         Assert.Equal(topics.Count, topics.Select(t => t.Key).Distinct().Count());
         Assert.All(topics, t =>
         {

@@ -175,6 +175,10 @@ public static class AuditVocabulary
         ["PasswordChanged"] = A("تغيير كلمة المرور", "Password changed", "تغيير كلمة المرور لـ{r}", "changed the password of {r}"),
         ["TwoFactorSkipped"] = A("تأجيل التحقق بخطوتين", "Two-step postponed", "تأجيل إعداد التحقق بخطوتين لـ{r}", "postponed setting up two-step verification for {r}"),
         ["TwoFactorEnabled"] = A("تفعيل التحقق بخطوتين", "Two-step enabled", "تفعيل التحقق بخطوتين لـ{r}", "enabled two-step verification for {r}"),
+        // DT-210: managing two-step verification from the profile.
+        ["TwoFactorDisabled"] = A("إيقاف التحقق بخطوتين", "Two-step turned off", "إيقاف التحقق بخطوتين لـ{r}", "turned off two-step verification for {r}"),
+        ["TwoFactorAppChanged"] = A("تغيير تطبيق المصادقة", "Authenticator app changed", "تغيير تطبيق المصادقة لـ{r}", "changed the authenticator app of {r}"),
+        ["RecoveryCodesRenewed"] = A("رموز استرداد جديدة", "New recovery codes", "إصدار رموز استرداد جديدة لـ{r}", "issued new recovery codes for {r}"),
         ["TwoFactorReset"] = A("إعادة تعيين التحقق بخطوتين", "Two-step reset", "إعادة تعيين التحقق بخطوتين لـ{r}", "reset two-step verification of {r}"),
         ["Unlock"] = A("فك القفل", "Unlocked", "فك قفل {r}", "unlocked {r}"),
         ["Disable"] = A("تعطيل", "Disabled", "تعطيل {r}", "disabled {r}"),

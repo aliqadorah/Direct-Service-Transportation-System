@@ -176,6 +176,47 @@ public sealed class AuthService(UserManager<User> users, IAppDbContext db, IChan
         }
     }
 
+    /// <summary>
+    /// Step-up for managing two-step verification (DT-210): the current password AND a current authenticator code or an unused recovery
+    /// code (a recovery code is used up). Failures count towards the lockout like sign-in failures (DT-204); while blocked the ordinary
+    /// "wrong password" answer is given. Both proofs are checked; errors are field errors (400), never 401 (that would end the session).
+    /// </summary>
+    public async Task VerifyStepUpAsync(User user, string? password, string? code, string? recoveryCode, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        if (user.TwoFactorEnabledAt is null) throw new AppException(ErrorCodes.Forbidden, 403);
+        // Both proofs must be given before anything is checked (security review 19 Oct 2026: no "password right, now the code" answer).
+        new Validator()
+            .Require("currentPassword", password)
+            .Check(!string.IsNullOrWhiteSpace(code) || !string.IsNullOrWhiteSpace(recoveryCode), string.IsNullOrWhiteSpace(recoveryCode) ? "code" : "recoveryCode", ErrorCodes.TwoFactorStepUpCode)
+            .ThrowIfInvalid();
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Rule(ErrorCodes.StepUpFailed);
+        var ok = await users.CheckPasswordAsync(user, password!).ConfigureAwait(false);
+        // The code is checked only after the right password, so a wrong password never uses up a recovery code; the answer is the same.
+        if (ok && !string.IsNullOrWhiteSpace(recoveryCode))
+        {
+            ok = (await users.RedeemTwoFactorRecoveryCodeAsync(user, Common.TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim())
+                .ConfigureAwait(false)).Succeeded;
+        }
+        else if (ok)
+        {
+            ok = await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Clean(code)).ConfigureAwait(false);
+        }
+        if (!ok)
+        {
+            await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
+            throw Fail.Rule(ErrorCodes.StepUpFailed);
+        }
+        throttle.Reset(user.Id, ctx.IpAddress);
+    }
+
+    /// <summary>A wrong code in a 2FA management step (e.g. confirming a new authenticator app) counts like any failed attempt (DT-204).</summary>
+    public Task RecordStepUpFailureAsync(User user, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return RecordFailureAsync(user, "SignInFailed", ct);
+    }
+
     /// <summary>Step 2 (enrolled users): authenticator code or one-time recovery code.</summary>
     public async Task VerifySecondFactorAsync(User user, string? code, string? recoveryCode, CancellationToken ct)
     {

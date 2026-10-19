@@ -32,6 +32,12 @@ public static class ErrorCatalog
         [ErrorCodes.EmailNotConfirmed] = ("يرجى تأكيد بريدك الإلكتروني أولاً.", "Please verify your email address first."),
         [ErrorCodes.TwoFactorInvalid] = ("رمز التحقق غير صحيح.", "The verification code is incorrect."),
         [ErrorCodes.TwoFactorRequired] = ("يلزم إكمال التحقق بخطوتين.", "Two-factor authentication must be completed."),
+        // DT-210: managing two-step verification from the profile.
+        [ErrorCodes.TwoFactorRequiredByPolicy] = ("لا يمكن إيقاف التحقق بخطوتين: جهتكم تشترطه لجميع المستخدمين.", "Two-step verification cannot be turned off: your organisation requires it for all users."),
+        [ErrorCodes.TwoFactorRequiredForStaff] = ("لا يمكن إيقاف التحقق بخطوتين لموظفي المنصة.", "Two-step verification cannot be turned off for platform staff."),
+        [ErrorCodes.TwoFactorChangeExpired] = ("انتهت مهلة تغيير تطبيق المصادقة أو تغيّرت بيانات الحساب. ابدأ من جديد.", "The change of authenticator app has expired or the account changed meanwhile. Start again."),
+        [ErrorCodes.StepUpFailed] = ("كلمة المرور أو الرمز غير صحيح. أعد المحاولة.", "The password or the code is not correct. Try again."),
+        [ErrorCodes.TwoFactorStepUpCode] = ("أدخل رمز التحقق الحالي من تطبيق المصادقة، أو رمز استرداد.", "Enter the current code from your authenticator app, or a recovery code."),
         // DT-208: the message states the organisation's actual rules (one code per combination; {0} = minimum length).
         [ErrorCodes.PasswordPolicy] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل، منها حرف واحد ورقم واحد على الأقل.", "The password does not meet your organisation's policy: at least {0} characters, including at least one letter and one digit."),
         [ErrorCodes.PasswordPolicyLetter] = ("كلمة المرور لا تحقق سياسة جهتكم: {0} خانات على الأقل، منها حرف واحد على الأقل.", "The password does not meet your organisation's policy: at least {0} characters, including at least one letter."),
@@ -298,6 +304,11 @@ public static class ErrorCodes
     public const string EmailNotConfirmed = "auth.emailNotConfirmed";
     public const string TwoFactorInvalid = "auth.twoFactorInvalid";
     public const string TwoFactorRequired = "auth.twoFactorRequired";
+    public const string TwoFactorRequiredByPolicy = "auth.twoFactorRequiredByPolicy";
+    public const string TwoFactorRequiredForStaff = "auth.twoFactorRequiredForStaff";
+    public const string TwoFactorChangeExpired = "auth.twoFactorChangeExpired";
+    public const string TwoFactorStepUpCode = "auth.twoFactorStepUpCode";
+    public const string StepUpFailed = "auth.stepUpFailed";
     public const string PasswordPolicy = "auth.passwordPolicy";
     public const string PasswordPolicyLetter = "auth.passwordPolicyLetter";
     public const string PasswordPolicyDigit = "auth.passwordPolicyDigit";

@@ -40,10 +40,11 @@ internal static class AccountEndpoints
             TypedResults.Ok(new { revoked = await s.SignOutOthersAsync(ct).ConfigureAwait(false) }));
         // Revision 6: own password change (users without email have no reset link) and turning 2FA on later. Each changes the security
         // stamp: this session's cookie is re-issued, every other session ends.
-        me.MapPost("/password", async (ChangePasswordRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, CancellationToken ct) =>
+        me.MapPost("/password", async (ChangePasswordRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, SessionService sessions, CancellationToken ct) =>
         {
             var user = await SelfAsync(users, ctx).ConfigureAwait(false);
             await auth.ChangePasswordAsync(user, r.CurrentPassword, r.NewPassword, ct).ConfigureAwait(false);
+            await sessions.RevokeAllAsync(user.Id, "Password changed", ctx.SessionId, ct).ConfigureAwait(false);   // DT-211: at once, not after the 30-s cache
             await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
             return TypedResults.NoContent();
         });
@@ -54,11 +55,41 @@ internal static class AccountEndpoints
             await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
             return TypedResults.Ok(new TwoFactorSetupResponse(setup.SharedKey, setup.AuthenticatorUri, qr.Svg(setup.AuthenticatorUri)));
         });
-        me.MapPost("/2fa/setup", async (TwoFactorCodeRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, MeService s, CancellationToken ct) =>
+        me.MapPost("/2fa/setup", async (TwoFactorCodeRequest r, HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, MeService s, TwoFactorSettingsService tfa, SessionService sessions, CancellationToken ct) =>
         {
             var user = await SelfAsync(users, ctx).ConfigureAwait(false);
             var codes = await auth.CompleteAuthenticatorSetupAsync(user, r.Code ?? string.Empty, ct).ConfigureAwait(false);
             await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            await sessions.RevokeAllAsync(user.Id, "Two-step verification turned on", ctx.SessionId, ct).ConfigureAwait(false);   // DT-211: at once
+            await tfa.NotifyEnabledAsync(user, ct).ConfigureAwait(false);   // DT-210
+            return TypedResults.Ok(new RecoveryCodesResponse(codes, await s.GetAsync(ct).ConfigureAwait(false)));
+        });
+        // DT-210 (owner testing 19 Oct 2026): manage two-step verification — status, turn off, change the app, new recovery codes. Each change
+        // needs the current password and a current code or a recovery code; turning off and changing the app end every other session.
+        me.MapGet("/2fa", async (TwoFactorSettingsService tfa, UserManager<User> users, IRequestContext ctx, CancellationToken ct) =>
+            TypedResults.Ok(await tfa.StatusAsync(await SelfAsync(users, ctx).ConfigureAwait(false), ct).ConfigureAwait(false)));
+        me.MapPost("/2fa/disable", async (TwoFactorStepUpRequest r, HttpContext http, TwoFactorSettingsService tfa, AuthFlow flow, UserManager<User> users, IRequestContext ctx, MeService s, CancellationToken ct) =>
+        {
+            var user = await SelfAsync(users, ctx).ConfigureAwait(false);
+            await tfa.DisableAsync(user, r, ct).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            return TypedResults.Ok(await s.GetAsync(ct).ConfigureAwait(false));
+        });
+        me.MapPost("/2fa/change", async (TwoFactorStepUpRequest r, TwoFactorSettingsService tfa, UserManager<User> users, IRequestContext ctx, IQrCodeRenderer qr, CancellationToken ct) =>
+        {
+            var setup = await tfa.StartChangeAsync(await SelfAsync(users, ctx).ConfigureAwait(false), r, ct).ConfigureAwait(false);
+            return TypedResults.Ok(new TwoFactorSetupResponse(setup.SharedKey, setup.AuthenticatorUri, qr.Svg(setup.AuthenticatorUri)));
+        });
+        me.MapPost("/2fa/change/confirm", async (TwoFactorCodeRequest r, HttpContext http, TwoFactorSettingsService tfa, AuthFlow flow, UserManager<User> users, IRequestContext ctx, MeService s, CancellationToken ct) =>
+        {
+            var user = await SelfAsync(users, ctx).ConfigureAwait(false);
+            await tfa.ConfirmChangeAsync(user, r.Code, ct).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
+            return TypedResults.Ok(await s.GetAsync(ct).ConfigureAwait(false));
+        });
+        me.MapPost("/2fa/recovery-codes", async (TwoFactorStepUpRequest r, TwoFactorSettingsService tfa, UserManager<User> users, IRequestContext ctx, MeService s, CancellationToken ct) =>
+        {
+            var codes = await tfa.NewRecoveryCodesAsync(await SelfAsync(users, ctx).ConfigureAwait(false), r, ct).ConfigureAwait(false);
             return TypedResults.Ok(new RecoveryCodesResponse(codes, await s.GetAsync(ct).ConfigureAwait(false)));
         });
         me.MapPost("/invitations/accept", async (InvitationAcceptRequest r, InvitationService s, CancellationToken ct) =>

@@ -34,6 +34,11 @@ internal static class ApiSummaries
         ["POST /api/v1/me/password"] = "Change my password with the current one (revision 6)",
         ["GET /api/v1/me/2fa/setup"] = "Get an authenticator key to turn two-step verification on",
         ["POST /api/v1/me/2fa/setup"] = "Turn two-step verification on with a first code; returns the one-time recovery codes",
+        ["GET /api/v1/me/2fa"] = "Own two-step verification: on/off, whether required, unused recovery codes",
+        ["POST /api/v1/me/2fa/disable"] = "Turn two-step verification off (current password + code; refused when required)",
+        ["POST /api/v1/me/2fa/change"] = "Start changing the authenticator app (current password + code); returns the new key to scan",
+        ["POST /api/v1/me/2fa/change/confirm"] = "Confirm the new authenticator app with one of its codes",
+        ["POST /api/v1/me/2fa/recovery-codes"] = "New recovery codes (current password + code); the old ones stop working",
         ["POST /api/v1/me/invitations/accept"] = "Accept an invitation as an existing user of the tenant",
 
         // Tenant (core.tenant.manage)

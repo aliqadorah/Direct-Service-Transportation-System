@@ -25,6 +25,15 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 public sealed record TwoFactorSetupResponse(string SharedKey, string AuthenticatorUri, string? QrSvg = null);
 public sealed record TwoFactorCodeRequest(string? Code, string? RecoveryCode);
 public sealed record RecoveryCodesResponse(IReadOnlyList<string> RecoveryCodes, MeResponse Me);
+
+/// <summary>
+/// The signed-in user's two-step verification (owner testing 19 Oct 2026, DT-210): on/off, whether it is required (the organisation's
+/// "Require 2FA for all users", or platform staff — then it cannot be turned off) and how many unused recovery codes are left.
+/// </summary>
+public sealed record TwoFactorStatusResponse(bool Enabled, bool Required, bool RequiredForStaff, int RecoveryCodesLeft, DateTime? EnabledAt);
+
+/// <summary>Proof for turning 2FA off, changing the authenticator app or new recovery codes: the current password and a current code or a recovery code.</summary>
+public sealed record TwoFactorStepUpRequest(string? CurrentPassword, string? Code, string? RecoveryCode);
 public sealed record LinkTokenRequest(string User, string Token);
 public sealed record PasswordResetConfirmRequest(string User, string Token, string NewPassword);
 public sealed record AntiforgeryResponse(string HeaderName, string Token);

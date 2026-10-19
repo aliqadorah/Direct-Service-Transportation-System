@@ -10,9 +10,10 @@
 @inject UiJs Js
 @inject NavigationManager Nav
 
-<PageHeader Title="@L["profile.title"]" Crumbs="@([new Crumb(L["shell.userMenu"])])" />
+<PageHeader Title="@L["profile.title"]" Help="profile" Crumbs="@([new Crumb(L["shell.userMenu"])])" />
 
 <div class="cols fill" style="grid-template-columns:380px 1fr;align-items:start">
+    <div class="stack" style="min-width:0">
     <Box Title="@L["profile.preferences"]">
         <EditForm Model="_form" OnValidSubmit="Save" class="stack">
             <ProblemValidator @ref="_problems" />
@@ -29,15 +30,31 @@
                 <Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" />
             </div>
         </EditForm>
-        <div class="stack" style="margin-top:16px;gap:8px">
-            <KeyValues Columns="1" Items="@([new KeyValue(L["usr.2fa"], L[Shell.Me?.TwoFactorEnabled == true ? "ui.on" : "ui.off"])])" />
-            @if (Shell.Me?.TwoFactorEnabled != true)
+    </Box>
+    <Box Title="@L["profile.tfaTitle"]">
+        @* DT-210: two-step verification — turn on; or turn off, change the app, new recovery codes (each with password + code). *@
+        <div class="stack" style="gap:8px">
+            @{ var on = _tfa?.Enabled ?? Shell.Me?.TwoFactorEnabled == true; }
+            <KeyValues Columns="1" Items="@(TfaFacts(on))" />
+            @if (!on)
             {
                 <Banner Tone="Tone.Warn" Icon="shield" Text="@L["profile.twoFactorRecommend"]" />
-                <Btn Icon="shield" Text="@L["profile.enable2fa"]" Busy="_tfaBusy" OnClick="StartTwoFactor" />
+                <div class="formbar"><Btn Primary="true" Icon="shield" Text="@L["profile.enable2fa"]" Busy="_tfaBusy" OnClick="StartTwoFactor" /></div>
+            }
+            else
+            {
+                @if (_tfa is { Required: true }) {<Banner Tone="Tone.Info" Icon="lock" Text="@L[_tfa.RequiredForStaff ? "profile.tfaStaffOnly" : "profile.tfaRequiredByOrg"]" />}
+                @if (_tfa is { RecoveryCodesLeft: < 3 }) {<Banner Tone="Tone.Warn" Icon="key" Text="@L.F("profile.tfaFewCodes", _tfa.RecoveryCodesLeft)" />}
+                <div class="formbar" style="flex-wrap:wrap;justify-content:flex-start">
+                    <Btn Icon="refresh" Text="@L["profile.tfaChangeApp"]" OnClick="@(() => OpenStep(StepAction.Change))" />
+                    <Btn Icon="key" Text="@L["profile.tfaNewCodes"]" OnClick="@(() => OpenStep(StepAction.Codes))" />
+                    <Btn Danger="true" Ghost="true" Icon="x" Text="@L["profile.tfaTurnOff"]" Disabled="@(_tfa?.Required != false)"
+                         Title="@(_tfa is { Required: true } ? L[_tfa.RequiredForStaff ? "profile.tfaStaffOnly" : "profile.tfaRequiredByOrg"] : null)" OnClick="@(() => OpenStep(StepAction.Off))" />
+                </div>
             }
         </div>
     </Box>
+    </div>
     <Box Title="@L["profile.sessions"]" NoPad="true">
         <Actions>@if (_sessions is { Count: > 1 }) {<Btn Small="true" Danger="true" Icon="logout" FlipIcon="true" Text="@L["profile.signOutOthers"]" OnClick="SignOutOthers" />}</Actions>
         <ChildContent>
@@ -45,7 +62,8 @@
                 <DataGrid TItem="SessionResponse" Items="_sessions!" Key="s => s.Id" Caption="@L["profile.sessions"]">
                     <Columns>
                         <GridColumn TItem="SessionResponse" Title="@L["profile.device"]" Value="s => Device(s)" Wrap="true" />
-                        <GridColumn TItem="SessionResponse" Title="@L["profile.ip"]" Value="s => s.IpAddress" Ltr="true" />
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.ip"]" Value="s => Address(s)" />
+                        <GridColumn TItem="SessionResponse" Title="@L["profile.signedIn"]" Value="s => Fmt.DateTime(s.CreatedAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                         <GridColumn TItem="SessionResponse" Title="@L["profile.lastSeen"]" Value="s => Fmt.DateTime(s.LastSeenAt.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                         <GridColumn TItem="SessionResponse" Title="@L["profile.action"]" HideTitle="true">
                             <Template>
@@ -56,6 +74,7 @@
                     </Columns>
                 </DataGrid>
             </StateView>
+            <p class="help" style="padding:8px 12px;margin:0">@L["profile.sessionsNote"]</p>
         </ChildContent>
     </Box>
 </div>
@@ -120,7 +139,208 @@
     </Footer>
 </Modal>
 
+<Modal @bind-Open="_stepOpen" Title="@StepTitle" Busy="_stepBusy" Icon="shield">
+    <ChildContent>
+        @* DT-210: password + current code (or a recovery code), then — for "Change authenticator app" — the new app's QR code and code. *@
+        @if (_newCodes is not null)
+        {
+            <Banner Tone="Tone.Ok" Text="@L["profile.tfaCodesDone"]" />
+            <p>@L["acct.codesLead"]</p>
+            <ul class="num tfa-codes" dir="ltr" aria-label="@L["acct.codesTitle"]">
+                @foreach (var c in _newCodes) {<li>@c</li>}
+            </ul>
+        }
+        else if (_changeSetup is not null)
+        {
+            <EditForm EditContext="_confirmCtx" OnSubmit="ConfirmChange" class="stack" novalidate>
+                <ProblemValidator @ref="_confirmProblems" />
+                <ErrorSummary Extra="_stepExtra" />
+                <p>@L["profile.tfaChangeLead"]</p>
+                @if (_changeSetup.QrSvg is { } svg) {<div class="tfa-qr" role="img" aria-label="@L["acct.setupQr"]">@((MarkupString)svg)</div>}
+                <div class="tfa-key num" dir="ltr">@_changeSetup.SharedKey</div>
+                <TextField Id="tfa-new-code" @bind-Value="_confirm.Code" Label="@L["acct.codeField"]" Required="true" Ltr="true" MaxLength="7" Autocomplete="one-time-code" />
+            </EditForm>
+        }
+        else
+        {
+            <EditForm EditContext="_stepCtx" OnSubmit="SubmitStep" class="stack" novalidate>
+                <ProblemValidator @ref="_stepProblems" />
+                <ErrorSummary Extra="_stepExtra" />
+                <p>@L["profile.tfaStepLead"]</p>
+                @if (_stepAction == StepAction.Off) {<Banner Tone="Tone.Warn" Icon="alert" Text="@L["profile.tfaOffWarn"]" />}
+                @if (_stepAction == StepAction.Codes) {<Banner Tone="Tone.Info" Icon="info" Text="@L["profile.tfaCodesWarn"]" />}
+                <TextField Id="tfa-password" @bind-Value="_step.CurrentPassword" Label="@L["profile.currentPassword"]" Type="password" Required="true" Ltr="true" MaxLength="128" Autocomplete="current-password" />
+                @if (_step.UseRecovery)
+                {
+                    <TextField Id="tfa-recovery" @bind-Value="_step.RecoveryCode" Label="@L["acct.recoveryTitle"]" Required="true" Ltr="true" MaxLength="20" Autocomplete="off" />
+                }
+                else
+                {
+                    <TextField Id="tfa-code" @bind-Value="_step.Code" Label="@L["acct.codeField"]" Required="true" Ltr="true" MaxLength="7" Autocomplete="one-time-code" />
+                }
+                <button type="button" class="linkbtn" @onclick="ToggleRecovery">@L[_step.UseRecovery ? "profile.tfaUseCode" : "acct.useRecovery"]</button>
+            </EditForm>
+        }
+    </ChildContent>
+    <Footer>
+        @if (_newCodes is not null) {<Btn Primary="true" Text="@L["ui.close"]" OnClick="() => _stepOpen = false" />}
+        else if (_changeSetup is not null)
+        {
+            <Btn Text="@L["ui.cancel"]" OnClick="() => _stepOpen = false" />
+            <Btn Primary="true" Text="@L["profile.tfaConfirmApp"]" Busy="_stepBusy" OnClick="ConfirmChange" />
+        }
+        else
+        {
+            <Btn Text="@L["ui.cancel"]" OnClick="() => _stepOpen = false" />
+            <Btn Primary="@(_stepAction != StepAction.Off)" DangerPrimary="@(_stepAction == StepAction.Off)" Text="@StepSubmit" Busy="_stepBusy" OnClick="SubmitStep" />
+        }
+    </Footer>
+</Modal>
+
 @code {
+    // ------------------------------------------------------------ two-step verification management (DT-210)
+
+    private enum StepAction { Off, Change, Codes }
+
+    private TwoFactorStatusResponse? _tfa;
+    private bool _stepOpen, _stepBusy;
+    private StepAction _stepAction;
+    private StepModel _step = new();
+    private ConfirmModel _confirm = new();
+    private EditContext _stepCtx = new(new StepModel()), _confirmCtx = new(new ConfirmModel());
+    private ProblemValidator? _stepProblems, _confirmProblems;
+    private IReadOnlyList<string>? _stepExtra, _newCodes;
+    private TwoFactorSetupResponse? _changeSetup;
+
+    private string StepTitle => _stepAction switch
+    {
+        StepAction.Off => L["profile.tfaTurnOffTitle"],
+        StepAction.Change => L["profile.tfaChangeApp"],
+        _ => L["profile.tfaNewCodes"],
+    };
+
+    private string StepSubmit => _stepAction switch
+    {
+        StepAction.Off => L["profile.tfaTurnOff"],
+        StepAction.Change => L["profile.tfaContinue"],
+        _ => L["profile.tfaNewCodes"],
+    };
+
+    private IReadOnlyList<KeyValue> TfaFacts(bool on)
+    {
+        var facts = new List<KeyValue> { new(L["usr.2fa"], L[on ? "ui.on" : "ui.off"]) };
+        if (on && _tfa?.EnabledAt is { } since) facts.Add(new KeyValue(L["profile.tfaSince"], Fmt.DateTime(since.ToLocalTime(), Shell.DateFormat)));
+        if (on && _tfa is not null) facts.Add(new KeyValue(L["profile.tfaCodesLeft"], _tfa.RecoveryCodesLeft.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        return facts;
+    }
+
+    private async Task LoadTwoFactor()
+    {
+        try { _tfa = await Api.GetAsync<TwoFactorStatusResponse>("api/v1/me/2fa"); } catch (ApiException) { }
+    }
+
+    private void OpenStep(StepAction action)
+    {
+        _stepAction = action;
+        _step = new StepModel();
+        _stepCtx = new EditContext(_step);
+        _confirm = new ConfirmModel();
+        _confirmCtx = new EditContext(_confirm);
+        _stepExtra = _newCodes = null;
+        _changeSetup = null;
+        _stepOpen = true;
+    }
+
+    private void ToggleRecovery()
+    {
+        _step.UseRecovery = !_step.UseRecovery;
+        _step.Code = _step.RecoveryCode = null;
+        _stepProblems?.Clear();
+    }
+
+    private async Task<bool> ShowStepProblem(ApiProblem p, ProblemValidator? problems)
+    {
+        var other = problems?.Show(p);
+        _stepExtra = other is null ? null : [other];
+        await Task.CompletedTask;
+        return false;
+    }
+
+    private async Task SubmitStep()
+    {
+        if (_stepBusy) return;
+        var missing = new List<ApiFieldError>();
+        if (string.IsNullOrEmpty(_step.CurrentPassword)) missing.Add(new("currentPassword", "validation.required", L.F("ui.requiredField", L["profile.currentPassword"])));
+        if (_step.UseRecovery && string.IsNullOrWhiteSpace(_step.RecoveryCode)) missing.Add(new("recoveryCode", "validation.required", L.F("ui.requiredField", L["acct.recoveryTitle"])));
+        if (!_step.UseRecovery && string.IsNullOrWhiteSpace(_step.Code)) missing.Add(new("code", "validation.required", L.F("ui.requiredField", L["acct.codeField"])));
+        if (missing.Count > 0) { await ShowStepProblem(new ApiProblem { Status = 400, Errors = missing }, _stepProblems); return; }
+        _stepBusy = true;
+        _stepExtra = null;
+        var request = new TwoFactorStepUpRequest(_step.CurrentPassword, _step.UseRecovery ? null : _step.Code?.Replace(" ", "", StringComparison.Ordinal),
+            _step.UseRecovery ? _step.RecoveryCode?.Trim() : null);
+        try
+        {
+            switch (_stepAction)
+            {
+                case StepAction.Off:
+                    Shell.SetMe(await Api.PostAsync<MeResponse>("api/v1/me/2fa/disable", request));
+                    _stepOpen = false;
+                    Toasts.Success(L["profile.tfaOffDone"]);
+                    await LoadSessions();
+                    break;
+                case StepAction.Change:
+                    _changeSetup = await Api.PostAsync<TwoFactorSetupResponse>("api/v1/me/2fa/change", request);
+                    break;
+                default:
+                    var result = await Api.PostAsync<RecoveryCodesResponse>("api/v1/me/2fa/recovery-codes", request);
+                    _newCodes = result.RecoveryCodes;
+                    break;
+            }
+            await LoadTwoFactor();
+        }
+        catch (ApiException e) { await ShowStepProblem(e.Problem, _stepProblems); }
+        finally { _stepBusy = false; }
+    }
+
+    private async Task ConfirmChange()
+    {
+        if (_stepBusy) return;
+        if (string.IsNullOrWhiteSpace(_confirm.Code))
+        {
+            await ShowStepProblem(new ApiProblem { Status = 400, Errors = [new("code", "validation.required", L.F("ui.requiredField", L["acct.codeField"]))] }, _confirmProblems);
+            return;
+        }
+        _stepBusy = true;
+        _stepExtra = null;
+        try
+        {
+            Shell.SetMe(await Api.PostAsync<MeResponse>("api/v1/me/2fa/change/confirm", new TwoFactorCodeRequest(_confirm.Code.Replace(" ", "", StringComparison.Ordinal), null)));
+            _stepOpen = false;
+            Toasts.Success(L["profile.tfaChangedDone"]);
+            await LoadTwoFactor();
+            await LoadSessions();
+        }
+        catch (ApiException e) { await ShowStepProblem(e.Problem, _confirmProblems); }
+        finally { _stepBusy = false; }
+    }
+
+    /// <summary>"This computer (local)" for the loopback address (the app running on this PC), otherwise the address (DT-211).</summary>
+    private string? Address(SessionResponse s) =>
+        s.IpAddress is "::1" or "127.0.0.1" or "::ffff:127.0.0.1" ? L["profile.localComputer"] : s.IpAddress;
+
+    private sealed class StepModel
+    {
+        public string? CurrentPassword { get; set; }
+        public string? Code { get; set; }
+        public string? RecoveryCode { get; set; }
+        public bool UseRecovery { get; set; }
+    }
+
+    private sealed class ConfirmModel
+    {
+        public string? Code { get; set; }
+    }
+
     private bool _pwOpen, _pwBusy, _tfaOpen, _tfaBusy;
     private string? _pwCurrent, _pwNew, _pwConfirm, _pwError, _tfaCode, _tfaError;
     private TwoFactorSetupResponse? _setup;
@@ -143,7 +363,7 @@
         _form.LanguageCode = me.LanguageCode;
         _form.DefaultCompany = me.DefaultCompany;
         _form.DateFormat = Fmt.Safe(me.DateFormat);
-        await LoadSessions();
+        await Task.WhenAll(LoadSessions(), LoadTwoFactor());
     }
 
     private async Task LoadSessions()
@@ -234,6 +454,7 @@
         {
             var result = await Api.PostAsync<RecoveryCodesResponse>("api/v1/me/2fa/setup", new TwoFactorCodeRequest(_tfaCode!.Replace(" ", "", StringComparison.Ordinal), null));
             _codes = result.RecoveryCodes;
+            await LoadTwoFactor();
             Shell.SetMe(result.Me);
             await LoadSessions();
         }

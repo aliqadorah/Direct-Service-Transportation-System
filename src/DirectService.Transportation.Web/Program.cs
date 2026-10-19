@@ -84,6 +84,7 @@ if (config.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<EInvoiceWorker>();
     builder.Services.AddHostedService<ExportWorker>();
     builder.Services.AddHostedService<TenantLifecycleWorker>();
+    builder.Services.AddHostedService<SessionCleanupWorker>();   // DT-211
 }
 
 var app = builder.Build();

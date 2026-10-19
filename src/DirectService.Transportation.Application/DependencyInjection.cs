@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<GrantGuard>();
         services.AddScoped<SessionService>();
         services.AddScoped<AuthService>();
+        services.AddScoped<TwoFactorSettingsService>();   // DT-210: 2FA management from the profile
         services.AddSingleton<SignInThrottle>();   // DT-204: failed sign-ins per account + IP
         services.AddScoped<AccountService>();
         services.AddScoped<MeService>();

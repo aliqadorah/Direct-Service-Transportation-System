@@ -16,6 +16,21 @@ public static class EmailTemplates
         $"Hello {E(name)},<br>Please verify your email address to finish creating your Direct Service Transportation account.",
         "تأكيد البريد", "Verify email", link, nameof(VerifyEmail));
 
+    /// <summary>
+    /// Notice of a change to the user's two-step verification (DT-210): turned on, turned off, authenticator app changed, new recovery codes.
+    /// <paramref name="whatAr"/>/<paramref name="whatEn"/> name the change; the time is UTC (the email has no time zone of the reader).
+    /// </summary>
+    public static EmailMessage TwoFactorChanged(string to, string name, string whatAr, string whatEn, DateTime atUtc, string? ip, string link)
+    {
+        var when = atUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+        var from = string.IsNullOrWhiteSpace(ip) ? "" : $" ({E(ip)})";
+        return Build(to,
+            "تغيير في التحقق بخطوتين — Two-step verification changed",
+            $"مرحباً {E(name)}،<br>{E(whatAr)} في حسابك في Direct Service Transportation بتاريخ {when}{from}. إن لم تكن أنت من فعل ذلك فغيّر كلمة المرور فوراً وأبلغ مسؤول المستخدمين في شركتك.",
+            $"Hello {E(name)},<br>{E(whatEn)} on your Direct Service Transportation account on {when}{from}. If this was not you, change your password at once and tell your company's user administrator.",
+            "مراجعة الحساب", "Review your account", link, nameof(TwoFactorChanged));
+    }
+
     /// <summary>An email an administrator entered for a username user: confirmed only while that user is signed in (DT-203).</summary>
     public static EmailMessage VerifyAddedEmail(string to, string name, string userName, string link) => Build(to,
         "تأكيد البريد الإلكتروني — Verify your email",

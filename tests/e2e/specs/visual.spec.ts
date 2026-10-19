@@ -291,6 +291,18 @@ function companyPopups(ids: Record<string, string | null>, w: World, roleName: s
       await button(p, t("usr.create")).click();
       await expect(d.locator('[aria-invalid="true"]').first()).toBeVisible();
     } },
+    // Owner testing 19 Oct 2026 (DT-210): two-step verification management on the profile.
+    { name: "profile#tfa-off", route: "profile", open: header("profile.tfaTurnOff") },
+    { name: "profile#tfa-off-errors", route: "profile", open: async (p, t) => {
+      await header("profile.tfaTurnOff")(p, t);
+      await p.locator(".dialog").getByRole("button", { name: new RegExp(t("profile.tfaTurnOff")) }).last().click();
+      await expect(p.locator('.dialog [aria-invalid="true"]').first()).toBeVisible();
+    } },
+    { name: "profile#tfa-codes", route: "profile", open: header("profile.tfaNewCodes") },
+    { name: "profile#tfa-recovery", route: "profile", open: async (p, t) => {
+      await header("profile.tfaChangeApp")(p, t);
+      await p.locator(".dialog .linkbtn").click();
+    } },
     { name: "users#role-new", route: "settings/users", open: header("usr.newRole") },
     { name: "users#role-preset", route: "settings/users", open: async (p, t) => { await rolesTab(p, t); await firstRow(p); } },
     { name: "users#role-custom", route: "settings/users", open: customRole },

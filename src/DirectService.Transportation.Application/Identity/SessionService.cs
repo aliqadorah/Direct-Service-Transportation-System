@@ -94,8 +94,44 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
 
         var principal = new SessionPrincipal(s.Id, row.UserId, row.UserPublicId, row.User.TenantId, row.User.IsPlatformStaff,
             row.User.FullName, row.User.LanguageCode, row.User.SecurityStamp);
-        cache.Set(CacheKey(hash), principal, CacheFor);
+        // DT-211: the short cache never outlives the session's own limits (12-hour lifetime, idle timeout).
+        var until = Min(s.ExpiresAt, s.LastSeenAt + idle) - now;
+        cache.Set(CacheKey(hash), principal, until < CacheFor ? until : CacheFor);
         return principal;
+    }
+
+    private static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
+
+    /// <summary>
+    /// Ends every session past its absolute lifetime or idle longer than its tenant's timeout (platform staff: their own timeout) — owner
+    /// testing 19 Oct 2026 (DT-211): such sessions were already refused, but stayed listed as "active". Revocation = RevokedAt + soft
+    /// delete with the reason, like a sign-out. Run by the session clean-up job; returns the number ended.
+    /// </summary>
+    public async Task<int> EndExpiredAsync(int batch, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow().UtcDateTime;
+        var staffIdle = options.Value.PlatformStaffIdleMinutes;
+        var stale = await db.Set<UserSession>().IgnoreQueryFilters(TenantFilter)
+            .Where(s => s.RevokedAt == null && (s.ExpiresAt <= now
+                || s.LastSeenAt.AddMinutes(db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == s.TenantId).Select(t => (int?)t.SessionIdleTimeoutMinutes).FirstOrDefault() ?? staffIdle) <= now))
+            .OrderBy(s => s.Id).Take(batch)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var s in stale)
+        {
+            Revoke(s, s.ExpiresAt <= now ? "Expired: absolute session lifetime" : "Expired: idle timeout");
+            cache.Remove(CacheKey(s.TokenHash));
+            using (scope.Use(s.TenantId, null, s.UserId))
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        return stale.Count;
+    }
+
+    /// <summary>The idle timeout of a user's sessions: the tenant's setting, or the platform staff timeout.</summary>
+    public async Task<TimeSpan> IdleTimeoutAsync(long? tenantId, CancellationToken ct)
+    {
+        var minutes = tenantId is null ? null : await db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == tenantId)
+            .Select(t => (int?)t.SessionIdleTimeoutMinutes).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return TimeSpan.FromMinutes(minutes ?? options.Value.PlatformStaffIdleMinutes);
     }
 
     /// <summary>Drops a session's cached user data (language, name), so the next request reads them again — e.g. after a language change (FR-178).</summary>

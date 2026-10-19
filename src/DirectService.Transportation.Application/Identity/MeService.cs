@@ -10,7 +10,7 @@ namespace DirectService.Transportation.Application.Identity;
 /// The signed-in user's own data: profile with the companies for the switcher (5.1, US-34), preferences
 /// (FR-178), and active sessions with sign-out of one or all others (FR-176).
 /// </summary>
-public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessService access, SessionService sessions, IUrlTokenService tokens)
+public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessService access, SessionService sessions, IUrlTokenService tokens, TimeProvider clock)
 {
     private static readonly string[] AllowedDateFormats = ["dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy"];
 
@@ -67,8 +67,13 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
     public async Task<IReadOnlyList<SessionResponse>> SessionsAsync(CancellationToken ct)
     {
         var userId = ctx.UserId ?? throw Fail.Forbidden();
+        // DT-211: only sessions that are still valid — not revoked, within the absolute lifetime and not idle past the timeout.
+        var now = clock.GetUtcNow().UtcDateTime;
+        // The user's own tenant (staff working inside a tenant keep the staff timeout; security review 19 Oct 2026).
+        var ownTenant = await db.Set<User>().IgnoreQueryFilters(["Tenant"]).Where(u => u.Id == userId).Select(u => u.TenantId).SingleAsync(ct).ConfigureAwait(false);
+        var idleSince = now - await sessions.IdleTimeoutAsync(ownTenant, ct).ConfigureAwait(false);
         var rows = await db.Set<UserSession>().IgnoreQueryFilters(["Tenant"]).AsNoTracking()
-            .Where(s => s.UserId == userId && s.RevokedAt == null)
+            .Where(s => s.UserId == userId && s.RevokedAt == null && s.ExpiresAt > now && s.LastSeenAt > idleSince)
             .OrderByDescending(s => s.LastSeenAt)
             .Select(s => new { s.Id, s.PublicId, s.CreatedAt, s.LastSeenAt, s.IpAddress, s.UserAgent, s.ExpiresAt })
             .ToListAsync(ct).ConfigureAwait(false);
