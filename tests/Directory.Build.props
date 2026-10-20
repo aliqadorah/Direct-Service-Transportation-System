@@ -1,0 +1,21 @@
+<Project>
+  <!-- The repository's settings first (target framework, warnings as errors, NuGet audit). -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!--
+    One runner set-up for every test project under tests/ (owner request 20 Oct 2026, DT-225): xUnit v3 on Microsoft.Testing.Platform
+    (global.json "test.runner"), built as an executable, with the code-coverage extension, so that `dotnet test (project) (coverage options)`
+    takes the same arguments for each project on Windows and on Linux. The UI project lacked the coverage extension: its test host refused
+    the coverage options (exit code 5 = invalid command line, "zero tests ran", handshake failure) in the first GitHub run.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

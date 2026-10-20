@@ -1,18 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>DirectService.Transportation.Infrastructure.Tests</RootNamespace>
-    <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Using Include="Xunit" />
   </ItemGroup>
 </Project>

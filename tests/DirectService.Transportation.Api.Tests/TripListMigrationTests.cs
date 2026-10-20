@@ -37,12 +37,22 @@ public sealed class TripListMigrationTests(ApiFactory f)
             clients[role] = await MemberAsync(o, roles.Single(r => r.IsPreset && r.Name == role).Id);
 
         // The latest migration, rolled back and applied again with these trips in the database.
+        // The shared test database may hold the 500,000 trips of TripPerformanceTests: rebuilding the persisted column and its index over them
+        // can take minutes on a busy machine, longer than the 30-second default (DT-225: a timeout left the database half-migrated and every
+        // later test failed). Whatever happens here, the database is brought to the latest migration again before the next test.
         await f.DbAsync(async db =>
         {
+            db.Database.SetCommandTimeout(TimeSpan.FromMinutes(15));
             var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
-            await migrator.MigrateAsync(BeforeLatest);
-            Assert.Null(await db.Database.SqlQueryRaw<int?>("SELECT COL_LENGTH('trn.TRN_Trips', 'ReceiptNoSearch') AS [Value]").SingleAsync());
-            await migrator.MigrateAsync();
+            try
+            {
+                await migrator.MigrateAsync(BeforeLatest);
+                Assert.Null(await db.Database.SqlQueryRaw<int?>("SELECT COL_LENGTH('trn.TRN_Trips', 'ReceiptNoSearch') AS [Value]").SingleAsync());
+            }
+            finally
+            {
+                await migrator.MigrateAsync();
+            }
             Assert.Empty(await db.Database.GetPendingMigrationsAsync());
             return true;
         });
