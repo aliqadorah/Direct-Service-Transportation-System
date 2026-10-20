@@ -19,7 +19,7 @@
                 <SelectField TValue="string?" @bind-Value="_m.Connector" Options="Connectors" Label="@L["eis.connector"]" Required="true" />
                 <SelectField TValue="string?" @bind-Value="_m.Environment" Options="Environments" Label="@L["eis.environment"]" Required="true" Help="@L["eis.environmentHelp"]" />
                 <TextField @bind-Value="_m.SellerTaxNumber" Label="@L["eis.sellerTax"]" Required="@_m.IsEnabled" MaxLength="20" Ltr="true" />
-                <SelectField TValue="string?" @bind-Value="_m.RegistrationType" Options="RegistrationTypes" Label="@L["eis.registration"]" Required="true" />
+                <SelectField TValue="string?" @bind-Value="_m.RegistrationType" Options="RegistrationTypes" Label="@L["eis.registration"]" Required="true" Help="@RegistrationHelp" />
                 <TextField @bind-Value="_m.IncomeSourceSequence" Label="@L["eis.sequence"]" Required="@_m.IsEnabled" MaxLength="20" Ltr="true" Help="@L["eis.sequenceHelp"]" />
                 <div class="field"><span class="lbl">@L["eis.icv"]</span><bdi class="num">@Fmt.Count(_icv)</bdi></div>
                 <TextField @bind-Value="_m.ClientId" Label="@L["eis.clientId"]" MaxLength="200" Ltr="true" Autocomplete="off"
@@ -47,7 +47,10 @@
 
     private IReadOnlyList<Option<string?>> Connectors => _connectors.Select(c => new Option<string?>(c, L["eis.conn." + c] is var t && t.StartsWith("eis.", StringComparison.Ordinal) ? c : t)).ToList();
     private IReadOnlyList<Option<string?>> Environments => [new(EInvoiceCodes.Test, L["ei.envTest"]), new(EInvoiceCodes.Production, L["ei.envProduction"])];
-    private IReadOnlyList<Option<string?>> RegistrationTypes => [new(EInvoiceCodes.Income, L["eis.reg.Income"]), new(EInvoiceCodes.Sales, L["eis.reg.Sales"]), new(EInvoiceCodes.Special, L["eis.reg.Special"])];
+    // Owner testing 20 Oct 2026 (DT-223): special sales tax is not offered (not supported; the server refuses it); the chosen type is explained.
+    private IReadOnlyList<Option<string?>> RegistrationTypes => [new(EInvoiceCodes.Income, L["eis.reg.Income"]), new(EInvoiceCodes.Sales, L["eis.reg.Sales"])];
+
+    private string? RegistrationHelp => _m.RegistrationType is EInvoiceCodes.Income or EInvoiceCodes.Sales ? L["eis.regHelp." + _m.RegistrationType] : null;
 
     protected override Task OnInitializedAsync() => Load();
 

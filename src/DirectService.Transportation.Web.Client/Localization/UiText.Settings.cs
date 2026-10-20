@@ -85,6 +85,12 @@ public static partial class UiText
         ["eis.reg.Income"] = ("ضريبة الدخل", "Income tax"),
         ["eis.reg.Sales"] = ("ضريبة المبيعات العامة", "General sales tax"),
         ["eis.reg.Special"] = ("ضريبة المبيعات الخاصة", "Special sales tax"),
+        // DT-223: checked against the JoFotara document builder — income: no tax totals are sent and a document with tax is refused before
+        // sending; general sales tax: tax totals per line at the invoice's rate (the company's tax rate, 16% by default; 0% lines as zero-rated).
+        ["eis.regHelp.Income"] = ("للشركة غير المسجلة في ضريبة المبيعات. تُرسل الفواتير الإلكترونية دون ضريبة مبيعات، فاجعل نسبة الضريبة في إعدادات الشركة 0%؛ لا تُرسل فاتورة عليها ضريبة مبيعات.",
+            "For a company that is not registered for sales tax. E-invoices are sent without sales tax, so set the tax rate in Company settings to 0%; an invoice with sales tax is not sent."),
+        ["eis.regHelp.Sales"] = ("للشركة المسجلة في ضريبة المبيعات العامة. تتضمن الفواتير الإلكترونية ضريبة المبيعات (16% ما لم تُحدَّد نسبة أخرى في إعدادات الشركة أو على بند المستند).",
+            "For a company registered for general sales tax. E-invoices include sales tax (16% unless set otherwise in Company settings or on a document line)."),
         ["eis.sequence"] = ("تسلسل مصدر الدخل", "Income-source sequence"),
         ["eis.sequenceHelp"] = ("من بوابة جوفوترة", "From the JoFotara portal"),
         ["eis.icv"] = ("عدّاد الفواتير (ICV)", "Invoice counter (ICV)"),

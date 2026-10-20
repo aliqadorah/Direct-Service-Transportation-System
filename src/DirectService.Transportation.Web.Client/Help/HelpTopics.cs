@@ -294,6 +294,7 @@ public static class HelpTopics
                 "عرض الفواتير؛ ضبط بيانات الربط بصلاحية الإعدادات.",
                 [
                     "فعّل الفوترة الإلكترونية وأدخل بيانات الربط من الإعدادات ← الفوترة الإلكترونية.",
+                    "اختر نوع التسجيل: «ضريبة الدخل» للشركة غير المسجلة في ضريبة المبيعات (تُرسل الفواتير دون ضريبة مبيعات؛ اجعل نسبة الضريبة في إعدادات الشركة 0%)، أو «ضريبة المبيعات العامة» للشركة المسجلة فيها (تتضمن الفواتير ضريبة المبيعات، 16% ما لم تُحدَّد نسبة أخرى). ضريبة المبيعات الخاصة غير مدعومة.",
                     "عند الاعتماد تُفحص الفاتورة وتُذكر الحقول الناقصة إن وُجدت.",
                     "تُرسل تلقائياً: «في الطابور» ثم «مُرسلة».",
                     "يُحفظ الرد (المعرّف الفريد ورقم النظام ورمز QR) ويُطبع رمز QR على الفاتورة.",
@@ -301,6 +302,7 @@ public static class HelpTopics
                 ],
                 [
                     "فشل الفحص: تبقى الفاتورة في الطابور مع الحقول المطلوب تصحيحها.",
+                    "نوع التسجيل «ضريبة الدخل» وعلى الفاتورة ضريبة مبيعات: لا تُرسل؛ صحّح نوع التسجيل أو نسبة الضريبة.",
                     "«مرفوضة»: السبب ظاهر؛ صحّح ثم أعد الإرسال.",
                     "عطل تقني: تُعاد المحاولة تلقائياً، ثم تظهر في قائمة المرفوض/الفاشل مع تنبيه في لوحة المعلومات.",
                     "الإشعار الدائن لا يُرسل إلا بعد قبول فاتورته الأصلية.",
@@ -310,6 +312,7 @@ public static class HelpTopics
                 "Viewing invoices; the connection settings need settings rights.",
                 [
                     "Turn e-invoicing on and enter the connection details under Settings → E-invoicing.",
+                    "Choose the registration type: “Income tax” for a company not registered for sales tax (invoices are sent without sales tax; set the tax rate in Company settings to 0%), or “General sales tax” for a registered company (invoices include sales tax, 16% unless set otherwise). Special sales tax is not supported.",
                     "On approval the invoice is checked and any missing fields are listed.",
                     "It is submitted automatically: Queued, then Submitted.",
                     "The response (unique ID, system number, QR code) is stored and the QR code is printed on the invoice.",
@@ -317,6 +320,7 @@ public static class HelpTopics
                 ],
                 [
                     "The check fails: the invoice stays Queued with the fields to fix.",
+                    "Registration type “Income tax” and the invoice has sales tax: it is not sent; correct the registration type or the tax rate.",
                     "Rejected: the reason is shown; fix it and submit again.",
                     "A technical failure: it is retried automatically, then listed as Rejected/Failed with a dashboard alert.",
                     "A credit note is submitted only after its original invoice is accepted.",

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.EInvoicing;
+using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
@@ -68,6 +69,26 @@ public sealed class EInvoiceTests(ApiFactory f)
             .RunOnceAsync(CancellationToken.None);
 
     // ------------------------------------------------------------------ settings (FR-059, SEC-09)
+
+    [Fact]
+    public async Task Special_sales_tax_cannot_be_saved_and_the_two_offered_types_can_DT223()
+    {
+        var (o, _) = await WorldAsync(enable: false);
+        var current = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.GetAsync(U(o, "/settings/e-invoicing")));
+        var special = await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"), Simulator(rowVersion: current.RowVersion) with { RegistrationType = EInvoiceCodes.Special });
+        Assert.Equal(HttpStatusCode.BadRequest, special.StatusCode);
+        var text = await special.Content.ReadAsStringAsync();
+        Assert.Contains(ErrorCodes.EInvoiceSpecialNotSupported, text, StringComparison.Ordinal);
+        Assert.Contains("registrationType", text, StringComparison.Ordinal);
+        Assert.Null(await f.DbAsync(db => db.Set<EInvoiceSettings>().IgnoreQueryFilters().Where(s => s.RegistrationType == EInvoiceCodes.Special).Select(s => (long?)s.Id).FirstOrDefaultAsync()));
+        foreach (var type in new[] { EInvoiceCodes.Income, EInvoiceCodes.Sales })
+        {
+            var saved = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"),
+                Simulator(rowVersion: current.RowVersion) with { RegistrationType = type }));
+            Assert.Equal(type, saved.RegistrationType);
+            current = saved;
+        }
+    }
 
     [Fact]
     public async Task Settings_store_credentials_encrypted_write_only_and_require_values_when_enabled()

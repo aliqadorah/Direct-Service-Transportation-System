@@ -61,6 +61,8 @@ public sealed class EInvoiceSettingsService(IAppDbContext db, ISecretProtector p
         new Validator()
             .Check(Available.Contains(connector, StringComparer.Ordinal), "connector", ErrorCodes.ValidationFormat)
             .Check(RegistrationTypes.Contains(registration, StringComparer.Ordinal), "registrationType", ErrorCodes.ValidationFormat)
+            // DT-223: special sales tax is not offered and cannot be saved (the connector refuses it too, as a second net).
+            .Check(registration != EInvoiceCodes.Special, "registrationType", ErrorCodes.EInvoiceSpecialNotSupported)
             .Check(Environments.Contains(environment, StringComparer.Ordinal), "environment", ErrorCodes.ValidationFormat)
             .Check(!(connector == EInvoiceCodes.Simulator && environment == EInvoiceCodes.Production), "environment", ErrorCodes.ValidationFormat)
             .Check(seller is null || (seller.Length <= 30 && seller.All(char.IsAsciiDigit)), "sellerTaxNumber", ErrorCodes.ValidationFormat)
