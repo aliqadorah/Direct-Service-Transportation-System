@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.Api.Tests;
 
@@ -59,7 +60,7 @@ public sealed class SupportAccessTests(ApiFactory f)
         Assert.Equal("support.requestNotFound", await reject.ProblemCodeAsync());
         Assert.Equal(HttpStatusCode.NotFound, (await b.Client.PostAsync($"/api/v1/tenant/support-access/{requested.Id}/end", null)).StatusCode);
         Assert.Equal("Requested", Assert.Single(await TenantListAsync(a)).Status);
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(a, "/customers"))).StatusCode);
+        Assert.Equal("support.notApproved", await (await staff.Client.GetAsync(U(a, "/customers"))).ProblemCodeAsync());   // 403 with the reason (DT-220)
 
         // A malformed token gets the same answer.
         Assert.Equal("support.requestNotFound", await (await a.Client.PostAsJsonAsync("/api/v1/tenant/support-access/not-a-token/approve",
@@ -98,7 +99,7 @@ public sealed class SupportAccessTests(ApiFactory f)
             .Where(u => u.Email == owner.Email).Select(u => u.TenantId!.Value).First()).Select(g => g.Id).SingleAsync()));
         await f.DbAsync(db => db.Set<SupportAccessGrant>().IgnoreQueryFilters().Where(g => g.Id == pid)
             .ExecuteUpdateAsync(s => s.SetProperty(g => g.StartsAt, DateTime.UtcNow.AddDays(-1)).SetProperty(g => g.EndsAt, DateTime.UtcNow.AddSeconds(-1))));
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);
+        Assert.Equal("support.windowExpired", await (await staff.Client.GetAsync(U(owner, "/customers"))).ProblemCodeAsync());   // 403 with the reason (DT-220)
         Assert.Equal("Expired", (await ConsoleRowAsync(staff, requested.Id)).Status);
         Assert.Equal("Expired", Assert.Single(await TenantListAsync(owner)).Status);
         // A second decision on a decided request is refused with its own message.
@@ -125,7 +126,7 @@ public sealed class SupportAccessTests(ApiFactory f)
         Assert.Equal(owner.Me.FullName, row.DecidedBy);
         Assert.Null(row.StartsAt);
         Assert.Contains("Not needed now", f.Emails.Last(staff.Email, "SupportDecision").TextBody, StringComparison.Ordinal);
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);
+        Assert.Equal("support.notApproved", await (await staff.Client.GetAsync(U(owner, "/customers"))).ProblemCodeAsync());   // 403 with the reason (DT-220)
         // A refusal needs a reason.
         var other = await RequestAsync(staff, owner, "again");
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.Client.PostAsJsonAsync($"/api/v1/tenant/support-access/{other.Id}/reject", new ReasonRequest(" "))).StatusCode);
@@ -165,5 +166,118 @@ public sealed class SupportAccessTests(ApiFactory f)
         // Too short a text finds nothing; tenants cannot search.
         Assert.Empty(await SearchAsync(staff, "T"));
         Assert.Equal(HttpStatusCode.NotFound, (await a.Client.GetAsync("/api/v1/platform/support-access/tenants?q=Twin")).StatusCode);
+    }
+
+    // ------------------------------------------------------------------ a window that closes while the staff member is inside (DT-220)
+
+    private async Task<(SignedInUser Staff, SignedInUser Owner, SupportAccessResponse Grant)> OpenWindowAsync()
+    {
+        var staff = await PlatformTests.StaffAsync(f);
+        var owner = await f.SignUpOwnerAsync();
+        var requested = await RequestAsync(staff, owner, "Dashboard check");
+        await (await owner.Client.PostAsJsonAsync($"/api/v1/tenant/support-access/{requested.Id}/approve", new SupportApprovalRequest(null, null, null, 24))).EnsureOkAsync();
+        Assert.Equal(HttpStatusCode.OK, (await staff.Client.GetAsync(U(owner, "/dashboard"))).StatusCode);
+        return (staff, owner, requested);
+    }
+
+    private static async Task<System.Text.Json.JsonElement> ProblemAsync(HttpResponseMessage r)
+    {
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+        return await r.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+    }
+
+    /// <summary>Every read of the company after the end: a 403 with a support reason, never a server error (the owner saw one on the dashboard).</summary>
+    private async Task AllReadsRefusedAsync(SignedInUser staff, SignedInUser owner, string code)
+    {
+        var routes = f.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints.OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText!.StartsWith("/api/v1/companies/{company}", StringComparison.Ordinal)
+                && e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods.Contains("GET") == true)
+            .Select(e => SecurityTests.Fill(e.RoutePattern.RawText!, owner.CompanyId)).Distinct().ToList();
+        Assert.True(routes.Count > 100);
+        foreach (var url in routes)
+        {
+            var r = await staff.Client.GetAsync(url);
+            Assert.True(r.StatusCode == HttpStatusCode.Forbidden, $"GET {url} after the window closed returned {(int)r.StatusCode}");
+            Assert.Equal(code, await r.ProblemCodeAsync());
+        }
+    }
+
+    private Task<Guid> PublicIdAsync(string email) =>
+        f.DbAsync(db => db.Set<User>().IgnoreQueryFilters().Where(u => u.Email == email).Select(u => u.PublicId).SingleAsync());
+
+    [Fact]
+    public async Task A_window_ended_by_the_subscriber_refuses_with_403_ended_by_subscriber_never_500_DT220()
+    {
+        var (staff, owner, grant) = await OpenWindowAsync();
+        var before = DateTime.UtcNow.AddSeconds(-5);
+        await (await owner.Client.PostAsync($"/api/v1/tenant/support-access/{grant.Id}/end", null)).EnsureOkAsync();
+
+        var problem = await ProblemAsync(await staff.Client.GetAsync(U(owner, "/dashboard")));
+        Assert.Equal("support.endedBySubscriber", problem.GetProperty("code").GetString());
+        Assert.Equal(owner.Me.FullName, problem.GetProperty("endedBy").GetString());
+        Assert.InRange(problem.GetProperty("endedAt").GetDateTime().ToUniversalTime(), before, DateTime.UtcNow.AddSeconds(5));
+        Assert.Contains("ended the support session at", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
+        await AllReadsRefusedAsync(staff, owner, "support.endedBySubscriber");
+        // The page address itself is the app (no data, no prerendering): a reload shows the app's message, never a raw problem document.
+        var shellPage = await staff.Client.GetAsync($"/c/{owner.CompanyId}");
+        Assert.Equal(HttpStatusCode.OK, shellPage.StatusCode);
+        Assert.Equal("text/html", shellPage.Content.Headers.ContentType?.MediaType);
+
+        // Pushed to the staff member's open pages at once, with the tenant's company tokens; emailed; in the audit log; in the console list.
+        var staffId = await PublicIdAsync(staff.Email);
+        var push = Assert.Single(f.Live.SupportEnds, p => p.Staff == staffId);
+        var payload = System.Text.Json.JsonSerializer.SerializeToElement(push.Payload);
+        Assert.Equal("support.endedBySubscriber", payload.GetProperty("reason").GetString());
+        Assert.Contains(payload.GetProperty("companies").EnumerateArray(), c => c.GetString() == owner.CompanyId);
+        Assert.Contains("ended your support session", f.Emails.Last(staff.Email, "SupportEnded").TextBody, StringComparison.Ordinal);
+        Assert.True(await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.Action == "End" && a.EntityType == "CORE.SupportAccessGrant")));
+        var row = await ConsoleRowAsync(staff, grant.Id);
+        Assert.Equal("Expired", row.Status);
+        Assert.Equal(owner.Me.FullName, row.EndedBy);
+    }
+
+    [Fact]
+    public async Task A_window_past_its_end_refuses_with_403_window_expired_and_the_job_closes_it_DT220()
+    {
+        var (staff, owner, grant) = await OpenWindowAsync();
+        var tenantId = await f.DbAsync(db => db.Set<User>().IgnoreQueryFilters().Where(u => u.Email == owner.Email).Select(u => u.TenantId!.Value).SingleAsync());
+        var end = DateTime.UtcNow.AddSeconds(-1);
+        await f.DbAsync(db => db.Set<SupportAccessGrant>().IgnoreQueryFilters().Where(g => g.TenantId == tenantId)
+            .ExecuteUpdateAsync(s => s.SetProperty(g => g.StartsAt, DateTime.UtcNow.AddDays(-1)).SetProperty(g => g.EndsAt, end)));
+
+        // Before the job runs: refused with the expiry reason already.
+        var problem = await ProblemAsync(await staff.Client.GetAsync(U(owner, "/dashboard")));
+        Assert.Equal("support.windowExpired", problem.GetProperty("code").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, problem.GetProperty("endedBy").ValueKind);
+
+        // The window job closes it: Expired, "Expire" in the audit log, pushed and emailed; then every read answers the same.
+        using (var scope = f.Services.CreateScope())
+            Assert.True(await scope.ServiceProvider.GetRequiredService<Application.Platform.SupportAccessService>().ExpireDueAsync(CancellationToken.None) >= 1);
+        Assert.Equal("Expired", await f.DbAsync(db => db.Set<SupportAccessGrant>().IgnoreQueryFilters().Where(g => g.TenantId == tenantId).Select(g => g.Status).SingleAsync()));
+        Assert.True(await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.TenantId == tenantId && a.Action == "Expire")));
+        var staffId = await PublicIdAsync(staff.Email);
+        Assert.Contains(f.Live.SupportEnds, p => p.Staff == staffId
+            && System.Text.Json.JsonSerializer.SerializeToElement(p.Payload).GetProperty("reason").GetString() == "support.windowExpired");
+        Assert.Contains("support window", f.Emails.Last(staff.Email, "SupportEnded").TextBody, StringComparison.Ordinal);
+        await AllReadsRefusedAsync(staff, owner, "support.windowExpired");
+        var row = await ConsoleRowAsync(staff, grant.Id);
+        Assert.Equal("Expired", row.Status);
+        Assert.Null(row.EndedBy);
+        // Nothing left to close: the job does not close it twice.
+        using (var scope = f.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<Application.Platform.SupportAccessService>().ExpireDueAsync(CancellationToken.None);
+        Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.TenantId == tenantId && a.Action == "Expire")));
+    }
+
+    [Fact]
+    public async Task A_request_not_approved_refuses_with_403_not_approved_and_no_grant_stays_404_DT220()
+    {
+        var staff = await PlatformTests.StaffAsync(f);
+        var owner = await f.SignUpOwnerAsync();
+        var stranger = await f.SignUpOwnerAsync();
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(stranger, "/dashboard"))).StatusCode);   // no grant: nothing revealed
+        await RequestAsync(staff, owner, "Pending");
+        var problem = await ProblemAsync(await staff.Client.GetAsync(U(owner, "/dashboard")));
+        Assert.Equal("support.notApproved", problem.GetProperty("code").GetString());
     }
 }

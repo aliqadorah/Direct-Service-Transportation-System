@@ -102,6 +102,9 @@ public interface IRealtimeNotifier
     /// <summary>A new in-app notification for one user (FR-190): pushed to that user's connections.</summary>
     Task NotifyUserAsync(Guid userPublicId, object notification, CancellationToken ct);
     Task LockChangedAsync(long companyId, string entityType, string token, string? holderName, CancellationToken ct);
+
+    /// <summary>A support window of this staff member ended (subscriber or expiry, DT-220): pushed to the staff member's open pages.</summary>
+    Task SupportEndedAsync(Guid staffPublicId, object payload, CancellationToken ct);
 }
 
 /// <summary>Application settings bound from configuration.</summary>

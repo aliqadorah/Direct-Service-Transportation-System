@@ -66,7 +66,10 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext http, RequestContext ctx, DataScope scope, AccessService access, IUrlTokenService tokens, IAppDbContext db, TimeProvider clock)
     {
-        if (http.GetRouteValue("company") is string token && ctx.UserId is long userId)
+        // API requests only: the pages /c/{company}/… are the WebAssembly shell without data (no prerendering); it asks the API, which is
+        // checked here. A page address of a closed support window or another tenant's company then shows the app's own message (with the
+        // reason, DT-220) instead of a raw problem document.
+        if (http.GetRouteValue("company") is string token && ctx.UserId is long userId && http.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
         {
             var publicId = tokens.Decode<Company>(token);
             if (ctx.IsPlatformStaff && ctx.TenantId is null)
@@ -108,6 +111,16 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
         var window = company is null ? false : await db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters()
             .AnyAsync(g => g.TenantId == company.TenantId && g.RequestedBy == userId && !g.IsDeleted && g.Status == "Approved" && g.StartsAt <= now && g.EndsAt > now,
                 http.RequestAborted).ConfigureAwait(false);
+        // A window of this staff member for the tenant that is closed (ended by the subscriber, expired, not approved): a clear 403 with the
+        // reason, when and by whom (owner testing 20 Oct 2026, DT-220). Without any grant for that tenant the company stays "not found".
+        if (company is not null && !window
+            && await Application.Platform.SupportAccessService.WhyClosedAsync(db, company.TenantId, userId, now, http.RequestAborted).ConfigureAwait(false) is { } closed)
+        {
+            var at = closed.At?.ToString("HH:mm", CultureInfo.InvariantCulture) + " UTC";
+            await ProblemWriter.WriteAsync(http, closed.Code, StatusCodes.Status403Forbidden, ctx.Language, args: [at, closed.By],
+                extensions: new Dictionary<string, object?> { ["reason"] = closed.Code, ["endedAt"] = closed.At, ["endedBy"] = closed.By }).ConfigureAwait(false);
+            return;
+        }
         if (company is null || !window)
         {
             await ProblemWriter.WriteAsync(http, Contracts.Errors.ErrorCodes.NotFound, StatusCodes.Status404NotFound, ctx.Language).ConfigureAwait(false);

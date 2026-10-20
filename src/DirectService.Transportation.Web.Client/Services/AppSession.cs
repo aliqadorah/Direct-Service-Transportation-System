@@ -40,10 +40,16 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
         await EnsureLoadedAsync().ConfigureAwait(false);
         // Staff: the window list is read again on every company change, so an ended window shows "not found" (review L3).
         var staff = shell.Me?.IsPlatformStaff == true;
-        if (staff && company != _companyLoaded && !await LoadSupportCompaniesAsync().ConfigureAwait(false)) return false;
+        if (staff && company != _companyLoaded) await LoadSupportCompaniesAsync().ConfigureAwait(false);
         // A newer switch started meanwhile (DT-187): this one must not select its company after it.
         if (_entering != company) throw new OperationCanceledException("Another company is being opened.");
-        if (!shell.SelectCompany(company)) return false;
+        if (!shell.SelectCompany(company))
+        {
+            // Staff whose window closed (e.g. a reload after the subscriber ended it): the server says why (403 with the reason), and the shell
+            // shows it instead of "not found" (DT-220). Without any window for that subscriber the server answers 404: "not found" stays.
+            if (staff) await AskWhySupportClosedAsync(company).ConfigureAwait(false);
+            return false;
+        }
         if (_companyLoaded == company) return true;
         _companyLoaded = company;
         // The old company's figures never stay on the shell of the new one.
@@ -107,6 +113,19 @@ public sealed class AppSession(Api api, ShellState shell, Loc loc, NavigationMan
         catch (ApiException)
         {
             return false;
+        }
+    }
+
+    /// <summary>One request to the company: a closed window answers 403 with its reason, which <see cref="Api"/> hands to the shell.</summary>
+    private async Task AskWhySupportClosedAsync(string company)
+    {
+        try
+        {
+            await api.GetAsync<SetupChecklistResponse>(Api.C(company, "setup-checklist")).ConfigureAwait(false);
+        }
+        catch (ApiException)
+        {
+            // 403 with a support reason: the shell already shows it; any other answer: "not found".
         }
     }
 

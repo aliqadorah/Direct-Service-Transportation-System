@@ -24,7 +24,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// IgnoreQueryFilters had switched the filter off for the whole list query, so another tenant's requests were listed).
 /// </summary>
 public sealed partial class SupportAccessService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, TimeProvider clock,
-    IEmailSender email, IOptions<AppOptions> app, Microsoft.Extensions.Logging.ILogger<SupportAccessService> log)
+    IEmailSender email, IOptions<AppOptions> app, Microsoft.Extensions.Logging.ILogger<SupportAccessService> log, IRealtimeNotifier live, DataScope scope)
 {
     public const int MaxWindowDays = 7;
 
@@ -32,6 +32,11 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     public const string RejectAction = "Reject";
 
     public const string GrantEntity = "CORE.SupportAccessGrant";
+
+    /// <summary>Audit actions of a window that closed: ended early by the subscriber, or expired at its end time (DT-220).</summary>
+    public const string EndAction = "End";
+
+    public const string ExpireAction = "Expire";
 
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
 
@@ -50,13 +55,14 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         var names = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName })
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct).ConfigureAwait(false);
         var refusals = await RefusalReasonsAsync(db, tenantId, grants.Where(g => g.Status == LifecycleCodes.Rejected).Select(g => g.Id).ToList(), ct).ConfigureAwait(false);
+        var ends = await EndsAsync(db, tenantId, grants.Where(g => g.Status == LifecycleCodes.Expired).Select(g => g.Id).ToList(), ct).ConfigureAwait(false);
         var tenant = await db.Set<Tenant>().AsNoTracking().Where(t => t.Id == tenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
         var now = Now;
         return grants.Select(g => new SupportAccessResponse(support.Token<SupportAccessGrant>(g.PublicId), tenant, names.GetValueOrDefault(g.RequestedBy) ?? string.Empty, g.Reason,
             g.Status == LifecycleCodes.Approved && g.EndsAt <= now ? LifecycleCodes.Expired : g.Status,
             g.StartsAt is DateTime s ? DateTime.SpecifyKind(s, DateTimeKind.Utc) : null, g.EndsAt is DateTime e ? DateTime.SpecifyKind(e, DateTimeKind.Utc) : null,
             g.ApprovedBy is long by ? names.GetValueOrDefault(by) : null, DateTime.SpecifyKind(g.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(g.RowVersion),
-            refusals.GetValueOrDefault(g.Id))).ToList();
+            refusals.GetValueOrDefault(g.Id), EndedBy: ends.GetValueOrDefault(g.Id))).ToList();
     }
 
     /// <summary>The Owner's reason of each refused request (from its "Reject" audit row; no schema change), by grant id.</summary>
@@ -149,9 +155,98 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         if (g.Status != LifecycleCodes.Approved || g.EndsAt <= Now) throw Fail.Rule(ErrorCodes.SupportNotOpen);
         g.Status = LifecycleCodes.Expired;
         g.EndsAt = Now > g.StartsAt ? Now : g.StartsAt!.Value.AddSeconds(1);
-        changes.SetAction(g, "End");
+        changes.SetAction(g, EndAction);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await AnnounceEndAsync(g, ctx.UserName ?? string.Empty, ct).ConfigureAwait(false);
         return await ListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes every approved window whose end time has passed (support window job, DT-220): status Expired, an "Expire" row in the tenant's
+    /// audit log (system account), and the staff member's open pages and mailbox are told. Returns the number closed.
+    /// </summary>
+    public async Task<int> ExpireDueAsync(CancellationToken ct)
+    {
+        var now = Now;
+        var due = await db.Set<SupportAccessGrant>().IgnoreQueryFilters().Where(g => !g.IsDeleted && g.Status == LifecycleCodes.Approved && g.EndsAt <= now)
+            .OrderBy(g => g.Id).Take(100).ToListAsync(ct).ConfigureAwait(false);
+        var system = await db.Set<User>().IgnoreQueryFilters().Where(u => u.Email == TenantLifecycleService.SystemEmail).Select(u => (long?)u.Id)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        foreach (var g in due)
+        {
+            using (scope.Use(g.TenantId, null, system))
+            {
+                g.Status = LifecycleCodes.Expired;
+                changes.SetAction(g, ExpireAction);
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+            await AnnounceEndAsync(g, null, ct).ConfigureAwait(false);
+        }
+        return due.Count;
+    }
+
+    /// <summary>
+    /// Tells the staff member a window ended: a live message to every open page (with the tenant's company tokens, so only pages of that
+    /// tenant leave) and an email. The end is already saved; a failure to tell is logged and never undoes it.
+    /// </summary>
+    private async Task AnnounceEndAsync(SupportAccessGrant g, string? endedBy, CancellationToken ct)
+    {
+        try
+        {
+            var staff = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy && u.IsPlatformStaff && !u.IsDeleted)
+                .Select(u => new { u.PublicId, u.Email, u.FullName }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+            if (staff is null) return;
+            var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => c.TenantId == g.TenantId && !c.IsDeleted)
+                .Select(c => c.PublicId).ToListAsync(ct).ConfigureAwait(false);
+            var at = DateTime.SpecifyKind(g.EndsAt ?? Now, DateTimeKind.Utc);
+            var reason = endedBy is null ? ErrorCodes.SupportWindowExpired : ErrorCodes.SupportEndedBySubscriber;
+            await live.SupportEndedAsync(staff.PublicId, new { reason, endedAt = at, endedBy, companies = companies.Select(c => support.Token<Company>(c)).ToList() }, ct)
+                .ConfigureAwait(false);
+            if (staff.Email is null) return;
+            var tenant = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
+            await email.SendAsync(EmailTemplates.SupportEnded(staff.Email, staff.FullName, tenant, endedBy, at,
+                $"{app.Value.PublicBaseUrl.TrimEnd('/')}/console/support-access"), ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogEmailFailed(log, g.Id, ex);
+        }
+    }
+
+    /// <summary>Why a staff member's support session for a tenant is closed (the request pipeline answers 403 with it), or null when there is no
+    /// grant at all for that tenant (then the company stays "not found", nothing is revealed).</summary>
+    public sealed record ClosedWindow(string Code, DateTime? At, string? By);
+
+    public static async Task<ClosedWindow?> WhyClosedAsync(IAppDbContext db, long tenantId, long staffId, DateTime now, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        var g = await db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.RequestedBy == staffId && !x.IsDeleted).OrderByDescending(x => x.Id)
+            .Select(x => new { x.Id, x.Status, x.StartsAt, x.EndsAt }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (g is null) return null;
+        if (g.Status is LifecycleCodes.Approved or LifecycleCodes.Expired && g.EndsAt is DateTime ends && ends <= now)
+        {
+            var ended = (await EndsAsync(db, tenantId, [g.Id], ct).ConfigureAwait(false)).GetValueOrDefault(g.Id);
+            var at = DateTime.SpecifyKind(ends, DateTimeKind.Utc);
+            return ended is not null ? new ClosedWindow(ErrorCodes.SupportEndedBySubscriber, at, ended) : new ClosedWindow(ErrorCodes.SupportWindowExpired, at, null);
+        }
+        return new ClosedWindow(ErrorCodes.SupportNotApproved, null, null);
+    }
+
+    /// <summary>Who ended each window early (from its "End" audit row; a window that simply expired has none), by grant id.</summary>
+    internal static async Task<Dictionary<long, string>> EndsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    {
+        if (grantIds.Count == 0) return [];
+        var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
+            .Where(a => a.EntityType == GrantEntity && a.Action == EndAction && a.EntityId != null && grantIds.Contains(a.EntityId.Value)
+                && (tenantId == null || a.TenantId == tenantId))
+            .OrderBy(a => a.Id).Select(a => new { Id = a.EntityId!.Value, a.UserId }).ToListAsync(ct).ConfigureAwait(false);
+        var users = rows.Where(r => r.UserId != null).Select(r => r.UserId!.Value).Distinct().ToList();
+        var names = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => users.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FullName, ct)
+            .ConfigureAwait(false);
+        var result = new Dictionary<long, string>();
+        foreach (var r in rows) result[r.Id] = r.UserId is long id ? names.GetValueOrDefault(id) ?? string.Empty : string.Empty;
+        return result;
     }
 
     /// <summary>Read-only permissions of a support session (G-09: all view permissions of the company, nothing that creates or changes).</summary>

@@ -34,11 +34,12 @@ internal static class ProblemWriter
     }
 
     public static async Task WriteAsync(HttpContext http, string code, int status, string language, string? field = null,
-        object?[]? args = null, IReadOnlyList<FieldError>? errors = null)
+        object?[]? args = null, IReadOnlyList<FieldError>? errors = null, IReadOnlyDictionary<string, object?>? extensions = null)
     {
         http.Response.StatusCode = status;
         var problem = Build(code, status, language, field, args ?? [], errors);
         problem.Extensions["traceId"] = http.TraceIdentifier;
+        foreach (var (key, value) in extensions ?? new Dictionary<string, object?>()) problem.Extensions[key] = value;
         await http.Response.WriteAsJsonAsync(problem, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json", http.RequestAborted)
             .ConfigureAwait(false);
     }

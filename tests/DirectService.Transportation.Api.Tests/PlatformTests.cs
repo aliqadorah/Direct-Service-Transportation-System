@@ -429,7 +429,7 @@ public sealed class PlatformTests(ApiFactory f)
         var requested = await ReadAsync<SupportAccessResponse>(await staff.Client.PostAsJsonAsync("/api/v1/platform/support-access", new SupportAccessRequest(tenantToken, "Invoice printing issue")));
         Assert.Equal("Requested", requested.Status);
         Assert.Contains((await ReadAsync<NotificationPage>(await owner.Client.GetAsync(U(owner, "/notifications")))).Items, n => n.Type == "CORE.SupportRequested");
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);   // not approved yet
+        Assert.Equal("support.notApproved", await (await staff.Client.GetAsync(U(owner, "/customers"))).ProblemCodeAsync());   // 403 with the reason (DT-220)   // not approved yet
         Assert.DoesNotContain(await ReadAsync<List<CompanyAccess>>(await staff.Client.GetAsync("/api/v1/platform/support-access/companies")), c => c.Id == owner.CompanyId);
         Assert.Equal(HttpStatusCode.NotFound, (await owner.Client.GetAsync("/api/v1/platform/support-access/companies")).StatusCode);   // staff only
 
@@ -454,7 +454,7 @@ public sealed class PlatformTests(ApiFactory f)
 
         // The Owner ends the window → no access.
         await (await owner.Client.PostAsync($"/api/v1/tenant/support-access/{grants[0].Id}/end", null)).EnsureOkAsync();
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.Client.GetAsync(U(owner, "/customers"))).StatusCode);
+        Assert.Equal("support.endedBySubscriber", await (await staff.Client.GetAsync(U(owner, "/customers"))).ProblemCodeAsync());   // 403 with the reason (DT-220)
         Assert.DoesNotContain(await ReadAsync<List<CompanyAccess>>(await staff.Client.GetAsync("/api/v1/platform/support-access/companies")), c => c.Id == owner.CompanyId);
     }
 }

@@ -28,6 +28,9 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
     public event Action<LockChange>? LockChanged;
     public event Action<JsonElement>? Notification;
 
+    /// <summary>The staff member's support window ended (DT-220): reason, when, who, and the tenant's company tokens.</summary>
+    public event Action<JsonElement>? SupportEnded;
+
     /// <summary>Raised after the connection came back: screens reload what they show (RT-02).</summary>
     public event Action? Reconnected;
 
@@ -60,6 +63,7 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
                 _hub.On<JsonElement>("recordChanged", OnRecord);
                 _hub.On<JsonElement>("lockChanged", OnLock);
                 _hub.On<JsonElement>("notification", n => Notification?.Invoke(n));
+                _hub.On<JsonElement>("supportEnded", e => SupportEnded?.Invoke(e));
                 _hub.Reconnected += async _ =>
                 {
                     try { if (_company is not null) await _hub.InvokeAsync<bool>("JoinCompany", _company).ConfigureAwait(false); }
@@ -110,6 +114,9 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
     }
 
     public void RaiseLock(LockChange change) => LockChanged?.Invoke(change);
+
+    /// <summary>For tests: as if the hub had sent "supportEnded".</summary>
+    public void RaiseSupportEnded(JsonElement payload) => SupportEnded?.Invoke(payload);
 
     private void OnRecord(JsonElement e) =>
         Raise(new LiveChange(Text(e, "entityType") ?? "", Text(e, "id"), Text(e, "action") ?? "", Text(e, "by")));

@@ -77,6 +77,26 @@ public static class EmailTemplates
                 "فتح طلبات الوصول", "Open support access", link, nameof(SupportDecision));
     }
 
+    /// <summary>
+    /// A support window of the staff member ended (owner testing 20 Oct 2026, DT-220): ended early by the subscriber (<paramref name="endedBy"/>
+    /// names who) or expired; the time is UTC.
+    /// </summary>
+    public static EmailMessage SupportEnded(string to, string name, string tenant, string? endedBy, DateTime atUtc, string link)
+    {
+        var when = atUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+        return endedBy is not null
+            ? Build(to,
+                $"أنهى المشترك جلسة الدعم — Support session ended by the subscriber: {tenant}",
+                $"مرحباً {E(name)}،<br>أنهى {E(endedBy)} جلسة الدعم في {E(tenant)} بتاريخ {when}. لم يعد بإمكانك الاطلاع على بياناته.",
+                $"Hello {E(name)},<br>{E(endedBy)} ended your support session for {E(tenant)} on {when}. You can no longer view its data.",
+                "فتح طلبات الوصول", "Open support access", link, nameof(SupportEnded))
+            : Build(to,
+                $"انتهت نافذة الدعم — Support window ended: {tenant}",
+                $"مرحباً {E(name)}،<br>انتهت نافذة الدعم في {E(tenant)} بتاريخ {when}. اطلب نافذة جديدة إن احتجت.",
+                $"Hello {E(name)},<br>Your support window for {E(tenant)} ended on {when}. Request a new window if you need one.",
+                "فتح طلبات الوصول", "Open support access", link, nameof(SupportEnded));
+    }
+
     private static EmailMessage Build(string to, string subject, string ar, string en, string buttonAr, string buttonEn, string link, string template)
     {
         var safeLink = WebUtility.HtmlEncode(link);

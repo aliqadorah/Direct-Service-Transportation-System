@@ -22,7 +22,12 @@ else
               OnLanguage="Session.SetLanguageAsync" OnSignOut="Session.SignOutAsync">
         <Banners><TenantBanners /></Banners>
         <ChildContent>
-            @if (_switching)
+            @if (Shell.SupportEnded is { } ended)
+            {
+                @* The support window closed (DT-220): only the reason and the way back; the company's pages are gone. *@
+                <SupportEndedView End="ended" />
+            }
+            else if (_switching)
             {
                 @* Switching company (DT-187): no page is built until the new company is selected, so none asks for the old one's data. *@
                 <div class="empty" role="status"><div class="sk" style="width:48px;height:48px;border-radius:50%"></div><span class="muted">@L["ui.loading"]</span></div>
@@ -62,6 +67,8 @@ else
         _lastUri = Nav.Uri;
         Nav.LocationChanged += Moved;
         Live.Notification += Notified;
+        Live.SupportEnded += SupportEnded;
+        Shell.Changed += ShellChanged;
         _company = CompanyOfUrl() ?? Shell.Company?.Id;
         _started = true;
         await Load();
@@ -162,9 +169,29 @@ else
         StateHasChanged();
     });
 
+    /// <summary>
+    /// The staff member's support window ended (live message, DT-220): when it names the company on screen, the shell leaves it at once and
+    /// shows why — not only at the next request.
+    /// </summary>
+    private void SupportEnded(System.Text.Json.JsonElement e) => _ = InvokeAsync(() =>
+    {
+        if (Shell.Me?.IsPlatformStaff != true || Shell.Company?.Id is not { } company) return;
+        var companies = e.TryGetProperty("companies", out var list) && list.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? list.EnumerateArray().Select(x => x.GetString()).ToList() : [];
+        if (!companies.Contains(company)) return;
+        var reason = e.TryGetProperty("reason", out var r) ? r.GetString() : null;
+        DateTime? at = e.TryGetProperty("endedAt", out var a) && a.TryGetDateTime(out var t) ? DateTime.SpecifyKind(t.ToUniversalTime(), DateTimeKind.Utc) : null;
+        var by = e.TryGetProperty("endedBy", out var b) && b.ValueKind == System.Text.Json.JsonValueKind.String ? b.GetString() : null;
+        Shell.EndSupport(new ShellState.SupportEnd(reason ?? Contracts.Errors.ErrorCodes.SupportWindowExpired, at, by));
+    });
+
+    private void ShellChanged() => _ = InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         Nav.LocationChanged -= Moved;
         Live.Notification -= Notified;
+        Live.SupportEnded -= SupportEnded;
+        Shell.Changed -= ShellChanged;
     }
 }

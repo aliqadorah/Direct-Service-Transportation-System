@@ -161,8 +161,15 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
         {
             nav.NavigateTo("sign-in?returnUrl=" + Uri.EscapeDataString("/" + nav.ToBaseRelativePath(nav.Uri)), forceLoad: true);
         }
+        // A staff member's support window closed (DT-220): the shell leaves the company and says why, whatever page asked.
+        if (problem.Status == 403 && IsSupportEnd(problem.Code) && shell.Me?.IsPlatformStaff == true)
+            shell.EndSupport(new ShellState.SupportEnd(problem.Code!, problem.EndedAt, problem.EndedBy));
         throw Failed(problem);
     }
+
+    /// <summary>The reasons the server gives when a support window is no longer open.</summary>
+    public static bool IsSupportEnd(string? code) =>
+        code is ErrorCodes.SupportEndedBySubscriber or ErrorCodes.SupportWindowExpired or ErrorCodes.SupportNotApproved;
 
     /// <summary>The code of a call that got no answer (status 0).</summary>
     public const string NetworkCode = "network";

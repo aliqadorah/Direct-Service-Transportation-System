@@ -317,4 +317,12 @@ public sealed class RecordingNotifier : IRealtimeNotifier
         Notifications.Enqueue((userPublicId, notification));
         return Task.CompletedTask;
     }
+
+    public ConcurrentQueue<(Guid Staff, object Payload)> SupportEnds { get; } = new();
+
+    public Task SupportEndedAsync(Guid staffPublicId, object payload, CancellationToken ct)
+    {
+        SupportEnds.Enqueue((staffPublicId, payload));
+        return Task.CompletedTask;
+    }
 }

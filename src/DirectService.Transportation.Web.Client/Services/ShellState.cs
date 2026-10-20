@@ -57,6 +57,7 @@ public sealed class ShellState : IDisposable
     {
         var c = Me?.Companies.FirstOrDefault(x => x.Id == token);
         if (c is null) return false;
+        SupportEnded = null;
         if (!ReferenceEquals(c, Company))
         {
             if (Company?.Id != c.Id) LeaveCompany();
@@ -64,6 +65,26 @@ public sealed class ShellState : IDisposable
             Changed?.Invoke();
         }
         return true;
+    }
+
+    /// <summary>Why the staff member's support session for the company on screen ended (DT-220): code, when (UTC) and who ended it.</summary>
+    public sealed record SupportEnd(string Reason, DateTime? At, string? By);
+
+    /// <summary>Set when the support window closed: the shell then shows only the "support ended" message — no banner, no company data.</summary>
+    public SupportEnd? SupportEnded { get; private set; }
+
+    /// <summary>
+    /// The support window closed (a 403 with its reason, or the live message): the company is left at once — its requests in flight are
+    /// cancelled and nothing of it stays selected — and the shell shows the reason.
+    /// </summary>
+    public void EndSupport(SupportEnd end)
+    {
+        ArgumentNullException.ThrowIfNull(end);
+        if (SupportEnded is not null) return;
+        SupportEnded = end;
+        LeaveCompany();
+        Company = null;
+        Changed?.Invoke();
     }
 
     public void SetDensity(string density)

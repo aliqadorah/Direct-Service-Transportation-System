@@ -11,7 +11,7 @@
 <div class="shell @(Provider ? "provider" : null) @(_menuOpen ? "menu-open" : null)" @key="L.Language">
     <SideNav Groups="Groups" Company="@(Shell.Company?.Id ?? "")" Foot="@Shell.PlanText" Provider="Provider" />
     <div class="main">
-        <TopBar Provider="Provider" Environment="@Shell.Me?.Environment" Companies="@(Shell.Me?.Companies ?? [])" CurrentCompany="@Shell.Company?.Id" UserName="@Shell.Me?.FullName"
+        <TopBar Provider="Provider" Environment="@Shell.Me?.Environment" Companies="@(Shell.SupportEnded is null ? Shell.Me?.Companies ?? [] : [])" CurrentCompany="@Shell.Company?.Id" UserName="@Shell.Me?.FullName"
                 Unread="Shell.UnreadNotifications" Density="@Shell.Density" OnCompany="OnCompany" OnCommandBar="OpenCommandBar" OnNotifications="OnNotifications"
                 OnProfile="OnProfile" OnMenu="() => _menuOpen = !_menuOpen" MenuOpen="_menuOpen" OnDensity="SetDensity" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
         <main class="content @(Fixed ? "fixed" : null)" id="content" tabindex="-1">
@@ -40,7 +40,8 @@
     [Parameter] public EventCallback<string> OnLanguage { get; set; }
     [Parameter] public EventCallback OnSignOut { get; set; }
 
-    private IReadOnlyList<NavGroup> Groups => Provider ? [] : NavModel.For(Shell.Permissions, Shell.SetupIncomplete);
+    // A closed support session (DT-220) keeps no menu of the company it left.
+    private IReadOnlyList<NavGroup> Groups => Provider || Shell.SupportEnded is not null ? [] : NavModel.For(Shell.Permissions, Shell.SetupIncomplete);
 
     private IReadOnlyList<CommandResult> Commands => Provider
         ? NavModel.Console.Select(c => new CommandResult(L[c.Key], L["shell.console"], c.Route)).ToList()

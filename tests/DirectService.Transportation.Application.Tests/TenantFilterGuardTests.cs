@@ -58,7 +58,7 @@ public sealed class TenantFilterGuardTests
         ["AuditDescriber.LoadAsync|PrepareAsync"] = "Names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only.",
         ["AuditLogService.FacetsAsync"] = "Users who have a row in this company's log: explicit CompanyId condition, names only.",
         ["RateHistoryLog.ReadAsync"] = "Names of the users who changed this company's rates (ids from the company's own rows), names only.",
-        ["SupportAccessService.ListAsync|RefusalReasonsAsync|TellStaffAsync"] = "Names of staff/Owners by ids from this tenant's own grants; audit rows by explicit TenantId (DT-213).",
+        ["SupportAccessService.ListAsync|RefusalReasonsAsync|TellStaffAsync|EndsAsync|AnnounceEndAsync|WhyClosedAsync|ExpireDueAsync"] = "Names of staff/Owners by ids from this tenant's own grants; audit rows by explicit TenantId (DT-213); a staff member's own window by explicit tenant/staff ids; the window job closes each grant in a scope set to its own tenant (DT-220).",
         ["MasterDataSupport.SaveCreateAsync"] = "Only whether a client id (random GUID) is already taken anywhere, to refuse its reuse; returns no data.",
         // Raw SQL locks and numbering (the filters do not apply to raw SQL).
         ["NumberingService"] = "Raw SQL row lock on the current company's own sequence row (explicit CompanyId).",

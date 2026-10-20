@@ -576,3 +576,46 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Owner testing 20 Oct 2026 (DT-220): a staff member is on the subscriber's dashboard in a support session when the subscriber ends the
+ * window. The staff page must show "ended by the subscriber at HH:MM" with "Back to provider console" — pushed live, without a new request —
+ * with no support banner and no company data; a reload shows the same (the server answers 403 with the reason, never a server error).
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — support session ended (${lang})`, async ({ page }) => {
+    test.skip(!wanted("support-ended"), "not among VISUAL_ONLY");
+    test.setTimeout(10 * 60_000);
+    const run = new VisualRun(lang, "support-ended");
+    const t = texts(lang);
+    const owner = await enrol(page, lang, new VisualRun(lang, "support-ended-enrol", false));
+    const company = companyOf(page);
+    const staff = await page.context().browser()!.newPage({ baseURL: BASE_URL, ignoreHTTPSErrors: true });
+    try {
+      await staffSignIn(staff, lang);
+      const found = await api<{ id: string; ownerEmail: string | null }[]>(staff, "GET", `/api/v1/platform/support-access/tenants?q=${encodeURIComponent(owner.email)}`);
+      await api(staff, "POST", "/api/v1/platform/support-access", { tenantId: found.find((x) => x.ownerEmail === owner.email)!.id, reason: "Visual check" });
+      const grants = await api<{ id: string; status: string }[]>(page, "GET", "/api/v1/tenant/support-access");
+      const grant = grants.find((g) => g.status === "Requested")!.id;
+      await api(page, "POST", `/api/v1/tenant/support-access/${grant}/approve`, { hours: 1 });
+      await staff.goto(`/c/${company}`);
+      await expect(staff.locator(".banner").filter({ hasText: t("banner.support") })).toBeVisible({ timeout: 30_000 });
+      // The page opens its live connection after it has loaded: give it a moment, as a person reading the dashboard would.
+      await staff.waitForTimeout(3000);
+      // The subscriber ends the window: the staff page changes by itself (live message).
+      await api(page, "POST", `/api/v1/tenant/support-access/${grant}/end`);
+      await expect(staff.locator("[data-testid=support-ended]")).toBeVisible({ timeout: 15_000 });
+      await expect(staff.locator(".banner").filter({ hasText: t("banner.support") })).toHaveCount(0);
+      await expect(staff.getByRole("link", { name: t("support.backToConsole") })).toBeVisible();
+      await run.check(staff, "support-ended#live");
+      // A reload asks the server again: 403 with the reason, the same screen.
+      await staff.reload();
+      await expect(staff.locator("[data-testid=support-ended]")).toBeVisible({ timeout: 30_000 });
+      await expect(staff.getByText(t("ui.serverErrorTitle"))).toHaveCount(0);
+      await run.check(staff, "support-ended#reload");
+    } finally {
+      await staff.close();
+    }
+    run.assertClean();
+  });
+}

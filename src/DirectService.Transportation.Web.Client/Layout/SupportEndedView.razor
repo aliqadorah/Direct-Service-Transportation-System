@@ -1,0 +1,25 @@
+@*
+  Shown to a staff member instead of the company's pages when the support window closed (owner testing 20 Oct 2026, DT-220): who ended it
+  and when (in the browser's time), with the way back to the provider console. No company data and no support banner stay on screen.
+*@
+@using DirectService.Transportation.Contracts.Errors
+@inject Loc L
+<div class="empty errstate" role="alert" data-testid="support-ended">
+    <div class="ei"><Icon Name="shield" /></div>
+    <h2>@L["support.endedTitle"]</h2>
+    <p><Tx Value="@Message" /></p>
+    <div class="acts"><Btn Primary="true" Icon="home" Text="@L["support.backToConsole"]" Href="/console/support-access" /></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ShellState.SupportEnd End { get; set; } = null!;
+
+    private string Time => End.At is DateTime at ? at.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "";
+
+    internal string Message => End.Reason switch
+    {
+        ErrorCodes.SupportEndedBySubscriber => L.F("support.endedBySubscriber", Time),
+        ErrorCodes.SupportWindowExpired => L.F("support.windowEnded", Time),
+        _ => L["support.notApproved"],
+    };
+}

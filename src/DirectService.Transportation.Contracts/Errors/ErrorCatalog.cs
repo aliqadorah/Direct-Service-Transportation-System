@@ -240,6 +240,10 @@ public static class ErrorCatalog
         [ErrorCodes.SupportWindow] = ("نافذة الدعم يجب أن تبدأ قبل نهايتها وألا تتجاوز 7 أيام.", "The support window must start before it ends and last at most 7 days."),
         [ErrorCodes.SupportNotRequested] = ("طلب الوصول هذا لم يعد بانتظار القرار: تمت الموافقة عليه أو رفضه من قبل. حدّث القائمة.", "This access request is no longer waiting for a decision: it was already approved or refused. Refresh the list."),
         [ErrorCodes.SupportRequestNotFound] = ("لم يُعثر على طلب الوصول هذا في اشتراككم؛ ربما سُحب أو حُذف. حدّث القائمة.", "This access request was not found in your subscription; it may have been withdrawn. Refresh the list."),
+        // Support session refused after its window (owner testing 20 Oct 2026, DT-220): {0} is the end time (UTC), {1} who ended it.
+        [ErrorCodes.SupportEndedBySubscriber] = ("أنهى المشترك جلسة الدعم في {0}.", "The subscriber ended the support session at {0}."),
+        [ErrorCodes.SupportWindowExpired] = ("انتهت نافذة الدعم في {0}.", "The support window ended at {0}."),
+        [ErrorCodes.SupportNotApproved] = ("لا توجد نافذة دعم موافق عليها لهذا المشترك الآن.", "There is no approved support window for this subscriber now."),
         [ErrorCodes.SupportNotOpen] = ("نافذة الوصول هذه ليست مفتوحة الآن؛ انتهت أو أُنهيت من قبل. حدّث القائمة.", "This access window is not open now; it has ended or was already closed. Refresh the list."),
         [ErrorCodes.MaintenanceResetBlocked] = ("رُفضت إعادة الضبط الكاملة: {0}.", "Full reset refused: {0}."),
         // Report builder (owner feedback 13 Oct 2026): {0} is the setting as the side panel names it ("Grouping 1", "Measure 2", "Filter 1"…).
@@ -513,6 +517,9 @@ public static class ErrorCodes
     public const string SupportNotRequested = "support.notRequested";
     public const string SupportRequestNotFound = "support.requestNotFound";
     public const string SupportNotOpen = "support.notOpen";
+    public const string SupportEndedBySubscriber = "support.endedBySubscriber";
+    public const string SupportWindowExpired = "support.windowExpired";
+    public const string SupportNotApproved = "support.notApproved";
     public const string ReportSource = "report.source";
     public const string ReportDefinition = "report.definition";
     public const string ReportRowsNone = "report.rowsNone";

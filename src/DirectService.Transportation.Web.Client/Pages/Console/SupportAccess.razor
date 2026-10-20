@@ -39,7 +39,7 @@
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.from"]" Value="r => Fmt.DateTime(r.StartsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.to"]" Value="r => Fmt.DateTime(r.EndsAt?.ToLocalTime(), Shell.DateFormat)" Ltr="true" />
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.decidedBy"]" Value="@(r => r.DecidedBy ?? "—")" />
-                    <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@SupportApprovals.Status(context)" /></Template></GridColumn>
+                    <GridColumn TItem="SupportAccessResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@SupportApprovals.Status(context)" />@if (context.EndedBy is not null) {<div class="muted small">@L.F("con.endedByAt", context.EndedBy, Fmt.DateTime(context.EndsAt?.ToLocalTime(), Shell.DateFormat))</div>}</Template></GridColumn>
                     <GridColumn TItem="SupportAccessResponse" Title="@L["ten.refusal"]" Value="@(r => r.DecisionReason ?? "")" />
                 </Columns>
             </DataGrid>

@@ -64,4 +64,8 @@ public sealed class SignalRNotifier(IHubContext<LiveHub> hub, IRequestContext ct
     /// <summary>SignalR addresses users by the name identifier claim (the user's public id, "N" format).</summary>
     public Task NotifyUserAsync(Guid userPublicId, object notification, CancellationToken ct) =>
         hub.Clients.User(userPublicId.ToString("N")).SendAsync("notification", notification, ct);
+
+    /// <summary>The staff member's support window ended (DT-220): every open page of that staff member leaves the company at once.</summary>
+    public Task SupportEndedAsync(Guid staffPublicId, object payload, CancellationToken ct) =>
+        hub.Clients.User(staffPublicId.ToString("N")).SendAsync("supportEnded", payload, ct);
 }

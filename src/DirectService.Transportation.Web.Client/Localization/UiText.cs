@@ -804,6 +804,7 @@ public static partial class UiText
         ["st.submitted"] = ("مقبولة", "Accepted"),
         ["st.rejected"] = ("مرفوضة", "Rejected"),
         ["st.refused"] = ("مرفوض", "Refused"),
+        ["st.endedBySubscriber"] = ("أنهاه المشترك", "Ended by subscriber"),
         ["st.notRequired"] = ("غير مطلوبة", "Not required"),
         ["st.mapped"] = ("مربوط", "Mapped"),
         ["st.missing"] = ("غير مربوط", "Not mapped"),

@@ -17,6 +17,10 @@ public sealed record ApiProblem
     [JsonPropertyName("traceId")] public string? TraceId { get; init; }
     [JsonPropertyName("errors")] public IReadOnlyList<ApiFieldError>? Errors { get; init; }
 
+    /// <summary>A closed support window (DT-220): when it ended (UTC) and who ended it early.</summary>
+    [JsonPropertyName("endedAt")] public DateTime? EndedAt { get; init; }
+    [JsonPropertyName("endedBy")] public string? EndedBy { get; init; }
+
     /// <summary>A short reference for support (the last part of the trace id).</summary>
     public string? Reference => TraceId is { Length: > 9 } t ? t[^9..].TrimStart(':').ToUpperInvariant() : TraceId;
 }

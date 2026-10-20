@@ -101,7 +101,8 @@
 
     internal static string Status(SupportAccessResponse r) => r.Status switch
     {
-        LifecycleCodes.Requested => "requested", LifecycleCodes.Approved => "approved", LifecycleCodes.Rejected => "refused", _ => "expired",
+        LifecycleCodes.Requested => "requested", LifecycleCodes.Approved => "approved", LifecycleCodes.Rejected => "refused",
+        _ => r.EndedBy is not null ? "endedBySubscriber" : "expired",   // ended early by the subscriber, or reached its end time (DT-220)
     };
 
     /// <summary>

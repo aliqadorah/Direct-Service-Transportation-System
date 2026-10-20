@@ -418,10 +418,11 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             .ToListAsync(ct).ConfigureAwait(false);
         var refusals = await SupportAccessService.RefusalReasonsAsync(db, null, rows.Where(x => x.G.Status == LifecycleCodes.Rejected).Select(x => x.G.Id).ToList(), ct)
             .ConfigureAwait(false);
+        var ends = await SupportAccessService.EndsAsync(db, null, rows.Where(x => x.G.Status == LifecycleCodes.Expired).Select(x => x.G.Id).ToList(), ct).ConfigureAwait(false);
         var now = Now;
         return rows.Select(x => new SupportAccessResponse(support.Token<SupportAccessGrant>(x.G.PublicId), x.Tenant ?? string.Empty, x.Requester ?? string.Empty, x.G.Reason,
             x.G.Status == LifecycleCodes.Approved && x.G.EndsAt <= now ? LifecycleCodes.Expired : x.G.Status, Utc(x.G.StartsAt), Utc(x.G.EndsAt), x.Decider,
-            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion), refusals.GetValueOrDefault(x.G.Id), x.OwnerEmail)).ToList();
+            DateTime.SpecifyKind(x.G.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.G.RowVersion), refusals.GetValueOrDefault(x.G.Id), x.OwnerEmail, ends.GetValueOrDefault(x.G.Id))).ToList();
     }
 
     /// <summary>

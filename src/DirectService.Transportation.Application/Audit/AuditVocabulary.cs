@@ -203,6 +203,7 @@ public static class AuditVocabulary
         ["Approve.Support"] = A("موافقة", "Approved", "الموافقة على {r}", "approved {r}"),
         ["Reject"] = A("رفض", "Rejected", "رفض {r}", "rejected {r}"),
         ["End"] = A("إنهاء", "Ended", "إنهاء {r}", "ended {r}"),
+        ["Expire"] = A("انتهاء المدة", "Expired", "انتهاء مدة {r}", "{r} expired"),
         ["SupportRequest"] = A("طلب دعم", "Support request", "اطلاع الدعم على {r}", "support viewed {r}"),
     };
 

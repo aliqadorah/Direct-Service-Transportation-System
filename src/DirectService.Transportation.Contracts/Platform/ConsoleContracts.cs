@@ -111,7 +111,7 @@ public sealed record SupportApprovalRequest(DateTime? StartsAt, DateTime? EndsAt
 /// (provider console only) tells same-named subscribers apart (DT-219).
 /// </summary>
 public sealed record SupportAccessResponse(string Id, string Tenant, string RequestedBy, string Reason, string Status, DateTime? StartsAt, DateTime? EndsAt, string? DecidedBy,
-    DateTime CreatedAt, string RowVersion, string? DecisionReason = null, string? OwnerEmail = null);
+    DateTime CreatedAt, string RowVersion, string? DecisionReason = null, string? OwnerEmail = null, string? EndedBy = null);
 
 /// <summary>
 /// A subscriber found for a support request (owner testing 19 Oct 2026, DT-214): enough to tell two subscribers with the same name apart —
