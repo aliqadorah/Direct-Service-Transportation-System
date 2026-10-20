@@ -295,18 +295,32 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         var sourceBlocked = throttle.RecordFailure(user.Id, ctx.IpAddress);
         using (scope.Use(user.TenantId, null, null))
         {
-            var wasLocked = user.LockedUntil > clock.GetUtcNow().UtcDateTime;
-            changes.SetAction(user, action);
-            await users.AccessFailedAsync(user).ConfigureAwait(false);
-            var accountLocked = !wasLocked && user.LockedUntil > clock.GetUtcNow().UtcDateTime;
+            // Counted on the current row (DT-222): Identity's AccessFailedAsync dropped the count silently when another attempt had
+            // changed the user row at the same moment (row version), so simultaneous wrong attempts were not all counted.
+            var lockout = users.Options.Lockout;
+            var accountLocked = false;
+            await db.SaveUserAsync(user, () =>
+            {
+                var now = clock.GetUtcNow().UtcDateTime;
+                var wasLocked = user.LockedUntil > now;
+                changes.SetAction(user, action);
+                if (++user.FailedSignInCount >= lockout.MaxFailedAccessAttempts)
+                {
+                    user.LockedUntil = now + lockout.DefaultLockoutTimeSpan;
+                    user.FailedSignInCount = 0;
+                }
+                accountLocked = !wasLocked && user.LockedUntil > now;
+            }, ct).ConfigureAwait(false);
             if (sourceBlocked || accountLocked)
             {
                 // Every lock is audited (DT-204): which one, from which address (the audit row also carries the request's address).
-                changes.SetAction(user, "SignInLocked",
-                    accountLocked ? $"Account locked for everyone after {SignInThrottle.PerAccountLimit} failed attempts (from {ctx.IpAddress ?? "?"})"
-                                  : $"Blocked for address {ctx.IpAddress ?? "?"} after {SignInThrottle.PerSourceLimit} failed attempts");
-                user.UpdatedAt = clock.GetUtcNow().UtcDateTime;
-                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                await db.SaveUserAsync(user, () =>
+                {
+                    changes.SetAction(user, "SignInLocked",
+                        accountLocked ? $"Account locked for everyone after {SignInThrottle.PerAccountLimit} failed attempts (from {ctx.IpAddress ?? "?"})"
+                                      : $"Blocked for address {ctx.IpAddress ?? "?"} after {SignInThrottle.PerSourceLimit} failed attempts");
+                    user.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+                }, ct).ConfigureAwait(false);
             }
         }
     }
@@ -316,11 +330,13 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         throttle.Reset(user.Id, ctx.IpAddress);
         using (scope.Use(user.TenantId, null, user.Id))
         {
-            changes.SetAction(user, "SignIn");
-            user.FailedSignInCount = 0;
-            user.LockedUntil = null;
-            user.LastSignInAt = clock.GetUtcNow().UtcDateTime;
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await db.SaveUserAsync(user, () =>
+            {
+                changes.SetAction(user, "SignIn");
+                user.FailedSignInCount = 0;
+                user.LockedUntil = null;
+                user.LastSignInAt = clock.GetUtcNow().UtcDateTime;
+            }, ct).ConfigureAwait(false);
         }
     }
 

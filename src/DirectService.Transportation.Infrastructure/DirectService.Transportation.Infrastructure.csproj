@@ -7,6 +7,10 @@
     <ProjectReference Include="..\DirectService.Transportation.Application\DirectService.Transportation.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The PDF engine's test hook (a browser that dies during a print, DT-222). -->
+    <InternalsVisibleTo Include="DirectService.Transportation.Infrastructure.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- ASP.NET Core Identity token providers and Data Protection -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

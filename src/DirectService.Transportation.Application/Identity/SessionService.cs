@@ -47,8 +47,7 @@ public sealed class SessionService(IAppDbContext db, IDataScope scope, TimeProvi
         using (scope.Use(user.TenantId, null, user.Id))
         {
             db.Set<UserSession>().Add(session);
-            user.LastSignInAt = now;
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await db.SaveUserAsync(user, () => user.LastSignInAt = now, ct).ConfigureAwait(false);   // DT-222: other attempts may change the row now
         }
         return (token, session.Id);
     }

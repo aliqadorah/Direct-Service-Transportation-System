@@ -33,57 +33,74 @@ public sealed class ChromiumPdfRenderer(IConfiguration config, ILogger<ChromiumP
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var browser = await BrowserAsync().ConfigureAwait(false);
-            await using var page = await browser.NewPageAsync().ConfigureAwait(false);
-            // Defence in depth (review M4): no JavaScript in documents and only data: URIs may load (the brand fonts, logo and QR
-            // are embedded), so a document can never make the server fetch anything (SSRF).
-            await page.SetJavaScriptEnabledAsync(false).ConfigureAwait(false);
-            await page.SetRequestInterceptionAsync(true).ConfigureAwait(false);
-            page.Request += async (_, e) =>
+            // DT-222: a browser (or its page) that dies during a print — under memory pressure — failed that print with "engine not available";
+            // the print is now rendered once more on a fresh browser before giving up.
+            for (var attempt = 1; ; attempt++)
             {
-                var url = e.Request.Url;
-                var allowed = url.StartsWith("data:", StringComparison.Ordinal) || url.StartsWith("about:", StringComparison.Ordinal);
-                if (allowed) await e.Request.ContinueAsync().ConfigureAwait(false);
-                else await e.Request.AbortAsync().ConfigureAwait(false);
-            };
-            try
-            {
-                await page.SetContentAsync(html, new SetContentOptions { WaitUntil = [WaitUntilNavigation.Load], Timeout = 4_000 }).ConfigureAwait(false);
+                try
+                {
+                    return await RenderOnceAsync(html, footer, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    RenderFailed(log, ex);
+                    await ResetAsync().ConfigureAwait(false);
+                    if (attempt == 2) throw;
+                }
             }
-            catch (WaitTaskTimeoutException)
-            {
-                // Load did not finish in time (all resources are embedded, so this should not happen): render what is set.
-            }
-            catch (NavigationException)
-            {
-                // Same: the content is set.
-            }
-            var dir = footer.RightToLeft ? "rtl" : "ltr";
-            var footerHtml = $"<div style=\"width:100%;font-size:8px;color:#5B6570;padding:0 12mm;display:flex;justify-content:space-between;direction:{dir};font-family:Segoe UI,Tahoma,sans-serif\">"
-                + $"<span>{System.Net.WebUtility.HtmlEncode(footer.LeftText)} · <span class=\"date\"></span></span>"
-                + $"<span>{System.Net.WebUtility.HtmlEncode(footer.PageWord)} <span class=\"pageNumber\"></span> {System.Net.WebUtility.HtmlEncode(footer.OfWord)} <span class=\"totalPages\"></span></span></div>";
-            // Per-render limit (review L6): a very large annex must not hold the gate indefinitely.
-            return await page.PdfDataAsync(new PdfOptions
-            {
-                Format = PaperFormat.A4,
-                PrintBackground = true,
-                PreferCSSPageSize = true,
-                DisplayHeaderFooter = true,
-                HeaderTemplate = "<span></span>",
-                FooterTemplate = footerHtml,
-                MarginOptions = new MarginOptions { Top = "14mm", Bottom = "18mm", Left = "12mm", Right = "12mm" },
-            }).WaitAsync(TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            RenderFailed(log, ex);
-            await ResetAsync().ConfigureAwait(false);
-            throw;
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>Tests only: runs once the page of a print is open (to make the browser die in the middle of a print).</summary>
+    internal Func<IPage, Task>? AfterPageOpened { get; set; }
+
+    private async Task<byte[]> RenderOnceAsync(string html, PdfFooter footer, CancellationToken ct)
+    {
+        var browser = await BrowserAsync().ConfigureAwait(false);
+        await using var page = await browser.NewPageAsync().ConfigureAwait(false);
+        if (AfterPageOpened is { } hook) await hook(page).ConfigureAwait(false);
+        // Defence in depth (review M4): no JavaScript in documents and only data: URIs may load (the brand fonts, logo and QR
+        // are embedded), so a document can never make the server fetch anything (SSRF).
+        await page.SetJavaScriptEnabledAsync(false).ConfigureAwait(false);
+        await page.SetRequestInterceptionAsync(true).ConfigureAwait(false);
+        page.Request += async (_, e) =>
+        {
+            var url = e.Request.Url;
+            var allowed = url.StartsWith("data:", StringComparison.Ordinal) || url.StartsWith("about:", StringComparison.Ordinal);
+            if (allowed) await e.Request.ContinueAsync().ConfigureAwait(false);
+            else await e.Request.AbortAsync().ConfigureAwait(false);
+        };
+        try
+        {
+            await page.SetContentAsync(html, new SetContentOptions { WaitUntil = [WaitUntilNavigation.Load], Timeout = 4_000 }).ConfigureAwait(false);
+        }
+        catch (WaitTaskTimeoutException)
+        {
+            // Load did not finish in time (all resources are embedded, so this should not happen): render what is set.
+        }
+        catch (NavigationException)
+        {
+            // Same: the content is set.
+        }
+        var dir = footer.RightToLeft ? "rtl" : "ltr";
+        var footerHtml = $"<div style=\"width:100%;font-size:8px;color:#5B6570;padding:0 12mm;display:flex;justify-content:space-between;direction:{dir};font-family:Segoe UI,Tahoma,sans-serif\">"
+            + $"<span>{System.Net.WebUtility.HtmlEncode(footer.LeftText)} · <span class=\"date\"></span></span>"
+            + $"<span>{System.Net.WebUtility.HtmlEncode(footer.PageWord)} <span class=\"pageNumber\"></span> {System.Net.WebUtility.HtmlEncode(footer.OfWord)} <span class=\"totalPages\"></span></span></div>";
+        // Per-render limit (review L6): a very large annex must not hold the gate indefinitely.
+        return await page.PdfDataAsync(new PdfOptions
+        {
+            Format = PaperFormat.A4,
+            PrintBackground = true,
+            PreferCSSPageSize = true,
+            DisplayHeaderFooter = true,
+            HeaderTemplate = "<span></span>",
+            FooterTemplate = footerHtml,
+            MarginOptions = new MarginOptions { Top = "14mm", Bottom = "18mm", Left = "12mm", Right = "12mm" },
+        }).WaitAsync(TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
     }
 
     private async Task<IBrowser> BrowserAsync()
@@ -95,6 +112,8 @@ public sealed class ChromiumPdfRenderer(IConfiguration config, ILogger<ChromiumP
         _browser = await Puppeteer.LaunchAsync(new LaunchOptions
         {
             Headless = true,
+            // A cold start on a busy machine can take longer than the library's 30 s (DT-222).
+            Timeout = config.GetValue("Printing:LaunchTimeoutSeconds", 120) * 1000,
             ExecutablePath = path,
             // In a container (Printing:NoSandbox, set by the image) Chromium cannot have its own sandbox; it renders only our HTML with scripts off.
             Args = config.GetValue("Printing:NoSandbox", false)
