@@ -14,7 +14,7 @@ public static partial class UiText
         ["doc.entry"] = ("القيد المحاسبي", "Journal entry"),
         ["doc.inWords"] = ("المبلغ كتابةً: {0}", "Amount in words: {0}"),
         ["doc.postingPending"] = ("القيد بانتظار الترحيل: تعذّر ترحيله الآن وستُعاد المحاولة تلقائياً.", "The entry is waiting: it could not be posted now and will be retried automatically."),
-        ["post.disabled"] = ("الترحيل والفوترة معطّلان حتى تُربط مفاتيح الترحيل: {0}.", "Posting and invoicing are disabled until these posting keys are mapped: {0}."),
+        ["post.disabled"] = ("الترحيل والفوترة معطّلان حتى تُربط حسابات الترحيل التالية بدليل الحسابات: {0}.", "Posting and invoicing are disabled until these posting accounts are linked to the chart of accounts: {0}."),
         ["post.complete"] = ("إكمال ربط الحسابات", "Complete account mapping"),
         ["st.partReturned"] = ("مرتجعة جزئياً", "Partly returned"),
         ["nav.newReceipt"] = ("سند قبض جديد", "New receipt"),

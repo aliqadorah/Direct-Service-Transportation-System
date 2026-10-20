@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// Transport customers are offered as receivable parties: a receivable for a transport customer uses its linked accounting party, created
 /// and linked on first use (DT-101).
 /// </summary>
-public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks, ChartOfAccountsService chart)
+public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks, ChartOfAccountsService chart, IRequestContext ctx)
 {
     public const string EntityType = "ACC.ApArParty";
 
@@ -200,7 +200,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
         var current = await db.Set<Customer>().AsNoTracking().Where(x => x.Id == c.Id).Select(x => x.ApArPartyId).SingleAsync(ct).ConfigureAwait(false);
         if (current is long linked) return await db.Set<ApArParty>().SingleAsync(p => p.Id == linked, ct).ConfigureAwait(false);
         var accountId = await db.Set<PostingKeyMapping>().Where(m => m.PostingKey == PostingKeys.TradeReceivables).Select(m => (long?)m.AccountId)
-            .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.TradeReceivables);
+            .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.NameList([PostingKeys.TradeReceivables], ctx.Language));
         var party = new ApArParty
         {
             PartyRole = ApArCodes.Customer, Name = c.Name, TaxNumber = c.TaxNumber, Phone = c.Phone is { Length: <= 20 } ? c.Phone : null,

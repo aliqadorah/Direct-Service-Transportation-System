@@ -114,7 +114,7 @@ public static class ErrorCatalog
         [ErrorCodes.JournalMinLines] = ("القيد يحتاج سطرين على الأقل.", "An entry needs at least two lines."),
         [ErrorCodes.JournalNotManual] = ("القيود الآلية تتغير فقط من خلال المستند المصدر.", "Automatic entries change only through their source document."),
         [ErrorCodes.JournalNotPosted] = ("القيد {0} معكوس أو ملغى مسبقاً.", "Entry {0} is already reversed or void."),
-        [ErrorCodes.PostingKeysMissing] = ("الترحيل والفوترة معطّلان حتى تُربط مفاتيح الترحيل: {0}.", "Posting and invoicing are disabled until these posting keys are mapped: {0}."),
+        [ErrorCodes.PostingKeysMissing] = ("الترحيل والفوترة معطّلان حتى تُربط حسابات الترحيل التالية بدليل الحسابات: {0}.", "Posting and invoicing are disabled until these posting accounts are linked to the chart of accounts: {0}."),
         [ErrorCodes.OpeningUnbalanced] = ("الأرصدة الافتتاحية غير متوازنة (الفرق {0}). بعد انتهاء الإعداد يجب أن تتوازن.", "The opening balances do not balance (difference {0}). After setup they must balance."),
         [ErrorCodes.OpeningEmpty] = ("لا توجد أرصدة افتتاحية للترحيل.", "There are no opening balances to post."),
         [ErrorCodes.PeriodAlreadyClosed] = ("الفترة {0} مغلقة مسبقاً.", "Period {0} is already closed."),

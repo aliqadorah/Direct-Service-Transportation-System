@@ -47,6 +47,16 @@ public static class PostingKeys
 
     public static Definition? Find(string? key) => All.FirstOrDefault(d => d.Key == key);
 
+    /// <summary>
+    /// The names users see for posting keys (the Account mapping page's names) in a language — never the internal codes (owner testing
+    /// 20 Oct 2026, DT-224). An unknown key is kept as it is.
+    /// </summary>
+    public static IReadOnlyList<string> Names(IEnumerable<string> keys, string? language) =>
+        keys.Select(k => Find(k) is { } d ? (language == "en" ? d.NameEn : d.NameAr) : k).ToList();
+
+    /// <summary><see cref="Names"/> joined for a message ("، " in Arabic).</summary>
+    public static string NameList(IEnumerable<string> keys, string? language) => string.Join(language == "en" ? ", " : "، ", Names(keys, language));
+
     /// <summary>Keys that must be mapped before automatic posting and invoicing (FR-094); the opening-difference key only during setup.</summary>
     public static IEnumerable<string> Required(bool setupOpen) =>
         All.Where(d => !d.Optional && (!d.RequiredOnlyDuringSetup || setupOpen)).Select(d => d.Key);

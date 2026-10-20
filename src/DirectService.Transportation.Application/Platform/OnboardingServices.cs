@@ -47,8 +47,8 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
         bool Marked(string step) => marks.Contains(SettingKeys.SetupPrefix + step);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var steps = new List<SetupStep>();
-        void Add(string key, string ar, string en, string status, string? detail, string link) =>
-            steps.Add(new SetupStep(key, En ? en : ar, Marked(key) ? Done : status, Marked(key) ? null : detail, link, Marked(key)));
+        void Add(string key, string ar, string en, string status, string? detail, string link, IReadOnlyList<string>? items = null) =>
+            steps.Add(new SetupStep(key, En ? en : ar, Marked(key) ? Done : status, Marked(key) ? null : detail, link, Marked(key), Marked(key) ? null : items));
 
         Add("account", "إنشاء الحساب", "Create account", Done, null, "/me");
 
@@ -66,7 +66,11 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
         var missing = await posting.MissingKeysAsync(ct).ConfigureAwait(false);
         var mapped = await db.Set<PostingKeyMapping>().AsNoTracking().CountAsync(ct).ConfigureAwait(false);
         Add("mapping", "ربط الحسابات", "Account mapping", missing.Count == 0 ? Done : mapped > 0 ? InProgress : NotStarted,
-            missing.Count == 0 ? null : string.Join(", ", missing), "/accounting/posting-keys");
+            // DT-224: a count in words and the Account mapping page's names, never the internal posting-key codes.
+            missing.Count == 0 ? null
+                : En ? (missing.Count == 1 ? "1 posting account still needs to be linked to your chart of accounts" : $"{missing.Count} posting accounts still need to be linked to your chart of accounts")
+                : missing.Count == 1 ? "حساب ترحيل واحد لم يُربط بعد بدليل الحسابات" : $"{missing.Count} من حسابات الترحيل لم تُربط بعد بدليل الحسابات",
+            "/accounting/posting-keys", missing.Count == 0 ? null : PostingKeys.Names(missing, ctx.Language));
 
         var masters = new (string Ar, string En, bool Has)[]
         {

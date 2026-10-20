@@ -73,7 +73,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     public async Task EnsurePostingReadyAsync(CancellationToken ct)
     {
         var missing = await MissingKeysAsync(ct).ConfigureAwait(false);
-        if (missing.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, string.Join(", ", missing));
+        if (missing.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.NameList(missing, ctx.Language));   // names, not codes (DT-224)
     }
 
     public async Task<int> CurrencyDecimalsAsync(CancellationToken ct) =>
@@ -105,7 +105,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         var mapping = await db.Set<PostingKeyMapping>().AsNoTracking().Where(m => keys.Contains(m.PostingKey))
             .ToDictionaryAsync(m => m.PostingKey, m => m.AccountId, ct).ConfigureAwait(false);
         var unmapped = keys.Where(k => !mapping.ContainsKey(k)).ToList();
-        if (unmapped.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, string.Join(", ", unmapped));
+        if (unmapped.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.NameList(unmapped, ctx.Language));
 
         var resolved = request.Lines.Select(l => l with { AccountId = l.PostingKey is null ? l.AccountId : mapping[l.PostingKey] }).ToList();
         var accountIds = resolved.Select(l => l.AccountId ?? 0).Distinct().ToList();

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
@@ -49,6 +50,26 @@ public sealed class OnboardingTests(ApiFactory f)
         var viewer = await SecurityTests.InviteAndAcceptAsync(f, o, PresetRoles.Viewer);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.Client.PostAsJsonAsync(U(o, "/setup-checklist/market"), new SetupMarkRequest(false))).StatusCode);
         Assert.Equal("Done", (await ReadAsync<SetupChecklistResponse>(await viewer.Client.GetAsync(U(o, "/setup-checklist")))).Steps.Single(s => s.Key == "users").Status);
+    }
+
+    [Theory]
+    [InlineData("en", "posting accounts still need to be linked to your chart of accounts", "Transport revenue")]
+    [InlineData("ar", "من حسابات الترحيل لم تُربط بعد بدليل الحسابات", "إيرادات النقل")]
+    public async Task Mapping_step_and_posting_banner_name_the_accounts_never_the_codes_DT224(string language, string sentence, string name)
+    {
+        var o = await f.SignUpOwnerAsync();
+        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
+        var step = (await ReadAsync<SetupChecklistResponse>(await o.Client.GetAsync(U(o, "/setup-checklist")))).Steps.Single(s => s.Key == "mapping");
+        var status = await ReadAsync<AccountingStatusResponse>(await o.Client.GetAsync(U(o, "/accounting/status")));
+        Assert.Equal(status.MissingPostingKeys.Count.ToString(CultureInfo.InvariantCulture) + " " + sentence, step.Detail);
+        Assert.Contains(name, step.Items!);
+        Assert.Equal(status.MissingPostingKeys.Count, step.Items!.Count);
+        Assert.Equal(step.Items, status.MissingPostingKeyNames);   // the shell banner shows the same names
+        foreach (var text in step.Items.Append(step.Detail!))
+        {
+            Assert.DoesNotContain("TRN.", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("ACC.", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

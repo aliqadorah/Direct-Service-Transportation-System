@@ -9,7 +9,7 @@
 @inject ShellState Shell
 @if (_status is { PostingReady: false } s)
 {
-    <Banner Tone="Tone.Err" Text="@L.F("post.disabled", string.Join("، ", s.MissingPostingKeys))">
+    <Banner Tone="Tone.Err" Text="@L.F("post.disabled", string.Join(L.En ? ", " : "، ", s.MissingPostingKeyNames ?? s.MissingPostingKeys))">
         <Actions>@if (Shell.Can(PermissionKeys.SettingsManage) && Shell.Company is { } c) {<a href="@NavModel.Href(c.Id, "settings/mapping")">@L["post.complete"]</a>}</Actions>
     </Banner>
 }

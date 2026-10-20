@@ -70,10 +70,11 @@ public sealed record PostingKeyResponse(string Key, string NameAr, string NameEn
 
 public sealed record PostingKeyRequest(string? AccountId);
 
-/// <summary>Banner state shown in the app shell (FR-094, FR-110, FR-101).</summary>
+/// <summary>Banner state shown in the app shell (FR-094, FR-110, FR-101). <c>MissingPostingKeyNames</c> are the missing keys' names in the reader's
+/// language, for display (DT-224); <c>MissingPostingKeys</c> are the codes, for programs.</summary>
 public sealed record AccountingStatusResponse(
     bool PostingReady, IReadOnlyList<string> MissingPostingKeys, bool OpeningDifferenceWarning, decimal OpeningDifferenceBalance,
-    int PendingPostings);
+    int PendingPostings, IReadOnlyList<string>? MissingPostingKeyNames = null);
 
 // ---------------------------------------------------------------- cost centres, cash boxes, bank accounts (FR-129, FR-131)
 

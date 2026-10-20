@@ -25,7 +25,16 @@
                     var (tone, icon) = step.Status switch { "Done" => (Tone.Ok, "check"), "InProgress" => (Tone.Warn, "clock"), _ => (Tone.Mute, (string?)null) };
                     <li class="step">
                         <span class="si badge @ToneCss.Badge(tone)" style="padding:0;justify-content:center">@if (icon is not null) {<Icon Name="@icon" />}</span>
-                        <div><b>@step.Title</b>@if (step.Detail is not null) {<div class="muted" style="font-size:13px"><Tx Value="@step.Detail" /></div>}</div>
+                        <div><b>@step.Title</b>@if (step.Detail is not null) {<div class="muted" style="font-size:13px"><Tx Value="@step.Detail" /></div>}
+                            @* DT-224: what is still missing, by name (the Account mapping page's names), on request. *@
+                            @if (step.Items is { Count: > 0 } items)
+                            {
+                                <details class="muted" style="font-size:13px" data-testid="setup-items-@step.Key">
+                                    <summary>@L["setup.showList"]</summary>
+                                    <ul style="margin:4px 0 0;padding-inline-start:18px">@foreach (var item in items) {<li>@item</li>}</ul>
+                                </details>
+                            }
+                        </div>
                         <div style="display:flex;gap:8px;align-items:center">
                             <Badge Tone="tone" Icon="@icon" Text="@L["setup.st." + step.Status]" />
                             <Btn Small="true" Primary="@(step.Status != "Done")" Text="@L[step.Status switch { "Done" => "setup.review", "InProgress" => "setup.continue", _ => "setup.start" }]" Href="@Links.ForSetupStep(Company, step.Link)" />

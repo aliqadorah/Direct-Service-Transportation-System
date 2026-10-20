@@ -12,7 +12,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// old → new by the interceptor (AccountId change on acc.PostingKeyMappings).
 /// </summary>
 public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IUrlTokenService tokens, IChangeContext changes,
-    OpeningBalanceService openings, PendingPostingService pending)
+    OpeningBalanceService openings, PendingPostingService pending, IRequestContext ctx)
 {
     public const string Mapped = "Mapped";
     public const string Missing = "Missing";
@@ -62,6 +62,6 @@ public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IU
         var missing = await engine.MissingKeysAsync(ct).ConfigureAwait(false);
         var difference = await openings.DifferenceBalanceAsync(ct).ConfigureAwait(false);
         return new AccountingStatusResponse(missing.Count == 0, missing, difference != 0, difference,
-            await pending.CountAsync(ct).ConfigureAwait(false));
+            await pending.CountAsync(ct).ConfigureAwait(false), PostingKeys.Names(missing, ctx.Language));
     }
 }

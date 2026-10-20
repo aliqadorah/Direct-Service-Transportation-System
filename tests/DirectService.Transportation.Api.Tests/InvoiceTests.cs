@@ -143,6 +143,10 @@ public sealed class InvoiceTests(ApiFactory f)
             new InvoiceRequest(bare.Customer.Id, "Manual", Today, null, null, [new ManualLineRequest("Service", 1, 100m)], 0, 0, null, null, null, false, null, null)));
         var refused = await bare.Owner.Client.PostAsJsonAsync(U(bare.Owner, $"/invoices/{draft.Invoice.Id}/approve"), new StatusChangeRequest(draft.Invoice.RowVersion));
         Assert.Equal("posting.keysMissing", await refused.ProblemCodeAsync());
+        var why = await refused.Content.ReadAsStringAsync();   // DT-224: the names of the Account mapping page, never the codes
+        Assert.Contains("Transport revenue", why, StringComparison.Ordinal);
+        Assert.DoesNotContain("TRN.", why, StringComparison.Ordinal);
+        Assert.DoesNotContain("ACC.", why, StringComparison.Ordinal);
 
         // A future invoice date is refused; an extra fee needs a description.
         var bad = await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Skip(1).Take(1)) with { InvoiceDate = Today.AddDays(5), ExtraFeesDescription = null });

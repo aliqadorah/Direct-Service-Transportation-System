@@ -561,6 +561,7 @@ public static partial class UiText
         ["setup.unmark"] = ("إلغاء العلامة", "Remove the mark"),
         ["setup.marked"] = ("تم تحديث الخطوة «{0}».", "Step “{0}” updated."),
         ["setup.anyOrder"] = ("يمكنك العمل بأي ترتيب", "Work in any order"),
+        ["setup.showList"] = ("عرض القائمة", "Show the list"),
         ["setup.anyOrderText"] = ("التقدم محفوظ. الفوترة تبقى معطلة حتى اكتمال ربط الحسابات.", "Progress is saved. Invoicing stays off until the account mapping is complete."),
         ["setup.trial"] = ("الفترة التجريبية", "Trial"),
 

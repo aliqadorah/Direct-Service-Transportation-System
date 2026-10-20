@@ -1,7 +1,10 @@
 namespace DirectService.Transportation.Contracts.Platform;
 
-/// <summary>A setup step (5.4, P-08): key, title, status (NotStarted / InProgress / Done), what is missing, where to do it, whether marked by hand.</summary>
-public sealed record SetupStep(string Key, string Title, string Status, string? Detail, string Link, bool Marked);
+/// <summary>
+/// A setup step (5.4, P-08): key, title, status (NotStarted / InProgress / Done), what is missing, where to do it, whether marked by hand;
+/// <paramref name="Items"/> lists what is still missing in the reader's language (names, never internal codes — DT-224), shown on request.
+/// </summary>
+public sealed record SetupStep(string Key, string Title, string Status, string? Detail, string Link, bool Marked, IReadOnlyList<string>? Items = null);
 
 /// <summary>The setup checklist of the company: the eight steps in any order, progress, resumable (G-10).</summary>
 public sealed record SetupChecklistResponse(IReadOnlyList<SetupStep> Steps, int Done, int Total);
