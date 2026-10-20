@@ -192,6 +192,24 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 
+  // Owner testing 20 Oct 2026 (DT-221): a sign-in form opened before the browser lost its antiforgery cookie (restart, sign-in or sign-out
+  // in another tab) is shown again with "This page expired. Please try again." and the login kept — never the framework's raw text.
+  test(`Visual — sign-in page expired (${lang})`, async ({ page }) => {
+    test.skip(!wanted("sign-in#expired"), "not among VISUAL_ONLY");
+    const run = new VisualRun(lang, "sign-in-expired");
+    await page.goto(`/sign-in?lang=${lang}`);
+    await page.locator('[name="Input.Email"]').fill("someone@e2e.test");
+    await page.locator('[name="Input.Password"]').fill("Any-passw0rd");
+    await page.context().clearCookies();
+    await submitForm(page, "sign-in");
+    await expect(page.locator(".banner.warn")).toBeVisible();
+    await expect(page.locator('[name="Input.Email"]')).toHaveValue("someone@e2e.test");
+    await expect(page.locator('[name="Input.Password"]')).toHaveValue("");
+    await expect(page.locator("body")).not.toContainText("antiforgery");
+    await run.check(page, "sign-in#expired", { full: true });
+    run.assertClean();
+  });
+
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
     const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
     {

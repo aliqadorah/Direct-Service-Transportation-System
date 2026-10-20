@@ -157,6 +157,8 @@ public sealed class Api(HttpClient http, Loc loc, ShellState shell, NavigationMa
             _xsrf = null;
             return await RawAsync(method, path, body, ct, retried: true).ConfigureAwait(false);
         }
+        // Refused again with a fresh token (DT-221): the page is out of date (signed in or out elsewhere); the shell offers a reload.
+        if (problem.Code == ErrorCodes.Antiforgery) shell.MarkPageExpired();
         if (problem.Status == 401)
         {
             nav.NavigateTo("sign-in?returnUrl=" + Uri.EscapeDataString("/" + nav.ToBaseRelativePath(nav.Uri)), forceLoad: true);

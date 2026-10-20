@@ -12,7 +12,6 @@ using DirectService.Transportation.Web.Realtime;
 using DirectService.Transportation.Web.Security;
 using DirectService.Transportation.Web.Workers;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 
@@ -24,9 +23,8 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(config);
 builder.Services.AddOptions<AppOptions>().Bind(config.GetSection(AppOptions.Section));
 
-var dp = builder.Services.AddDataProtection().SetApplicationName("DirectService.Transportation")
-    .PersistKeysToFileSystem(new DirectoryInfo(config["DataProtection:KeysPath"] ?? ".local/keys"));
-if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi();
+// Key ring of the auth cookies, antiforgery tokens and stored credentials (DT-221): see DataProtectionSetup.
+DataProtectionSetup.Add(builder.Services, config, builder.Environment);
 
 builder.Services.AddAppAuthentication();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
@@ -134,6 +132,7 @@ app.UseMiddleware<RequestContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
+app.UseMiddleware<ExpiredFormMiddleware>();   // DT-221: an account form with an outdated token is shown again, never a raw 400
 
 if (app.Environment.IsDevelopment())
 {

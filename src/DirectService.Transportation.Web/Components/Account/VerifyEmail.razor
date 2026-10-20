@@ -43,7 +43,7 @@
 
 @code {
     // Form models: bound from the posted form, or new on a GET.
-    protected override void OnParametersSet() { Confirm ??= new(); Resend ??= new(); }
+    protected override void OnParametersSet() { Confirm ??= new(); Resend ??= new() { Email = Kept("Resend.Email") }; }
 
     private enum State { Ready, Done, Invalid, Sent, SignIn }
 

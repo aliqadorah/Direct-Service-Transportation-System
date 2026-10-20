@@ -2,6 +2,9 @@
 # Not built on the development PC (no container runtime there); the hosting provider is still to be chosen (DEF-01).
 # Build:  docker build -t direct-service-transportation .
 # Run:    docker run -p 8080:8080 -e ConnectionStrings__MasterDb=... -e UrlTokens__Key=... -v dst-keys:/keys -v dst-files:/files direct-service-transportation
+# The key ring in /keys must be protected at rest (DT-221): mount a certificate and add -e DataProtection__CertificatePath=/certs/keys.pfx
+# -e DataProtection__CertificatePassword=... (or -e DataProtection__AllowUnprotectedKeys=true when the volume is encrypted by the host);
+# without either the host refuses to start.
 # Behind a TLS-terminating proxy add -e Hosting__BehindProxy=true and the proxy's addresses, e.g. -e Hosting__KnownNetworks__0=10.0.0.0/8
 # (or Hosting__KnownProxies__0=...); the host refuses to start behind a proxy without them, so X-Forwarded-For cannot be forged.
 

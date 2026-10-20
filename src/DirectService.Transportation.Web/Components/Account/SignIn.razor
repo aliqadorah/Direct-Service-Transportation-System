@@ -23,7 +23,7 @@
 
 @code {
     // Form models: bound from the posted form, or new on a GET.
-    protected override void OnParametersSet() { Input ??= new(); }
+    protected override void OnParametersSet() { Input ??= new() { Email = Kept("Input.Email") }; }
 
     private ProblemValidator? _problems;
     private string? _banner;

@@ -61,7 +61,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Input ??= new(); Existing ??= new();   // before the first await: the page renders while waiting
+        Input ??= new() { FullName = Kept("Input.FullName") }; Existing ??= new();   // before the first await: the page renders while waiting
         if (string.IsNullOrEmpty(Token)) return;
         try { _info = await Invitations.InfoAsync(Token, Http.RequestAborted); }
         catch (AppException) { _info = null; }

@@ -50,7 +50,7 @@ Settings come from `appsettings.json`, then `appsettings.<Environment>.json`, th
 | `App:PublicBaseUrl` | absolute address used in e-mails | e.g. `https://app.example.com` |
 | `App:AbsoluteSessionHours` / `App:PlatformStaffIdleMinutes` | session lifetime 12 h (Q-04) / staff idle timeout | 12 / 30 |
 | `App:TrialDays`, `App:InvitationDays`, `App:TermsVersion` | trial length, invitation validity, terms version recorded at sign-up | 14 / 7 / draft-1 |
-| `DataProtection:KeysPath` | key ring (cookies, antiforgery, encrypted e-invoicing credentials) | `.local/keys`; **shared, persistent storage in production** (DPAPI-protected on Windows) |
+| `DataProtection:KeysPath` | key ring (cookies, antiforgery, encrypted e-invoicing credentials) | `.local/keys` under the content root; **shared, persistent storage in production**, protected at rest (see "The Data Protection key ring" below) |
 | `Email:DropFolder`, `Email:From` | development e-mail: messages are written as `.eml` files | provider to choose (DEF-02) |
 | `Files:Root` | stored files (background exports) | `App_Data/files` |
 | `Printing:ChromiumPath` | Chrome/Edge executable for PDFs | found automatically when installed |
@@ -77,6 +77,16 @@ Store it outside the files:
 - Production: the environment variable `UrlTokens__Key` (two underscores) or the hosting provider's secret store.
 
 Do not put it in `appsettings.json` (it would be committed with the code). Changing the key later breaks every saved or e-mailed link to a record.
+
+### The Data Protection key ring (`DataProtection:*`, DT-221)
+
+The key ring signs the sign-in cookies and the antiforgery tokens of every form and encrypts the stored e-invoicing credentials. If it is lost or regenerated, every user is signed out and every open form is refused after a restart or update. It is set up in `Web/Security/DataProtectionSetup.cs`:
+
+- **Stable application name** `DirectService.Transportation` (never the default, which depends on the install folder).
+- **Persisted keys** in `DataProtection:KeysPath` (default `.local/keys`). A relative path is taken under the **content root** (the project folder in development, the application folder when published), not the process working directory — so `dotnet run`, Visual Studio, a Windows service and a container all use the same folder. Development: `src/DirectService.Transportation.Web/.local/keys` (one key, in use since 8 Oct 2026, excluded from git). Container: `/keys` (`Dockerfile`, a named volume). Several instances must share the folder.
+- **Protected at rest:** `DataProtection:CertificatePath` (+ `DataProtection:CertificatePassword`, a secret) encrypts the keys with that certificate (.pfx) on any system; otherwise DPAPI of the account the host runs as (Windows — run the service under one fixed account). In **Production on Linux/containers** the host refuses to start without a certificate, unless `DataProtection:AllowUnprotectedKeys=true` is set because the key volume itself is encrypted by the hosting provider. Back up the key folder (and the certificate) with the database: without them the stored e-invoicing credentials cannot be decrypted.
+- Keys rotate automatically every 90 days; old keys stay in the folder, so cookies and forms signed with them stay valid until they expire. Never delete the folder on an update.
+- A form posted with an outdated token (page opened before the user signed in or out in another tab, or before the browser session ended) is shown again with "This page expired. Please try again." and the email/username kept (never the password); a change inside the application refused twice for its token shows "This page expired… Reload" at the top of the page.
 
 ## 5. Run (development)
 

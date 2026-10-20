@@ -18,6 +18,7 @@
                 <h1 style="font-size:22px">@Title</h1>
                 @if (Lead is not null) {<p class="muted" style="margin-top:4px">@Lead</p>}
             </header>
+            @if (Http?.Features.Get<DirectService.Transportation.Web.Pipeline.ExpiredForm>() is not null || (Http is { Request.Method: "GET" } && Http.Request.Query["expired"] == "1")) {<Banner Tone="Tone.Warn" Icon="clock" Text="@L["acct.pageExpired"]" />}
             @ChildContent
             @if (Foot is not null) {<div class="help" style="font-size:13px">@Foot</div>}
         </div>
@@ -25,6 +26,9 @@
 </div>
 
 @code {
+    // Set when the form was refused for an outdated antiforgery token (DT-221): the page says so above its fields.
+    [CascadingParameter] private HttpContext? Http { get; set; }
+
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public string? Lead { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }

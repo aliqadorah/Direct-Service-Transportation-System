@@ -46,6 +46,12 @@ public abstract class AccountPage : ComponentBase
         };
     }
 
+    /// <summary>
+    /// A field typed into a form that was refused for an outdated antiforgery token (DT-221), by its form name (<c>Input.Email</c>), to
+    /// fill the page shown again; null otherwise. Only emails, usernames and names are kept, never passwords or codes.
+    /// </summary>
+    protected string? Kept(string field) => Http.Features.Get<DirectService.Transportation.Web.Pipeline.ExpiredForm>()?.Value(field);
+
     /// <summary>A return address inside this application only (no open redirect).</summary>
     protected static string LocalUrl(string? returnUrl) =>
         returnUrl is { Length: > 0 } r && r[0] == '/' && !r.StartsWith("//", StringComparison.Ordinal) && !r.StartsWith("/\\", StringComparison.Ordinal) ? r : "/";
@@ -56,6 +62,8 @@ public abstract class AccountPage : ComponentBase
         var q = new List<string>();
         if (Http.Request.Query["lang"].ToString() is "ar" or "en") q.Add("lang=" + Http.Request.Query["lang"]);
         if (returnUrl is not null && returnUrl != "/") q.Add("returnUrl=" + Uri.EscapeDataString(returnUrl));
+        // An expired form of a later sign-in step sends the user back to sign in: that page then says why (DT-221).
+        if (path == "/sign-in" && Http.Features.Get<DirectService.Transportation.Web.Pipeline.ExpiredForm>() is not null) q.Add("expired=1");
         return q.Count == 0 ? path : path + "?" + string.Join('&', q);
     }
 

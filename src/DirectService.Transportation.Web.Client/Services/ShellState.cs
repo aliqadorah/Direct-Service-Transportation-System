@@ -87,6 +87,19 @@ public sealed class ShellState : IDisposable
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// A change was refused for its antiforgery token even after a fresh one (DT-221): the page is out of date, e.g. the user signed in or
+    /// out in another tab. The shell then says so with a "Reload" button instead of a raw error.
+    /// </summary>
+    public bool PageExpired { get; private set; }
+
+    public void MarkPageExpired()
+    {
+        if (PageExpired) return;
+        PageExpired = true;
+        Changed?.Invoke();
+    }
+
     public void SetDensity(string density)
     {
         Density = density == "comfortable" ? "comfortable" : "compact";

@@ -15,6 +15,12 @@
                 Unread="Shell.UnreadNotifications" Density="@Shell.Density" OnCompany="OnCompany" OnCommandBar="OpenCommandBar" OnNotifications="OnNotifications"
                 OnProfile="OnProfile" OnMenu="() => _menuOpen = !_menuOpen" MenuOpen="_menuOpen" OnDensity="SetDensity" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
         <main class="content @(Fixed ? "fixed" : null)" id="content" tabindex="-1">
+            @if (Shell.PageExpired)
+            {
+                <Banner Tone="Tone.Warn" Icon="refresh" Text="@L["shell.pageExpired"]" Live="true">
+                    <Actions><Btn Small="true" Text="@L["shell.reload"]" OnClick="@(() => Nav.NavigateTo(Nav.Uri, forceLoad: true))" /></Actions>
+                </Banner>
+            }
             @Banners
             @ChildContent
         </main>

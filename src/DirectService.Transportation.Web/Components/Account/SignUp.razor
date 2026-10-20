@@ -40,7 +40,7 @@ else
 
 @code {
     // Form models: bound from the posted form, or new on a GET.
-    protected override void OnParametersSet() { Input ??= new(); }
+    protected override void OnParametersSet() { Input ??= new() { FullName = Kept("Input.FullName"), OrganisationName = Kept("Input.OrganisationName"), Email = Kept("Input.Email") }; }
 
     private ProblemValidator? _problems;
     private ErrorSummary? _summary;
