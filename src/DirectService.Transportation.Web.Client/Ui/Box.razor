@@ -4,7 +4,8 @@
     {
         <div class="bh">@if (Title is not null) {<h2 id="@_id"><Tx Value="@Title" /></h2>} else {<span></span>}@if (Actions is not null) {<span class="a">@Actions</span>}</div>
     }
-    @if (NoPad) { @ChildContent } else { <div class="pad">@ChildContent</div> }
+    @* DT-234: a table card (NoPad, not Fill) scrolls sideways inside the card instead of spilling out of it; Fill cards keep their own scroller. *@
+    @if (NoPad) { @if (Fill) { @ChildContent } else { <div class="box-x">@ChildContent</div> } } else { <div class="pad">@ChildContent</div> }
 </section>
 
 @code {

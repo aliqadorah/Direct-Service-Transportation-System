@@ -35,34 +35,51 @@ export function releaseFocus(id) {
   if (t.opener && document.contains(t.opener)) t.opener.focus();
 }
 
-/** Global shortcuts: Ctrl+K / ⌘K opens the command bar (FR-187); "/" focuses it when no field has focus. */
+/**
+ * The key of a shortcut by its physical position (DT-233): "KeyS" is "s" whatever the keyboard language (with the Arabic layout e.key is
+ * "س"), "Slash" is "/". Other keys fall back to e.key.
+ */
+export function shortcutKey(e) {
+  if (/^Key[A-Z]$/.test(e.code || "")) return e.code.slice(3).toLowerCase();
+  if (e.code === "Slash") return "/";
+  return (e.key || "").toLowerCase();
+}
+
+/** Ctrl (⌘ on a Mac) without Alt: AltGr is reported as Ctrl+Alt on Windows and types characters, never a shortcut. */
+const withCtrl = (e) => (e.ctrlKey || e.metaKey) && !e.altKey;
+
+/**
+ * Global shortcuts, one handler for every screen: Ctrl+K / ⌘K opens the command bar (FR-187); "/" focuses it when no field has focus;
+ * Ctrl+P prints through the screen's Print button; Ctrl+S saves through the button that shows "Ctrl S".
+ */
 let shortcutRef = null;
-function onShortcut(e) {
+export function onShortcut(e) {
   if (!shortcutRef) return;
-  const k = e.key.toLowerCase();
+  const k = shortcutKey(e);
   const typing = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
-  if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
-  else if (k === "/" && !typing) { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
-  else if ((e.ctrlKey || e.metaKey) && k === "p" && document.querySelector('button[data-shortcut="Ctrl P"]')) {
+  if (withCtrl(e) && k === "k") { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
+  else if (k === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); shortcutRef.invokeMethodAsync("OpenCommandBar"); }
+  else if (withCtrl(e) && k === "p" && document.querySelector('button[data-shortcut="Ctrl P"]')) {
     // Print preview: Ctrl+P prints the logged copy through the screen's Print button, never the unlogged preview (FR-058).
     e.preventDefault();
     const b = document.querySelector('button[data-shortcut="Ctrl P"]:not([disabled])');
     if (b) b.click();
   }
-  else if ((e.ctrlKey || e.metaKey) && k === "s") {
-    // Ctrl+S: the save button of the open dialog (the top one), else the screen's (shown with its shortcut on the button); never the page
-    // behind an open dialog.
-    const dialogs = document.querySelectorAll('[aria-modal="true"]');
-    const scope = dialogs.length ? dialogs[dialogs.length - 1] : document;
-    const b = scope.querySelector('button[data-shortcut="Ctrl S"]:not([disabled])');
-    if (dialogs.length) e.preventDefault();
-    if (b) {
-      e.preventDefault();
-      // Commit the field being typed in first (fields bind on change).
-      const a = document.activeElement;
-      if (a && a !== document.body) a.dispatchEvent(new Event("change", { bubbles: true }));
-      b.click();
-    }
+  else if (withCtrl(e) && k === "s") {
+    // Ctrl+S never opens the browser's "Save page" dialog in the application (DT-233). It presses the save button of the open dialog (the
+    // top one), else the screen's (shown with its shortcut on the button); never the page behind an open dialog.
+    e.preventDefault();
+    const scope = () => {
+      const dialogs = document.querySelectorAll('[aria-modal="true"]');
+      return dialogs.length ? dialogs[dialogs.length - 1] : document;
+    };
+    if (!scope().querySelector('button[data-shortcut="Ctrl S"]')) return;
+    // Commit the field being typed in first (fields bind on change, which Enter or leaving the field would also fire), then press the
+    // button as it is after that change (re-read: the change may re-render it or enable it).
+    const a = document.activeElement;
+    if (a && a !== document.body && /^(input|textarea|select)$/i.test(a.tagName)) a.dispatchEvent(new Event("change", { bubbles: true }));
+    const b = scope().querySelector('button[data-shortcut="Ctrl S"]:not([disabled])');
+    if (b) b.click();
   }
 }
 export function registerShortcuts(ref) {

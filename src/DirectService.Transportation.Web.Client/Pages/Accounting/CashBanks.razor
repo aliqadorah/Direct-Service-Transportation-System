@@ -29,7 +29,7 @@
         </EmptyState>
     </Empty>
     <ChildContent>
-        <div class="cols fill" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start;min-height:0">
+        <div class="cols fill lp" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start;min-height:0">
             <div class="stack" style="min-width:0">
                 <Box Title="@L["cb.boxes"]" NoPad="true">
                     <DataGrid TItem="CashBoxResponse" Items="_boxes" Key="b => b.Id" Caption="@L["cb.boxes"]" OnRowClick="b => Show(CashCodes.CashBox, b.Id, b.Name)"
@@ -49,7 +49,8 @@
                         <Columns>
                             <GridColumn TItem="BankAccountResponse" Title="@L["md.name"]" Value="b => b.Name" />
                             <GridColumn TItem="BankAccountResponse" Title="@L["md.bank"]" Value="b => b.BankName" />
-                            <GridColumn TItem="BankAccountResponse" Title="IBAN" Value="b => b.Iban" Ltr="true" />
+                            @* DT-234: the IBAN in groups of four, wrapping inside its column (it made the table wider than its card). *@
+                            <GridColumn TItem="BankAccountResponse" Title="IBAN" Value="b => Fmt.Iban(b.Iban)" Ltr="true" Wrap="true" />
                             <GridColumn TItem="BankAccountResponse" Title="@L["cb.currency"]" Value="b => b.CurrencyCode" Ltr="true" />
                             <GridColumn TItem="BankAccountResponse" Title="@L["dash.balance"]" Value="b => Fmt.Money(Balance(b.Id))" Numeric="true" />
                             <GridColumn TItem="BankAccountResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>

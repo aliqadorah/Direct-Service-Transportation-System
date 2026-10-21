@@ -16,9 +16,11 @@ namespace DirectService.Transportation.Api.Tests;
 /// migration. Here trips exist before the latest migration is applied: the database is taken back to the migration before
 /// <c>Rev6_ReceiptNoSearch</c> (its Down drops the search column and index) and forward again (its Up adds the persisted column, which
 /// SQL Server fills for the existing trips) — then the list, its search and its totals open for every preset role.
+/// DT-231: on its own database. Rolling back to before Rev6_ReceiptNoSearch also rolls back every later migration; on the shared API
+/// database the result depended on what other tests had left (a driver repayment cannot exist in the older schema), so the outcome changed
+/// with the order of the test classes (GitHub CI run of 21 Oct 2026).
 /// </summary>
-[Collection(ApiCollection.Name)]
-public sealed class TripListMigrationTests(ApiFactory f)
+public sealed class TripListMigrationTests(TripListMigrationFactory f) : IClassFixture<TripListMigrationFactory>
 {
     private const string BeforeLatest = "20261018070410_Rev6_PostJournalEntries";
 
@@ -37,9 +39,7 @@ public sealed class TripListMigrationTests(ApiFactory f)
             clients[role] = await MemberAsync(o, roles.Single(r => r.IsPreset && r.Name == role).Id);
 
         // The latest migration, rolled back and applied again with these trips in the database.
-        // The shared test database may hold the 500,000 trips of TripPerformanceTests: rebuilding the persisted column and its index over them
-        // can take minutes on a busy machine, longer than the 30-second default (DT-225: a timeout left the database half-migrated and every
-        // later test failed). Whatever happens here, the database is brought to the latest migration again before the next test.
+        // A generous command timeout (DT-225) and, whatever happens, the database is brought to the latest migration again.
         await f.DbAsync(async db =>
         {
             db.Database.SetCommandTimeout(TimeSpan.FromMinutes(15));

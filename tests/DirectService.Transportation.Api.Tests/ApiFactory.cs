@@ -20,8 +20,20 @@ namespace DirectService.Transportation.Api.Tests;
 /// migrations). Email is captured in memory; the URL-token key is random per run. Tests isolate
 /// themselves by signing up their own tenant (ADR-18).
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    /// <summary>
+    /// The test database. The shared API collection uses DirectServiceMaster_ApiTests; migration tests use their own database (DT-231), so the
+    /// data other tests leave behind (e.g. driver repayments) never decides whether a migration can be rolled back.
+    /// </summary>
+    protected virtual string DatabaseName => "DirectServiceMaster_ApiTests";
+
+    /// <summary>The connection string of this factory's database (CI gives the server and credentials in DST_API_TEST_DB).</summary>
+    public string Database => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("DST_API_TEST_DB") ?? ConnectionString)
+    {
+        InitialCatalog = DatabaseName,
+    }.ConnectionString;
+
     public const string ConnectionString =
         "Server=localhost;Database=DirectServiceMaster_ApiTests;Integrated Security=true;TrustServerCertificate=true;Encrypt=true";
 
@@ -40,7 +52,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:MasterDb", Environment.GetEnvironmentVariable("DST_API_TEST_DB") ?? ConnectionString);
+        builder.UseSetting("ConnectionStrings:MasterDb", Database);
         builder.UseSetting("UrlTokens:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         builder.UseSetting("DataProtection:KeysPath", _keysPath);
         builder.UseSetting("Jobs:Enabled", "false");
@@ -91,6 +103,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public new async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
+        GC.SuppressFinalize(this);
         try { Directory.Delete(_keysPath, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
@@ -325,4 +338,16 @@ public sealed class RecordingNotifier : IRealtimeNotifier
         SupportEnds.Enqueue((staffPublicId, payload));
         return Task.CompletedTask;
     }
+}
+
+/// <summary>DT-231: the trips-list migration test on its own database (no other test's data in it).</summary>
+public sealed class TripListMigrationFactory : ApiFactory
+{
+    protected override string DatabaseName => "DirectServiceMaster_MigrationTests";
+}
+
+/// <summary>DT-231: the settlement upgrade / rollback test on its own database.</summary>
+public sealed class SettlementUpgradeFactory : ApiFactory
+{
+    protected override string DatabaseName => "DirectServiceMaster_UpgradeTests";
 }

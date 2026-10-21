@@ -14,7 +14,7 @@
 
 <PageHeader Title="@L["profile.title"]" Help="profile" Crumbs="@([new Crumb(L["shell.userMenu"])])" />
 
-<div class="cols fill" style="grid-template-columns:380px 1fr;align-items:start">
+<div class="cols fill lp" style="grid-template-columns:380px 1fr;align-items:start">
     <div class="stack" style="min-width:0">
     <Box Title="@L["profile.preferences"]">
         <EditForm Model="_form" OnValidSubmit="Save" class="stack">
@@ -38,10 +38,11 @@
             <SelectField TValue="string?" @bind-Value="_form.DefaultCompany" Options="Companies" Label="@L["profile.defaultCompany"]" />
             <SelectField TValue="string" @bind-Value="_form.DateFormat" Options="DateFormats" Label="@L["profile.dateFormat"]" />
             <SelectField TValue="string" Value="@Shell.Density" ValueChanged="Density" ValueExpression="() => _densityShown" Options="Densities" Label="@L["shell.density"]" Help="@L["shell.densityNote"]" />
-            <div class="formbar">
+            <div class="formbar"><Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" /></div>
+            @* DT-232: the account actions in their own row (they overflowed the card next to Save). *@
+            <div class="formbar start acct-actions">
                 <Btn Icon="lock" Text="@L["profile.changePassword"]" Busy="_sendingLink" OnClick="ChangePassword" />
                 <Btn Icon="mail" Text="@L["profile.changeEmail"]" OnClick="OpenEmail" />
-                <Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" />
             </div>
         </EditForm>
     </Box>
@@ -59,7 +60,7 @@
             {
                 @if (_tfa is { Required: true }) {<Banner Tone="Tone.Info" Icon="lock" Text="@L[_tfa.RequiredForStaff ? "profile.tfaStaffOnly" : "profile.tfaRequiredByOrg"]" />}
                 @if (_tfa is { RecoveryCodesLeft: < 3 }) {<Banner Tone="Tone.Warn" Icon="key" Text="@L.F("profile.tfaFewCodes", _tfa.RecoveryCodesLeft)" />}
-                <div class="formbar" style="flex-wrap:wrap;justify-content:flex-start">
+                <div class="formbar start">
                     <Btn Icon="refresh" Text="@L["profile.tfaChangeApp"]" OnClick="@(() => OpenStep(StepAction.Change))" />
                     <Btn Icon="key" Text="@L["profile.tfaNewCodes"]" OnClick="@(() => OpenStep(StepAction.Codes))" />
                     <Btn Danger="true" Ghost="true" Icon="x" Text="@L["profile.tfaTurnOff"]" Disabled="@(_tfa?.Required != false)"

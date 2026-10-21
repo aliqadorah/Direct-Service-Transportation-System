@@ -13,6 +13,10 @@ public static partial class Fmt
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
+    /// <summary>An IBAN in groups of four ("JO94 CBJO 0010 …"), as printed on bank documents; it can wrap between the groups (DT-234).</summary>
+    public static string Iban(string? iban) =>
+        string.IsNullOrWhiteSpace(iban) ? string.Empty : string.Join(' ', iban.Replace(" ", "", StringComparison.Ordinal).Chunk(4).Select(c => new string(c)));
+
     public static string Money(decimal? v, int decimals = 3) =>
         v is null ? string.Empty : v.Value.ToString("#,##0." + new string('0', Math.Clamp(decimals, 0, 6)), Inv).TrimEnd('.');
 

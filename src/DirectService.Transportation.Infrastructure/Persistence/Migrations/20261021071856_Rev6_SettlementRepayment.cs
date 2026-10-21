@@ -125,6 +125,16 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // DT-231: the schema before this migration cannot hold a driver repayment, a carried advance or a partner repayment (the old
+            // CK_TRN_Settlements_NetPayable requires Net = Gross - Advances - Deductions >= 0; 'Carried' is not a payment method; a repayment
+            // would turn into a payment). Rolling back with such rows would fail half-way or change the accounting, so it is refused first,
+            // in the same transaction, with the reason. Void those documents first if a rollback is really needed.
+            migrationBuilder.Sql(
+                "IF EXISTS (SELECT 1 FROM [trn].[TRN_Settlements] WHERE [RepaidAmount] <> 0 OR [CarriedForward] <> 0)" +
+                " OR EXISTS (SELECT 1 FROM [trn].[TRN_Advances] WHERE [CarriedFromSettlementId] IS NOT NULL)" +
+                " OR EXISTS (SELECT 1 FROM [trn].[TRN_PartnerPayments] WHERE [Kind] <> 'Payment')" +
+                " THROW 50231, N'Rev6_SettlementRepayment cannot be rolled back: settlements with a driver repayment, carried advances or partner repayments exist.', 1;");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_TRN_Advances_TRN_Settlements_CarriedFromSettlementId",
                 schema: "trn",

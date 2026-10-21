@@ -152,6 +152,12 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // DT-231: rolling back would drop the recorded choices for paid partner trips and the deductions shown on payments; refused while
+            // there are any, with the reason (see Rev6_SettlementRepayment.Down).
+            migrationBuilder.Sql(
+                "IF EXISTS (SELECT 1 FROM [trn].[TRN_PartnerOverpayments]) OR EXISTS (SELECT 1 FROM [trn].[TRN_PartnerPayments] WHERE [DeductedAmount] <> 0)" +
+                " THROW 50232, N'Rev6_PartnerOverpayments cannot be rolled back: choices for paid partner trips or payment deductions exist.', 1;");
+
             migrationBuilder.DropTable(
                 name: "TRN_PartnerOverpayments",
                 schema: "trn");

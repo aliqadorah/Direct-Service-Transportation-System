@@ -743,3 +743,47 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Owner testing 21 Oct 2026 (DT-232…DT-234): the profile's buttons wrap inside their card; Ctrl+S saves the trip being edited with the field
+ * just typed; the Banks & cash boxes lists (a long IBAN) stay inside their cards and the statement panel goes under them when narrow — the
+ * same for Cost centres and Maintenance.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — layout fixes of 21 Oct (${lang})`, async ({ page }) => {
+    test.skip(!wanted("fix21#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const run = new VisualRun(lang, "fix21");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "fix21-enrol", false));
+    const company = companyOf(page);
+    const w = await buildWorld(page, company);
+    const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    await api(page, "POST", c(company, "accounting/bank-accounts"), { name: lang === "ar" ? "الحساب الجاري الرئيسي" : "Main current account",
+      bankName: lang === "ar" ? "بنك القاهرة عمان" : "Cairo Amman Bank", accountNumber: "0131000302", iban: "JO94CBJO0010000000000131000302", currencyCode: "JOD",
+      accountId: chart.find((x) => x.code === "110201")!.id });
+
+    expect(await open(page, `/c/${company}/profile`)).toBe(true);
+    await run.check(page, "fix21#profile");
+    await page.locator(".acct-actions").scrollIntoViewIfNeeded();
+    await run.check(page, "fix21#profile-actions");
+    await page.locator(".formbar.start").last().scrollIntoViewIfNeeded();
+    await run.check(page, "fix21#profile-2fa");
+    for (const route of ["accounting/cash-banks", "accounting/cost-centres", "accounting/maintenance"]) {
+      expect(await open(page, `/c/${company}/${route}`)).toBe(true);
+      await run.check(page, `fix21#${route.split("/")[1]}`);
+    }
+
+    // Ctrl+S on a trip being edited, the field just typed and not left: saved with that value.
+    const trip = await addTrip(page, w, `KS-1-${company.slice(0, 4)}`);
+    expect(await open(page, `/c/${company}/trips/${trip}`)).toBe(true);
+    const notes = page.getByLabel(t("md.notes"));
+    await notes.fill("Ctrl+S " + lang);
+    await page.keyboard.press("Control+KeyS");
+    await expect(page.locator(".toast")).toBeVisible({ timeout: 15_000 });
+    const saved = await api<{ trip: { notes: string | null } }>(page, "GET", c(company, `trips/${trip}`));
+    expect(saved.trip.notes).toBe("Ctrl+S " + lang);
+    await run.check(page, "fix21#trip-saved");
+    run.assertClean();
+  });
+}
