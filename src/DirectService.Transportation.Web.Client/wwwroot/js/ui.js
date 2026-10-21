@@ -105,6 +105,40 @@ export function offOutside(id) {
   outside.delete(id);
 }
 
+/**
+ * Collapsed side menu (DT-236): a section's flyout (fixed, so the scrolling menu never clips it) is placed beside the section that is
+ * pointed at or focused, kept inside the window. Listeners are added once per menu.
+ */
+export function navFlyouts(nav) {
+  if (!nav || nav.dataset.fly) return;
+  nav.dataset.fly = "1";
+  const place = (e) => {
+    const sec = e.target && e.target.closest ? e.target.closest(".sec") : null;
+    const fly = sec && nav.contains(sec) ? sec.querySelector(":scope > .fly") : null;
+    if (fly && !fly.contains(e.target)) placeFly(fly);
+  };
+  nav.addEventListener("pointerover", place);
+  nav.addEventListener("focusin", place);
+  // An opened flyout stays inside a window that was made smaller.
+  window.addEventListener("resize", () => { for (const f of nav.querySelectorAll(".sec.flown > .fly")) placeFly(f, false); });
+}
+
+/**
+ * Places a flyout beside its section, inside the window. With focus: its entries were just opened with Enter or a click (the flyout grew) —
+ * placed again and the first entry focused, once more on the next frame if the focus did not take while the flyout was being shown.
+ */
+export function placeFly(fly, focus) {
+  if (typeof fly === "string") fly = document.getElementById(fly);
+  if (!fly || !fly.closest(".side.mini")) return;
+  const top = fly.parentElement.getBoundingClientRect().top;
+  fly.style.top = Math.max(8, Math.min(top, window.innerHeight - fly.offsetHeight - 8)) + "px";
+  if (!focus) return;
+  const first = fly.querySelector("a[href]");
+  if (!first) return;
+  first.focus();
+  if (document.activeElement !== first) requestAnimationFrame(() => { placeFly(fly, false); first.focus(); });
+}
+
 /** Per-device preferences (DT-69: density is stored in the browser, not in core.Users). Storage may be unavailable. */
 export function getPref(key) { try { return localStorage.getItem("dst." + key); } catch { return null; } }
 export function setPref(key, value) { try { localStorage.setItem("dst." + key, value); } catch { /* storage unavailable */ } }

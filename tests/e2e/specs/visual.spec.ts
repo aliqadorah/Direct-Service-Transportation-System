@@ -787,3 +787,45 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Side menu of 22 Oct (DT-235…DT-239): expanded with icons on every entry and the labelled parts of Accounting; collapsed to the icon rail;
+ * a section's entries opened with the keyboard beside the rail; Ctrl+K finding a menu page by its name in the other language.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — side menu (${lang})`, async ({ page }) => {
+    test.skip(!wanted("nav22#"), "not among VISUAL_ONLY");
+    test.setTimeout(10 * 60_000);
+    const run = new VisualRun(lang, "nav22");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "nav22-enrol", false));
+    const company = companyOf(page);
+
+    expect(await open(page, `/c/${company}/accounting/trial-balance`)).toBe(true);
+    await expect(page.locator(".side .sec.open .part").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "nav22#expanded");
+
+    await page.locator(".side button.collapse").click();
+    await expect(page.locator("aside.side.mini")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "nav22#collapsed");
+
+    await page.locator(".side button.g", { hasText: t("nav.accounting") }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".side .sec.flown .fly a.it").first()).toBeFocused({ timeout: 15_000 });
+    await run.check(page, "nav22#flyout");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".side .sec.flown")).toHaveCount(0, { timeout: 15_000 });
+
+    // The collapsed state is kept for this user on this device.
+    await page.reload();
+    await expect(page.locator("aside.side.mini")).toBeVisible({ timeout: 30_000 });
+    await page.locator(".side button.collapse").click();
+    await expect(page.locator("aside.side.mini")).toHaveCount(0, { timeout: 15_000 });
+
+    await page.keyboard.press("Control+KeyK");
+    await page.locator("input[role=combobox]").fill(lang === "ar" ? "Trial balance" : "ميزان المراجعة");
+    await expect(page.locator("li[role=option]", { hasText: t("nav.trialBalance") })).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "nav22#search");
+    run.assertClean();
+  });
+}

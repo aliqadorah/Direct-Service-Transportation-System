@@ -29,6 +29,8 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask UnregisterShortcuts() => Call("unregisterShortcuts");
     public ValueTask OnOutside(Microsoft.AspNetCore.Components.ElementReference el, object dotNetRef, string id) => Call("onOutside", el, dotNetRef, id);
     public ValueTask OffOutside(string id) => Call("offOutside", id);
+    public ValueTask NavFlyouts(Microsoft.AspNetCore.Components.ElementReference nav) => Call("navFlyouts", nav);
+    public ValueTask PlaceFly(string id, bool focus) => Call("placeFly", id, focus);
     public ValueTask<string?> GetPref(string key) => Get<string?>("getPref", key);
 
     /// <summary>Seconds since the user last pressed a key, clicked, typed or scrolled (record-lock heartbeat, BR-039).</summary>

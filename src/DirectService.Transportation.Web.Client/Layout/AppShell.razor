@@ -49,10 +49,11 @@
     // A closed support session (DT-220) keeps no menu of the company it left.
     private IReadOnlyList<NavGroup> Groups => Provider || Shell.SupportEnded is not null ? [] : NavModel.For(Shell.Permissions, Shell.SetupIncomplete);
 
+    // Menu pages by name in either language (DT-239), only those of the user's menu (already filtered by permission).
     private IReadOnlyList<CommandResult> Commands => Provider
-        ? NavModel.Console.Select(c => new CommandResult(L[c.Key], L["shell.console"], c.Route)).ToList()
-        : Groups.SelectMany(g => g.Route is not null ? [new CommandResult(L[g.Key], L["shell.mainMenu"], NavModel.Href(Shell.Company?.Id ?? "", g.Route))]
-            : g.Items.Select(i => new CommandResult(L[i.Key], L[g.Key], NavModel.Href(Shell.Company?.Id ?? "", i.Route)))).ToList();
+        ? NavModel.Console.Select(c => new CommandResult(L[c.Key], L["shell.console"], c.Route, Loc.Both(c.Key))).ToList()
+        : Groups.SelectMany(g => g.Route is not null ? [new CommandResult(L[g.Key], L["shell.mainMenu"], NavModel.Href(Shell.Company?.Id ?? "", g.Route), Loc.Both(g.Key))]
+            : g.Items.Select(i => new CommandResult(L[i.Key], L[g.Key], NavModel.Href(Shell.Company?.Id ?? "", i.Route), Loc.Both(i.Key)))).ToList();
 
     protected override void OnInitialized()
     {

@@ -27,6 +27,9 @@ public sealed class Loc
 
     public string this[string key] => UiText.All.TryGetValue(key, out var t) ? (En ? t.En : t.Ar) : key;
 
+    /// <summary>The text of a key in both languages (searching menu pages by either name, DT-239).</summary>
+    public static string Both(string key) => UiText.All.TryGetValue(key, out var t) ? t.Ar + " " + t.En : key;
+
     /// <summary>Text with <c>{0}</c>-style arguments (numbers are formatted with Western digits, DT-65).</summary>
     public string F(string key, params object?[] args) => string.Format(CultureInfo.InvariantCulture, this[key], args);
 

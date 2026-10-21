@@ -1,19 +1,31 @@
 @*
-  Dark side menu at the inline start (right in Arabic) with the PRD groups (UX-11). The group holding the current page is open and marked;
-  other groups open on click (one at a time). Current entries carry aria-current="page".
+  Dark side menu at the inline start (right in Arabic) with the PRD groups (UX-11). Every entry has its own icon (DT-235); long sections
+  are split into labelled parts (DT-238). Sections open and close on click, several at a time; the one holding the current page opens by
+  itself. The menu collapses to an icon rail (DT-236): pointing at a section, or focusing it, shows its name, and its entries on hover or
+  with Enter (Escape closes). Collapsed / open sections are remembered per user on this device (DT-237). Current entries carry
+  aria-current="page".
 *@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager Nav
 @inject Loc L
-<aside class="side" aria-label="@L[Provider ? "shell.providerMenu" : "shell.mainMenu"]">
-    <div class="brand"><img src="img/logo.png" alt="" /><span>@L[Provider ? "shell.console" : "shell.product"]</span></div>
-    <nav>
+@inject UiJs Js
+@inject ShellState Shell
+<aside class="side @(_mini ? "mini" : null)" aria-label="@L[Provider ? "shell.providerMenu" : "shell.mainMenu"]" @ref="_aside">
+    <div class="brand">
+        <img src="img/logo.png" alt="" /><span class="lbl">@L[Provider ? "shell.console" : "shell.product"]</span>
+        <button type="button" class="collapse" aria-label="@L[_mini ? "shell.expandMenu" : "shell.collapseMenu"]" aria-expanded="@(_mini ? "false" : "true")"
+                @onclick="ToggleMini"><Icon Name="@(_mini ? "panel-out" : "panel-in")" Flip="true" /></button>
+    </div>
+    <nav @ref="_nav" @onkeydown="NavKey">
         @if (Provider)
         {
             @foreach (var (key, route, icon) in NavModel.Console)
             {
                 var cur = IsCurrent(route);
-                <a class="g @(cur ? "cur" : null)" href="@route" aria-current="@(cur ? "page" : null)"><Icon Name="@icon" /><span class="lbl">@L[key]</span></a>
+                <div class="sec @(cur ? "has-cur" : null)">
+                    <a class="g @(cur ? "cur" : null)" href="@route" aria-current="@(cur ? "page" : null)" @onfocus="() => Focused(null)"><Icon Name="@icon" /><span class="lbl">@L[key]</span></a>
+                    @if (_mini) {<div class="fly tip" aria-hidden="true"><div class="ft">@L[key]</div></div>}
+                </div>
             }
         }
         else
@@ -25,22 +37,41 @@
                 {
                     var href = NavModel.Href(Company, group.Route);
                     var cur = IsCurrent(href, exact: group.Route.Length == 0);
-                    <a class="g @(cur ? "cur" : null)" href="@href" aria-current="@(cur ? "page" : null)"><Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span></a>
+                    <div class="sec @(cur ? "has-cur" : null)">
+                        <a class="g @(cur ? "cur" : null)" href="@href" aria-current="@(cur ? "page" : null)" @onfocus="() => Focused(null)"><Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span></a>
+                        @if (_mini) {<div class="fly tip" aria-hidden="true"><div class="ft">@L[group.Key]</div></div>}
+                    </div>
                     continue;
                 }
-                var open = _open == group.Key;
-                <button type="button" class="g @(open ? "open" : null)" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(group.Key)">
-                    <Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span><Icon Name="@(open ? "down" : "left")" Flip="!open" Class="ch" />
-                </button>
-                @if (open)
-                {
-                    foreach (var i in group.Items)
+                var open = _open.Contains(group.Key);
+                var flown = _flown == group.Key;
+                var holds = group.Items.Any(i => IsCurrent(NavModel.Href(Company, i.Route)));
+                var fly = $"{_id}-{group.Key.Replace('.', '-')}";
+                <div class="sec @(open ? "open" : null) @(flown ? "flown" : null) @(holds ? "has-cur" : null)">
+                    <button type="button" class="g" id="@($"{fly}-b")" aria-expanded="@((_mini ? flown : open) ? "true" : "false")" aria-controls="@(_mini || open ? fly : null)"
+                            @onclick="() => Toggle(group.Key)" @onfocus="() => Focused(group.Key)">
+                        <Icon Name="@group.Icon" /><span class="lbl">@L[group.Key]</span><Icon Name="@(open ? "down" : "left")" Flip="!open" Class="ch" />
+                    </button>
+                    @if (_mini || open)
                     {
-                        var href = NavModel.Href(Company, i.Route);
-                        var cur = IsCurrent(href);
-                        <a class="it @(cur ? "cur" : null)" href="@href" aria-current="@(cur ? "page" : null)">@L[i.Key]</a>
+                        <div class="fly" id="@fly" role="group" aria-label="@L[group.Key]">
+                            <div class="ft" aria-hidden="true">@L[group.Key]</div>
+                            @foreach (var part in group.Items.GroupBy(i => i.Part))
+                            {
+                                var partId = part.Key is null ? null : $"{fly}-{part.Key.Replace('.', '-')}";
+                                <div class="pt" role="@(part.Key is null ? null : "group")" aria-labelledby="@partId">
+                                    @if (part.Key is not null) {<div class="part" id="@partId">@L[part.Key]</div>}
+                                    @foreach (var i in part)
+                                    {
+                                        var ihref = NavModel.Href(Company, i.Route);
+                                        var icur = IsCurrent(ihref);
+                                        <a class="it @(icur ? "cur" : null)" href="@ihref" aria-current="@(icur ? "page" : null)" id="@(i == group.Items[0] ? $"{fly}-1" : null)"><Icon Name="@i.Icon" /><span>@L[i.Key]</span></a>
+                                    }
+                                </div>
+                            }
+                        </div>
                     }
-                }
+                </div>
             }
         }
     </nav>
@@ -48,21 +79,84 @@
 </aside>
 
 @code {
-    private string? _open;
+    private readonly string _id = Ids.Next("nav");
+    private readonly HashSet<string> _open = [];
+    private bool _mini;
+    private string? _flown;            // collapsed menu: the section whose entries were opened with Enter or a click
+    private bool _focusFlyout;
+    private bool _outside;
+    private string? _openedFor;        // the address whose section was last opened by itself
+    private ElementReference _aside;
+    private ElementReference _nav;
+    private DotNetObjectReference<SideNav>? _ref;
 
     [Parameter] public IReadOnlyList<NavGroup> Groups { get; set; } = [];
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string? Foot { get; set; }
     [Parameter] public bool Provider { get; set; }
 
-    protected override void OnInitialized() => Nav.LocationChanged += Moved;
+    /// <summary>Device preference of this user (DT-237): "mini=1;open=nav.billing,nav.accounting".</summary>
+    private string PrefKey => "nav." + (Shell.Me?.Id ?? "-");
 
-    protected override void OnParametersSet() => _open ??= CurrentGroup();
-
-    private void Moved(object? sender, LocationChangedEventArgs e)
+    protected override void OnInitialized()
     {
-        _open = CurrentGroup() ?? _open;
+        Nav.LocationChanged += Moved;
+        OpenCurrent();
+    }
+
+    protected override void OnParametersSet() => OpenCurrent();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+            await Js.NavFlyouts(_nav);
+            if (Read(await Js.GetPref(PrefKey))) StateHasChanged();
+        }
+        if (_focusFlyout && _flown is not null)
+        {
+            _focusFlyout = false;
+            await Js.PlaceFly($"{_id}-{_flown.Replace('.', '-')}", focus: true);
+        }
+    }
+
+    /// <summary>Applies a stored preference; anything unreadable is ignored (the menu stays as it is).</summary>
+    private bool Read(string? pref)
+    {
+        if (string.IsNullOrWhiteSpace(pref)) return false;
+        foreach (var part in pref.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var (name, value) = part.IndexOf('=') is var at and > 0 ? (part[..at], part[(at + 1)..]) : (part, "");
+            if (name == "mini") _mini = value == "1";
+            else if (name == "open")
+            {
+                _open.Clear();
+                foreach (var key in value.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    if (NavModel.Company.Any(g => g.Key == key)) _open.Add(key);
+            }
+        }
+        _openedFor = null;
+        OpenCurrent();
+        return true;
+    }
+
+    private Task Save() => Js.SetPref(PrefKey, $"mini={(_mini ? 1 : 0)};open={string.Join(',', _open.Order(StringComparer.Ordinal))}").AsTask();
+
+    private void Moved(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(async () =>
+    {
+        OpenCurrent();
+        await Fly(null);
         StateHasChanged();
+    });
+
+    /// <summary>The section holding the current page opens by itself when that page is reached (DT-237); the user may close it again.</summary>
+    private void OpenCurrent()
+    {
+        if (_openedFor == Path) return;
+        if (Groups.FirstOrDefault(g => g.Items.Any(i => IsCurrent(NavModel.Href(Company, i.Route))))?.Key is not { } key) return;
+        _open.Add(key);
+        _openedFor = Path;
     }
 
     private string Path => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
@@ -74,9 +168,59 @@
             : string.Equals(Path, h, StringComparison.OrdinalIgnoreCase) || Path.StartsWith(h + "/", StringComparison.OrdinalIgnoreCase) && !Groups.SelectMany(g => g.Items).Any(i => i.Route.Length > 0 && NavModel.Href(Company, i.Route).Length > h.Length && Path.StartsWith(NavModel.Href(Company, i.Route), StringComparison.OrdinalIgnoreCase));
     }
 
-    private string? CurrentGroup() => Groups.FirstOrDefault(g => g.Items.Any(i => IsCurrent(NavModel.Href(Company, i.Route))))?.Key;
+    private async Task Toggle(string key)
+    {
+        if (_mini)
+        {
+            await Fly(_flown == key ? null : key);
+            return;
+        }
+        if (!_open.Remove(key)) _open.Add(key);
+        await Save();
+    }
 
-    private void Toggle(string key) => _open = _open == key ? null : key;
+    private async Task ToggleMini()
+    {
+        _mini = !_mini;
+        await Fly(null);
+        await Save();
+    }
 
-    public void Dispose() => Nav.LocationChanged -= Moved;
+    /// <summary>Opens (or closes) the entries of a section of the collapsed menu; they close again when focus or a click goes elsewhere.</summary>
+    private async Task Fly(string? key)
+    {
+        _flown = key;
+        _focusFlyout = key is not null;
+        if (key is not null && !_outside && _ref is not null) { _outside = true; await Js.OnOutside(_aside, _ref, _id); }
+        else if (key is null && _outside) { _outside = false; await Js.OffOutside(_id); }
+    }
+
+    /// <summary>Focus reached another section of the collapsed menu: the opened one closes.</summary>
+    private async Task Focused(string? key)
+    {
+        if (_flown is not null && _flown != key) await Fly(null);
+    }
+
+    private async Task NavKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape" || _flown is null) return;
+        var button = $"{_id}-{_flown.Replace('.', '-')}-b";
+        await Fly(null);
+        await Js.FocusById(button);
+    }
+
+    [JSInvokable]
+    public Task Outside() => InvokeAsync(async () =>
+    {
+        if (_flown is null) return;
+        await Fly(null);
+        StateHasChanged();
+    });
+
+    public async ValueTask DisposeAsync()
+    {
+        Nav.LocationChanged -= Moved;
+        if (_outside) await Js.OffOutside(_id);
+        _ref?.Dispose();
+    }
 }

@@ -53,7 +53,7 @@
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
-        var commands = string.IsNullOrWhiteSpace(_text) ? [] : Commands.Where(c => Fold.Contains(c.Text, _text)).Take(6).ToList();
+        var commands = string.IsNullOrWhiteSpace(_text) ? [] : Commands.Where(c => Fold.Contains(c.Text, _text) || Fold.Contains(c.Terms, _text)).Take(8).ToList();
         _results = commands;
         _active = _results.Count > 0 ? 0 : -1;
         if (SearchAsync is null || _text.Trim().Length < 2) return;

@@ -108,6 +108,7 @@
 
   /* ---- layout */
   --side-w: 224px;
+  --side-w-mini: 60px;   /* collapsed side menu: icons only (DT-236) */
   --top-h: 46px;
   --cmdk-w: 360px;
   --dialog-w: 480px;
