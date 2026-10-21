@@ -45,7 +45,7 @@ public sealed record CompanyAccess(string Id, string Name, string? NameEn, strin
 public sealed record MeResponse(
     string Id, string FullName, string? Email, string LanguageCode, string DateFormat, string? DefaultCompany,
     bool IsPlatformStaff, string? TenantName, string? TenantStatus, IReadOnlyList<CompanyAccess> Companies,
-    string? UserName = null, bool TwoFactorEnabled = false, string? Environment = null);
+    string? UserName = null, bool TwoFactorEnabled = false, string? Environment = null, string? PendingEmail = null);
 
 public sealed record PreferencesRequest(string LanguageCode, string? DefaultCompany, string DateFormat);
 public sealed record SessionResponse(string Id, DateTime CreatedAt, DateTime LastSeenAt, string? IpAddress, string? UserAgent, bool IsCurrent);
@@ -54,7 +54,7 @@ public sealed record SessionResponse(string Id, DateTime CreatedAt, DateTime Las
 
 public sealed record UserListItem(
     string Id, string FullName, string? Email, string Status, Ref? Role, bool IsLocked, bool TwoFactorEnabled,
-    bool EmailConfirmed, DateTime? LastSignInAt, string RowVersion, string? UserName = null, bool MustChangePassword = false);
+    bool EmailConfirmed, DateTime? LastSignInAt, string RowVersion, string? UserName = null, bool MustChangePassword = false, string? PendingEmail = null);
 
 /// <summary>
 /// "Add user" → "Create with username and password" (revision 6): username unique platform-wide (letters, digits, . _ -), optional email,
@@ -69,6 +69,24 @@ public sealed record PasswordPolicyResponse(int MinLength, bool RequireLetter, b
 public sealed record SetPasswordRequest(string Password, bool MustChangePassword = true);
 
 public sealed record AssignRoleRequest(string Role);
+
+/// <summary>
+/// DT-229: an Owner or Administrator changes a user's name and username in Users & roles (also their own). Username: same rules as at
+/// creation, the generic "not available" answer; it may be cleared only when the user has an email to sign in with.
+/// </summary>
+public sealed record UpdateUserRequest(string? FullName, string? UserName, string? RowVersion);
+
+/// <summary>
+/// DT-229: the user asks to change their own email: the new address, the current password and, with two-step verification on, a current
+/// code or a recovery code. A link goes to the new address; nothing changes until it is confirmed.
+/// </summary>
+public sealed record ChangeEmailRequest(string? NewEmail, string? CurrentPassword, string? Code = null, string? RecoveryCode = null);
+
+/// <summary>DT-229: an Owner or Administrator starts an email change for a user; it takes effect only when that user confirms the link.</summary>
+public sealed record StartEmailChangeRequest(string? NewEmail);
+
+/// <summary>DT-229: the address in use and the one waiting for confirmation.</summary>
+public sealed record EmailChangeResponse(string? Email, string? PendingEmail);
 public sealed record ReasonRequest(string Reason);
 
 public sealed record PermissionItem(string Key, string PrdName, string Group, string DescriptionAr, string DescriptionEn);

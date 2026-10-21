@@ -637,3 +637,54 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Owner testing 21 Oct 2026 (DT-226, DT-228, DT-229): the e-invoicing settings with income tax chosen (the 0% offer), the driver settlement
+ * with the driver's repayment (the trips unticked: only the 20.000 advance is left, so the net is negative), the profile page with its
+ * "Change email" dialog, and the Users & roles dialogs for name / username and for starting an email change. Openers write nothing.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — account changes and repayment (${lang})`, async ({ page }) => {
+    test.skip(!wanted("einvoice#income", "settle#repayment", "profile#", "users#edit-account", "users#change-email"), "not among VISUAL_ONLY");
+    test.setTimeout(20 * 60_000);
+    const run = new VisualRun(lang, "account-changes");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "account-changes-enrol", false));
+    const company = companyOf(page);
+    const { w } = await documents(page, company);
+    const roles = await api<{ id: string; name: string }[]>(page, "GET", c(company, "roles"));
+    await api(page, "POST", c(company, "users"), { fullName: lang === "ar" ? "كاتب الحسابات" : "Accounts clerk", userName: `clerk.${Date.now()}`, email: null,
+      password: "Visual-Passw0rd-1", role: roles.find((r) => r.name === "Accountant")!.id, mustChangePassword: false });
+    const route = (r: string) => `/c/${company}/${r}`;
+
+    expect(await open(page, route("settings/e-invoicing"))).toBe(true);
+    const registration = page.locator("main select").filter({ has: page.locator("option", { hasText: t("eis.reg.Income") }) });
+    await registration.selectOption({ label: t("eis.reg.Income") });
+    await expect(page.getByText(t("eis.zeroOfferAccept"))).toBeVisible({ timeout: 10_000 });
+    await run.check(page, "einvoice#income-offer");
+
+    expect(await open(page, route(`driver-accounts/${w.driver}/settle`))).toBe(true);
+    await page.locator("main table").first().locator("thead input[type=checkbox]").uncheck();
+    await expect(page.getByRole("heading", { name: t("drv.repayTitle") })).toBeVisible({ timeout: 10_000 });
+    await run.check(page, "settle#repayment");
+
+    expect(await open(page, route("profile"))).toBe(true);
+    await run.check(page, "profile#page");
+    await button(page.locator("main"), t("profile.changeEmail")).click();
+    await expect(page.locator(".dialog")).toBeVisible({ timeout: 10_000 });
+    await run.check(page, "profile#change-email");
+
+    expect(await open(page, route("settings/users"))).toBe(true);
+    const clerkRow = page.locator("main table tbody tr").filter({ hasText: lang === "ar" ? "كاتب الحسابات" : "Accounts clerk" });
+    await clerkRow.click();
+    await button(page.locator(".panel-side"), t("usr.editAccount")).click();
+    await expect(page.locator(".dialog")).toBeVisible({ timeout: 10_000 });
+    await run.check(page, "users#edit-account");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".dialog")).toHaveCount(0, { timeout: 10_000 });
+    await button(page.locator(".panel-side"), t("profile.changeEmail")).click();
+    await expect(page.locator(".dialog")).toBeVisible({ timeout: 10_000 });
+    await run.check(page, "users#change-email");
+    run.assertClean();
+  });
+}

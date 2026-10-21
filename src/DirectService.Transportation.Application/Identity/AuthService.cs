@@ -210,6 +210,29 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     }
 
     /// <summary>
+    /// DT-229: re-authentication for a sensitive change of the user's own account (the email address): the current password, and with
+    /// two-step verification on also a current code or a recovery code (<see cref="VerifyStepUpAsync"/>). Failures count towards the
+    /// lockout like sign-in failures; while blocked the ordinary "wrong password" answer is given.
+    /// </summary>
+    public async Task VerifyReauthenticationAsync(User user, string? password, string? code, string? recoveryCode, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        if (user.TwoFactorEnabledAt is not null)
+        {
+            await VerifyStepUpAsync(user, password, code, recoveryCode, ct).ConfigureAwait(false);
+            return;
+        }
+        new Validator().Require("currentPassword", password).ThrowIfInvalid();
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+        if (!await users.CheckPasswordAsync(user, password!).ConfigureAwait(false))
+        {
+            await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
+            throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+        }
+        throttle.Reset(user.Id, ctx.IpAddress);
+    }
+
+    /// <summary>
     /// Spends one recovery code (DT-212): the store marks it used with one conditional update, so of simultaneous requests with the same code
     /// exactly one succeeds. Identity's own redeem also saves the user row afterwards, which made the one success fail when parallel
     /// failed attempts had changed that row; nothing on the user changes when a code is spent, so the store is called directly.

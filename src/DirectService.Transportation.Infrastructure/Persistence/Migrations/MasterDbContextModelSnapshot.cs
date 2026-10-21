@@ -6901,6 +6901,18 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("PasswordHash")
                         .HasColumnOrder(7);
 
+                    b.Property<string>("PendingEmail")
+                        .HasMaxLength(150)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("PendingEmail")
+                        .HasColumnOrder(32);
+
+                    b.Property<DateTime?>("PendingEmailAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("PendingEmailAt")
+                        .HasColumnOrder(33);
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("PublicId")
@@ -6999,6 +7011,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Users_IsPlatformStaff_TenantId", "([IsPlatformStaff] = 1 AND [TenantId] IS NULL) OR ([IsPlatformStaff] = 0 AND [TenantId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Users_LanguageCode", "[LanguageCode] IN ('ar','en')");
+
+                            t.HasCheckConstraint("CK_Users_PendingEmail_PendingEmailAt", "([PendingEmail] IS NULL AND [PendingEmailAt] IS NULL) OR ([PendingEmail] IS NOT NULL AND [PendingEmailAt] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Users_Status", "[Status] IN ('Active','Disabled','Archived')");
                         });

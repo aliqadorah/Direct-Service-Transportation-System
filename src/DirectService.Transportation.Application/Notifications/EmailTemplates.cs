@@ -31,6 +31,36 @@ public static class EmailTemplates
             "مراجعة الحساب", "Review your account", link, nameof(TwoFactorChanged));
     }
 
+    /// <summary>
+    /// DT-229: confirm a new email address for an existing account (asked by the user, or started by an administrator). The change takes effect
+    /// only when the account's user, signed in, confirms it; until then sign-in and password reset keep the current address.
+    /// </summary>
+    public static EmailMessage ConfirmEmailChange(string to, string name, bool byAdministrator, string link) => Build(to,
+        "تأكيد تغيير البريد الإلكتروني — Confirm your new email",
+        byAdministrator
+            ? $"مرحباً {E(name)}،<br>طلب مسؤول المستخدمين جعل هذا البريد بريد حسابك في Direct Service Transportation. لا يتغيّر شيء حتى تسجّل الدخول إلى حسابك وتفتح الرابط لتأكيده. إن لم يكن هذا حسابك فتجاهل هذه الرسالة."
+            : $"مرحباً {E(name)}،<br>طلبت جعل هذا البريد بريد حسابك في Direct Service Transportation. سجّل الدخول وافتح الرابط لتأكيده؛ حتى ذلك الحين يبقى بريدك الحالي. إن لم تطلب ذلك فتجاهل هذه الرسالة.",
+        byAdministrator
+            ? $"Hello {E(name)},<br>Your user administrator asked to make this the email address of your Direct Service Transportation account. Nothing changes until you sign in to your account and open the link to confirm it. If this is not your account, ignore this email."
+            : $"Hello {E(name)},<br>You asked to make this the email address of your Direct Service Transportation account. Sign in and open the link to confirm it; until then your current address stays. If you did not ask for this, ignore this email.",
+        "تأكيد البريد الجديد", "Confirm new email", link, nameof(ConfirmEmailChange));
+
+    /// <summary>DT-229 (security review F8): notice to the current address as soon as a change is asked (the new address masked).</summary>
+    public static EmailMessage EmailChangeAsked(string to, string name, string maskedNew, bool byAdministrator, string link) => Build(to,
+        "طلب تغيير بريدك الإلكتروني — Email change requested",
+        (byAdministrator ? $"مرحباً {E(name)}،<br>بدأ مسؤول المستخدمين تغيير بريد حسابك في Direct Service Transportation إلى {E(maskedNew)}." : $"مرحباً {E(name)}،<br>طُلب تغيير بريد حسابك في Direct Service Transportation إلى {E(maskedNew)}.")
+            + " لا يتغيّر شيء قبل تأكيده من حسابك. إن لم تكن أنت من طلب ذلك فسجّل الدخول وألغِ الطلب من ملفك الشخصي وغيّر كلمة المرور، وتواصل مع مسؤول المستخدمين.",
+        (byAdministrator ? $"Hello {E(name)},<br>Your user administrator started changing the email address of your Direct Service Transportation account to {E(maskedNew)}." : $"Hello {E(name)},<br>A change of the email address of your Direct Service Transportation account to {E(maskedNew)} was requested.")
+            + " Nothing changes until it is confirmed from your account. If this wasn't you, sign in, cancel the request in your profile, change your password and contact your administrator.",
+        "تسجيل الدخول", "Sign in", link, nameof(EmailChangeAsked));
+
+    /// <summary>DT-229: notice to the previous address after the change (the new address is shown masked).</summary>
+    public static EmailMessage EmailChanged(string to, string name, string maskedNew, DateTime atUtc, string link) => Build(to,
+        "تم تغيير بريدك الإلكتروني — Your email was changed",
+        $"مرحباً {E(name)}،<br>تم تغيير بريد حسابك في Direct Service Transportation إلى {E(maskedNew)} بتاريخ {atUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)} UTC. إن لم تكن أنت من فعل ذلك فتواصل مع مسؤول المستخدمين في شركتك فوراً.",
+        $"Hello {E(name)},<br>The email address of your Direct Service Transportation account was changed to {E(maskedNew)} on {atUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)} UTC. If this wasn't you, contact your administrator at once.",
+        "تسجيل الدخول", "Sign in", link, nameof(EmailChanged));
+
     /// <summary>An email an administrator entered for a username user: confirmed only while that user is signed in (DT-203).</summary>
     public static EmailMessage VerifyAddedEmail(string to, string name, string userName, string link) => Build(to,
         "تأكيد البريد الإلكتروني — Verify your email",

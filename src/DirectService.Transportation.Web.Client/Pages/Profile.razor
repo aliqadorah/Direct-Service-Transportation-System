@@ -1,7 +1,9 @@
 @page "/c/{Company}/profile"
 @* SCR-08 my profile (FR-176, FR-178): language, default company and date format; density on this device (DT-69); active sessions with
    sign-out of one or all others; password change by an emailed link (the reset flow of SCR-04, DT-143), or here with the current password for a
-   user without email (revision 6); two-step verification: state, and turning it on (QR code, first code, recovery codes). *@
+   user without email (revision 6); two-step verification: state, and turning it on (QR code, first code, recovery codes).
+   DT-229: name and username are read-only here (an Owner / Administrator sees "Edit" to their row in Users & roles); "Change email" asks for
+   the new address and the current password (+ code with 2FA); the address waiting for confirmation is shown with "Cancel". *@
 @using DirectService.Transportation.Contracts.Identity
 @inject Api Api
 @inject Loc L
@@ -19,14 +21,26 @@
             <ProblemValidator @ref="_problems" />
             <ErrorSummary />
             <TextField Value="@Shell.Me?.FullName" ValueExpression="() => _nameShown" Label="@L["profile.name"]" ReadOnly="true" Help="@L["profile.nameHelp"]" />
+            @if (Shell.Me?.UserName is { } userName) {<TextField Value="@userName" ValueExpression="() => _emailShown" Label="@L["usr.userName"]" ReadOnly="true" Ltr="true" Help="@L["profile.nameHelp"]" />}
+            @if (CanEditUsers)
+            {
+                <a style="font-size:13px" href="@NavModel.Href(Company, "settings/users?user=" + Uri.EscapeDataString(Shell.Me!.Id))">@L["profile.editInUsers"]</a>
+            }
             <TextField Value="@(Shell.Me?.Email ?? "—")" ValueExpression="() => _emailShown" Label="@L["acct.email"]" ReadOnly="true" Ltr="true" />
-            @if (Shell.Me?.UserName is { } userName) {<TextField Value="@userName" ValueExpression="() => _emailShown" Label="@L["usr.userName"]" ReadOnly="true" Ltr="true" />}
+            @if (Shell.Me?.PendingEmail is { } pending)
+            {
+                <Banner Tone="Tone.Info" Icon="mail">
+                    <span>@L.F("profile.emailPending", pending)</span>
+                    <button type="button" class="linkbtn" @onclick="CancelEmail" disabled="@_emBusy">@L["profile.emailCancel"]</button>
+                </Banner>
+            }
             <SelectField TValue="string" @bind-Value="_form.LanguageCode" Options="Languages" Label="@L["shell.language"]" />
             <SelectField TValue="string?" @bind-Value="_form.DefaultCompany" Options="Companies" Label="@L["profile.defaultCompany"]" />
             <SelectField TValue="string" @bind-Value="_form.DateFormat" Options="DateFormats" Label="@L["profile.dateFormat"]" />
             <SelectField TValue="string" Value="@Shell.Density" ValueChanged="Density" ValueExpression="() => _densityShown" Options="Densities" Label="@L["shell.density"]" Help="@L["shell.densityNote"]" />
             <div class="formbar">
                 <Btn Icon="lock" Text="@L["profile.changePassword"]" Busy="_sendingLink" OnClick="ChangePassword" />
+                <Btn Icon="mail" Text="@L["profile.changeEmail"]" OnClick="OpenEmail" />
                 <Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" />
             </div>
         </EditForm>
@@ -99,6 +113,34 @@
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _pwOpen = false" />
         <Btn Primary="true" Text="@L["profile.changePassword"]" Busy="_pwBusy" Disabled="@(string.IsNullOrEmpty(_pwCurrent) || string.IsNullOrEmpty(_pwNew) || string.IsNullOrEmpty(_pwConfirm))" OnClick="SavePassword" />
+    </Footer>
+</Modal>
+
+<Modal @bind-Open="_emOpen" Title="@L["profile.changeEmail"]" Busy="_emBusy" Icon="mail">
+    <ChildContent>
+        <EditForm EditContext="_emCtx" OnSubmit="SaveEmail" class="stack" novalidate>
+            <ProblemValidator @ref="_emProblems" />
+            <ErrorSummary Extra="_emExtra" />
+            <p>@L["profile.changeEmailLead"]</p>
+            <TextField Id="em-new" @bind-Value="_em.NewEmail" Label="@L["profile.newEmail"]" Type="email" Required="true" Ltr="true" MaxLength="150" Autocomplete="email" />
+            <TextField Id="em-password" @bind-Value="_em.CurrentPassword" Label="@L["profile.currentPassword"]" Type="password" Required="true" Ltr="true" MaxLength="128" Autocomplete="current-password" />
+            @if (Shell.Me?.TwoFactorEnabled == true)
+            {
+                @if (_em.UseRecovery)
+                {
+                    <TextField Id="em-recovery" @bind-Value="_em.RecoveryCode" Label="@L["acct.recoveryTitle"]" Required="true" Ltr="true" MaxLength="20" Autocomplete="off" />
+                }
+                else
+                {
+                    <TextField Id="em-code" @bind-Value="_em.Code" Label="@L["acct.codeField"]" Required="true" Ltr="true" MaxLength="7" Autocomplete="one-time-code" />
+                }
+                <button type="button" class="linkbtn" @onclick="() => _em.UseRecovery = !_em.UseRecovery">@L[_em.UseRecovery ? "profile.tfaUseCode" : "acct.useRecovery"]</button>
+            }
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _emOpen = false" />
+        <Btn Primary="true" Text="@L["profile.sendEmailLink"]" Busy="_emBusy" Disabled="@(string.IsNullOrWhiteSpace(_em.NewEmail) || string.IsNullOrEmpty(_em.CurrentPassword))" OnClick="SaveEmail" />
     </Footer>
 </Modal>
 
@@ -327,6 +369,65 @@
     /// <summary>"This computer (local)" for the loopback address (the app running on this PC), otherwise the address (DT-211).</summary>
     private string? Address(SessionResponse s) =>
         s.IpAddress is "::1" or "127.0.0.1" or "::ffff:127.0.0.1" ? L["profile.localComputer"] : s.IpAddress;
+
+    // ------------------------------------------------------------ DT-229: email change
+
+    private EmailModel _em = new();
+    private EditContext _emCtx = new(new EmailModel());
+    private bool _emOpen, _emBusy;
+    private ProblemValidator? _emProblems;
+    private IReadOnlyList<string>? _emExtra;
+
+    /// <summary>Owner or Administrator of this company: may edit names and usernames in Users &amp; roles (their own too).</summary>
+    private bool CanEditUsers => Shell.Company is { IsPresetRole: true, Role: PresetRoles.Owner or PresetRoles.Administrator };
+
+    private void OpenEmail()
+    {
+        _em = new EmailModel();
+        _emCtx = new EditContext(_em);
+        _emExtra = null;
+        _emOpen = true;
+    }
+
+    private async Task SaveEmail()
+    {
+        if (string.IsNullOrWhiteSpace(_em.NewEmail) || string.IsNullOrEmpty(_em.CurrentPassword)) return;
+        _emBusy = true;
+        _emExtra = null;
+        try
+        {
+            var twoFactor = Shell.Me?.TwoFactorEnabled == true;
+            var r = await Api.PostAsync<EmailChangeResponse>("api/v1/me/email", new ChangeEmailRequest(_em.NewEmail.Trim(), _em.CurrentPassword,
+                twoFactor && !_em.UseRecovery ? _em.Code?.Replace(" ", "", StringComparison.Ordinal) : null, twoFactor && _em.UseRecovery ? _em.RecoveryCode : null));
+            if (Shell.Me is { } me) Shell.SetMe(me with { PendingEmail = r.PendingEmail });
+            _emOpen = false;
+            Toasts.Success(L.F("profile.emailLinkSent", r.PendingEmail ?? ""));
+        }
+        catch (ApiException e) { if (_emProblems?.Show(e.Problem) is { } other) _emExtra = [other]; }
+        finally { _emBusy = false; }
+    }
+
+    private async Task CancelEmail()
+    {
+        _emBusy = true;
+        try
+        {
+            await Api.DeleteAsync("api/v1/me/email");
+            if (Shell.Me is { } me) Shell.SetMe(me with { PendingEmail = null });
+            Toasts.Success(L["profile.emailCancelled"]);
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.serverErrorText"]); }
+        finally { _emBusy = false; }
+    }
+
+    private sealed class EmailModel
+    {
+        public string? NewEmail { get; set; }
+        public string? CurrentPassword { get; set; }
+        public string? Code { get; set; }
+        public string? RecoveryCode { get; set; }
+        public bool UseRecovery { get; set; }
+    }
 
     private sealed class StepModel
     {

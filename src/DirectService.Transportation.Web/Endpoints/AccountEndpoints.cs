@@ -53,6 +53,10 @@ internal static class AccountEndpoints
             await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);
             return TypedResults.NoContent();
         });
+        // DT-229: own email change — re-authentication (password, + code with 2FA), link to the new address, rate-limited like sign-in.
+        me.MapPost("/email", async (ChangeEmailRequest r, EmailChangeService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.RequestOwnAsync(r, ct).ConfigureAwait(false))).RequireRateLimiting(RateLimits.Auth);
+        me.MapDelete("/email", async (EmailChangeService s, CancellationToken ct) => TypedResults.Ok(await s.CancelOwnAsync(ct).ConfigureAwait(false)));
         me.MapGet("/2fa/setup", async (HttpContext http, AuthService auth, AuthFlow flow, UserManager<User> users, IRequestContext ctx, IQrCodeRenderer qr) =>
         {
             var user = await SelfAsync(users, ctx).ConfigureAwait(false);
@@ -143,6 +147,13 @@ internal static class AccountEndpoints
             TypedResults.Ok(await s.CreateWithPasswordAsync(r, ct).ConfigureAwait(false)));
         users.MapGet("/password-policy", async (UserAdminService s, CancellationToken ct) =>
             TypedResults.Ok(await s.PasswordPolicyAsync(ct).ConfigureAwait(false)));   // DT-208: rules shown under the password field
+        // DT-229: name / username (Owner or Administrator only) and an email change that the user confirms.
+        users.MapPut("/{user}", async (string user, UpdateUserRequest r, UserAdminService s, CancellationToken ct) =>
+        { await s.UpdateUserAsync(user, r, ct).ConfigureAwait(false); return TypedResults.NoContent(); });
+        users.MapPost("/{user}/email", async (string user, StartEmailChangeRequest r, EmailChangeService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.StartForUserAsync(user, r, ct).ConfigureAwait(false))).RequireRateLimiting(RateLimits.Auth);
+        users.MapDelete("/{user}/email", async (string user, EmailChangeService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.CancelForUserAsync(user, ct).ConfigureAwait(false)));
         users.MapPost("/{user}/set-password", async (string user, SetPasswordRequest r, UserAdminService s, CancellationToken ct) =>
         { await s.SetPasswordAsync(user, r, ct).ConfigureAwait(false); return TypedResults.NoContent(); });
         users.MapPut("/{user}/role", async (string user, AssignRoleRequest r, UserAdminService s, CancellationToken ct) =>

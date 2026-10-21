@@ -65,6 +65,11 @@ public static class ErrorCatalog
         [ErrorCodes.ReceiptAllocationDuplicate] = ("الفاتورة {0} مختارة أكثر من مرة.", "Invoice {0} is selected more than once."),
         [ErrorCodes.UserNameInUse] = ("اسم المستخدم هذا مستخدم لحساب آخر.", "This username is already used by another account."),
         [ErrorCodes.NotAvailable] = ("اسم المستخدم أو البريد الإلكتروني غير متاح. اختر غيره.", "This username or email address is not available. Choose another one."),
+        // DT-229: account changes.
+        [ErrorCodes.EmailOwnInProfile] = ("غيّر بريدك أنت من ملفك الشخصي (بكلمة المرور الحالية).", "Change your own email in your profile (with your current password)."),
+        [ErrorCodes.UserNameNotForEmailUser] = ("هذا المستخدم يدخل ببريده الإلكتروني؛ لا يُضاف له اسم مستخدم.", "This user signs in with their email; a username is not added to them."),
+        [ErrorCodes.EmailUnchanged] = ("هذا هو البريد الحالي للحساب.", "This is already the account's email address."),
+        [ErrorCodes.OwnerOrAdministratorOnly] = ("يغيّر الاسم واسم المستخدم والبريد الإلكتروني للمستخدمين المالكُ أو المسؤول فقط.", "Only the Owner or an Administrator changes users' names, usernames and email addresses."),
         [ErrorCodes.VerifySignInRequired] = ("سجّل الدخول بحساب صاحب هذا البريد أولاً، ثم افتح الرابط مرة أخرى لتأكيده.", "Sign in as the user this email belongs to first, then open the link again to confirm it."),
         [ErrorCodes.UserNameFormat] = ("اسم المستخدم من 3 إلى 50 خانة: حروف إنجليزية وأرقام و . _ - فقط.", "The username must be 3 to 50 characters: English letters, digits and . _ - only."),
         [ErrorCodes.UserEmailNotVerified] = ("لم يؤكّد المستخدم بريده بعد، فلا يُرسل إليه رابط. عيّن له كلمة مرور جديدة بدلاً من ذلك.", "The user has not verified the email yet, so no link is sent to it. Set a new password for them instead."),
@@ -330,6 +335,10 @@ public static class ErrorCodes
     public const string UserNameInUse = "user.userNameInUse";
     // Owner decisions of 18 Oct 2026 on the security pass (DT-203).
     public const string NotAvailable = "user.notAvailable";
+    public const string EmailUnchanged = "user.emailUnchanged";
+    public const string OwnerOrAdministratorOnly = "user.ownerOrAdministratorOnly";
+    public const string EmailOwnInProfile = "user.emailOwnInProfile";
+    public const string UserNameNotForEmailUser = "user.userNameNotForEmailUser";
     public const string VerifySignInRequired = "auth.verifySignIn";
     public const string ReceiptAllocationsExceedAmount = "receipt.allocationsExceedAmount";
     public const string StatementNoAccounts = "statement.noAccounts";

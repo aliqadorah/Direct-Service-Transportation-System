@@ -81,6 +81,7 @@ public static class HelpTopics
                     "كل شاشة استيراد فيها «تنزيل القالب»: ملف Excel بلغتك بالأعمدة المطلوبة وصف مثال وورقة تشرح كل عمود (مطلوب أم لا، الصيغة، القيم المسموحة). استبدل الصف المثال ببياناتك ثم استورده.",
                     "الأسعار: تعرفة العملاء والشركاء، ثم أسعار السائقين للشهر الحالي لكل موقع تحميل (انظر «إدخال أسعار السائقين الشهرية»).",
                     "الإعدادات ← المستخدمون والأدوار: ادعُ الموظفين بالبريد مع دور لكل شركة.",
+                    "المالك والمسؤولون فقط يغيّرون اسم المستخدم واسم الدخول («تعديل الاسم واسم المستخدم»، ولأنفسهم أيضاً؛ اسم الدخول المأخوذ يظهر «غير متاح») ويبدؤون تغيير البريد («تغيير البريد الإلكتروني»): يُرسل رابط إلى البريد الجديد، ولا يتغيّر البريد إلا عندما يؤكده المستخدم وهو مسجّل الدخول. كل تغيير في سجل المستخدم.",
                     "بعد تحميل البيانات التاريخية: إعدادات الشركة ← التشغيل ← «إنهاء ترحيل البيانات».",
                 ],
                 [
@@ -104,6 +105,7 @@ public static class HelpTopics
                     "Every import screen has “Download template”: an Excel file in your language with the expected columns, a sample row and a sheet explaining each column (required or not, format, allowed values). Replace the sample row with your data, then import it.",
                     "Prices: customer and partner tariffs, then this month's driver rates for every loading site (see “Enter monthly driver rates”).",
                     "Settings → Users & roles: invite your staff by e-mail with a role per company.",
+                    "Only the Owner and Administrators change a user's name and username (“Edit name and username”, also their own; a taken username gets “not available”) and start an email change (“Change email”): a link goes to the new address and the email changes only when that user confirms it while signed in. Every change is in the user's history.",
                     "When the historical data is loaded: Company settings → Operations → “Finish data migration”.",
                 ],
                 [
@@ -651,6 +653,8 @@ public static class HelpTopics
                 "كل مستخدم لحسابه هو فقط. لا يمكن إيقاف التحقق بخطوتين إذا كانت جهتكم تشترطه لجميع المستخدمين، ولا لموظفي المنصة.",
                 [
                     "قائمة المستخدم (أعلى الصفحة) ← ملفي.",
+                    "الاسم واسم المستخدم للعرض فقط؛ يغيّرهما المالك أو المسؤول في الإعدادات ← المستخدمون والأدوار (للمالك والمسؤول رابط «تعديل» يفتح سطرهما هناك).",
+                    "«تغيير البريد الإلكتروني»: البريد الجديد وكلمة المرور الحالية (ورمز من التطبيق أو رمز استرداد إن كان التحقق بخطوتين مفعّلاً) ← «إرسال رابط التأكيد». يتغيّر البريد عندما تفتح الرابط المرسل إلى البريد الجديد وأنت مسجّل الدخول؛ حتى ذلك الحين تسجّل الدخول وتستعيد كلمة المرور بالبريد الحالي، ويظهر البريد المنتظر مع «إلغاء الطلب». بعد التأكيد تنتهي جلساتك الأخرى ويُبلَّغ البريد السابق.",
                     "التفعيل: «تفعيل التحقق بخطوتين»، امسح رمز QR بتطبيق مصادقة (أو أدخل المفتاح يدوياً)، أدخل الرمز المكوّن من 6 أرقام، ثم احفظ رموز الاسترداد العشرة؛ تظهر مرة واحدة فقط.",
                     "«تغيير تطبيق المصادقة» (هاتف جديد): أدخل كلمة المرور الحالية ورمزاً من التطبيق الحالي (أو رمز استرداد)، امسح الرمز الجديد بالتطبيق الجديد، ثم أدخل الرمز الذي يظهر فيه. يبقى التطبيق القديم فعّالاً حتى هذا التأكيد.",
                     "«رموز استرداد جديدة»: كلمة المرور الحالية ورمز من التطبيق؛ تظهر عشرة رموز جديدة مرة واحدة، وتتوقف القديمة عن العمل.",
@@ -659,6 +663,7 @@ public static class HelpTopics
                     "الجلسات النشطة: تظهر الجلسات الصالحة فقط مع وقت الدخول وآخر نشاط؛ «هذا الحاسوب (محلي)» للنظام المشغّل على جهازك. «تسجيل الخروج من الجلسات الأخرى» ينهيها فوراً.",
                 ],
                 [
+                    "«اسم المستخدم أو البريد الإلكتروني غير متاح»: البريد الجديد مستخدم لحساب آخر؛ اختر غيره. الرابط غير صالح: انتهت صلاحيته أو استُبدل بطلب أحدث أو أُلغي — اطلب من جديد.",
                     "«كلمة المرور الحالية غير صحيحة» أو «رمز التحقق غير صحيح»: أعد المحاولة؛ بعد خمس محاولات خاطئة من الجهاز نفسه يُوقف الإدخال منه 15 دقيقة.",
                     "فقدت هاتفك: استخدم رمز استرداد بدلاً من رمز التطبيق، ثم «تغيير تطبيق المصادقة». إن لم يبقَ لديك رمز استرداد فاطلب من مسؤول المستخدمين إعادة تعيين التحقق بخطوتين.",
                     "زر الإيقاف معطّل: جهتكم تشترط التحقق بخطوتين لجميع المستخدمين (المشترك ← الشركات ← أمان الدخول)، أو أنك من موظفي المنصة.",
@@ -670,6 +675,8 @@ public static class HelpTopics
                 "Every user, for their own account only. Two-step verification cannot be turned off when your organisation requires it for all users, nor by platform staff.",
                 [
                     "User menu (top of the page) → My profile.",
+                    "Name and username are shown only; the Owner or an Administrator changes them in Settings → Users & roles (the Owner and Administrators get an “Edit” link to their own row there).",
+                    "“Change email”: the new address and your current password (plus an app code or a recovery code when two-step verification is on) → “Send confirmation link”. The email changes when you open the link sent to the new address while signed in; until then you sign in and reset your password with the current address, and the address waiting is shown with “Cancel request”. After confirming, your other sessions end and the previous address is told.",
                     "Turn on: “Turn on two-step verification”, scan the QR code with an authenticator app (or type the key), enter the 6-digit code, then keep the ten recovery codes — they are shown only once.",
                     "“Change authenticator app” (new phone): enter your current password and a code from the current app (or a recovery code), scan the new QR code with the new app, then enter the code it shows. The old app keeps working until this confirmation.",
                     "“New recovery codes”: current password and a code from the app; ten new codes are shown once and the old ones stop working.",
@@ -678,6 +685,7 @@ public static class HelpTopics
                     "Active sessions: only sessions that are still valid are listed, with the sign-in time and last activity; “This computer (local)” is the system running on your own PC. “Sign out of the other sessions” ends them at once.",
                 ],
                 [
+                    "“This username or email address is not available”: the new email is used by another account; choose another one. The link says it is invalid: it expired, or a newer request or a cancel replaced it — ask again.",
                     "“The current password is incorrect” or “The verification code is incorrect”: try again; after five wrong attempts from the same device, input from it is blocked for 15 minutes.",
                     "Lost your phone: use a recovery code instead of the app code, then “Change authenticator app”. With no recovery code left, ask your user administrator to reset two-step verification.",
                     "“Turn off” is disabled: your organisation requires two-step verification for all users (Tenant → Companies → Sign-in security), or you are platform staff.",

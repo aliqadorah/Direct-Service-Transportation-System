@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<AccountService>();
         services.AddScoped<MeService>();
         services.AddScoped<UserAdminService>();
+        services.AddScoped<EmailChangeService>();
         services.AddScoped<RoleService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<CompanyProvisioningService>();

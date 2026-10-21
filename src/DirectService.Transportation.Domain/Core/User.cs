@@ -50,6 +50,13 @@ public class User : AuditableEntity, INullableTenantScoped
     /// one code can never be used twice (owner decision 19 Oct 2026, DT-212). Claimed by one conditional update in the token provider.
     /// </summary>
     public long? TwoFactorLastStep { get; set; }
+    /// <summary>
+    /// Revision 6 (owner testing 21 Oct 2026, DT-229): a requested new email address, waiting for its owner to confirm the link sent to it
+    /// (asked by the user, or started by an Owner / Administrator). Sign-in and password reset keep using <see cref="Email"/> until then.
+    /// </summary>
+    public string? PendingEmail { get; set; }
+    /// <summary>When the pending change was asked (UTC); part of the link's purpose, so a new request makes earlier links useless.</summary>
+    public DateTime? PendingEmailAt { get; set; }
     /// <summary>Last successful sign-in.</summary>
     public DateTime? LastSignInAt { get; set; }
     public Company? DefaultCompany { get; set; }

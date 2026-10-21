@@ -34,6 +34,9 @@ public sealed class TenantFilterGuardTests
         ["SessionService"] = "Sessions by unique token hash or the user's own id, before a tenant is known; scope set to the session's own user.",
         ["AuthService"] = "Sign-in by unique email/username before a tenant is known; scope set to that user's own tenant.",
         ["AccountService"] = "Sign-up, email verification, password reset by unique single-use tokens; scope set to that user's own tenant.",
+        // DT-229: the signed-in user's own row (by the user's id, staff have no tenant) and the email-change link (user + purpose-bound token,
+        // confirmed only by that user signed in; the save runs in that user's own tenant scope).
+        ["EmailChangeService"] = "Own email change by the user's id; the confirmation link by a single-use, purpose-bound token for the signed-in user only.",
         ["InvitationService"] = "Invitation acceptance by unique single-use link token; scope set to the invitation's own tenant.",
         ["TwoFactorSettingsService.ConfirmChangeAsync|DisableAsync|NewRecoveryCodesAsync"] = "The signed-in user's own 2FA settings; scope set to that user's own tenant.",
         ["UserStore"] = "ASP.NET Identity store: users by id/unique name and their own recovery codes (users of all tenants share one table).",

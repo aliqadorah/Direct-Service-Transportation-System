@@ -35,7 +35,7 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
             ?? grants.FirstOrDefault(g => g.CompanyStatus == "Active");
         return new MeResponse(tokens.Encode<User>(u.PublicId), u.FullName, u.Email, u.LanguageCode, u.DateFormat,
             defaultCompany is null ? null : tokens.Encode<Company>(defaultCompany.CompanyPublicId),
-            u.IsPlatformStaff, tenant?.Name, tenant?.Status, companies, u.UserName, u.TwoFactorEnabledAt is not null);
+            u.IsPlatformStaff, tenant?.Name, tenant?.Status, companies, u.UserName, u.TwoFactorEnabledAt is not null, PendingEmail: u.PendingEmail);
     }
 
     public async Task UpdatePreferencesAsync(PreferencesRequest r, CancellationToken ct)

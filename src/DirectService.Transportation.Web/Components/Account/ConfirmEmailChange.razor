@@ -1,0 +1,91 @@
+@page "/confirm-email-change"
+@* DT-229: the link sent to a new email address (u, t). Confirmed with a button (a mail scanner opening the link does not use it up), only
+   by the account's user, signed in — sign-in returns here. Until then sign-in and password reset keep the current address. *@
+@inherits AccountPage
+@using DirectService.Transportation.Application.Abstractions
+@using DirectService.Transportation.Application.Identity
+@using DirectService.Transportation.Contracts.Errors
+@inject EmailChangeService EmailChanges
+@inject DirectService.Transportation.Web.Security.AuthFlow Flow
+
+<AuthCard Title="@L["acct.emailChangeTitle"]" Lead="@(_state == State.Ready ? L["acct.emailChangeLead"] : null)">
+    @switch (_state)
+    {
+        case State.Done:
+            <Banner Tone="Tone.Ok" Text="@L["acct.emailChangeDone"]" />
+            <a class="btn pri w100" href="@Href("/")">@L["acct.emailChangeContinue"]</a>
+            break;
+        case State.SignIn:
+            <Banner Tone="Tone.Info" Icon="lock" Text="@L["acct.emailChangeSignIn"]" />
+            <a class="btn pri w100" href="@Href("/sign-in", SelfUrl)">@L["acct.verifySignInGo"]</a>
+            break;
+        case State.Taken:
+            <Banner Tone="Tone.Err" Text="@L["acct.emailChangeTaken"]" />
+            <a href="@Href("/")" style="font-size:13px">@L["acct.emailChangeContinue"]</a>
+            break;
+        case State.Invalid:
+            <Banner Tone="Tone.Err" Text="@L["acct.emailChangeInvalid"]" />
+            <a href="@Href("/sign-in")" style="font-size:13px">@L["acct.backToSignIn"]</a>
+            break;
+        default:
+            <EditForm Model="Confirm" FormName="confirm-email-change" OnSubmit="Go" class="stack" method="post">
+                <EmptyState Icon="mail" Title="@L["acct.emailChangeTitle"]" />
+                @* Security review 21 Oct 2026 (F5): the signed-in account's user sees the address before confirming it. *@
+                @if (_pending is not null) {<Banner Tone="Tone.Info" Icon="mail"><span>@L["acct.emailChangeTo"] <bdi dir="ltr">@_pending</bdi></span></Banner>}
+                <Btn Type="submit" Primary="true" Text="@L["acct.emailChangeConfirm"]" Class="w100" />
+            </EditForm>
+            break;
+    }
+</AuthCard>
+
+@code {
+    protected override void OnParametersSet() => Confirm ??= new();
+
+    private enum State { Ready, Done, Invalid, SignIn, Taken }
+
+    private State _state;
+    private string? _pending;
+
+    [SupplyParameterFromQuery(Name = "u")] private string? UserToken { get; set; }
+    [SupplyParameterFromQuery(Name = "t")] private string? LinkToken { get; set; }
+    [SupplyParameterFromForm(FormName = "confirm-email-change")] private ConfirmInput Confirm { get; set; } = default!;
+
+    private string SelfUrl => $"/confirm-email-change?u={Uri.EscapeDataString(UserToken ?? "")}&t={Uri.EscapeDataString(LinkToken ?? "")}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(UserToken) || string.IsNullOrEmpty(LinkToken)) { _state = State.Invalid; return; }
+        _pending = await EmailChanges.PendingForAsync(UserToken, LinkToken, Http.RequestAborted);
+    }
+
+    private async Task Go()
+    {
+        try
+        {
+            var user = await EmailChanges.ConfirmAsync(UserToken, LinkToken, Http.RequestAborted);
+            await Flow.RefreshAppCookieAsync(Http, user);   // new security stamp: this session stays signed in
+            _state = State.Done;
+        }
+        catch (AppException e) when (e.Code == ErrorCodes.VerifySignInRequired)
+        {
+            _state = State.SignIn;
+        }
+        catch (AppException e) when (e.Code == ErrorCodes.NotAvailable)
+        {
+            _state = State.Taken;
+        }
+        catch (AppException)
+        {
+            _state = State.Invalid;
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            _state = State.Invalid;   // a second tab or a double submit (F7): the first one did it, or the request changed
+        }
+    }
+
+    private sealed class ConfirmInput
+    {
+        public string? Go { get; set; }
+    }
+}

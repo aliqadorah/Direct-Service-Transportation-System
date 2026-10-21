@@ -92,6 +92,22 @@
             <KeyValues Columns="1" Items="@([new KeyValue(L["acct.email"], u.Email ?? "—"), new KeyValue(L["usr.userName"], u.UserName ?? "—"), new KeyValue(L["usr.lastSignIn"], Fmt.DateTime(u.LastSignInAt?.ToLocalTime(), Shell.DateFormat)),
                 new KeyValue(L["usr.2fa"], L[u.TwoFactorEnabled ? "ui.on" : "ui.off"]), new KeyValue(L["usr.emailConfirmed"], L[u.EmailConfirmed ? "ui.yes" : "ui.no"])])" />
             @if (Protected(u)) {<Banner Tone="Tone.Lock" Icon="lock" Text="@L["usr.ownerProtected"]" />}
+            @if (u.PendingEmail is { } pending)
+            {
+                <Banner Tone="Tone.Info" Icon="mail">
+                    <span>@L.F("usr.emailPending", pending)</span>
+                    @if (CanEditAccounts && !Protected(u)) {<button type="button" class="linkbtn" disabled="@_busy" @onclick="CancelEmail">@L["profile.emailCancel"]</button>}
+                </Banner>
+            }
+            @* DT-229: name, username and email are changed by the Owner or an Administrator only (their own row too). *@
+            @if (CanEditAccounts && !Protected(u))
+            {
+                <div class="formbar" style="justify-content:flex-start;flex-wrap:wrap">
+                    <Btn Icon="edit" Text="@L["usr.editAccount"]" Disabled="_busy" OnClick="OpenEdit" />
+                    @if (u.Id == Shell.Me?.Id) {<Btn Icon="mail" Text="@L["profile.changeEmail"]" Href="@NavModel.Href(Company, "profile")" />}
+                    else {<Btn Icon="mail" Text="@L["profile.changeEmail"]" Disabled="_busy" OnClick="OpenEmail" />}
+                </div>
+            }
             <SelectField @key="_roleSelectKey" TValue="string?" Value="u.Role?.Id" ValueChanged="ChangeRole" ValueExpression="() => _dummy" Options="RoleOptions" Label="@L["usr.role"]" Disabled="@(u.Status != "Active" || _busy || Protected(u))" />
             <div class="stack" style="gap:6px" hidden="@Protected(u)">
                 @if (u.IsLocked) {<Btn Icon="lock" Text="@L["usr.unlock"]" Disabled="_busy" OnClick="@(() => Act("unlock", null))" />}
@@ -195,6 +211,38 @@
     </Footer>
 </Modal>
 
+<Modal @bind-Open="_editing" Title="@L.F("usr.editAccountFor", _user?.FullName ?? "")" Busy="_busy" Icon="edit">
+    <ChildContent>
+        <EditForm EditContext="_editCtx" OnSubmit="SaveEdit" id="edit-user-form" class="stack" novalidate>
+            <ProblemValidator @ref="_editProblems" />
+            <ErrorSummary @ref="_editSummary" Extra="_editExtra" />
+            <TextField Id="edit-name" @bind-Value="_edit.FullName" Label="@L["acct.fullName"]" Required="true" MaxLength="150" Autocomplete="off" />
+            @* A username is changed, never added to a user who signs in with their email nor cleared (DT-229, security review F1/F2). *@
+            @if (_user?.UserName is not null) {<TextField Id="edit-username" @bind-Value="_edit.UserName" Label="@L["usr.userName"]" Required="true" Ltr="true" MaxLength="50" Autocomplete="off" Help="@L["usr.userNameHelp"]" />}
+            <Banner Tone="Tone.Info" Text="@L["usr.editAccountNote"]" />
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Primary="true" Text="@L["ui.save"]" Busy="_busy" OnClick="SaveEdit" />
+    </Footer>
+</Modal>
+
+<Modal @bind-Open="_emailing" Title="@L.F("usr.changeEmailFor", _user?.FullName ?? "")" Busy="_busy" Icon="mail">
+    <ChildContent>
+        <EditForm EditContext="_emailCtx" OnSubmit="SaveEmail" id="email-user-form" class="stack" novalidate>
+            <ProblemValidator @ref="_emailProblems" />
+            <ErrorSummary @ref="_emailSummary" Extra="_emailExtra" />
+            <TextField Id="email-new" @bind-Value="_email.NewEmail" Label="@L["profile.newEmail"]" Type="email" Required="true" Ltr="true" MaxLength="150" Autocomplete="off" />
+            <Banner Tone="Tone.Info" Text="@L["usr.changeEmailNote"]" />
+        </EditForm>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _emailing = false" />
+        <Btn Primary="true" Icon="mail" Text="@L["profile.sendEmailLink"]" Busy="_busy" OnClick="SaveEmail" />
+    </Footer>
+</Modal>
+
 <Modal @bind-Open="_settingPassword" Title="@L.F("usr.setPasswordFor", _user?.FullName ?? "")" Busy="_busy" Icon="lock">
     <ChildContent>
         <EditForm EditContext="_setCtx" OnSubmit="SetPassword" id="set-password-form" class="stack" novalidate>
@@ -243,6 +291,119 @@
     {
         try { _roles = await Api.GetAsync<IReadOnlyList<RoleResponse>>(Api.C("roles")); } catch (ApiException) { }
         await Load();
+        // DT-229: "Edit" in the profile opens the caller's own row (searched by name when it is not on the first page).
+        if (UserParam is { } wanted)
+        {
+            if (_users?.Items.FirstOrDefault(x => x.Id == wanted) is null && wanted == Shell.Me?.Id && Shell.Me.FullName is { } name) { _q = name; await Load(); }
+            if (_users?.Items.FirstOrDefault(x => x.Id == wanted) is { } found) OpenUser(found);
+        }
+    }
+
+    [SupplyParameterFromQuery(Name = "user")] public string? UserParam { get; set; }
+
+    // ------------------------------------------------------------ DT-229: name, username and email (Owner / Administrator)
+
+    private bool CanEditAccounts => Shell.Company is { IsPresetRole: true, Role: PresetRoles.Owner or PresetRoles.Administrator };
+
+    private EditModel _edit = new();
+    private EditContext _editCtx = new(new EditModel());
+    private bool _editing, _emailing;
+    private ProblemValidator? _editProblems, _emailProblems;
+    private ErrorSummary? _editSummary, _emailSummary;
+    private IReadOnlyList<string>? _editExtra, _emailExtra;
+    private EmailModel _email = new();
+    private EditContext _emailCtx = new(new EmailModel());
+
+    private void OpenEdit()
+    {
+        if (_user is null) return;
+        _edit = new EditModel { FullName = _user.FullName, UserName = _user.UserName };
+        _editCtx = new EditContext(_edit);
+        _editExtra = null;
+        _editing = true;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_user is null || _busy) return;
+        var errors = Required(("fullName", _edit.FullName, "acct.fullName"));
+        if (_user.UserName is not null && string.IsNullOrWhiteSpace(_edit.UserName)) errors.AddRange(Required(("userName", _edit.UserName, "usr.userName")));
+        if (!string.IsNullOrWhiteSpace(_edit.UserName) && !ValidUserName(_edit.UserName.Trim())) errors.Add(new ApiFieldError("userName", "user.userNameFormat", L["usr.userNameFormat"]));
+        if (errors.Count > 0)
+        {
+            _editExtra = await ShowAsync(new ApiProblem { Status = 400, Errors = errors }, _editProblems, _editSummary);
+            return;
+        }
+        _busy = true;
+        _editExtra = null;
+        try
+        {
+            var name = _edit.FullName!.Trim();
+            var userName = string.IsNullOrWhiteSpace(_edit.UserName) ? null : _edit.UserName.Trim();
+            await Api.PutAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}"), new UpdateUserRequest(name, userName, _user.RowVersion));
+            if (_user.Id == Shell.Me?.Id) Shell.SetMe(Shell.Me with { FullName = name, UserName = userName });
+            _editing = false;
+            Toasts.Success(L.F("usr.accountSaved", name));
+            await Refresh();
+        }
+        catch (ApiException e) { _editExtra = await ShowAsync(e.Problem, _editProblems, _editSummary); }
+        finally { _busy = false; }
+    }
+
+    private void OpenEmail()
+    {
+        _email = new EmailModel();
+        _emailCtx = new EditContext(_email);
+        _emailExtra = null;
+        _emailing = true;
+    }
+
+    private async Task SaveEmail()
+    {
+        if (_user is null || _busy) return;
+        var errors = Required(("newEmail", _email.NewEmail, "profile.newEmail"));
+        if (errors.Count == 0 && !ValidEmail(_email.NewEmail!.Trim())) errors.Add(new ApiFieldError("newEmail", "validation.format", L["usr.emailFormat"]));
+        if (errors.Count > 0)
+        {
+            _emailExtra = await ShowAsync(new ApiProblem { Status = 400, Errors = errors }, _emailProblems, _emailSummary);
+            return;
+        }
+        _busy = true;
+        _emailExtra = null;
+        try
+        {
+            var r = await Api.PostAsync<EmailChangeResponse>(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/email"), new StartEmailChangeRequest(_email.NewEmail!.Trim()));
+            _emailing = false;
+            Toasts.Success(L.F("usr.emailLinkSent", r.PendingEmail ?? "", _user.FullName));
+            await Refresh();
+        }
+        catch (ApiException e) { _emailExtra = await ShowAsync(e.Problem, _emailProblems, _emailSummary); }
+        finally { _busy = false; }
+    }
+
+    private async Task CancelEmail()
+    {
+        if (_user is null || _busy) return;
+        _busy = true;
+        try
+        {
+            await Api.DeleteAsync(Api.C($"users/{Uri.EscapeDataString(_user.Id)}/email"));
+            Toasts.Success(L["profile.emailCancelled"]);
+            await Refresh();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.serverErrorText"]); }
+        finally { _busy = false; }
+    }
+
+    private sealed class EditModel
+    {
+        public string? FullName { get; set; }
+        public string? UserName { get; set; }
+    }
+
+    private sealed class EmailModel
+    {
+        public string? NewEmail { get; set; }
     }
 
     private Task SetTab(string t) { _tab = t; return Load(); }

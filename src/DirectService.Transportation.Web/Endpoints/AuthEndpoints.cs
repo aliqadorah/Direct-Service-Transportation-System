@@ -40,6 +40,13 @@ internal static class AuthEndpoints
             return TypedResults.Accepted((string?)null);
         });
 
+        // DT-229: the link sent to a new email address (also the account page /confirm-email-change); only the account's user, signed in.
+        auth.MapPost("/confirm-email-change", async (LinkTokenRequest r, HttpContext http, EmailChangeService changes, AuthFlow flow, CancellationToken ct) =>
+        {
+            var user = await changes.ConfirmAsync(r.User, r.Token, ct).ConfigureAwait(false);
+            await flow.RefreshAppCookieAsync(http, user).ConfigureAwait(false);   // new security stamp: this session stays signed in
+            return TypedResults.NoContent();
+        });
         auth.MapPost("/verify-email", async (LinkTokenRequest r, AccountService accounts, CancellationToken ct) =>
         {
             await accounts.VerifyEmailAsync(r.User, r.Token, ct).ConfigureAwait(false);

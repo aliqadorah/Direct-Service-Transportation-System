@@ -17,6 +17,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             t.HasCheckConstraint("CK_Users_Status", "[Status] IN ('Active','Disabled','Archived')");
             t.HasCheckConstraint("CK_Users_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
             t.HasCheckConstraint("CK_Users_Email_UserName", "[Email] IS NOT NULL OR [UserName] IS NOT NULL");
+            t.HasCheckConstraint("CK_Users_PendingEmail_PendingEmailAt", "([PendingEmail] IS NULL AND [PendingEmailAt] IS NULL) OR ([PendingEmail] IS NOT NULL AND [PendingEmailAt] IS NOT NULL)");
             t.HasCheckConstraint("CK_Users_IsPlatformStaff_TenantId", "([IsPlatformStaff] = 1 AND [TenantId] IS NULL) OR ([IsPlatformStaff] = 0 AND [TenantId] IS NOT NULL)");
         });
 
@@ -227,6 +228,19 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired(true)
             .HasDefaultValueSql("0")
             .ValueGeneratedNever();
+        // Revision 6 (DT-229): an email change waiting for confirmation.
+        builder.Property(e => e.PendingEmail)
+            .HasColumnName("PendingEmail")
+            .HasColumnType("nvarchar(150)")
+            .HasColumnOrder(32)
+            .IsUnicode(true)
+            .HasMaxLength(150)
+            .IsRequired(false);
+        builder.Property(e => e.PendingEmailAt)
+            .HasColumnName("PendingEmailAt")
+            .HasColumnType("datetime2")
+            .HasColumnOrder(33)
+            .IsRequired(false);
 
         builder.HasIndex(new[] { "PublicId" }, "UX_Users_PublicId")
             .IsUnique()

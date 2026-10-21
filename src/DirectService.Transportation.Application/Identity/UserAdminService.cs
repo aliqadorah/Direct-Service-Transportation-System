@@ -44,13 +44,13 @@ public sealed class UserAdminService(
             {
                 r.User.PublicId, r.User.FullName, r.User.Email, r.User.Status, r.User.LockedUntil, r.User.TwoFactorEnabledAt,
                 r.User.EmailConfirmedAt, r.User.LastSignInAt, r.User.RowVersion, RolePublicId = r.Role.PublicId, RoleName = r.Role.Name,
-                r.User.UserName, r.User.MustChangePassword,
+                r.User.UserName, r.User.MustChangePassword, r.User.PendingEmail,
             })
             .ToListAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var items = rows.Select(u => new UserListItem(tokens.Encode<User>(u.PublicId), u.FullName, u.Email, u.Status,
             new Ref(tokens.Encode<Role>(u.RolePublicId), u.RoleName), u.LockedUntil > now, u.TwoFactorEnabledAt is not null,
-            u.EmailConfirmedAt is not null, u.LastSignInAt, Convert.ToBase64String(u.RowVersion), u.UserName, u.MustChangePassword)).ToList();
+            u.EmailConfirmedAt is not null, u.LastSignInAt, Convert.ToBase64String(u.RowVersion), u.UserName, u.MustChangePassword, u.PendingEmail)).ToList();
         return new PagedResult<UserListItem>(items, page.SafePage, page.SafePageSize, total);
     }
 
@@ -131,6 +131,63 @@ public sealed class UserAdminService(
         var result = await users.ResetPasswordAsync(user, token, r.Password).ConfigureAwait(false);   // new security stamp
         if (!result.Succeeded) throw AccountService.PolicyError(policy);
         await AfterAccessChangeAsync(user.Id, "Password set by an administrator", ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// DT-229: name and username are changed only by the Owner or an Administrator, in Users &amp; roles — for any user they may manage
+    /// (GrantGuard: an Administrator never manages the Owner), themselves included. Username: same format and availability rules as at
+    /// creation, one generic "not available" answer. A username is changed, never added to a user who signs in with their email nor cleared
+    /// (security review 21 Oct 2026, F1/F2: "has a username" decides who may get an administrator's password and whose email needs its
+    /// user signed in to be verified). Audited
+    /// ("ProfileChangedByAdmin", old → new in the readable history).
+    /// </summary>
+    public async Task UpdateUserAsync(string userToken, UpdateUserRequest r, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        var user = await AccountTargetAsync(userToken, ct).ConfigureAwait(false);
+        var fullName = Common.TextNormalizer.CleanText(r.FullName);
+        var userName = string.IsNullOrWhiteSpace(r.UserName) ? null : r.UserName.Trim();
+        new Validator()
+            .Require("fullName", fullName).MaxLength("fullName", fullName, 150)
+            .Check(userName is not null || user.UserName is null, "userName", ErrorCodes.ValidationRequired)
+            .Check(userName is null || user.UserName is not null, "userName", ErrorCodes.UserNameNotForEmailUser)
+            .Require("rowVersion", r.RowVersion)
+            .ThrowIfInvalid();
+        if (userName is not null && !IsValidUserName(userName)) throw Fail.Field("userName", ErrorCodes.UserNameFormat);
+        db.ExpectRowVersion(user, r.RowVersion!);
+        var normalized = userName is null ? null : users.NormalizeName(userName);
+        if (normalized is not null && normalized != user.NormalizedUserName
+            && (await users.FindByNameAsync(userName!).ConfigureAwait(false) is { } other && other.Id != user.Id))
+            throw Fail.Conflict(ErrorCodes.NotAvailable);
+        if (user.FullName == fullName && user.UserName == userName) return;
+        changes.SetAction(user, "ProfileChangedByAdmin");
+        user.FullName = fullName!;
+        user.UserName = userName;
+        user.NormalizedUserName = normalized;
+        try
+        {
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (DbUpdateException e) when (normalized is not null && e is not DbUpdateConcurrencyException)
+        {
+            throw Fail.Conflict(ErrorCodes.NotAvailable);   // taken at the same moment (unique index)
+        }
+        access.Invalidate(user.Id);
+    }
+
+    /// <summary>DT-229: the caller holds the preset Owner or Administrator role in the current company; otherwise 403.</summary>
+    public async Task EnsureOwnerOrAdministratorAsync(CancellationToken ct)
+    {
+        var ok = await db.Set<UserCompanyRole>().AsNoTracking().AnyAsync(r => r.UserId == ctx.UserId && r.CompanyId == ctx.CompanyId && r.Role.IsPreset
+            && (r.Role.Name == PresetRoles.Owner || r.Role.Name == PresetRoles.Administrator), ct).ConfigureAwait(false);
+        if (!ok) throw new AppException(ErrorCodes.OwnerOrAdministratorOnly, 403);
+    }
+
+    /// <summary>DT-229: a user whose name, username or email the caller (Owner / Administrator) may change.</summary>
+    public async Task<User> AccountTargetAsync(string userToken, CancellationToken ct)
+    {
+        await EnsureOwnerOrAdministratorAsync(ct).ConfigureAwait(false);
+        return (await TargetAsync(userToken, ct).ConfigureAwait(false)).User;
     }
 
     /// <summary>3–50 characters: ASCII letters, digits, dot, underscore, hyphen (never "@", so a username is never taken for an email).</summary>
