@@ -27,6 +27,19 @@
                 <TextField @bind-Value="_m.SecretKey" Label="@L["eis.secret"]" Type="password" MaxLength="500" Ltr="true" Autocomplete="new-password"
                            Placeholder="@(_hasSecret ? L["eis.stored"] : null)" Help="@L["eis.secretHelp"]" />
             </div>
+            @if (OfferZeroRate)
+            {
+                <Banner Tone="Tone.Warn">
+                    <span class="stack">
+                        <span>@L.F("eis.zeroOffer", Fmt.Percent(_taxRate))</span>
+                        <CheckField @bind-Value="_m.SetTaxRateToZero" Label="@L["eis.zeroOfferAccept"]" />
+                    </span>
+                </Banner>
+            }
+            else if (_m.RegistrationType == EInvoiceCodes.Income && _taxRate == 0)
+            {
+                <Banner Tone="Tone.Ok" Text="@L["eis.zeroDone"]" />
+            }
             <div><Btn Type="submit" Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_busy" /></div>
         </EditForm>
     </ChildContent>
@@ -37,6 +50,7 @@
     private EditContext _ctx = new(new Model());
     private IReadOnlyList<string> _connectors = [];
     private long _icv;
+    private decimal _taxRate;
     private bool _hasClientId, _hasSecret, _busy;
     private string? _rowVersion, _reference;
     private LoadState _state = LoadState.Loading;
@@ -50,7 +64,11 @@
     // Owner testing 20 Oct 2026 (DT-223): special sales tax is not offered (not supported; the server refuses it); the chosen type is explained.
     private IReadOnlyList<Option<string?>> RegistrationTypes => [new(EInvoiceCodes.Income, L["eis.reg.Income"]), new(EInvoiceCodes.Sales, L["eis.reg.Sales"])];
 
-    private string? RegistrationHelp => _m.RegistrationType is EInvoiceCodes.Income or EInvoiceCodes.Sales ? L["eis.regHelp." + _m.RegistrationType] : null;
+    // DT-226: income-tax e-invoices may carry no tax — offer, in the same save, to set the company's default rate (16% unless changed) to 0%.
+    // Declined (left unticked): nothing else changes and the type's description above still says to set 0% in Company settings.
+    private bool OfferZeroRate => _m.RegistrationType == EInvoiceCodes.Income && _taxRate != 0;
+
+    private string? RegistrationHelp =>_m.RegistrationType is EInvoiceCodes.Income or EInvoiceCodes.Sales ? L["eis.regHelp." + _m.RegistrationType] : null;
 
     protected override Task OnInitializedAsync() => Load();
 
@@ -74,6 +92,7 @@
         _hasClientId = s.HasClientId;
         _hasSecret = s.HasSecretKey;
         _rowVersion = s.RowVersion;
+        _taxRate = s.CompanyTaxRate;
     }
 
     private async Task Save()
@@ -84,7 +103,7 @@
         {
             static string? C(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
             var r = await Api.PutAsync<EInvoiceSettingsResponse>(Api.C("settings/e-invoicing"), new EInvoiceSettingsRequest(_m.IsEnabled, _m.Connector, C(_m.SellerTaxNumber),
-                _m.RegistrationType, C(_m.IncomeSourceSequence), C(_m.ClientId), C(_m.SecretKey), _m.Environment, _rowVersion));
+                _m.RegistrationType, C(_m.IncomeSourceSequence), C(_m.ClientId), C(_m.SecretKey), _m.Environment, _rowVersion, OfferZeroRate && _m.SetTaxRateToZero));
             Fill(r);
             Toasts.Success(L["set.saved"]);
         }
@@ -102,5 +121,6 @@
         public string? ClientId { get; set; }
         public string? SecretKey { get; set; }
         public string? Environment { get; set; }
+        public bool SetTaxRateToZero { get; set; }
     }
 }

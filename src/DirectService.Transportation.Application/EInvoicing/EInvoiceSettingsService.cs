@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -23,10 +24,11 @@ public sealed class EInvoicingOptions
 /// <summary>
 /// E-invoicing settings per company (FR-059, FR-066, SEC-09): switch, connector, seller tax number, registration type, income-source
 /// sequence, environment, and the API credentials encrypted with Data Protection — write-only, never returned or logged (audit
-/// writes "***"). Enabling requires every value the submission needs.
+/// writes "***"). Enabling requires every value the submission needs. Income tax: an income-tax e-invoice may carry no tax, so the
+/// save can also set the company's default tax rate to 0% (DT-226; audited as a company setting change, documents keep their rate).
 /// </summary>
-public sealed class EInvoiceSettingsService(IAppDbContext db, ISecretProtector protector, IEnumerable<IEInvoiceConnector> connectors,
-    IOptions<EInvoicingOptions> options)
+public sealed class EInvoiceSettingsService(IAppDbContext db, IRequestContext ctx, IChangeContext changes, ISecretProtector protector,
+    IEnumerable<IEInvoiceConnector> connectors, IOptions<EInvoicingOptions> options)
 {
     private static readonly string[] RegistrationTypes = [EInvoiceCodes.Income, EInvoiceCodes.Sales, EInvoiceCodes.Special];
     private static readonly string[] Environments = [EInvoiceCodes.Test, EInvoiceCodes.Production];
@@ -37,8 +39,11 @@ public sealed class EInvoiceSettingsService(IAppDbContext db, ISecretProtector p
     public async Task<EInvoiceSettingsResponse> GetAsync(CancellationToken ct)
     {
         var row = await db.Set<EInvoiceSettings>().AsNoTracking().SingleOrDefaultAsync(ct).ConfigureAwait(false);
-        return ToResponse(row);
+        return ToResponse(row, await CompanyTaxRateAsync(ct).ConfigureAwait(false));
     }
+
+    private async Task<decimal> CompanyTaxRateAsync(CancellationToken ct) =>
+        await db.Set<Company>().AsNoTracking().Where(c => c.Id == ctx.CompanyId).Select(c => c.TaxRate).SingleAsync(ct).ConfigureAwait(false);
 
     public async Task<EInvoiceSettingsResponse> SaveAsync(EInvoiceSettingsRequest r, CancellationToken ct)
     {
@@ -77,6 +82,8 @@ public sealed class EInvoiceSettingsService(IAppDbContext db, ISecretProtector p
             .Check(!r.IsEnabled || source is not null, "incomeSourceSequence", ErrorCodes.ValidationRequired)
             .Check(!r.IsEnabled || hasClient, "clientId", ErrorCodes.ValidationRequired)
             .Check(!r.IsEnabled || hasSecret, "secretKey", ErrorCodes.ValidationRequired)
+            // DT-226: the 0% offer belongs to income tax only (general sales tax uses the company's rate).
+            .Check(!r.SetTaxRateToZero || registration == EInvoiceCodes.Income, "setTaxRateToZero", ErrorCodes.ValidationFormat)
             .ThrowIfInvalid();
         // Documents waiting or rejected were built for the current connector and environment: finish or cancel them first (review M2).
         if (row is not null && (row.Environment != environment || row.Connector != connector)
@@ -95,15 +102,23 @@ public sealed class EInvoiceSettingsService(IAppDbContext db, ISecretProtector p
         row.IncomeSourceSequence = source;
         if (!string.IsNullOrEmpty(clientId)) row.ClientIdEncrypted = protector.Protect(clientId);
         if (!string.IsNullOrEmpty(secret)) row.SecretKeyEncrypted = protector.Protect(secret);
+        // DT-226: the company's default rate for new documents only (invoices, credit notes and receivable lines keep the rate they were
+        // made with); one save, so the settings and the rate change together; the audit shows the rate old → new with this reason.
+        var company = await db.Set<Company>().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
+        if (r.SetTaxRateToZero && company.TaxRate != 0)
+        {
+            company.TaxRate = 0;
+            changes.SetAction(company, "SettingChange", ctx.Language == "en" ? "E-invoicing: income tax" : "الفوترة الإلكترونية: ضريبة الدخل");
+        }
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return ToResponse(row);
+        return ToResponse(row, company.TaxRate);
     }
 
-    private EInvoiceSettingsResponse ToResponse(EInvoiceSettings? row) => row is null
-        ? new(false, EInvoiceCodes.JoFotara, null, EInvoiceCodes.Sales, null, false, false, EInvoiceCodes.Test, 0, Available, null)
+    private EInvoiceSettingsResponse ToResponse(EInvoiceSettings? row, decimal taxRate) => row is null
+        ? new(false, EInvoiceCodes.JoFotara, null, EInvoiceCodes.Sales, null, false, false, EInvoiceCodes.Test, 0, Available, null, taxRate)
         : new(row.IsEnabled, row.Connector, row.SellerTaxNumber, row.RegistrationType ?? EInvoiceCodes.Sales, row.IncomeSourceSequence,
             row.ClientIdEncrypted is { Length: > 0 }, row.SecretKeyEncrypted is { Length: > 0 }, row.Environment, row.IcvCounter, Available,
-            Convert.ToBase64String(row.RowVersion));
+            Convert.ToBase64String(row.RowVersion), taxRate);
 
     /// <summary>The enabled settings of the current company, or null (documents are then not queued).</summary>
     internal async Task<EInvoiceSettings?> EnabledAsync(CancellationToken ct) =>

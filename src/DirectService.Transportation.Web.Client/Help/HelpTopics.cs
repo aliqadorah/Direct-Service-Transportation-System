@@ -294,7 +294,7 @@ public static class HelpTopics
                 "عرض الفواتير؛ ضبط بيانات الربط بصلاحية الإعدادات.",
                 [
                     "فعّل الفوترة الإلكترونية وأدخل بيانات الربط من الإعدادات ← الفوترة الإلكترونية.",
-                    "اختر نوع التسجيل: «ضريبة الدخل» للشركة غير المسجلة في ضريبة المبيعات (تُرسل الفواتير دون ضريبة مبيعات؛ اجعل نسبة الضريبة في إعدادات الشركة 0%)، أو «ضريبة المبيعات العامة» للشركة المسجلة فيها (تتضمن الفواتير ضريبة المبيعات، 16% ما لم تُحدَّد نسبة أخرى). ضريبة المبيعات الخاصة غير مدعومة.",
+                    "اختر نوع التسجيل: «ضريبة الدخل» للشركة غير المسجلة في ضريبة المبيعات (تُرسل الفواتير دون ضريبة مبيعات، فيجب أن تكون نسبة الضريبة في إعدادات الشركة 0%؛ عند اختيارها تعرض الشاشة جعل النسبة 0% في الحفظ نفسه، للمستندات الجديدة فقط)، أو «ضريبة المبيعات العامة» للشركة المسجلة فيها (تتضمن الفواتير ضريبة المبيعات، 16% ما لم تُحدَّد نسبة أخرى). ضريبة المبيعات الخاصة غير مدعومة.",
                     "عند الاعتماد تُفحص الفاتورة وتُذكر الحقول الناقصة إن وُجدت.",
                     "تُرسل تلقائياً: «في الطابور» ثم «مُرسلة».",
                     "يُحفظ الرد (المعرّف الفريد ورقم النظام ورمز QR) ويُطبع رمز QR على الفاتورة.",
@@ -312,7 +312,7 @@ public static class HelpTopics
                 "Viewing invoices; the connection settings need settings rights.",
                 [
                     "Turn e-invoicing on and enter the connection details under Settings → E-invoicing.",
-                    "Choose the registration type: “Income tax” for a company not registered for sales tax (invoices are sent without sales tax; set the tax rate in Company settings to 0%), or “General sales tax” for a registered company (invoices include sales tax, 16% unless set otherwise). Special sales tax is not supported.",
+                    "Choose the registration type: “Income tax” for a company not registered for sales tax (invoices are sent without sales tax, so the tax rate in Company settings must be 0%; when you choose it, the screen offers to set the rate to 0% in the same save, for new documents only), or “General sales tax” for a registered company (invoices include sales tax, 16% unless set otherwise). Special sales tax is not supported.",
                     "On approval the invoice is checked and any missing fields are listed.",
                     "It is submitted automatically: Queued, then Submitted.",
                     "The response (unique ID, system number, QR code) is stored and the QR code is printed on the invoice.",

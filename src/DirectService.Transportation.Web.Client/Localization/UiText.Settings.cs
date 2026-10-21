@@ -91,6 +91,12 @@ public static partial class UiText
             "For a company that is not registered for sales tax. E-invoices are sent without sales tax, so set the tax rate in Company settings to 0%; an invoice with sales tax is not sent."),
         ["eis.regHelp.Sales"] = ("للشركة المسجلة في ضريبة المبيعات العامة. تتضمن الفواتير الإلكترونية ضريبة المبيعات (16% ما لم تُحدَّد نسبة أخرى في إعدادات الشركة أو على بند المستند).",
             "For a company registered for general sales tax. E-invoices include sales tax (16% unless set otherwise in Company settings or on a document line)."),
+        // DT-226: the offer shown when income tax is chosen and the company's default tax rate is not 0%.
+        ["eis.zeroOffer"] = ("فواتير ضريبة الدخل الإلكترونية لا تحمل ضريبة مبيعات، ونسبة الضريبة الافتراضية للشركة الآن {0}، فكل فاتورة بهذه النسبة سيرفض النظام إرسالها.",
+            "Income-tax e-invoices carry no sales tax, and the company's default tax rate is now {0}, so every invoice at this rate would be refused for sending."),
+        ["eis.zeroOfferAccept"] = ("اجعل نسبة الضريبة الافتراضية للشركة 0% عند الحفظ (للمستندات الجديدة فقط؛ لا تتغير المستندات الموجودة)",
+            "Set the company's default tax rate to 0% when saving (new documents only; existing documents are not changed)"),
+        ["eis.zeroDone"] = ("نسبة الضريبة الافتراضية للشركة 0%، فتُرسل الفواتير الجديدة دون ضريبة مبيعات.", "The company's default tax rate is 0%, so new invoices are sent without sales tax."),
         ["eis.sequence"] = ("تسلسل مصدر الدخل", "Income-source sequence"),
         ["eis.sequenceHelp"] = ("من بوابة جوفوترة", "From the JoFotara portal"),
         ["eis.icv"] = ("عدّاد الفواتير (ICV)", "Invoice counter (ICV)"),

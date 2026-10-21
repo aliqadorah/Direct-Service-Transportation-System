@@ -25,15 +25,20 @@ public static class EInvoiceCodes
 /// <summary>
 /// E-invoicing settings (FR-059): switch, connector, seller tax number, registration type, income-source sequence, credentials and
 /// environment. Credentials are write-only: an empty value keeps the stored one; they are never returned.
+/// <c>SetTaxRateToZero</c> (income tax only, DT-226): the company's default tax rate becomes 0% in the same save; documents already
+/// made keep their own rate.
 /// </summary>
 public sealed record EInvoiceSettingsRequest(
     bool IsEnabled, string? Connector, string? SellerTaxNumber, string? RegistrationType, string? IncomeSourceSequence,
-    string? ClientId, string? SecretKey, string? Environment, string? RowVersion);
+    string? ClientId, string? SecretKey, string? Environment, string? RowVersion, bool SetTaxRateToZero = false);
 
-/// <summary>The settings without the credentials (only whether they are stored), the counter and the connectors available.</summary>
+/// <summary>
+/// The settings without the credentials (only whether they are stored), the counter, the connectors available and the company's
+/// default tax rate (the page offers 0% when income tax is chosen, DT-226).
+/// </summary>
 public sealed record EInvoiceSettingsResponse(
     bool IsEnabled, string Connector, string? SellerTaxNumber, string RegistrationType, string? IncomeSourceSequence, bool HasClientId, bool HasSecretKey,
-    string Environment, long IcvCounter, IReadOnlyList<string> Connectors, string? RowVersion);
+    string Environment, long IcvCounter, IReadOnlyList<string> Connectors, string? RowVersion, decimal CompanyTaxRate);
 
 /// <summary>A missing or invalid value that keeps a document from being submitted (FR-060), with its message.</summary>
 public sealed record EInvoiceProblemResponse(string Field, string Code, string Message);

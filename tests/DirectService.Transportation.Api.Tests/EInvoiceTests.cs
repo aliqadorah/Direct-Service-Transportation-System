@@ -2,11 +2,13 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
+using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Infrastructure.EInvoicing;
@@ -88,6 +90,48 @@ public sealed class EInvoiceTests(ApiFactory f)
             Assert.Equal(type, saved.RegistrationType);
             current = saved;
         }
+    }
+
+    [Fact]
+    public async Task Income_tax_can_set_the_company_rate_to_zero_in_the_same_save_and_declining_keeps_it_DT226()
+    {
+        var (o, c) = await WorldAsync(enable: false);
+        var draft = await InvoiceAsync(o, c);   // made at 16%: existing documents keep their rate
+        var current = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.GetAsync(U(o, "/settings/e-invoicing")));
+        Assert.Equal(16m, current.CompanyTaxRate);
+
+        // Only with income tax.
+        var wrong = await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"), Simulator(enabled: false, rowVersion: current.RowVersion) with { SetTaxRateToZero = true });
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        Assert.Contains("setTaxRateToZero", await wrong.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        // Declined: income tax saved, the rate stays.
+        current = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"),
+            Simulator(enabled: false, rowVersion: current.RowVersion) with { RegistrationType = EInvoiceCodes.Income }));
+        Assert.Equal(EInvoiceCodes.Income, current.RegistrationType);
+        Assert.Equal(16m, current.CompanyTaxRate);
+        Assert.Equal(16m, (await ReadAsync<MarketSettingsResponse>(await o.Client.GetAsync(U(o, "/settings/market")))).TaxRate);
+
+        // Accepted: one save, rate 0%, audited as a company setting change with the reason; the draft keeps 16%.
+        current = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"),
+            Simulator(enabled: false, rowVersion: current.RowVersion) with { RegistrationType = EInvoiceCodes.Income, SetTaxRateToZero = true }));
+        Assert.Equal(0m, current.CompanyTaxRate);
+        Assert.Equal(0m, (await ReadAsync<MarketSettingsResponse>(await o.Client.GetAsync(U(o, "/settings/market")))).TaxRate);
+        Assert.Equal(16m, (await ReadAsync<InvoiceDetails>(await o.Client.GetAsync(U(o, $"/invoices/{draft.Invoice.Id}")))).Invoice.TaxRate);
+        var audit = await f.DbAsync(async db =>
+        {
+            var pid = f.Services.GetRequiredService<IUrlTokenService>().Decode<Domain.Core.Company>(o.CompanyId)!.Value;
+            var id = await db.Set<Domain.Core.Company>().IgnoreQueryFilters().Where(x => x.PublicId == pid).Select(x => x.Id).SingleAsync();
+            return await db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters()
+                .Where(a => a.EntityType == "CORE.Company" && a.EntityId == id && a.Action == "SettingChange").Select(a => new { a.OldValues, a.NewValues }).ToListAsync();
+        });
+        var change = Assert.Single(audit, a => a.NewValues != null && a.NewValues.Contains("TaxRate", StringComparison.Ordinal));
+        Assert.Contains("16", change.OldValues, StringComparison.Ordinal);
+        Assert.Contains("E-invoicing: income tax", change.NewValues + change.OldValues, StringComparison.Ordinal);
+
+        // Already 0%: asking again is accepted and changes nothing.
+        await (await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"),
+            Simulator(enabled: false, rowVersion: current.RowVersion) with { RegistrationType = EInvoiceCodes.Income, SetTaxRateToZero = true })).EnsureOkAsync();
     }
 
     [Fact]
