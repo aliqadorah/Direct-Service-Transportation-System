@@ -148,6 +148,7 @@ public static partial class UiText
         ["adash.rem.rejected-einvoices"] = ("فواتير إلكترونية مرفوضة: {0}", "Rejected e-invoices: {0}"),
         ["adash.rem.budget-over"] = ("أسطر موازنة تجاوزت 100%: {0}", "Budget lines over 100%: {0}"),
         ["adash.rem.unallocated-receipts"] = ("سندات قبض غير مخصصة بالكامل: {0}", "Receipts not fully allocated: {0}"),
+        ["adash.rem.carried-advances"] = ("أرصدة سائقين مرحّلة إلى التسوية التالية بعد سداد جزئي ({0})", "Driver balances carried to the next settlement after a partial repayment ({0})"),
         ["adash.rem.deductions-unmapped"] = ("«خصومات الموردين» غير مربوطة بحساب وتوجد فواتير بخصم ({0})", "“Supplier deductions” is not mapped while bills with deductions exist ({0})"),
         ["ap.viewDueSoon"] = ("مستحقة خلال 7 أيام", "Due within 7 days"),
         ["rcpt.unallocatedView"] = ("غير مخصصة", "Not allocated"),

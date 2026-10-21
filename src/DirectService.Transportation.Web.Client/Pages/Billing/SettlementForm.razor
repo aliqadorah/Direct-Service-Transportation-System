@@ -3,7 +3,8 @@
   SCR-27 settlement (FR-077…080, BR-031, BR-032, 8.5): the driver's open own-fleet trips and open advances up to the date, all pre-selected
   (untick to leave for later); deduction lines (shortage, fine, other) with suggestions from shortage trips (FR-078, DT-96); net = wages −
   advances − deductions, never below zero; method and cash box / bank for the net. Confirming posts the entry and locks the items until the
-  settlement is voided.
+  settlement is voided. DT-228: when advances and deductions exceed the wages, "Repayment from the driver" — amount (all, or part of the
+  shortfall: the rest stays an open advance for the next settlement), method, cash box / bank and reference (bank transfer, CliQ).
 *@
 @inject Api Api
 @inject Loc L
@@ -20,7 +21,7 @@
             <Actions><Btn Primary="true" Text="@L["drv.confirmSettlement"]" Busy="_saving" Disabled="!CanSave" OnClick="Save" /></Actions>
         </PageHeader>
         <PostingBanner OnStatus="r => _postingReady = r" />
-        @if (Net < 0) {<Banner Tone="Tone.Err" Text="@L.F("drv.netNegative", Fmt.Money(Net))" />}
+        @if (Net < 0) {<Banner Tone="Tone.Warn" Text="@L.F("drv.netNegativeRepay", Fmt.Money(-Net))" />}
         <EditForm EditContext="_ctx" OnValidSubmit="Save" class="cols fill" style="grid-template-columns:1fr 300px;align-items:start;min-height:0">
             <div class="stack" style="min-width:0;min-height:0">
                 <ProblemValidator @ref="_problems" />
@@ -70,8 +71,17 @@
                 <div class="ln"><span>@L["drv.deductions"]</span><Money Value="-DeductionsTotal" /></div>
                 <div class="ln tot big" style="@(Net < 0 ? "color:var(--err)" : null)"><span>@L["drv.net"]</span><Money Value="Net" /></div>
                 <DateField @bind-Value="_m.SettlementDate" Label="@L["drv.settlementDate"]" Required="true" @bind-Value:after="Load" Help="@L["drv.dateHelp"]" />
+                @if (Net < 0)
+                {
+                    <section class="repay stack" aria-labelledby="repay-h" style="border-top:1px solid var(--border);padding-top:var(--sp-3)">
+                        <h3 id="repay-h" style="margin:0;font-size:inherit">@L["drv.repayTitle"]</h3>
+                        <NumberField @bind-Value="Repaid" Label="@L["drv.repayAmount"]" Required="true" Help="@L.F("drv.repayHelp", Fmt.Money(-Net))" />
+                        @if (Carried > 0) {<div class="ln"><span>@L["drv.repayCarried"]</span><Money Value="Carried" /></div>}
+                        @if (RepaidInvalid) {<p class="help err" role="alert" style="margin:0">@L.F("drv.repayRange", Fmt.Money(-Net))</p>}
+                    </section>
+                }
                 <PaymentFields Model="_m" />
-                <p class="help" style="margin:6px 0 0">@L["drv.netHelp"]</p>
+                <p class="help" style="margin:6px 0 0">@(Net < 0 ? L["drv.repayMoneyHelp"] : L["drv.netHelp"])</p>
             </Box>
         </EditForm>
     </ChildContent>
@@ -112,7 +122,14 @@
     private decimal AdvancesTotal => _p?.Advances.Where(a => _advances.Contains(a.Id)).Sum(a => a.Amount) ?? 0;
     private decimal DeductionsTotal => _m.Deductions.Sum(d => d.Amount ?? 0);
     private decimal Net => Gross - AdvancesTotal - DeductionsTotal;
-    private bool CanSave => _postingReady && !_saving && Net >= 0 && (_trips.Count > 0 || _advances.Count > 0) && Shell.Can(PermissionKeys.DrvSettle);
+
+    // DT-228: what the driver repays now — the whole shortfall unless changed; the rest is carried as an open advance.
+    private decimal? _repaid;
+    private decimal? Repaid { get => _repaid ?? (Net < 0 ? -Net : null); set => _repaid = value; }
+    private decimal Carried => Net < 0 && Repaid is decimal r && r > 0 && r <= -Net ? -Net - r : 0;
+    private bool RepaidInvalid => Net < 0 && (Repaid is not decimal r || r <= 0 || r > -Net);
+
+    private bool CanSave => _postingReady && !_saving && (Net >= 0 || !RepaidInvalid) && (_trips.Count > 0 || _advances.Count > 0) && Shell.Can(PermissionKeys.DrvSettle);
 
     private IReadOnlyList<SuggestedDeduction> Suggestions => _p?.Suggestions.Where(s => _trips.Contains(s.TripId)).ToList() ?? [];
 
@@ -160,9 +177,10 @@
             var r = await Api.PostAsync<SettlementDetails>(Api.C("settlements"), new SettlementRequest(DriverId, _m.SettlementDate,
                 _trips.Select(k => k.ToString()!).ToList(), _advances.Select(k => k.ToString()!).ToList(),
                 _m.Deductions.Where(d => d.Amount is > 0).Select(d => new SettlementDeductionRequest(d.Type, d.Amount, string.IsNullOrWhiteSpace(d.Note) ? null : d.Note.Trim())).ToList(),
-                _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(), _m.ClientId));
+                _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(), _m.ClientId, Net < 0 ? Repaid : null));
             var s = r.Settlement;
-            Toasts.Success(L.F("drv.settled", s.Number, Fmt.Money(s.NetPayable)), L["ui.print"], NavModel.Href(Company, $"print/settlement/{s.Id}"));
+            Toasts.Success(s.RepaidAmount > 0 ? L.F("drv.settledRepaid", s.Number, Fmt.Money(s.RepaidAmount)) : L.F("drv.settled", s.Number, Fmt.Money(s.NetPayable)),
+                L["ui.print"], NavModel.Href(Company, $"print/settlement/{s.Id}"));
             Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}"));
         }
         catch (ApiException e)

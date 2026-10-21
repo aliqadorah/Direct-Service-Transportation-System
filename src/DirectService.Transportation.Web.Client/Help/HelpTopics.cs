@@ -400,9 +400,13 @@ public static class HelpTopics
                     "أضف الخصومات (مثل خصم النقص المقترح)؛ يُحسب الصافي.",
                     "اختر طريقة الدفع والصندوق أو البنك ثم «تأكيد».",
                     "تُرقّم التسوية (STL-) وتُربط البنود وتُقفل ويُرحّل القيد. اطبع الكشف وسند الصرف.",
+                    "إذا زادت السلف والخصومات على الأجور (صافٍ سالب) يظهر «سداد من السائق»: المبلغ (كامل الفرق أو جزء منه) والطريقة (نقداً أو تحويل بنكي أو CliQ) والصندوق أو الحساب البنكي، والمرجع للتحويل وCliQ (مثل رقم حركة CliQ).",
+                    "السداد الجزئي: يبقى الباقي سلفة مفتوحة جديدة «مرحّلة» تظهر في التسوية التالية وفي تذكيرات لوحة المحاسبة مع «سدّده السائق: المبلغ (الطريقة، المرجع)».",
+                    "القيد بنفس رقم التسوية: مدين الصندوق أو البنك بالسداد، ودائن سلف السائقين. يظهر السداد في كشف التسوية (مع سند قبض) وفي كشف حساب السائق.",
                 ],
                 [
-                    "صافي أقل من صفر: ممنوع؛ ألغِ تحديد بعض السلف أو قلّل الخصومات.",
+                    "صافي أقل من صفر دون سداد: ممنوع؛ سجّل سداد السائق، أو ألغِ تحديد بعض السلف أو قلّل الخصومات. سداد أكبر من الفرق: ممنوع.",
+                    "السلفة المرحّلة لا تُعدّل ولا تُلغى وحدها؛ إلغاء التسوية يلغيها ويعكس السداد. إن سُوّيت في تسوية لاحقة فألغِ اللاحقة أولاً.",
                     "تاريخ في فترة مغلقة: ممنوع.",
                     "تسوية خاطئة: افتحها و«إلغاء» مع السبب؛ تتحرّر البنود ويُرحّل قيد عكسي.",
                 ]),
@@ -416,9 +420,13 @@ public static class HelpTopics
                     "Add deductions (such as the suggested shortage deduction); the net is calculated.",
                     "Choose the method and cash box or bank, then Confirm.",
                     "The settlement is numbered (STL-), its items are linked and locked and the entry is posted. Print the statement and the payment voucher.",
+                    "When advances and deductions exceed the wages (a negative net), “Repayment from the driver” appears: the amount (the whole difference or part of it), the method (cash, bank transfer or CliQ), the cash box or bank account, and a reference for bank transfer and CliQ (such as the CliQ transaction number).",
+                    "A partial repayment leaves the rest as a new open “carried” advance, shown in the next settlement and in the accounting dashboard reminders with “Repaid by driver: amount (method, reference)”.",
+                    "The entry has the settlement's number: debit the cash box or bank with the repayment, credit driver advances. The repayment is shown on the settlement statement (with a receipt voucher) and on the driver's statement.",
                 ],
                 [
-                    "A net below zero: blocked; untick some advances or reduce the deductions.",
+                    "A net below zero without a repayment: blocked; record the driver's repayment, or untick some advances or reduce the deductions. A repayment above the difference: blocked.",
+                    "A carried advance cannot be edited or voided on its own; voiding the settlement voids it and reverses the repayment. If a later settlement settled it, void the later one first.",
                     "A date in a closed period: blocked.",
                     "A wrong settlement: open it and Void with a reason; its items are released and a reversal is posted.",
                 ]),
@@ -431,9 +439,10 @@ public static class HelpTopics
                 [
                     "الفوترة والنقد ← حسابات الشركاء ← الشريك؛ يظهر الرصيد المستحق له.",
                     "«دفعة»: المبلغ والطريقة والصندوق أو البنك ← «حفظ»؛ تُرحّل الدفعة (PPY-). اطبع سند الصرف.",
+                    "إذا أصبح على الشريك للشركة (مثلاً أُلغيت رحلة بعد الدفع له) يظهر ذلك في حسابه مع «تسجيل سداد من الشريك»: المبلغ حتى ما عليه، نقداً أو تحويل بنكي أو CliQ مع المرجع؛ يُرحّل مدين الصندوق أو البنك ودائن ذمم الشركاء، ويُطبع سند قبض.",
                 ],
                 [
-                    "مبلغ أكبر من الرصيد المستحق: ممنوع، ويظهر الرصيد.",
+                    "مبلغ أكبر من الرصيد المستحق: ممنوع، ويظهر الرصيد. سداد أكبر مما على الشريك: ممنوع.",
                     "دفعة خاطئة: افتحها و«إلغاء» مع السبب.",
                 ]),
             new("Partner payment",
@@ -442,9 +451,10 @@ public static class HelpTopics
                 [
                     "Billing & cash → Partner accounts → the partner; the balance due is shown.",
                     "Payment: amount, method, cash box or bank → Save; the payment is posted (PPY-). Print the payment voucher.",
+                    "When the partner owes the company (for example a trip voided after the partner was paid), its account says so with Record repayment: the amount up to what it owes, by cash, bank transfer or CliQ with the reference; it posts debit cash box or bank, credit partner payables, and prints a receipt voucher.",
                 ],
                 [
-                    "An amount above the balance due: blocked, with the balance shown.",
+                    "An amount above the balance due: blocked, with the balance shown. A repayment above what the partner owes: blocked.",
                     "A wrong payment: open it and Void with a reason.",
                 ]),
             [new("partner-accounts", "nav.partnerAccounts"), new("partner-accounts/payments", "prt.paymentsList")]),

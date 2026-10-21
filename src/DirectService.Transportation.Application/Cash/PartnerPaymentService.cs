@@ -25,7 +25,10 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";
 
-    /// <summary>What the company owes a partner now: partner cost of active trips − active payments.</summary>
+    /// <summary>
+    /// What the company owes a partner now: partner cost of active trips − active payments (+ repayments from the partner, DT-228). Below
+    /// zero the partner owes the company (a trip voided or made cheaper after the partner was paid).
+    /// </summary>
     public async Task<(decimal Cost, decimal Paid)> BalanceAsync(long partnerId, DateOnly? upTo, CancellationToken ct)
     {
         var tripsQ = db.Set<Trip>().Where(t => t.PartnerId == partnerId && t.Status == TripService.Active);
@@ -36,7 +39,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
             payQ = payQ.Where(p => p.PaymentDate <= d);
         }
         var cost = await tripsQ.SumAsync(t => (decimal?)t.PartnerCost, ct).ConfigureAwait(false) ?? 0;
-        var paid = await payQ.SumAsync(p => (decimal?)p.Amount, ct).ConfigureAwait(false) ?? 0;
+        var paid = await payQ.SumAsync(p => (decimal?)(p.Kind == CashCodes.Repayment ? -p.Amount : p.Amount), ct).ConfigureAwait(false) ?? 0;
         return (cost, paid);
     }
 
@@ -53,8 +56,12 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         // An archived partner can still be paid its balance due (DT-97).
         var partner = await cash.PartyAsync<Partner>("partnerId", r.PartnerId, ct).ConfigureAwait(false);
         var money = await cash.ChooseAsync(r.PaymentMethod, r.CashBoxId, r.BankAccountId, r.Reference, ct).ConfigureAwait(false);
+        var kind = string.IsNullOrWhiteSpace(r.Kind) ? CashCodes.Payment
+            : new[] { CashCodes.Payment, CashCodes.Repayment }.FirstOrDefault(k => string.Equals(k, r.Kind.Trim(), StringComparison.OrdinalIgnoreCase))
+              ?? throw Fail.Field("kind", ErrorCodes.ValidationFormat, "kind");
         var payment = new PartnerPayment
         {
+            Kind = kind,
             PartnerId = partner.Id, PaymentDate = date, Amount = amount, PaymentMethod = money.Method, CashBoxId = money.CashBoxId, BankAccountId = money.BankAccountId,
             Reference = money.Reference, Notes = notes, Status = CashCodes.Active,
         };
@@ -69,7 +76,11 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
                 payment.Number = await numbering.NextAsync(Configuration.DocumentTypes.PartnerPayment, c).ConfigureAwait(false);
                 // Under the number lock: the balance cannot change through another payment meanwhile (FR-085).
                 var (cost, paid) = await BalanceAsync(partner.Id, null, c).ConfigureAwait(false);
-                if (amount > cost - paid) throw Fail.RuleOn("amount", ErrorCodes.PartnerPaymentExceedsBalance, Money.Format(amount), Money.Format(cost - paid));
+                if (kind == CashCodes.Payment && amount > cost - paid)
+                    throw Fail.RuleOn("amount", ErrorCodes.PartnerPaymentExceedsBalance, Money.Format(amount), Money.Format(Math.Max(cost - paid, 0)));
+                // DT-228: a repayment never above what the partner owes the company.
+                if (kind == CashCodes.Repayment && amount > paid - cost)
+                    throw Fail.RuleOn("amount", ErrorCodes.PartnerRepaymentExceedsOwed, Money.Format(amount), Money.Format(Math.Max(paid - cost, 0)));
                 db.Set<PartnerPayment>().Add(payment);
                 if (await support.SaveCreateAsync<PartnerPayment>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
                 var entry = await posting.PostOrPendAsync(BuildEntry(payment, money.AccountId), c).ConfigureAwait(false);
@@ -108,17 +119,25 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
             payment.VoidedAt = DateTime.UtcNow;
             changes.SetAction(payment, "Void", why);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            await CashPosting.ReverseAsync(db, posting, payment, SourceType, cash.En ? $"Void of partner payment {payment.Number}" : $"إلغاء دفعة الشريك {payment.Number}", c)
+            await CashPosting.ReverseAsync(db, posting, payment, SourceType, payment.Kind == CashCodes.Repayment
+                    ? (cash.En ? $"Void of partner repayment {payment.Number}" : $"إلغاء سداد الشريك {payment.Number}")
+                    : (cash.En ? $"Void of partner payment {payment.Number}" : $"إلغاء دفعة الشريك {payment.Number}"), c)
                 .ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         return await DetailsAsync(payment.Id, ct).ConfigureAwait(false);
     }
 
-    /// <summary>Partner payment entry (8.6): Dr partner payable with the partner, Cr cash / bank.</summary>
+    /// <summary>
+    /// Partner payment entry (8.6): Dr partner payable with the partner, Cr cash / bank. A repayment from the partner (DT-228): Dr cash /
+    /// bank, Cr partner payable with the partner.
+    /// </summary>
     public PostingRequest BuildEntry(PartnerPayment p, long moneyAccountId)
     {
         ArgumentNullException.ThrowIfNull(p);
         var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, p.PartnerId);
+        if (p.Kind == CashCodes.Repayment)
+            return new PostingRequest(p.PaymentDate, (cash.En ? "Partner repayment " : "سداد من شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false,
+                [CashSupport.Debit(moneyAccountId, p.Amount), PostingLine.CreditKey(PostingKeys.PartnerPayable, p.Amount, party)]);
         return new PostingRequest(p.PaymentDate, (cash.En ? "Partner payment " : "دفعة شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false,
             [PostingLine.DebitKey(PostingKeys.PartnerPayable, p.Amount, party), CashSupport.Credit(moneyAccountId, p.Amount)]);
     }
@@ -163,7 +182,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         ArgumentNullException.ThrowIfNull(q);
         var query = Filter(q);
         var paging = new PageRequest(q.Page, q.PageSize);
-        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? p.Amount : 0), g.Count(p => p.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
+        var totals = await query.GroupBy(_ => 1).Select(g => new CashListTotals(g.Count(), g.Sum(p => p.Status == CashCodes.Active ? (p.Kind == CashCodes.Repayment ? -p.Amount : p.Amount) : 0), g.Count(p => p.Status == CashCodes.Active))).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? new CashListTotals(0, 0);
         var rows = await Rows(MasterDataSupport.Sort(query, q.Sort, SortFields, "-paymentDate").ThenByDescending(p => p.Id).Skip(paging.Skip).Take(paging.SafePageSize))
             .ToListAsync(ct).ConfigureAwait(false);
         return new PartnerPaymentPage(new PagedResult<PartnerPaymentResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Count), totals);
@@ -195,7 +214,8 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
 
     internal PartnerPaymentResponse ToResponse(Row x) => new(support.Token<PartnerPayment>(x.P.PublicId), x.P.Number, new Ref(support.Token<Partner>(x.PartnerPid), x.PartnerName),
         x.P.PaymentDate, x.P.Amount, x.P.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.P.Reference, x.P.Notes, x.P.Status,
-        cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.P.VoidReason, DateTime.SpecifyKind(x.P.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.P.RowVersion));
+        cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.P.VoidReason, DateTime.SpecifyKind(x.P.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.P.RowVersion),
+        x.P.Kind);
 }
 
 /// <summary>Pending-posting retries for partner payments.</summary>

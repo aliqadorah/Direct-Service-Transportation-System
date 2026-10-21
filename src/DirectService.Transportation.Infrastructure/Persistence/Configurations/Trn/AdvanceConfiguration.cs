@@ -14,10 +14,12 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
         builder.ToTable("TRN_Advances", "trn", t =>
         {
             t.HasCheckConstraint("CK_TRN_Advances_Amount", "[Amount] > 0");
-            t.HasCheckConstraint("CK_TRN_Advances_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
+            t.HasCheckConstraint("CK_TRN_Advances_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ','Carried')");
             t.HasCheckConstraint("CK_TRN_Advances_Status", "[Status] IN ('Active','Void')");
             t.HasCheckConstraint("CK_TRN_Advances_VoidReason_VoidedBy_VoidedAt", "[Status] <> 'Void' OR ([VoidReason] IS NOT NULL AND [VoidedBy] IS NOT NULL AND [VoidedAt] IS NOT NULL)");
-            t.HasCheckConstraint("CK_TRN_Advances_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
+            t.HasCheckConstraint("CK_TRN_Advances_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL) OR ([PaymentMethod] = 'Carried' AND [CashBoxId] IS NULL AND [BankAccountId] IS NULL)");
+            // Revision 6 (DT-228): a carried advance belongs to the settlement that left it, and only a carried one does.
+            t.HasCheckConstraint("CK_TRN_Advances_CarriedFromSettlementId", "([PaymentMethod] = 'Carried' AND [CarriedFromSettlementId] IS NOT NULL) OR ([PaymentMethod] <> 'Carried' AND [CarriedFromSettlementId] IS NULL)");
             t.HasCheckConstraint("CK_TRN_Advances_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
         });
 
@@ -114,6 +116,11 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
             .HasColumnType("bigint")
             .HasColumnOrder(14)
             .IsRequired(false);
+        builder.Property(e => e.CarriedFromSettlementId)
+            .HasColumnName("CarriedFromSettlementId")
+            .HasColumnType("bigint")
+            .HasColumnOrder(28)
+            .IsRequired(false);
         builder.Property(e => e.JournalEntryId)
             .HasColumnName("JournalEntryId")
             .HasColumnType("bigint")
@@ -199,6 +206,7 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
         builder.HasIndex(new[] { "CashBoxId" }, "IX_TRN_Advances_CashBoxId");
         builder.HasIndex(new[] { "BankAccountId" }, "IX_TRN_Advances_BankAccountId");
         builder.HasIndex(new[] { "SettlementId" }, "IX_TRN_Advances_SettlementId");
+        builder.HasIndex(new[] { "CarriedFromSettlementId" }, "IX_TRN_Advances_CarriedFromSettlementId").HasFilter("[CarriedFromSettlementId] IS NOT NULL");
         builder.HasIndex(new[] { "JournalEntryId" }, "IX_TRN_Advances_JournalEntryId");
         builder.HasIndex(new[] { "VoidedBy" }, "IX_TRN_Advances_VoidedBy");
 
@@ -222,6 +230,13 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
             .HasPrincipalKey(p => p.Id)
             .IsRequired(false)
             .HasConstraintName("FK_TRN_Advances_BankAccounts_BankAccountId")
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(e => e.CarriedFromSettlement)
+            .WithMany()
+            .HasForeignKey(e => e.CarriedFromSettlementId)
+            .HasPrincipalKey(p => p.Id)
+            .IsRequired(false)
+            .HasConstraintName("FK_TRN_Advances_TRN_Settlements_CarriedFromSettlementId")
             .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.Settlement)
             .WithMany()

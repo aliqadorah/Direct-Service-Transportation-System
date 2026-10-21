@@ -113,6 +113,11 @@
                                     <span class="badge @ToneCss.Badge(SeverityTone(r.Severity))"><Icon Name="@(r.Severity == "info" ? "info" : "alert")" Label="@L["sev." + r.Severity]" /></span>
                                     <span class="rem-text"><Tx Value="@L.F("adash.rem." + r.Key, r.Count)" />@if (r.Amount is decimal v && v != 0) {<span class="muted"> · <bdi class="num">@Fmt.Money(v)</bdi></span>}</span>
                                     <a href="@NavModel.Href(Company, r.Route)" aria-label="@L.F("adash.openReminder", L.F("adash.rem." + r.Key, r.Count))">@L["dash.openList"]</a>
+                                    @if (r.Items is { Count: > 0 } items)
+                                    {
+                                        @* DT-228: e.g. the carried driver balances, each with "Repaid by driver: amount (method, reference)". *@
+                                        <ul class="rem-items help">@foreach (var i in items) {<li><Tx Value="@i" /></li>}</ul>
+                                    }
                                 </li>
                             }
                         </ul>

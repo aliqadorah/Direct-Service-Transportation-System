@@ -149,9 +149,9 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
     private async Task<List<AccountingReminder>> RemindersAsync(DateOnly today, int year, int month, CancellationToken ct)
     {
         var list = new List<AccountingReminder>();
-        void Add(string key, string severity, int count, decimal? amount, string route)
+        void Add(string key, string severity, int count, decimal? amount, string route, IReadOnlyList<string>? items = null)
         {
-            if (count > 0) list.Add(new AccountingReminder(key, severity, count, amount, route));
+            if (count > 0) list.Add(new AccountingReminder(key, severity, count, amount, route, items));
         }
 
         // Draft journal entries not posted.
@@ -254,6 +254,24 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
                 var recent = DateOnly.TryParseExact(attempted, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at)
                     && at >= today.AddDays(-DeductionAttemptDays);
                 Add(AccountingReminderKeys.DeductionsUnmapped, "error", Math.Max(bills, recent ? 1 : 0), null, canMap ? "settings/mapping" : "accounting/payables");
+            }
+        }
+
+        // DT-228: driver balances carried after a partial repayment with the settlement, still open — with what the driver repaid.
+        if (Any(PermissionKeys.DrvView, PermissionKeys.DrvSettle))
+        {
+            var open = db.Set<Advance>().AsNoTracking().Where(a => a.Status == CashCodes.Active && a.SettlementId == null && a.CarriedFromSettlementId != null);
+            var count = await open.CountAsync(ct).ConfigureAwait(false);
+            if (count > 0)
+            {
+                var en = ctx.Language == "en";
+                var rows = await open.OrderBy(a => a.AdvanceDate).ThenBy(a => a.Id).Take(20)
+                    .Select(a => new { a.Number, a.Amount, Driver = a.Driver.FullName, Stl = a.CarriedFromSettlement!.Number, a.CarriedFromSettlement.RepaidAmount,
+                        a.CarriedFromSettlement.PaymentMethod, a.CarriedFromSettlement.Reference })
+                    .ToListAsync(ct).ConfigureAwait(false);
+                var items = rows.Select(x => $"{x.Number} · {x.Driver} · {Money.Format(x.Amount)} ({x.Stl}) — "
+                    + Cash.CashSupport.RepaidText(en, x.RepaidAmount, x.PaymentMethod, x.Reference)).ToList();
+                Add(AccountingReminderKeys.CarriedAdvances, "warning", count, await open.SumAsync(a => a.Amount, ct).ConfigureAwait(false), "driver-accounts", items);
             }
         }
         return list;

@@ -44,10 +44,10 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var tripRows = await db.Set<Trip>().AsNoTracking().Where(t => t.DriverId == driverId && t.Status == TripService.Active && t.PartnerId == null && t.TripDate <= upTo)
             .Select(t => new { t.Id, t.PublicId, t.ReceiptNo, t.TripDate, Route = t.LoadingSite.Name + " ← " + t.UnloadingSite.Name, Material = t.Material.Name, t.WageQty, t.DriverRate, t.DriverWage })
             .ToListAsync(ct).ConfigureAwait(false);
-        var advRows = await db.Set<Advance>().AsNoTracking().Where(a => a.DriverId == driverId && a.Status == CashCodes.Active && a.AdvanceDate <= upTo)
+        var advRows = await db.Set<Advance>().AsNoTracking().Where(a => a.DriverId == driverId && a.Status == CashCodes.Active && a.CarriedFromSettlementId == null && a.AdvanceDate <= upTo)
             .Select(a => new { a.Id, a.PublicId, a.Number, a.AdvanceDate, a.Amount }).ToListAsync(ct).ConfigureAwait(false);
         var stlRows = await db.Set<Settlement>().AsNoTracking().Where(s => s.DriverId == driverId && s.Status == CashCodes.Active && s.SettlementDate <= upTo)
-            .Select(s => new { s.Id, s.PublicId, s.Number, s.SettlementDate, s.DeductionsTotal, s.NetPayable }).ToListAsync(ct).ConfigureAwait(false);
+            .Select(s => new { s.Id, s.PublicId, s.Number, s.SettlementDate, s.DeductionsTotal, s.NetPayable, s.RepaidAmount, s.PaymentMethod, s.Reference }).ToListAsync(ct).ConfigureAwait(false);
         var events = new List<Event>();
         events.AddRange(tripRows.Select(t => new Event(t.TripDate, KindTrip, t.Id, "Trip", new DocRef(support.Token<Trip>(t.PublicId), t.ReceiptNo),
             $"{t.Route} · {t.Material}", t.DriverWage, 0, t.Route, t.WageQty, t.DriverRate)));
@@ -58,6 +58,8 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
             var doc = new DocRef(support.Token<Settlement>(s.PublicId), s.Number);
             if (s.DeductionsTotal > 0) events.Add(new Event(s.SettlementDate, KindDeduction, s.Id, "Deduction", doc, cash.En ? "Settlement deductions" : "خصومات التسوية", 0, s.DeductionsTotal));
             if (s.NetPayable > 0) events.Add(new Event(s.SettlementDate, KindSettlement, s.Id, "Settlement", doc, cash.En ? "Net paid" : "الصافي المدفوع", 0, s.NetPayable));
+            if (s.RepaidAmount > 0)
+                events.Add(new Event(s.SettlementDate, KindSettlement, s.Id, "Repaid", doc, CashSupport.RepaidText(cash.En, s.RepaidAmount, s.PaymentMethod, s.Reference), s.RepaidAmount, 0));
         }
         return events;
     }
@@ -90,11 +92,14 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
             .Select(x => new { x.Id, x.PublicId, x.ReceiptNo, x.TripDate, Route = x.LoadingSite.Name + " ← " + x.UnloadingSite.Name, Material = x.Material.Name, x.WageQty, x.PartnerRate, x.PartnerCost })
             .ToListAsync(ct).ConfigureAwait(false);
         var payRows = await db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partner.Id && p.Status == CashCodes.Active && p.PaymentDate <= t)
-            .Select(p => new { p.Id, p.PublicId, p.Number, p.PaymentDate, p.Amount }).ToListAsync(ct).ConfigureAwait(false);
+            .Select(p => new { p.Id, p.PublicId, p.Number, p.PaymentDate, p.Amount, p.Kind }).ToListAsync(ct).ConfigureAwait(false);
         var events = tripRows.Select(x => new Event(x.TripDate, KindTrip, x.Id, "Trip", new DocRef(support.Token<Trip>(x.PublicId), x.ReceiptNo), $"{x.Route} · {x.Material}",
                 x.PartnerCost, 0, x.Route, x.WageQty, x.PartnerRate))
-            .Concat(payRows.Select(p => new Event(p.PaymentDate, KindPayment, p.Id, "Payment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
-                cash.En ? "Payment" : "دفعة", 0, p.Amount)))
+            .Concat(payRows.Select(p => p.Kind == CashCodes.Repayment
+                ? new Event(p.PaymentDate, KindPayment, p.Id, "Repayment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
+                    cash.En ? "Repaid by the partner" : "سداد من الشريك", p.Amount, 0)
+                : new Event(p.PaymentDate, KindPayment, p.Id, "Payment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
+                    cash.En ? "Payment" : "دفعة", 0, p.Amount)))
             .ToList();
         return Statement(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), f, t, events);
     }

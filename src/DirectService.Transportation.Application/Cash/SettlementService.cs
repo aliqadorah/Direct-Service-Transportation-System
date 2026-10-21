@@ -7,6 +7,7 @@ using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Transportation.Contracts.Trips;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,9 @@ namespace DirectService.Transportation.Application.Cash;
 /// (a subset may be chosen, BR-031); deductions (shortage — suggested from flagged trips —, fine, other); net = gross − advances −
 /// deductions ≥ 0; confirming numbers the settlement, links and locks the items and posts Dr driver payable (trips whose wage was
 /// accrued) / driver wage expense (the others, BR-031a), Cr driver advances, driver deductions and cash/bank (net). Void releases the
-/// items and reverses the entry.
+/// items and reverses the entry. Revision 6 (DT-228): when advances and deductions exceed the wages, the driver repays part or all of the
+/// shortfall with the settlement (Dr cash / bank, Cr driver advances, same STL entry); an unpaid rest becomes a new open advance
+/// ("Carried", no money moved, kept on driver advances by the same entry) for the next settlement. Void reverses it and voids that advance.
 /// </summary>
 public sealed class SettlementService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
     INumberingService numbering, PostingEngine posting, TripService trips)
@@ -112,11 +115,32 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
                 stl.GrossWages = tripList.Sum(t => t.DriverWage);
                 stl.AdvancesTotal = advanceList.Sum(a => a.Amount);
                 stl.DeductionsTotal = deductions.Sum(d => d.Amount);
-                stl.NetPayable = stl.GrossWages - stl.AdvancesTotal - stl.DeductionsTotal;
-                // 8.5 / FR-079: never below zero.
-                if (stl.NetPayable < 0) throw Fail.Rule(ErrorCodes.SettlementNetNegative, Money.Format(stl.NetPayable));
+                var net = stl.GrossWages - stl.AdvancesTotal - stl.DeductionsTotal;
+                // 8.5 / FR-079: never below zero — a shortfall is repaid by the driver (all or part) and the rest carried (DT-228).
+                if (net < 0)
+                {
+                    if (r.RepaidAmount is not decimal repaid) throw Fail.Rule(ErrorCodes.SettlementNetNegative, Money.Format(net));
+                    if (repaid <= 0 || repaid > -net || decimal.Round(repaid, decimals) != repaid)
+                        throw Fail.RuleOn("repaidAmount", ErrorCodes.SettlementRepaymentRange, Money.Format(-net));
+                    stl.RepaidAmount = repaid;
+                    stl.CarriedForward = -net - repaid;
+                }
+                else if (r.RepaidAmount is decimal extra && extra != 0) throw Fail.RuleOn("repaidAmount", ErrorCodes.SettlementRepaymentNotNeeded);
+                stl.NetPayable = Math.Max(net, 0);
                 db.Set<Settlement>().Add(stl);
                 if (await support.SaveCreateAsync<Settlement>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
+                if (stl.CarriedForward > 0)
+                {
+                    // The unpaid rest: a new open advance of the driver, numbered like any advance, dated with the settlement.
+                    var carried = new Advance
+                    {
+                        DriverId = driver.Id, AdvanceDate = date, Amount = stl.CarriedForward, PaymentMethod = CashCodes.Carried, Status = CashCodes.Active,
+                        CarriedFromSettlementId = stl.Id, Number = await numbering.NextAsync(Configuration.DocumentTypes.Advance, c).ConfigureAwait(false),
+                        Notes = (cash.En ? "Carried from settlement " : "مرحّلة من التسوية ") + stl.Number,
+                    };
+                    db.Set<Advance>().Add(carried);
+                    changes.SetAction(carried, "CarriedForward", stl.Number);
+                }
                 foreach (var d in deductions)
                     db.Set<SettlementDeduction>().Add(new SettlementDeduction { SettlementId = stl.Id, DeductionType = d.Type, Amount = d.Amount, Note = d.Note });
                 foreach (var t in tripList)
@@ -198,7 +222,8 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
 
     /// <summary>
     /// Settlement entry (8.6): Dr driver payable (accrued wages, with the driver) and driver wage expense (the rest, BR-031a); Cr driver
-    /// advances (with the driver), driver deductions, cash / bank (net). Null when every amount is zero.
+    /// advances (with the driver), driver deductions, cash / bank (net). Null when every amount is zero. DT-228: Dr cash / bank for the
+    /// driver's repayment; driver advances are credited only with what leaves them (settled advances − the carried rest, which stays).
     /// </summary>
     public PostingRequest? BuildEntry(Settlement s, long moneyAccountId, decimal accruedGross)
     {
@@ -208,9 +233,13 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         var lines = new List<PostingLine>();
         if (accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverPayable, accruedGross, party));
         if (s.GrossWages - accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverWageExpense, s.GrossWages - accruedGross, party));
-        if (s.AdvancesTotal > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DriverAdvances, s.AdvancesTotal, party));
+        // Deductions above the wages can leave more on driver advances than was settled (a debit then).
+        var advances = s.AdvancesTotal - s.CarriedForward;
+        if (advances > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DriverAdvances, advances, party));
+        if (advances < 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverAdvances, -advances, party));
         if (s.DeductionsTotal > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DriverDeductions, s.DeductionsTotal, party));
         if (s.NetPayable > 0) lines.Add(CashSupport.Credit(moneyAccountId, s.NetPayable));
+        if (s.RepaidAmount > 0) lines.Add(CashSupport.Debit(moneyAccountId, s.RepaidAmount));
         return new PostingRequest(s.SettlementDate, (cash.En ? "Driver settlement " : "تسوية سائق ") + s.Number, AccountingCodes.ModuleTrn, SourceType, s.Id, false, lines);
     }
 
@@ -238,6 +267,19 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         await db.InTransactionAsync(async c =>
         {
             await periods.EnsureOpenAsync(stl.SettlementDate, c).ConfigureAwait(false);
+            // DT-228: the carried rest goes with the settlement — unless a later settlement already settled it.
+            var carried = await db.Set<Advance>().Where(a => a.CarriedFromSettlementId == stl.Id && a.Status == CashCodes.Active).ToListAsync(c).ConfigureAwait(false);
+            foreach (var a in carried)
+            {
+                if (a.SettlementId is long later)
+                    throw Fail.Rule(ErrorCodes.SettlementCarriedSettled, a.Number,
+                        await db.Set<Settlement>().Where(x => x.Id == later).Select(x => x.Number).SingleAsync(c).ConfigureAwait(false));
+                a.Status = CashCodes.Void;
+                a.VoidReason = why;
+                a.VoidedBy = cash.UserId;
+                a.VoidedAt = DateTime.UtcNow;
+                changes.SetAction(a, "SettlementVoided", stl.Number);
+            }
             stl.Status = CashCodes.Void;
             stl.VoidReason = why;
             stl.VoidedBy = cash.UserId;
@@ -262,13 +304,15 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
     // ============================================================ reads
 
     internal sealed record Row(Settlement S, Guid DriverPid, string DriverName, Guid? BoxPid, string? BoxName, Guid? BankPid, string? BankName, Guid? EntryPid,
-        string? EntryNumber, bool Pending);
+        string? EntryNumber, bool Pending, Guid? CarriedPid = null, string? CarriedNumber = null);
 
     internal IQueryable<Row> Rows(IQueryable<Settlement> q) => q.Select(s => new Row(s, s.Driver.PublicId, s.Driver.FullName,
         s.CashBox != null ? s.CashBox.PublicId : null, s.CashBox != null ? s.CashBox.Name : null,
         s.BankAccount != null ? s.BankAccount.PublicId : null, s.BankAccount != null ? s.BankAccount.Name : null,
         s.JournalEntry != null ? s.JournalEntry.PublicId : null, s.JournalEntry != null ? s.JournalEntry.Number : null,
-        db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == s.Id && p.ResolvedAt == null)));
+        db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == s.Id && p.ResolvedAt == null),
+        db.Set<Advance>().Where(a => a.CarriedFromSettlementId == s.Id).Select(a => (Guid?)a.PublicId).FirstOrDefault(),
+        db.Set<Advance>().Where(a => a.CarriedFromSettlementId == s.Id).Select(a => a.Number).FirstOrDefault()));
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<Settlement, object?>>> SortFields = new Dictionary<string, Expression<Func<Settlement, object?>>>(StringComparer.Ordinal)
     {
@@ -318,7 +362,8 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
     internal SettlementResponse ToResponse(Row x) => new(support.Token<Settlement>(x.S.PublicId), x.S.Number, new Ref(support.Token<Driver>(x.DriverPid), x.DriverName),
         x.S.SettlementDate, x.S.GrossWages, x.S.AdvancesTotal, x.S.DeductionsTotal, x.S.NetPayable, x.S.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName),
         x.S.Reference, x.S.Status, cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.S.VoidReason, DateTime.SpecifyKind(x.S.CreatedAt, DateTimeKind.Utc),
-        Convert.ToBase64String(x.S.RowVersion));
+        Convert.ToBase64String(x.S.RowVersion), x.S.RepaidAmount, x.S.CarriedForward,
+        x.CarriedPid is Guid cp ? new DocRef(support.Token<Advance>(cp), x.CarriedNumber!) : null);
 }
 
 /// <summary>Pending-posting retries for settlements.</summary>

@@ -8,13 +8,15 @@
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        @{ var a = _d!.Advance; var open = a.Status != "Void" && a.Settlement is null; }
+        @{ var a = _d!.Advance; var open = a.Status != "Void" && a.Settlement is null && a.CarriedFrom is null; }
         <CashDocView Title="@a.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.driverAccounts"], NavModel.Href(Company, "driver-accounts")), new Crumb(a.Driver.Name, NavModel.Href(Company, $"driver-accounts/{a.Driver.Id}"))])"
                      IsVoid="@(a.Status == "Void")" VoidReason="@a.VoidReason" PostingPending="a.PostingPending" Details="Details(a)" Amount="a.Amount" AmountLabel="@L["inv.amount"]"
                      AmountInWords="@_d.AmountInWords" Entry="a.JournalEntry" History="_d.History" PrintHref="@NavModel.Href(Company, $"print/advance/{Id}")"
                      CanVoid="@(open && Shell.Can(PermissionKeys.DrvAdvance))" VoidText="@L["drv.advanceVoidText"]" OnVoid="Void">
             <Actions>@if (open && Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"driver-accounts/advances/{Id}/edit")" />}</Actions>
-            <Above>@if (a.Settlement is { } s) {<Banner Tone="Tone.Lock" Text="@L.F("drv.advanceSettled", s.Number ?? "")" />}</Above>
+            <Above>@if (a.Settlement is { } s) {<Banner Tone="Tone.Lock" Text="@L.F("drv.advanceSettled", s.Number ?? "")" />}
+                @* DT-228: the unpaid rest of a settlement — changes only with that settlement. *@
+                else if (a.CarriedFrom is { } cf && a.Status != "Void") {<Banner Tone="Tone.Lock" Text="@L.F("drv.advanceCarried", cf.Number ?? "")" />}</Above>
         </CashDocView>
     </ChildContent>
 </StateView>
@@ -48,6 +50,7 @@
         new(L["cash.account"], a.Account.Name),
         new(L["cash.reference"], a.Reference),
         a.Settlement is { } s ? new(L["drv.settlement"], null, @<a href="@NavModel.Href(Company, $"driver-accounts/settlements/{s.Id}")"><bdi>@s.Number</bdi></a>) : new(L["drv.settlement"], "—"),
+        .. (a.CarriedFrom is { } cf ? new KeyValue[] { new(L["drv.carriedFrom"], null, @<a href="@NavModel.Href(Company, $"driver-accounts/settlements/{cf.Id}")"><bdi>@cf.Number</bdi></a>) } : []),
         new(L["md.notes"], a.Notes),
     ];
 

@@ -85,6 +85,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         await locks.EnsureNotLockedByOthersAsync(EntityType, advance.Id, ct).ConfigureAwait(false);
         CashSupport.EnsureActive(advance, ErrorCodes.AdvanceIsVoid);
         await EnsureUnsettledAsync(advance, ct).ConfigureAwait(false);
+        await EnsureNotCarriedAsync(advance, ct).ConfigureAwait(false);
         CashSupport.RequireRowVersion(r.RowVersion);
         db.ExpectRowVersion(advance, r.RowVersion);
         var x = await ReadAsync(r, advance, ct).ConfigureAwait(false);
@@ -122,6 +123,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         await locks.EnsureNotLockedByOthersAsync(EntityType, advance.Id, ct).ConfigureAwait(false);
         CashSupport.EnsureActive(advance, ErrorCodes.AdvanceIsVoid);
         await EnsureUnsettledAsync(advance, ct).ConfigureAwait(false);
+        await EnsureNotCarriedAsync(advance, ct).ConfigureAwait(false);
         CashSupport.RequireRowVersion(r.RowVersion);
         db.ExpectRowVersion(advance, r.RowVersion);
         await db.InTransactionAsync(async c =>
@@ -145,6 +147,14 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         throw Fail.Rule(ErrorCodes.AdvanceSettled, a.Number, number);
     }
 
+    /// <summary>DT-228: an advance carrying a settlement's unpaid rest changes only with that settlement (void the settlement).</summary>
+    private async Task EnsureNotCarriedAsync(Advance a, CancellationToken ct)
+    {
+        if (a.CarriedFromSettlementId is not long s) return;
+        var number = await db.Set<Settlement>().Where(x => x.Id == s).Select(x => x.Number).SingleAsync(ct).ConfigureAwait(false);
+        throw Fail.Rule(ErrorCodes.AdvanceCarried, a.Number, number);
+    }
+
     private async Task PostAsync(Advance a, long moneyAccountId, CancellationToken ct)
     {
         var entry = await posting.PostOrPendAsync(BuildEntry(a, moneyAccountId), ct).ConfigureAwait(false);
@@ -164,14 +174,15 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
     // ============================================================ reads
 
     internal sealed record Row(Advance A, Guid DriverPid, string DriverName, Guid? SettlementPid, string? SettlementNumber, Guid? BoxPid, string? BoxName, Guid? BankPid,
-        string? BankName, Guid? EntryPid, string? EntryNumber, bool Pending);
+        string? BankName, Guid? EntryPid, string? EntryNumber, bool Pending, Guid? CarriedPid, string? CarriedNumber);
 
     private IQueryable<Row> Rows(IQueryable<Advance> q) => q.Select(a => new Row(a, a.Driver.PublicId, a.Driver.FullName,
         a.Settlement != null ? a.Settlement.PublicId : null, a.Settlement != null ? a.Settlement.Number : null,
         a.CashBox != null ? a.CashBox.PublicId : null, a.CashBox != null ? a.CashBox.Name : null,
         a.BankAccount != null ? a.BankAccount.PublicId : null, a.BankAccount != null ? a.BankAccount.Name : null,
         a.JournalEntry != null ? a.JournalEntry.PublicId : null, a.JournalEntry != null ? a.JournalEntry.Number : null,
-        db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == a.Id && p.ResolvedAt == null)));
+        db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == a.Id && p.ResolvedAt == null),
+        a.CarriedFromSettlement != null ? a.CarriedFromSettlement.PublicId : null, a.CarriedFromSettlement != null ? a.CarriedFromSettlement.Number : null));
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<Advance, object?>>> SortFields = new Dictionary<string, Expression<Func<Advance, object?>>>(StringComparer.Ordinal)
     {
@@ -241,7 +252,8 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
     internal AdvanceResponse ToResponse(Row x) => new(support.Token<Advance>(x.A.PublicId), x.A.Number, new Ref(support.Token<Driver>(x.DriverPid), x.DriverName),
         x.A.AdvanceDate, x.A.Amount, x.A.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.A.Reference, x.A.Notes, x.A.Status,
         x.SettlementPid is Guid s ? new DocRef(support.Token<Settlement>(s), x.SettlementNumber) : null, cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.A.VoidReason,
-        DateTime.SpecifyKind(x.A.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.A.RowVersion));
+        DateTime.SpecifyKind(x.A.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.A.RowVersion),
+        x.CarriedPid is Guid cf ? new DocRef(support.Token<Settlement>(cf), x.CarriedNumber) : null);
 }
 
 /// <summary>Pending-posting retries for advances.</summary>

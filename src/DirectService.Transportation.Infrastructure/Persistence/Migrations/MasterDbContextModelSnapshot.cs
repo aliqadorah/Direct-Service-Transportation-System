@@ -7377,6 +7377,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("BankAccountId")
                         .HasColumnOrder(10);
 
+                    b.Property<long?>("CarriedFromSettlementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CarriedFromSettlementId")
+                        .HasColumnOrder(28);
+
                     b.Property<long?>("CashBoxId")
                         .HasColumnType("bigint")
                         .HasColumnName("CashBoxId")
@@ -7526,6 +7531,9 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "BankAccountId" }, "IX_TRN_Advances_BankAccountId");
 
+                    b.HasIndex(new[] { "CarriedFromSettlementId" }, "IX_TRN_Advances_CarriedFromSettlementId")
+                        .HasFilter("[CarriedFromSettlementId] IS NOT NULL");
+
                     b.HasIndex(new[] { "CashBoxId" }, "IX_TRN_Advances_CashBoxId");
 
                     b.HasIndex(new[] { "DriverId" }, "IX_TRN_Advances_DriverId");
@@ -7547,11 +7555,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_TRN_Advances_Amount", "[Amount] > 0");
 
-                            t.HasCheckConstraint("CK_TRN_Advances_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
+                            t.HasCheckConstraint("CK_TRN_Advances_CarriedFromSettlementId", "([PaymentMethod] = 'Carried' AND [CarriedFromSettlementId] IS NOT NULL) OR ([PaymentMethod] <> 'Carried' AND [CarriedFromSettlementId] IS NULL)");
+
+                            t.HasCheckConstraint("CK_TRN_Advances_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL) OR ([PaymentMethod] = 'Carried' AND [CashBoxId] IS NULL AND [BankAccountId] IS NULL)");
 
                             t.HasCheckConstraint("CK_TRN_Advances_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_TRN_Advances_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
+                            t.HasCheckConstraint("CK_TRN_Advances_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ','Carried')");
 
                             t.HasCheckConstraint("CK_TRN_Advances_Status", "[Status] IN ('Active','Void')");
 
@@ -9891,6 +9901,15 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("JournalEntryId")
                         .HasColumnOrder(14);
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnName("Kind")
+                        .HasColumnOrder(27)
+                        .HasDefaultValueSql("'Payment'", "DF_TRN_PartnerPayments_Kind");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .IsUnicode(true)
@@ -10013,6 +10032,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
 
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_TRN_PartnerPayments_Kind", "[Kind] IN ('Payment','Repayment')");
 
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
 
@@ -10510,6 +10531,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("BankAccountId")
                         .HasColumnOrder(13);
 
+                    b.Property<decimal>("CarriedForward")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("CarriedForward")
+                        .HasColumnOrder(30)
+                        .HasDefaultValueSql("0", "DF_TRN_Settlements_CarriedForward");
+
                     b.Property<long?>("CashBoxId")
                         .HasColumnType("bigint")
                         .HasColumnName("CashBoxId")
@@ -10611,6 +10639,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("Reference")
                         .HasColumnOrder(14);
 
+                    b.Property<decimal>("RepaidAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("RepaidAmount")
+                        .HasColumnOrder(29)
+                        .HasDefaultValueSql("0", "DF_TRN_Settlements_RepaidAmount");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -10697,9 +10732,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_TRN_Settlements_GrossWages", "[GrossWages] >= 0");
 
-                            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal]");
+                            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [RepaidAmount] + [CarriedForward]");
 
                             t.HasCheckConstraint("CK_TRN_Settlements_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
+
+                            t.HasCheckConstraint("CK_TRN_Settlements_RepaidAmount_CarriedForward", "[RepaidAmount] >= 0 AND [CarriedForward] >= 0 AND ([NetPayable] = 0 OR ([RepaidAmount] = 0 AND [CarriedForward] = 0))");
 
                             t.HasCheckConstraint("CK_TRN_Settlements_Status", "[Status] IN ('Active','Void')");
 
@@ -13582,6 +13619,12 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_BankAccounts_BankAccountId");
 
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Settlement", "CarriedFromSettlement")
+                        .WithMany()
+                        .HasForeignKey("CarriedFromSettlementId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_Advances_TRN_Settlements_CarriedFromSettlementId");
+
                     b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
@@ -13646,6 +13689,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_TRN_Advances_Users_VoidedBy");
 
                     b.Navigation("BankAccount");
+
+                    b.Navigation("CarriedFromSettlement");
 
                     b.Navigation("CashBox");
 

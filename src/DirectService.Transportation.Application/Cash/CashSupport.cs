@@ -94,6 +94,19 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
 
     public static PostingLine Debit(long accountId, decimal amount) => new(null, accountId, amount, 0);
 
+    /// <summary>A payment method's name in the reader's language (Carried: a settlement's rest, DT-228).</summary>
+    public static string MethodName(bool en, string method) => method switch
+    {
+        CashCodes.Cash => en ? "Cash" : "نقداً",
+        CashCodes.Bank => en ? "Bank transfer" : "تحويل بنكي",
+        CashCodes.Carried => en ? "Carried forward, no money moved" : "مرحّلة دون حركة نقدية",
+        _ => "CliQ",
+    };
+
+    /// <summary>DT-228: "Repaid by driver: amount (method, reference)" — settlement print, driver statement, reminders.</summary>
+    public static string RepaidText(bool en, decimal amount, string method, string? reference) =>
+        (en ? "Repaid by driver: " : "سدّده السائق: ") + Money.Format(amount) + " (" + MethodName(en, method) + (string.IsNullOrEmpty(reference) ? string.Empty : ", " + reference) + ")";
+
     public static PostingLine Credit(long accountId, decimal amount) => new(null, accountId, 0, amount);
 
     /// <summary>The cash box or bank account shown on a document.</summary>

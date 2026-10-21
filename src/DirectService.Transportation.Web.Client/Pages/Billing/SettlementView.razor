@@ -77,6 +77,9 @@
         new(L["cash.method"], L["pay." + s.PaymentMethod]),
         new(L["cash.account"], s.Account.Name),
         new(L["cash.reference"], s.Reference),
+        // DT-228: the driver's repayment with the settlement and the rest carried to the next one.
+        .. (s.RepaidAmount > 0 ? new KeyValue[] { new(L["drv.repaidBy"], L.F("drv.repaidValue", Fmt.Money(s.RepaidAmount), L["pay." + s.PaymentMethod], s.Reference ?? "—")) } : []),
+        .. (s.CarriedAdvance is { } c ? new KeyValue[] { new(L["drv.carriedAs"], null, @<span><a href="@NavModel.Href(Company, $"driver-accounts/advances/{c.Id}")"><bdi>@c.Number</bdi></a> · <bdi class="num">@Fmt.Money(s.CarriedForward)</bdi></span>) } : []),
     ];
 
     private async Task<string?> Void(string reason)

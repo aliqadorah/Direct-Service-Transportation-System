@@ -19,6 +19,11 @@ public class PartnerPayment : AuditableEntity, ITenantScoped, ICompanyScoped, IC
     public DateOnly PaymentDate { get; set; }
     /// <summary>Amount paid.</summary>
     public decimal Amount { get; set; }
+    /// <summary>
+    /// Revision 6 (DT-228): "Payment" (to the partner, the default) or "Repayment" (from a partner who owes the company: money received,
+    /// Dr cash / bank, Cr partner payable). Same PPY numbering.
+    /// </summary>
+    public string Kind { get; set; } = "Payment";
     /// <summary>How the money was paid or received.</summary>
     public string PaymentMethod { get; set; } = string.Empty;
     /// <summary>Cash box the money came from or went to.</summary>

@@ -1,7 +1,8 @@
 @page "/c/{Company}/partner-accounts/{Id}"
 @*
   SCR-28 partner account (FR-084, FR-088): partner trips with their cost, payments and the balance due; tabs for the trips, payments and the
-  statement of a period (Excel / PDF). New payment (drv.settle) — never above the balance due (FR-085).
+  statement of a period (Excel / PDF). New payment (drv.settle) — never above the balance due (FR-085). DT-228: a partner who owes the company
+  (balance below zero, e.g. a trip voided after payment) — "Record repayment" by cash, bank transfer or CliQ.
 *@
 @using DirectService.Transportation.Contracts.Trips
 @inject Api Api
@@ -16,10 +17,15 @@
         <PageHeader Help="partner-payments" Title="@a.Partner.Name" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
             <Actions>
                 <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />
-                @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Icon="cash" Text="@L["prt.payment"]" Href="@NavModel.Href(Company, $"partner-accounts/{Id}/pay")" Disabled="@(a.BalanceDue <= 0)" />}
+                @if (Shell.Can(PermissionKeys.DrvSettle))
+                {
+                    @if (a.BalanceDue < 0) {<Btn Primary="true" Icon="cash" Text="@L["prt.recordRepayment"]" Href="@NavModel.Href(Company, $"partner-accounts/{Id}/pay?kind=repayment")" />}
+                    else {<Btn Primary="true" Icon="cash" Text="@L["prt.payment"]" Href="@NavModel.Href(Company, $"partner-accounts/{Id}/pay")" Disabled="@(a.BalanceDue <= 0)" />}
+                }
             </Actions>
         </PageHeader>
         <Figures Items="@([new Figure(L["prt.trips"], Fmt.Count(a.Trips)), new Figure(L["prt.cost"], Fmt.Money(a.Cost)), new Figure(L["prt.paid"], Fmt.Money(a.Paid)), new Figure(L["prt.balance"], Fmt.Money(a.BalanceDue))])" />
+        @if (a.BalanceDue < 0) {<Banner Tone="Tone.Warn" Text="@L.F("prt.owesCompany", a.Partner.Name, Fmt.Money(-a.BalanceDue))" />}
         <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@a.Partner.Name" />
         <Box NoPad="true" Class="fill">
             @switch (_tab)
@@ -33,6 +39,7 @@
                             <Columns>
                                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["doc.number"]" Value="p => p.Number" Ltr="true" />
                                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["trip.date"]" Value="p => Fmt.Date(p.PaymentDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="PartnerPaymentResponse" Title="@L["prt.kind"]" Value="@(p => L["prt.kind." + p.Kind])" />
                                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.method"]" Value="@(p => L["pay." + p.PaymentMethod])" />
                                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["cash.reference"]" Value="p => p.Reference" Ltr="true" />
                                 <GridColumn TItem="PartnerPaymentResponse" Title="@L["inv.amount"]" Value="p => Fmt.Money(p.Amount)" Numeric="true" />

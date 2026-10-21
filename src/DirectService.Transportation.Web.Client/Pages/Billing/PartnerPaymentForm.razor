@@ -2,7 +2,8 @@
 @page "/c/{Company}/partner-accounts/payments/new"
 @*
   SCR-28 partner payment (FR-085, FR-086): partner (with its balance due shown), date, amount — refused above the balance due —, method,
-  cash box or bank account, reference, notes; "Save & print" opens the payment voucher.
+  cash box or bank account, reference, notes; "Save & print" opens the payment voucher. DT-228: <c>?kind=repayment</c> records money received
+  from a partner who owes the company (balance below zero) — never above what it owes; the voucher is then a receipt voucher.
 *@
 @inject Api Api
 @inject Loc L
@@ -12,7 +13,7 @@
 @inject MoneyAccounts Accounts
 @inject NavigationManager Nav
 
-<PageHeader Help="partner-payments" Title="@L["prt.newPayment"]" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
+<PageHeader Help="partner-payments" Title="@(Repayment ? L["prt.newRepayment"] : L["prt.newPayment"])" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts"))])">
     <Actions>
         <Btn Icon="print" Text="@L["cash.savePrint"]" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(true)" />
         <Btn Primary="true" Text="@L["ui.save"]" Shortcut="Ctrl S" Busy="_saving" Disabled="!CanSave" OnClick="() => Save(false)" />
@@ -22,7 +23,12 @@
 <EditForm EditContext="_ctx" OnValidSubmit="() => Save(false)" class="box pad stack" style="max-width:820px">
     <ProblemValidator @ref="_problems" />
     <ErrorSummary @ref="_summary" Extra="_extra" />
-    @if (_account is { } a) {<Banner Tone="Tone.Info" Text="@L.F("prt.balanceDue", a.Partner.Name, Fmt.Money(a.BalanceDue))" />}
+    @if (_account is { } a)
+    {
+        @if (a.BalanceDue < 0) {<Banner Tone="Tone.Warn" Text="@L.F("prt.owesCompany", a.Partner.Name, Fmt.Money(-a.BalanceDue))" />}
+        else {<Banner Tone="Tone.Info" Text="@L.F("prt.balanceDue", a.Partner.Name, Fmt.Money(a.BalanceDue))" />}
+    }
+    @if (Repayment) {<p class="help" style="margin:0">@L["prt.repayHelp"]</p>}
     <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
         <ComboField TValue="string?" @bind-Value="_m.PartnerId" Options="Lookups.Partners" Label="@L["md.partner"]" Required="true" Span="2" OnSelected="_ => LoadAccount()" />
         <DateField @bind-Value="_m.PaymentDate" Label="@L["trip.date"]" Required="true" />
@@ -43,6 +49,9 @@
 
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string? PartnerId { get; set; }
+    [SupplyParameterFromQuery(Name = "kind")] public string? Kind { get; set; }
+
+    private bool Repayment => string.Equals(Kind, "repayment", StringComparison.OrdinalIgnoreCase);
 
     private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.DrvSettle);
 
@@ -53,6 +62,7 @@
         try { await Accounts.EnsureAsync(); } catch (ApiException) { }
         _m.PaymentDate = Accounts.Today ?? DateOnly.FromDateTime(DateTime.Today);
         if (PartnerId is not null) { _m.PartnerId = PartnerId; await LoadAccount(); }
+        if (Repayment && _account is { BalanceDue: < 0 } owed) _m.Amount ??= -owed.BalanceDue;   // the whole debt unless changed
     }
 
     private async Task LoadAccount()
@@ -71,9 +81,9 @@
         try
         {
             var r = await Api.PostAsync<PartnerPaymentDetails>(Api.C("partner-payments"), new PartnerPaymentRequest(_m.PartnerId, _m.PaymentDate, _m.Amount, _m.PaymentMethod,
-                _m.CashBox(), _m.Bank(), _m.Ref(), string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId));
+                _m.CashBox(), _m.Bank(), _m.Ref(), string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId, Repayment ? CashCodes.Repayment : CashCodes.Payment));
             var p = r.Payment;
-            Toasts.Success(L.F("prt.saved", p.Number, Fmt.Money(p.Amount)), L["ui.print"], NavModel.Href(Company, $"print/partner-payment/{p.Id}"));
+            Toasts.Success(L.F(Repayment ? "prt.savedRepayment" : "prt.saved", p.Number, Fmt.Money(p.Amount)), L["ui.print"], NavModel.Href(Company, $"print/partner-payment/{p.Id}"));
             Nav.NavigateTo(NavModel.Href(Company, print ? $"print/partner-payment/{p.Id}" : $"partner-accounts/payments/{p.Id}"));
         }
         catch (ApiException e)

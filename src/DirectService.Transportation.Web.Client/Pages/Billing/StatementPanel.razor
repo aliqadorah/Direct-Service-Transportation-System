@@ -89,8 +89,8 @@
         {
             "Trip" => $"trips/{l.Document.Id}",
             "Advance" => $"driver-accounts/advances/{l.Document.Id}",
-            "Settlement" or "Deduction" => $"driver-accounts/settlements/{l.Document.Id}",
-            "Payment" => $"partner-accounts/payments/{l.Document.Id}",
+            "Settlement" or "Deduction" or "Repaid" => $"driver-accounts/settlements/{l.Document.Id}",
+            "Payment" or "Repayment" => $"partner-accounts/payments/{l.Document.Id}",
             _ => null,
         };
         if (route is not null) Nav.NavigateTo(NavModel.Href(c.Id, route));

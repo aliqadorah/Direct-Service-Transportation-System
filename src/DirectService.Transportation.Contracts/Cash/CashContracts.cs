@@ -17,6 +17,11 @@ public static class CashCodes
     public const string Other = "Other";
     public const string CashBox = "CashBox";
     public const string BankAccount = "BankAccount";
+    /// <summary>Revision 6 (DT-228): method of an advance that carries a settlement's unpaid rest (no money moved).</summary>
+    public const string Carried = "Carried";
+    /// <summary>Revision 6 (DT-228): kinds of a partner payment — to the partner, or repaid by a partner who owes the company.</summary>
+    public const string Payment = "Payment";
+    public const string Repayment = "Repayment";
 }
 
 /// <summary>The cash box or bank account of a document.</summary>
@@ -68,7 +73,8 @@ public sealed record AdvanceRequest(
 
 public sealed record AdvanceResponse(
     string Id, string Number, Ref Driver, DateOnly AdvanceDate, decimal Amount, string PaymentMethod, MoneyAccountRef Account, string? Reference, string? Notes,
-    string Status, DocRef? Settlement, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion);
+    string Status, DocRef? Settlement, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion,
+    DocRef? CarriedFrom = null);
 
 public sealed record AdvanceDetails(AdvanceResponse Advance, string AmountInWords, IReadOnlyList<HistoryEntry> History);
 
@@ -98,18 +104,20 @@ public sealed record SettlementDeductionRequest(string? Type, decimal? Amount, s
 
 /// <summary>
 /// A settlement (FR-077 … FR-080): driver, date, the trips and advances included (omitted = every open item up to the date), deductions,
-/// method and cash box / bank for the net.
+/// method and cash box / bank for the net. Revision 6 (DT-228): when advances and deductions exceed the wages, <paramref name="RepaidAmount"/>
+/// (&gt; 0, at most the shortfall) is what the driver pays back now with that method and cash box / bank (reference required for bank
+/// transfer and CliQ); the rest is carried to the next settlement as a new open advance.
 /// </summary>
 public sealed record SettlementRequest(
     string? DriverId, DateOnly? SettlementDate, IReadOnlyList<string>? TripIds, IReadOnlyList<string>? AdvanceIds, IReadOnlyList<SettlementDeductionRequest>? Deductions,
-    string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? ClientId);
+    string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? ClientId, decimal? RepaidAmount = null);
 
 public sealed record SettlementDeductionResponse(string Id, string Type, decimal Amount, string? Note);
 
 public sealed record SettlementResponse(
     string Id, string Number, Ref Driver, DateOnly SettlementDate, decimal GrossWages, decimal AdvancesTotal, decimal DeductionsTotal, decimal NetPayable,
     string PaymentMethod, MoneyAccountRef Account, string? Reference, string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason,
-    DateTime CreatedAt, string RowVersion);
+    DateTime CreatedAt, string RowVersion, decimal RepaidAmount = 0, decimal CarriedForward = 0, DocRef? CarriedAdvance = null);
 
 public sealed record SettlementDetails(
     SettlementResponse Settlement, IReadOnlyList<SettlementTripItem> Trips, IReadOnlyList<SettlementAdvanceItem> Advances,
@@ -121,14 +129,17 @@ public sealed record SettlementPage(PagedResult<SettlementResponse> Page, CashLi
 
 // ------------------------------------------------------------------ partner payments (7.4.4)
 
-/// <summary>A partner payment (FR-085): never above the partner's current balance due.</summary>
+/// <summary>
+/// A partner payment (FR-085): never above the partner's current balance due. Revision 6 (DT-228): <paramref name="Kind"/> "Repayment" records
+/// money received from a partner who owes the company (balance below zero), never above what the partner owes.
+/// </summary>
 public sealed record PartnerPaymentRequest(
     string? PartnerId, DateOnly? PaymentDate, decimal? Amount, string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? Notes,
-    string? ClientId);
+    string? ClientId, string? Kind = null);
 
 public sealed record PartnerPaymentResponse(
     string Id, string Number, Ref Partner, DateOnly PaymentDate, decimal Amount, string PaymentMethod, MoneyAccountRef Account, string? Reference, string? Notes,
-    string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion);
+    string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion, string Kind = CashCodes.Payment);
 
 public sealed record PartnerPaymentDetails(PartnerPaymentResponse Payment, string AmountInWords, IReadOnlyList<HistoryEntry> History);
 

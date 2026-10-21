@@ -275,9 +275,7 @@ public sealed class CashTests(ApiFactory f)
         Assert.Equal(2, statement.Lines.Count);
         Assert.Equal(2.750m, statement.Lines.First(l => l.Kind == "Trip").Rate);
         Assert.Equal(0m, statement.Closing);
-        // The paid trip cannot be voided now: the partner would be overpaid (review M2).
-        var current = (await ReadAsync<TripDetails>(await o.Client.GetAsync(U(o, $"/trips/{trip.Id}")))).Trip;
-        Assert.Equal("trip.partnerOverpaid", await (await o.Client.PostAsJsonAsync(U(o, $"/trips/{trip.Id}/void"), new TripVoidRequest("x", current.RowVersion))).ProblemCodeAsync());
+        // DT-228: voiding the paid trip is no longer refused (the partner would then owe the company and repay) — SettlementRepaymentTests.
         var voucher = await (await o.Client.GetAsync(U(o, $"/partner-payments/{paid.Payment.Id}/print?format=html"))).Content.ReadAsStringAsync();
         Assert.Contains("CLIQ-1", voucher, StringComparison.Ordinal);
         await (await o.Client.PostAsJsonAsync(U(o, $"/partner-payments/{paid.Payment.Id}/void"), new CashVoidRequest("Duplicate", paid.Payment.RowVersion))).EnsureOkAsync();

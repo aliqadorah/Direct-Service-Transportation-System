@@ -39,7 +39,7 @@ public sealed record MonthAmounts(string Month, decimal Revenue, decimal Expense
 /// A reminder computed from the data (never entered by hand): its key (the screen words it), severity (error / warning / info), how many,
 /// an amount where it means something, and the screen it opens (company-relative route with filters).
 /// </summary>
-public sealed record AccountingReminder(string Key, string Severity, int Count, decimal? Amount, string Route);
+public sealed record AccountingReminder(string Key, string Severity, int Count, decimal? Amount, string Route, IReadOnlyList<string>? Items = null);
 
 public static class AccountingReminderKeys
 {
@@ -52,6 +52,12 @@ public static class AccountingReminderKeys
     public const string BudgetOver = "budget-over";
     public const string UnallocatedReceipts = "unallocated-receipts";
     public const string DeductionsUnmapped = "deductions-unmapped";
+    /// <summary>
+    /// DT-228: driver balances carried to the next settlement after a repayment with the settlement; each item names the carried advance,
+    /// the driver and "Repaid by driver: amount (method, reference)". Shown to driver-account readers (not in <see cref="All"/>, which lists
+    /// the accounting reminders; covered by the cash tests).
+    /// </summary>
+    public const string CarriedAdvances = "carried-advances";
 
     public static readonly IReadOnlyList<string> All =
         [DraftJournals, PendingPostings, OpenMonths, OverdueInvoices, BillsDueSoon, RejectedEInvoices, BudgetOver, UnallocatedReceipts, DeductionsUnmapped];

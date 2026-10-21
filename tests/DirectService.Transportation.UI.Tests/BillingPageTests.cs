@@ -123,16 +123,58 @@ public sealed class BillingPageTests : PageTestBase
         Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "invoices/calculate" && r.Body!.Contains("\"invoiceType\":\"Manual\"", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void Settlement_blocks_a_negative_net()
+    /// <summary>
+    /// Owner testing 21 Oct 2026, item 1 (DT-228): a negative net offers "Repayment from the driver" — the whole shortfall by default, a part
+    /// shows what is carried to the next settlement, more than the shortfall is refused on screen; method CliQ with its reference is sent.
+    /// </summary>
+    [Theory]
+    [InlineData("ar")]
+    [InlineData("en")]
+    public void Settlement_with_a_negative_net_offers_the_drivers_repayment(string language)
     {
+        L.SetLanguage(language);
         Respond("settlements/preview", new SettlementPreview(new Ref("d1", "أحمد صالح"), "10-11111", Day,
             [new SettlementTripItem("t1", "TRP-1", Day, "غور الصافي ← العقبة", "بوتاس", 30m, 12.333m, 370m, false, null)],
             [new SettlementAdvanceItem("a1", "ADV-00411", Day, 400m)], [], 370m, 400m, -30m));
+        Respond("settlements", new SettlementDetails(new SettlementResponse("s1", "STL-00001", new Ref("d1", "أحمد صالح"), Day, 370m, 400m, 0m, 0m, "CliQ",
+            new MoneyAccountRef("BankAccount", "b1", "البنك العربي"), "CLIQ-55", "Active", null, false, null, DateTime.UtcNow, "RV", 10m, 20m, new DocRef("a2", "ADV-00412")),
+            [], [], [], "words", []));
         var cut = Render<SettlementForm>(p => p.Add(x => x.Company, Company).Add(x => x.DriverId, "d1"));
-        cut.WaitForAssertion(() => Assert.Contains(L.F("drv.netNegative", Fmt.Money(-30m)), Text(cut)));
-        var confirm = cut.FindAll("button").Single(b => b.TextContent.Contains(L["drv.confirmSettlement"], StringComparison.Ordinal));
-        Assert.True(confirm.HasAttribute("disabled"));
+        cut.WaitForAssertion(() => Assert.Contains(L.F("drv.netNegativeRepay", Fmt.Money(30m)), Text(cut)));
+        Assert.Contains(L["drv.repayTitle"], Text(cut));
+        AngleSharp.Dom.IElement Field(string label) => cut.Find("#" + cut.FindAll("label").First(l => l.TextContent.Contains(label, StringComparison.Ordinal)).GetAttribute("for"));
+        AngleSharp.Dom.IElement Confirm() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["drv.confirmSettlement"], StringComparison.Ordinal));
+        Assert.Equal("30.000", Field(L["drv.repayAmount"]).GetAttribute("value"));   // the whole shortfall by default
+        Assert.False(Confirm().HasAttribute("disabled"));
+        Assert.DoesNotContain(L["drv.repayCarried"], Text(cut));
+
+        Field(L["drv.repayAmount"]).Change("40");                                        // above the shortfall
+        cut.WaitForAssertion(() => Assert.Contains(L.F("drv.repayRange", Fmt.Money(30m)), Text(cut)));
+        Assert.True(Confirm().HasAttribute("disabled"));
+
+        Field(L["drv.repayAmount"]).Change("10");                                        // part: 20 carried
+        cut.WaitForAssertion(() => Assert.Contains(L["drv.repayCarried"], Text(cut)));
+        Assert.Contains(Fmt.Money(20m), Text(cut));
+        var method = Field(L["cash.method"]);
+        method.Change(method.QuerySelectorAll("option").First(o => o.TextContent.Trim() == L["pay.CliQ"]).GetAttribute("value"));
+        cut.WaitForAssertion(() => Assert.Contains(L["cash.bankAccount"], Text(cut)));
+        Field(L["cash.reference"]).Change("CLIQ-55");
+        Confirm().Click();
+        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "settlements"));
+        var body = Requests.Last(r => r.Method == "POST" && r.Path == "settlements").Body!;
+        Assert.Contains("\"repaidAmount\":10", body, StringComparison.Ordinal);
+        Assert.Contains("\"paymentMethod\":\"CliQ\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"reference\":\"CLIQ-55\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settlement_with_a_positive_net_shows_no_repayment()
+    {
+        Respond("settlements/preview", new SettlementPreview(new Ref("d1", "أحمد صالح"), "10-11111", Day,
+            [new SettlementTripItem("t1", "TRP-1", Day, "غور الصافي ← العقبة", "بوتاس", 30m, 12.333m, 370m, false, null)], [], [], 370m, 0m, 370m));
+        var cut = Render<SettlementForm>(p => p.Add(x => x.Company, Company).Add(x => x.DriverId, "d1"));
+        cut.WaitForAssertion(() => Assert.Contains(L["drv.netHelp"], Text(cut)));
+        Assert.DoesNotContain(L["drv.repayTitle"], Text(cut));
     }
 
     [Fact]

@@ -33,6 +33,11 @@ public class Advance : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocu
     public string Status { get; set; } = "Active";
     /// <summary>Settlement that deducted the advance.</summary>
     public long? SettlementId { get; set; }
+    /// <summary>
+    /// Revision 6 (DT-228): the settlement whose unpaid rest this advance carries (payment method "Carried": no money moved, no journal
+    /// entry of its own — the settlement's entry keeps it on driver advances). Voided with that settlement.
+    /// </summary>
+    public long? CarriedFromSettlementId { get; set; }
     /// <summary>The journal entry this document posted. After an edit (reverse + re-post) it points to the current active entry.</summary>
     public long? JournalEntryId { get; set; }
     /// <summary>Why the record was voided.</summary>
@@ -45,6 +50,7 @@ public class Advance : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocu
     public CashBox? CashBox { get; set; }
     public BankAccount? BankAccount { get; set; }
     public Settlement? Settlement { get; set; }
+    public Settlement? CarriedFromSettlement { get; set; }
     public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
 }

@@ -41,6 +41,7 @@
     [
         new(L["md.partner"], null, @<a href="@NavModel.Href(Company, $"partner-accounts/{p.Partner.Id}")">@p.Partner.Name</a>),
         new(L["trip.date"], Fmt.Date(p.PaymentDate, Shell.DateFormat)),
+        new(L["prt.kind"], L["prt.kind." + p.Kind]),   // DT-228: payment to the partner or repayment from it
         new(L["cash.method"], L["pay." + p.PaymentMethod]),
         new(L["cash.account"], p.Account.Name),
         new(L["cash.reference"], p.Reference),

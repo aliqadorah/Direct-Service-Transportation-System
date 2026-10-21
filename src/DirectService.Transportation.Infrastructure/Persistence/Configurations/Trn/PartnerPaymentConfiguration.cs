@@ -15,6 +15,7 @@ internal sealed class PartnerPaymentConfiguration : IEntityTypeConfiguration<Par
         {
             t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
+            t.HasCheckConstraint("CK_TRN_PartnerPayments_Kind", "[Kind] IN ('Payment','Repayment')");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_Status", "[Status] IN ('Active','Void')");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_VoidReason_VoidedBy_VoidedAt", "[Status] <> 'Void' OR ([VoidReason] IS NOT NULL AND [VoidedBy] IS NOT NULL AND [VoidedAt] IS NOT NULL)");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
@@ -69,6 +70,15 @@ internal sealed class PartnerPaymentConfiguration : IEntityTypeConfiguration<Par
             .HasColumnOrder(7)
             .HasPrecision(18, 3)
             .IsRequired(true);
+        builder.Property(e => e.Kind)
+            .HasColumnName("Kind")
+            .HasColumnType("varchar(10)")
+            .HasColumnOrder(27)
+            .IsUnicode(false)
+            .HasMaxLength(10)
+            .IsRequired(true)
+            .HasDefaultValueSql("'Payment'")
+            .ValueGeneratedNever();
         builder.Property(e => e.PaymentMethod)
             .HasColumnName("PaymentMethod")
             .HasColumnType("varchar(10)")

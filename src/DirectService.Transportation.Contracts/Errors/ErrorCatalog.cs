@@ -201,7 +201,13 @@ public static class ErrorCatalog
         [ErrorCodes.AdvanceIsVoid] = ("السلفة {0} ملغاة.", "Advance {0} is void."),
         [ErrorCodes.AdvanceSettled] = ("السلفة {0} مسوّاة في التسوية {1}؛ ألغِ التسوية أولاً.", "Advance {0} is settled in settlement {1}; void the settlement first."),
         [ErrorCodes.SettlementIsVoid] = ("التسوية {0} ملغاة.", "Settlement {0} is void."),
-        [ErrorCodes.SettlementNetNegative] = ("صافي التسوية سالب ({0}): قلّل السلف أو الخصومات المختارة.", "The settlement net is negative ({0}): reduce the selected advances or deductions."),
+        [ErrorCodes.SettlementNetNegative] = ("صافي التسوية سالب ({0}): سجّل ما يسدّده السائق الآن، أو قلّل السلف أو الخصومات المختارة.", "The settlement net is negative ({0}): record what the driver repays now, or reduce the selected advances or deductions."),
+        // Revision 6 (DT-228): repayment by the driver when the net is negative; the unpaid rest carried as an open advance.
+        [ErrorCodes.SettlementRepaymentRange] = ("مبلغ السداد يجب أن يكون أكبر من صفر وألا يزيد على {0}.", "The repayment must be more than 0 and at most {0}."),
+        [ErrorCodes.SettlementRepaymentNotNeeded] = ("صافي التسوية غير سالب؛ لا يوجد ما يسدّده السائق.", "The settlement net is not negative; the driver has nothing to repay."),
+        [ErrorCodes.SettlementCarriedSettled] = ("السلفة {0} المرحّلة من هذه التسوية مسوّاة في التسوية {1}؛ ألغِ تلك التسوية أولاً.", "Advance {0} carried from this settlement is settled in settlement {1}; void that settlement first."),
+        [ErrorCodes.AdvanceCarried] = ("السلفة {0} تحمل الباقي من التسوية {1}؛ لا تتغير إلا مع تلك التسوية.", "Advance {0} carries the rest of settlement {1}; it changes only with that settlement."),
+        [ErrorCodes.PartnerRepaymentExceedsOwed] = ("المبلغ {0} أكبر مما على الشريك للشركة ({1}).", "The amount {0} is above what the partner owes the company ({1})."),
         [ErrorCodes.SettlementEmpty] = ("لا توجد رحلات أو سلف مفتوحة مختارة للتسوية.", "No open trips or advances are selected for the settlement."),
         [ErrorCodes.SettlementItemUnavailable] = ("البند {0} ليس بنداً مفتوحاً لهذا السائق حتى تاريخ التسوية.", "Item {0} is not an open item of this driver up to the settlement date."),
         [ErrorCodes.PartnerPaymentIsVoid] = ("دفعة الشريك {0} ملغاة.", "Partner payment {0} is void."),
@@ -479,6 +485,11 @@ public static class ErrorCodes
     public const string SettlementNetNegative = "settlement.netNegative";
     public const string SettlementEmpty = "settlement.empty";
     public const string SettlementItemUnavailable = "settlement.itemUnavailable";
+    public const string SettlementRepaymentRange = "settlement.repaymentRange";
+    public const string SettlementRepaymentNotNeeded = "settlement.repaymentNotNeeded";
+    public const string SettlementCarriedSettled = "settlement.carriedSettled";
+    public const string AdvanceCarried = "advance.carried";
+    public const string PartnerRepaymentExceedsOwed = "partnerPayment.repaymentExceedsOwed";
     public const string PartnerPaymentIsVoid = "partnerPayment.void";
     public const string PartnerPaymentExceedsBalance = "partnerPayment.exceedsBalance";
     public const string TripPartnerOverpaid = "trip.partnerOverpaid";
