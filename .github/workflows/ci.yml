@@ -4,7 +4,8 @@
 # Microsoft.Testing.Platform with the coverage extension), so each `dotnet test --project …` below takes the same arguments (DT-225).
 # Not in this workflow: the end-to-end and visual checks (tests/e2e, Playwright) — they start the host with the Windows tools of the
 # development PC (installed Edge, Windows sqlcmd and taskkill) and take 30+ minutes; they are run on that PC before a release
-# (docs/step9/Setup_and_Run.md §8).
+# (docs/step9/Setup_and_Run.md §8). Nor the NFR-01 500,000-trip timing check: an explicit test that `dotnet test` leaves out, run by hand
+# before a release with tools/perf/run-performance-check.* (DT-227).
 name: ci
 
 on:

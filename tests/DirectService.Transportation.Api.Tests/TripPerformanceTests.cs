@@ -14,6 +14,9 @@ namespace DirectService.Transportation.Api.Tests;
 /// <summary>
 /// NFR-01 / NFR-02 smoke test (build plan B5): one company with 500,000 trips; the Created Trips list (first page, filters and totals)
 /// answers in under one second. The trips are bulk-inserted with one INSERT … SELECT (they carry no journal entries).
+/// A manual performance check, not part of the normal or CI test run (DT-227): the test is explicit, so <c>dotnet test</c> leaves it out
+/// and only <c>--explicit only</c> runs it — through <c>tools/perf/run-performance-check.ps1</c> (or <c>.sh</c>) on its own database,
+/// before a release (docs/step9/Setup_and_Run.md §8). The limit stays 1 second.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class TripPerformanceTests(ApiFactory f, ITestOutputHelper output)
@@ -22,7 +25,7 @@ public sealed class TripPerformanceTests(ApiFactory f, ITestOutputHelper output)
 
     private static string U(SignedInUser o, string path) => $"/api/v1/companies/{o.CompanyId}{path}";
 
-    [Fact]
+    [Fact(Explicit = true)]
     [Trait("Category", "Performance")]
     public async Task Created_trips_list_with_500000_trips_answers_under_one_second_NFR01()
     {
