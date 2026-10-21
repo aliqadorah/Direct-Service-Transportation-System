@@ -34,6 +34,9 @@ public class AppException : Exception
     public string? Field { get; }
     public object?[] Args { get; } = [];
 
+    /// <summary>More values for the client, written as problem fields (e.g. DT-230: the amount and payment behind <c>trip.partnerPaid</c>).</summary>
+    public IReadOnlyDictionary<string, object?>? Extra { get; init; }
+
     /// <summary>Field-level errors for a 400 validation failure.</summary>
     public IReadOnlyList<FieldError> Errors { get; init; } = [];
 }

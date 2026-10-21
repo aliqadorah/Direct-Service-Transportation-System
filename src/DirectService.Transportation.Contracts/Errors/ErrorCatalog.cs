@@ -212,6 +212,12 @@ public static class ErrorCatalog
         [ErrorCodes.SettlementRepaymentNotNeeded] = ("صافي التسوية غير سالب؛ لا يوجد ما يسدّده السائق.", "The settlement net is not negative; the driver has nothing to repay."),
         [ErrorCodes.SettlementCarriedSettled] = ("السلفة {0} المرحّلة من هذه التسوية مسوّاة في التسوية {1}؛ ألغِ تلك التسوية أولاً.", "Advance {0} carried from this settlement is settled in settlement {1}; void that settlement first."),
         [ErrorCodes.AdvanceCarried] = ("السلفة {0} تحمل الباقي من التسوية {1}؛ لا تتغير إلا مع تلك التسوية.", "Advance {0} carries the rest of settlement {1}; it changes only with that settlement."),
+        // DT-230: a partner trip already paid; daily limits of administrator-started email changes.
+        [ErrorCodes.TripPartnerPaid] = ("هذه الرحلة دُفعت للشريك؛ سيصبح على الشريك للشركة {0}. اختر ما يُفعل بالمبلغ المدفوع واكتب السبب.", "This trip was already paid to the partner; the partner will owe the company {0}. Choose what to do with the amount paid and give a reason."),
+        [ErrorCodes.TripPartnerPaidPermission] = ("هذه الرحلة دُفعت للشريك؛ إلغاؤها أو تخفيض تكلفتها يحتاج صلاحية دفعات الشركاء.", "This trip was already paid to the partner; voiding it or lowering its cost needs the partner-payment permission."),
+        [ErrorCodes.PartnerPaymentTripMismatch] = ("الرحلة المحددة ليست رحلة لهذا الشريك.", "The trip given is not a trip of this partner."),
+        [ErrorCodes.EmailChangeLimitAdmin] = ("وصلت إلى الحد اليومي لتغييرات البريد التي تبدؤها ({0} في 24 ساعة). حاول لاحقاً.", "You reached the daily limit of email changes you can start ({0} in 24 hours). Try again later."),
+        [ErrorCodes.EmailChangeLimitUser] = ("وصل هذا المستخدم إلى الحد اليومي لتغييرات البريد ({0} في 24 ساعة). حاول لاحقاً.", "This user reached the daily limit of email changes ({0} in 24 hours). Try again later."),
         [ErrorCodes.PartnerRepaymentExceedsOwed] = ("المبلغ {0} أكبر مما على الشريك للشركة ({1}).", "The amount {0} is above what the partner owes the company ({1})."),
         [ErrorCodes.SettlementEmpty] = ("لا توجد رحلات أو سلف مفتوحة مختارة للتسوية.", "No open trips or advances are selected for the settlement."),
         [ErrorCodes.SettlementItemUnavailable] = ("البند {0} ليس بنداً مفتوحاً لهذا السائق حتى تاريخ التسوية.", "Item {0} is not an open item of this driver up to the settlement date."),
@@ -499,6 +505,11 @@ public static class ErrorCodes
     public const string SettlementCarriedSettled = "settlement.carriedSettled";
     public const string AdvanceCarried = "advance.carried";
     public const string PartnerRepaymentExceedsOwed = "partnerPayment.repaymentExceedsOwed";
+    public const string TripPartnerPaid = "trip.partnerPaid";
+    public const string TripPartnerPaidPermission = "trip.partnerPaidPermission";
+    public const string PartnerPaymentTripMismatch = "partnerPayment.tripMismatch";
+    public const string EmailChangeLimitAdmin = "user.emailChangeLimitAdmin";
+    public const string EmailChangeLimitUser = "user.emailChangeLimitUser";
     public const string PartnerPaymentIsVoid = "partnerPayment.void";
     public const string PartnerPaymentExceedsBalance = "partnerPayment.exceedsBalance";
     public const string TripPartnerOverpaid = "trip.partnerOverpaid";

@@ -178,7 +178,7 @@ public sealed class SettlementRepaymentTests(ApiFactory f)
 
         // The paid trip is voided: no longer refused — the partner now owes the company its cost.
         var current = (await ReadAsync<TripDetails>(await o.Client.GetAsync(U(o, $"/trips/{trip.Id}")))).Trip;
-        await (await o.Client.PostAsJsonAsync(U(o, $"/trips/{trip.Id}/void"), new TripVoidRequest("Cancelled load", current.RowVersion))).EnsureOkAsync();
+        await (await o.Client.PostAsJsonAsync(U(o, $"/trips/{trip.Id}/void"), new TripVoidRequest("Cancelled load", current.RowVersion, CashCodes.Return))).EnsureOkAsync();
         Assert.Equal(-cost, (await ReadAsync<PartnerAccountResponse>(await o.Client.GetAsync(U(o, $"/partners/{w.Partner.Id}/account")))).BalanceDue);
         Assert.Equal("partnerPayment.exceedsBalance", await (await o.Client.PostAsJsonAsync(U(o, "/partner-payments"),
             new PartnerPaymentRequest(w.Partner.Id, Today, 1m, "Cash", w.CashBox, null, null, null, null))).ProblemCodeAsync());

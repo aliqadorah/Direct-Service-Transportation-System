@@ -688,3 +688,58 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Owner decision 21 Oct 2026 on DT-228 (DT-230): a partner trip already paid — the void asks what to do with the amount (warning, three
+ * choices); then, after a void with "Deduct" and two newer trips, the next payment sets it off: the partner statement shows the trip voided
+ * after payment and the deduction on that payment.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — paid partner trip (${lang})`, async ({ page }) => {
+    test.skip(!wanted("partner-paid#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const run = new VisualRun(lang, "partner-paid");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "partner-paid-enrol", false));
+    const company = companyOf(page);
+    const w = await buildWorld(page, company);
+    const partner = await api<{ id: string }>(page, "POST", c(company, "partners"), { name: lang === "ar" ? "النور للنقل" : "Al-Noor Transport" });
+    const rented = await api<{ id: string }>(page, "POST", c(company, "ownership-types"), { name: "Rented", fleetClass: "External" });
+    const year = Number(today().slice(0, 4)) + 1;
+    const driver = await api<{ id: string }>(page, "POST", c(company, "drivers"), {
+      fullName: lang === "ar" ? "سامي العبادي" : "Sami Abbadi", nationalId: String(9_000_000_000 + Math.floor(Math.random() * 999_999_999)), phone1: "0791234567",
+      licenceNo: "L-2", licenceType: "C", licenceExpiry: `${year}-01-01`, paymentMethod: "Cash", plateNumber: `10-${Math.floor(10000 + Math.random() * 89999)}`,
+      truckType: "Volvo", capacityTons: 32, ownershipTypeId: rented.id, partnerId: partner.id, registrationExpiry: `${year}-01-01`, insuranceExpiry: `${year}-01-01`,
+      inspectionExpiry: `${year}-01-01` });
+    await api(page, "POST", c(company, "tariffs"), { partyType: "Partner", partyId: partner.id, price: 2.75, validFrom: `${today().slice(0, 7)}-01` });
+    const trip = async (receiptNo: string) => (await api<{ trip: { id: string; partnerCost: number } }>(page, "POST", c(company, "trips"), {
+      receiptNo, tripDate: today(), driverId: driver.id, customerId: w.customer, loadingSiteId: w.loading, unloadingSiteId: w.unloading, materialId: w.material,
+      partnerId: partner.id, loadedWeight: 30, unloadedWeight: 30 })).trip;
+    const accounts = await api<{ bankAccounts: { id: string }[]; cashBoxes: { id: string }[] }>(page, "GET", c(company, "accounting/money-accounts/options"));
+    const cash = accounts.cashBoxes[0].id;
+    const paid = await trip(`PP-1-${company.slice(0, 4)}`);
+    await api(page, "POST", c(company, "partner-payments"), { partnerId: partner.id, paymentDate: today(), amount: paid.partnerCost, paymentMethod: "Cash", cashBoxId: cash });
+
+    expect(await open(page, `/c/${company}/trips/${paid.id}`)).toBe(true);
+    await button(page.locator("main"), t("trip.void")).click();
+    await page.locator(".dialog textarea").fill(lang === "ar" ? "ألغى العميل الحمولة" : "The customer cancelled the load");
+    await button(page.locator(".dialog"), t("trip.void")).click();
+    await expect(page.locator(".dialog").getByText(t("trip.paidChoose"))).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "partner-paid#dialog");
+    await page.locator(".dialog input[type=radio][value=NotPaid]").check();
+    await run.check(page, "partner-paid#not-paid");
+
+    // Deduct, two newer trips, the next payment sets it off.
+    const current = await api<{ trip: { rowVersion: string } }>(page, "GET", c(company, `trips/${paid.id}`));
+    await api(page, "POST", c(company, `trips/${paid.id}/void`), { reason: "Load cancelled", rowVersion: current.trip.rowVersion, partnerPaidHandling: "Deduct" });
+    const t2 = await trip(`PP-2-${company.slice(0, 4)}`);
+    const t3 = await trip(`PP-3-${company.slice(0, 4)}`);
+    await api(page, "POST", c(company, "partner-payments"), { partnerId: partner.id, paymentDate: today(), amount: t2.partnerCost + t3.partnerCost - paid.partnerCost,
+      paymentMethod: "Cash", cashBoxId: cash });
+    expect(await open(page, `/c/${company}/partner-accounts/${partner.id}`)).toBe(true);
+    await page.getByRole("tab", { name: t("md.statement") }).click();
+    await expect(page.locator("main table").getByText(`PP-1-${company.slice(0, 4)}`).first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "partner-paid#statement");
+    run.assertClean();
+  });
+}

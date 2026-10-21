@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// payments cannot together exceed it); void with reason (drv.settle): reversal, number kept.
 /// </summary>
 public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter, AuditTrail audit)
 {
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";
@@ -41,6 +41,23 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         var cost = await tripsQ.SumAsync(t => (decimal?)t.PartnerCost, ct).ConfigureAwait(false) ?? 0;
         var paid = await payQ.SumAsync(p => (decimal?)(p.Kind == CashCodes.Repayment ? -p.Amount : p.Amount), ct).ConfigureAwait(false) ?? 0;
         return (cost, paid);
+    }
+
+    /// <summary>
+    /// DT-230: of what the partner owes now, the part chosen to be deducted from the next payment(s): amounts paid for trips voided or made
+    /// cheaper with "Deduct", less what payments already set off; never more than the partner owes.
+    /// </summary>
+    public async Task<decimal> ToDeductAsync(long partnerId, CancellationToken ct)
+    {
+        var (cost, paid) = await BalanceAsync(partnerId, null, ct).ConfigureAwait(false);
+        return Math.Min(await RemainingDeductAsync(partnerId, ct).ConfigureAwait(false), Math.Max(0, paid - cost));
+    }
+
+    private async Task<decimal> RemainingDeductAsync(long partnerId, CancellationToken ct)
+    {
+        var chosen = await db.Set<PartnerOverpayment>().Where(o => o.PartnerId == partnerId && o.Handling == CashCodes.Deduct).SumAsync(o => (decimal?)o.Amount, ct).ConfigureAwait(false) ?? 0;
+        var setOff = await db.Set<PartnerPayment>().Where(p => p.PartnerId == partnerId && p.Status == CashCodes.Active).SumAsync(p => (decimal?)p.DeductedAmount, ct).ConfigureAwait(false) ?? 0;
+        return Math.Max(0, chosen - setOff);
     }
 
     public async Task<(PartnerPaymentDetails Value, bool Created)> CreateAsync(PartnerPaymentRequest r, CancellationToken ct)
@@ -78,6 +95,9 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
                 var (cost, paid) = await BalanceAsync(partner.Id, null, c).ConfigureAwait(false);
                 if (kind == CashCodes.Payment && amount > cost - paid)
                     throw Fail.RuleOn("amount", ErrorCodes.PartnerPaymentExceedsBalance, Money.Format(amount), Money.Format(Math.Max(cost - paid, 0)));
+                // DT-230: a balance due above zero means the newer trips have absorbed what was paid earlier for voided / cheaper trips: the
+                // part chosen to be deducted is set off with this payment (shown on its voucher and the statement; no money, no entry).
+                if (kind == CashCodes.Payment) payment.DeductedAmount = await RemainingDeductAsync(partner.Id, c).ConfigureAwait(false);
                 // DT-228: a repayment never above what the partner owes the company.
                 if (kind == CashCodes.Repayment && amount > paid - cost)
                     throw Fail.RuleOn("amount", ErrorCodes.PartnerRepaymentExceedsOwed, Money.Format(amount), Money.Format(Math.Max(paid - cost, 0)));
@@ -108,6 +128,13 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         var payment = await support.FindAsync<PartnerPayment>(token, ct).ConfigureAwait(false);
         await locks.EnsureNotLockedByOthersAsync(EntityType, payment.Id, ct).ConfigureAwait(false);
         CashSupport.EnsureActive(payment, ErrorCodes.PartnerPaymentIsVoid);
+        // DT-230 option (c): "the payment was not actually made", voided for a trip of this partner — recorded with that trip.
+        Trip? forTrip = null;
+        if (!string.IsNullOrWhiteSpace(r.ForTrip))
+        {
+            forTrip = await support.FindAsync<Trip>(r.ForTrip, ct).ConfigureAwait(false);
+            if (forTrip.PartnerId != payment.PartnerId || payment.Kind != CashCodes.Payment) throw Fail.RuleOn("forTrip", ErrorCodes.PartnerPaymentTripMismatch);
+        }
         CashSupport.RequireRowVersion(r.RowVersion);
         db.ExpectRowVersion(payment, r.RowVersion);
         await db.InTransactionAsync(async c =>
@@ -118,6 +145,14 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
             payment.VoidedBy = cash.UserId;
             payment.VoidedAt = DateTime.UtcNow;
             changes.SetAction(payment, "Void", why);
+            if (forTrip is not null)
+            {
+                db.Set<PartnerOverpayment>().Add(new PartnerOverpayment
+                {
+                    PartnerId = payment.PartnerId, TripId = forTrip.Id, PartnerPaymentId = payment.Id, Amount = payment.Amount, Handling = CashCodes.NotPaid, Reason = why,
+                });
+                audit.Record(TripService.EntityType, forTrip.Id, "PartnerPaymentNotMade", $"{payment.Number} · {why}");
+            }
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             await CashPosting.ReverseAsync(db, posting, payment, SourceType, payment.Kind == CashCodes.Repayment
                     ? (cash.En ? $"Void of partner repayment {payment.Number}" : $"إلغاء سداد الشريك {payment.Number}")
@@ -215,7 +250,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
     internal PartnerPaymentResponse ToResponse(Row x) => new(support.Token<PartnerPayment>(x.P.PublicId), x.P.Number, new Ref(support.Token<Partner>(x.PartnerPid), x.PartnerName),
         x.P.PaymentDate, x.P.Amount, x.P.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.P.Reference, x.P.Notes, x.P.Status,
         cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.P.VoidReason, DateTime.SpecifyKind(x.P.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.P.RowVersion),
-        x.P.Kind);
+        x.P.Kind, x.P.DeductedAmount);
 }
 
 /// <summary>Pending-posting retries for partner payments.</summary>

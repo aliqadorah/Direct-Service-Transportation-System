@@ -54,7 +54,7 @@ internal sealed partial class AppExceptionHandler(ILogger<AppExceptionHandler> l
         switch (exception)
         {
             case AppException a:
-                await ProblemWriter.WriteAsync(httpContext, a.Code, a.Status, language, a.Field, a.Args, a.Errors).ConfigureAwait(false);
+                await ProblemWriter.WriteAsync(httpContext, a.Code, a.Status, language, a.Field, a.Args, a.Errors, a.Extra).ConfigureAwait(false);
                 return true;
             case DbUpdateConcurrencyException:
                 await ProblemWriter.WriteAsync(httpContext, ErrorCodes.ConcurrencyConflict, StatusCodes.Status409Conflict, language).ConfigureAwait(false);

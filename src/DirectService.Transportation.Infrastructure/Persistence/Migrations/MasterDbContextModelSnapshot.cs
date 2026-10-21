@@ -9845,6 +9845,149 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerOverpayment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Amount")
+                        .HasColumnOrder(7);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(10)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_TRN_PartnerOverpayments_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(11);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(17);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(15);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(16);
+
+                    b.Property<string>("Handling")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnName("Handling")
+                        .HasColumnOrder(8);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(14)
+                        .HasDefaultValueSql("0", "DF_TRN_PartnerOverpayments_IsDeleted");
+
+                    b.Property<long>("PartnerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PartnerId")
+                        .HasColumnOrder(4);
+
+                    b.Property<long?>("PartnerPaymentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PartnerPaymentId")
+                        .HasColumnOrder(6);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_TRN_PartnerOverpayments_PublicId");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("Reason")
+                        .HasColumnOrder(9);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(18);
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<long>("TripId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TripId")
+                        .HasColumnOrder(5);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(12);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(13);
+
+                    b.HasKey("Id")
+                        .HasName("PK_TRN_PartnerOverpayments");
+
+                    b.HasIndex(new[] { "CompanyId" }, "IX_TRN_PartnerOverpayments_CompanyId")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PartnerId" }, "IX_TRN_PartnerOverpayments_PartnerId");
+
+                    b.HasIndex(new[] { "PartnerPaymentId" }, "IX_TRN_PartnerOverpayments_PartnerPaymentId")
+                        .HasFilter("[PartnerPaymentId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "TripId" }, "IX_TRN_PartnerOverpayments_TripId");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_TRN_PartnerOverpayments_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("TRN_PartnerOverpayments", "trn", t =>
+                        {
+                            t.HasCheckConstraint("CK_TRN_PartnerOverpayments_Amount", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_TRN_PartnerOverpayments_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_TRN_PartnerOverpayments_Handling", "[Handling] IN ('Return','Deduct','NotPaid')");
+
+                            t.HasCheckConstraint("CK_TRN_PartnerOverpayments_PartnerPaymentId", "([Handling] = 'NotPaid' AND [PartnerPaymentId] IS NOT NULL) OR ([Handling] <> 'NotPaid' AND [PartnerPaymentId] IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerPayment", b =>
                 {
                     b.Property<long>("Id")
@@ -9886,6 +10029,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("CreatedBy")
                         .HasColumnOrder(19);
+
+                    b.Property<decimal>("DeductedAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("DeductedAmount")
+                        .HasColumnOrder(28)
+                        .HasDefaultValueSql("0", "DF_TRN_PartnerPayments_DeductedAmount");
 
                     b.Property<string>("DeleteReason")
                         .HasMaxLength(500)
@@ -10044,6 +10194,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0");
 
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
+
+                            t.HasCheckConstraint("CK_TRN_PartnerPayments_DeductedAmount", "[DeductedAmount] >= 0 AND ([Kind] = 'Payment' OR [DeductedAmount] = 0)");
 
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
 
@@ -14330,6 +14482,67 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Partners_Users_UpdatedBy");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerOverpayment", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Partner", "Partner")
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_TRN_Partners_PartnerId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.PartnerPayment", "PartnerPayment")
+                        .WithMany()
+                        .HasForeignKey("PartnerPaymentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_TRN_PartnerPayments_PartnerPaymentId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Trip", "Trip")
+                        .WithMany()
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_TRN_Trips_TripId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PartnerOverpayments_Users_UpdatedBy");
+
+                    b.Navigation("Partner");
+
+                    b.Navigation("PartnerPayment");
+
+                    b.Navigation("Trip");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerPayment", b =>

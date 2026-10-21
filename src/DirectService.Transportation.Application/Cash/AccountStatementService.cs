@@ -72,6 +72,14 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         return Statement(new Ref(support.Token<Driver>(driver.PublicId), driver.FullName), f, t, events);
     }
 
+    /// <summary>DT-230: the statement text of a trip voided or made cheaper after payment, by the choice made.</summary>
+    private string OverpaidText(string handling, decimal amount, string? payment) => handling switch
+    {
+        CashCodes.Return => cash.En ? $"Voided / cheaper after payment: {Accounting.Money.Format(amount)} paid — the partner will return it" : $"أُلغيت أو خُفّضت بعد الدفع: {Accounting.Money.Format(amount)} مدفوع — سيعيده الشريك",
+        CashCodes.Deduct => cash.En ? $"Voided / cheaper after payment: {Accounting.Money.Format(amount)} paid — deducted from the next payment(s)" : $"أُلغيت أو خُفّضت بعد الدفع: {Accounting.Money.Format(amount)} مدفوع — يُخصم من الدفعة التالية",
+        _ => cash.En ? $"Payment {payment} was not actually made: voided ({Accounting.Money.Format(amount)})" : $"الدفعة {payment} لم تُصرف فعلاً: أُلغيت ({Accounting.Money.Format(amount)})",
+    };
+
     // ============================================================ partner (FR-084, FR-088)
 
     public async Task<PartnerAccountResponse> PartnerAccountAsync(string token, CancellationToken ct)
@@ -81,7 +89,8 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var count = await db.Set<Trip>().CountAsync(t => t.PartnerId == partner.Id && t.Status == TripService.Active, ct).ConfigureAwait(false);
         var recent = await payments.Rows(db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partner.Id).OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).Take(20))
             .ToListAsync(ct).ConfigureAwait(false);
-        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid, recent.Select(payments.ToResponse).ToList());
+        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid, recent.Select(payments.ToResponse).ToList(),
+            await payments.ToDeductAsync(partner.Id, ct).ConfigureAwait(false));
     }
 
     public async Task<StatementResponse> PartnerStatementAsync(string token, DateOnly? from, DateOnly? to, CancellationToken ct)
@@ -92,15 +101,26 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
             .Select(x => new { x.Id, x.PublicId, x.ReceiptNo, x.TripDate, Route = x.LoadingSite.Name + " ← " + x.UnloadingSite.Name, Material = x.Material.Name, x.WageQty, x.PartnerRate, x.PartnerCost })
             .ToListAsync(ct).ConfigureAwait(false);
         var payRows = await db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partner.Id && p.Status == CashCodes.Active && p.PaymentDate <= t)
-            .Select(p => new { p.Id, p.PublicId, p.Number, p.PaymentDate, p.Amount, p.Kind }).ToListAsync(ct).ConfigureAwait(false);
+            .Select(p => new { p.Id, p.PublicId, p.Number, p.PaymentDate, p.Amount, p.Kind, p.DeductedAmount }).ToListAsync(ct).ConfigureAwait(false);
+        // DT-230: trips voided or made cheaper after payment, with the choice for the amount paid — information lines (no amount: the
+        // balance already shows it through the payment that stays), and the deduction on the payment that set it off.
+        var overRows = await db.Set<PartnerOverpayment>().AsNoTracking().Where(o => o.PartnerId == partner.Id)
+            .Select(o => new { o.Id, o.CreatedAt, o.Amount, o.Handling, TripPid = o.Trip.PublicId, o.Trip.ReceiptNo, Payment = o.PartnerPayment != null ? o.PartnerPayment.Number : null })
+            .ToListAsync(ct).ConfigureAwait(false);
+
         var events = tripRows.Select(x => new Event(x.TripDate, KindTrip, x.Id, "Trip", new DocRef(support.Token<Trip>(x.PublicId), x.ReceiptNo), $"{x.Route} · {x.Material}",
                 x.PartnerCost, 0, x.Route, x.WageQty, x.PartnerRate))
             .Concat(payRows.Select(p => p.Kind == CashCodes.Repayment
                 ? new Event(p.PaymentDate, KindPayment, p.Id, "Repayment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
                     cash.En ? "Repaid by the partner" : "سداد من الشريك", p.Amount, 0)
                 : new Event(p.PaymentDate, KindPayment, p.Id, "Payment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
-                    cash.En ? "Payment" : "دفعة", 0, p.Amount)))
+                    (cash.En ? "Payment" : "دفعة") + (p.DeductedAmount > 0
+                        ? (cash.En ? $" · deducted {Accounting.Money.Format(p.DeductedAmount)} paid earlier for voided / changed trips" : $" · خُصم {Accounting.Money.Format(p.DeductedAmount)} مدفوع سابقاً عن رحلات ملغاة أو معدّلة")
+                        : string.Empty), 0, p.Amount)))
             .ToList();
+        events.AddRange(overRows.Select(o => new Event(DateOnly.FromDateTime(o.CreatedAt), KindPayment, o.Id,
+            "Overpaid", new DocRef(support.Token<Trip>(o.TripPid), o.ReceiptNo), OverpaidText(o.Handling, o.Amount, o.Payment), 0, 0))
+            .Where(e => e.Date <= t));
         return Statement(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), f, t, events);
     }
 

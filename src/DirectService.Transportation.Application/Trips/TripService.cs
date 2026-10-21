@@ -55,7 +55,7 @@ public sealed record TripDraft(
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
     IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, StandardFieldService fields, CustomFieldService customFields,
-    CompanySettingsService settings, IMonthlyRateLock rateLock, Platform.PlanLimits? limits = null)
+    CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, AuditTrail audit, Platform.PlanLimits? limits = null)
 {
     /// <summary>Trips saved this month must fit the plan (P-07); viewing and exporting are never limited (BR-013).</summary>
     internal Task EnsureTripLimitAsync(int adding, CancellationToken ct) =>
@@ -152,10 +152,13 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             // The old date's period must be open too: the old entry is reversed on its own date (DT-22, FR-010).
             await periods.EnsureOpenAsync(t.TripDate, c).ConfigureAwait(false);
             var before = EntryKey(t);
+            var (oldPartner, oldCost) = (t.PartnerId, t.PartnerCost);
             warnings = await ApplyAsync(t, draft, isNew: false, s, new DbPriceSource(rateLock, pricing), c).ConfigureAwait(false);
+            // DT-230: moved to another partner or made cheaper after the partner was paid — the user's choice and reason are required.
+            if (await PartnerPaidAsync(t, oldPartner, oldCost, r.PartnerPaidHandling, TextNormalizer.CleanText(r.PartnerPaidReason) is { } pr ? pr[..Math.Min(pr.Length, 400)] : null, "partnerPaidReason", c).ConfigureAwait(false)
+                is { } paid)
+                audit.Record(EntityType, t.Id, "PartnerPaidChange", paid);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            // DT-228: a partner trip moved, voided or made cheaper may leave the partner paid more than its trips cost — the partner then
-            // owes the company (shown on the partner account) and repays it with a partner repayment; no longer refused.
             // The entry is reversed and re-posted only when what it posts changes (amount, party, date, receipt) (BR-035).
             if (t.JournalEntryId is null || EntryKey(t) != before)
             {
@@ -178,16 +181,61 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         await db.InTransactionAsync(async c =>
         {
             await periods.EnsureOpenAsync(t.TripDate, c).ConfigureAwait(false);
+            var (oldPartner, oldCost) = (t.PartnerId, t.PartnerCost);
             t.Status = Void;
             t.VoidReason = why;
             t.VoidedBy = ctx.UserId ?? throw new InvalidOperationException("A void needs an acting user.");
             t.VoidedAt = DateTime.UtcNow;
-            changes.SetAction(t, "Void", why);
+            // DT-230: a trip already paid to its partner — the choice for the amount goes with the void reason into the history.
+            var paid = await PartnerPaidAsync(t, oldPartner, oldCost, r.PartnerPaidHandling, why, "reason", c).ConfigureAwait(false);
+            changes.SetAction(t, "Void", paid ?? why);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             await ReverseEntryAsync(t, En ? $"Void of trip {t.ReceiptNo}" : $"إلغاء الرحلة {t.ReceiptNo}", c).ConfigureAwait(false);
             await ResolvePendingAsync(t.Id, c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
         return await ResponseAsync(t.Id, ct).ConfigureAwait(false);
+    }
+
+    private static readonly string[] PartnerPaidChoices = ["Return", "Deduct"];
+
+    /// <summary>
+    /// Owner decision 21 Oct 2026 on DT-228 (DT-230): a partner trip voided, moved to another partner or made cheaper after the partner was paid
+    /// leaves the partner owing the company. Then the change needs the partner-payment permission (drv.settle), a reason and the user's choice
+    /// for the amount already paid — "Return" (owes the company until a partner repayment) or "Deduct" (set off against the next payment(s));
+    /// the third answer, "the payment was not actually made", is to void that payment first (CashVoidRequest.ForTrip). Without a choice the
+    /// change is refused with <c>trip.partnerPaid</c> carrying the amount and the partner's last payment, so the screen can ask. Checked under
+    /// the partner-payment number lock, which payments also take. Returns the history text (reason · choice), or null when nothing was paid.
+    /// </summary>
+    private async Task<string?> PartnerPaidAsync(Trip t, long? oldPartner, decimal oldCost, string? handling, string? reason, string reasonField, CancellationToken ct)
+    {
+        if (oldPartner is not long partnerId) return null;
+        await numbering.LockAsync(Configuration.DocumentTypes.PartnerPayment, ct).ConfigureAwait(false);
+        var others = await db.Set<Trip>().Where(x => x.PartnerId == partnerId && x.Status == Active && x.Id != t.Id).SumAsync(x => (decimal?)x.PartnerCost, ct).ConfigureAwait(false) ?? 0;
+        var paid = await db.Set<PartnerPayment>().Where(p => p.PartnerId == partnerId && p.Status == "Active")
+            .SumAsync(p => (decimal?)(p.Kind == "Repayment" ? -p.Amount : p.Amount), ct).ConfigureAwait(false) ?? 0;
+        var after = others + (t.Status == Active && t.PartnerId == partnerId ? t.PartnerCost : 0);
+        var overpaid = Math.Max(0, paid - after) - Math.Max(0, paid - (others + oldCost));
+        if (overpaid <= 0) return null;
+        if (!ctx.HasPermission(PermissionKeys.DrvSettle)) throw new AppException(ErrorCodes.TripPartnerPaidPermission, 403);
+        var mode = PartnerPaidChoices.FirstOrDefault(m => string.Equals(m, handling?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (mode is null)
+        {
+            var last = await db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partnerId && p.Status == "Active" && p.Kind == "Payment")
+                .OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).Select(p => new { p.PublicId, p.Number, p.Amount }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            throw new AppException(ErrorCodes.TripPartnerPaid, 409, "partnerPaidHandling", Money.Format(overpaid))
+            {
+                Extra = new Dictionary<string, object?>
+                {
+                    ["overpaid"] = overpaid, ["tripCost"] = oldCost,
+                    ["paymentId"] = last is null ? null : support.Token<PartnerPayment>(last.PublicId), ["paymentNumber"] = last?.Number, ["paymentAmount"] = last?.Amount,
+                },
+            };
+        }
+        if (string.IsNullOrWhiteSpace(reason)) throw Fail.Field(reasonField, ErrorCodes.ReasonRequired);
+        db.Set<PartnerOverpayment>().Add(new PartnerOverpayment { PartnerId = partnerId, TripId = t.Id, Amount = overpaid, Handling = mode, Reason = reason });
+        return reason + " · " + (mode == "Return"
+            ? (En ? $"paid to the partner {Money.Format(overpaid)}: the partner will return it" : $"مدفوع للشريك {Money.Format(overpaid)}: سيعيده الشريك")
+            : (En ? $"paid to the partner {Money.Format(overpaid)}: deducted from the next payment(s)" : $"مدفوع للشريك {Money.Format(overpaid)}: يُخصم من الدفعة التالية"));
     }
 
     /// <summary>A user with trips.edit clears Needs review after checking; recorded in history (FR-014).</summary>

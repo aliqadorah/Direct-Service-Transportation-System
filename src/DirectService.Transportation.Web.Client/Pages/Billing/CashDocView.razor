@@ -64,6 +64,15 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
     /// <summary>Voids the document with the reason; returns the refusal message, or null when it worked.</summary>
     [Parameter] public Func<string, Task<string?>>? OnVoid { get; set; }
+    /// <summary>Opens the void dialog when the page is shown (DT-230: from a paid partner trip, "the payment was not actually made").</summary>
+    [Parameter] public bool StartVoid { get; set; }
+
+    private bool _started;
+
+    protected override void OnParametersSet()
+    {
+        if (StartVoid && CanVoid && !IsVoid && !_started) { _started = true; _voiding = true; }
+    }
 
     private async Task Void(string reason)
     {

@@ -442,6 +442,7 @@ public static class HelpTopics
                     "الفوترة والنقد ← حسابات الشركاء ← الشريك؛ يظهر الرصيد المستحق له.",
                     "«دفعة»: المبلغ والطريقة والصندوق أو البنك ← «حفظ»؛ تُرحّل الدفعة (PPY-). اطبع سند الصرف.",
                     "إذا أصبح على الشريك للشركة (مثلاً أُلغيت رحلة بعد الدفع له) يظهر ذلك في حسابه مع «تسجيل سداد من الشريك»: المبلغ حتى ما عليه، نقداً أو تحويل بنكي أو CliQ مع المرجع؛ يُرحّل مدين الصندوق أو البنك ودائن ذمم الشركاء، ويُطبع سند قبض.",
+                    "إلغاء رحلة مدفوعة للشريك أو تخفيض تكلفتها يحتاج صلاحية دفعات الشركاء وسبباً، ويُسأل عن المبلغ المدفوع: «سيعيده الشريك» (يبقى عليه حتى سداده)، أو «يُخصم من الدفعة التالية» (يُخصم تلقائياً ويظهر في سند الصرف وكشف الشريك)، أو «الدفعة لم تُصرف فعلاً» (تفتح سند الصرف لإلغائه بسببه الخاص؛ إن غطّى عدة رحلات فالإلغاء يشملها كلها). يُحفظ الاختيار مع الرحلة ويظهر في سجلها وفي كشف الشريك.",
                 ],
                 [
                     "مبلغ أكبر من الرصيد المستحق: ممنوع، ويظهر الرصيد. سداد أكبر مما على الشريك: ممنوع.",
@@ -454,6 +455,7 @@ public static class HelpTopics
                     "Billing & cash → Partner accounts → the partner; the balance due is shown.",
                     "Payment: amount, method, cash box or bank → Save; the payment is posted (PPY-). Print the payment voucher.",
                     "When the partner owes the company (for example a trip voided after the partner was paid), its account says so with Record repayment: the amount up to what it owes, by cash, bank transfer or CliQ with the reference; it posts debit cash box or bank, credit partner payables, and prints a receipt voucher.",
+                    "Voiding a partner trip already paid, or lowering its cost, needs the partner-payment permission and a reason, and asks what to do with the amount paid: “The partner will return it” (owed until a repayment), “Deduct it from the next payment” (set off automatically, shown on the payment voucher and the partner statement) or “The payment was not actually made” (opens the payment voucher to void it with its own reason; a payment covering several trips is voided for all of them). The choice is kept with the trip, in its history and on the partner statement.",
                 ],
                 [
                     "An amount above the balance due: blocked, with the balance shown. A repayment above what the partner owes: blocked.",

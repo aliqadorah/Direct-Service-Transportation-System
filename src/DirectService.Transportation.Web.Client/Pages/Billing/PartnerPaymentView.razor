@@ -12,7 +12,12 @@
         <CashDocView Title="@p.Number" Crumbs="@([new Crumb(L["nav.billing"]), new Crumb(L["nav.partnerAccounts"], NavModel.Href(Company, "partner-accounts")), new Crumb(p.Partner.Name, NavModel.Href(Company, $"partner-accounts/{p.Partner.Id}"))])"
                      IsVoid="@(p.Status == "Void")" VoidReason="@p.VoidReason" PostingPending="p.PostingPending" Details="Details(p)" Amount="p.Amount" AmountLabel="@L["inv.amount"]"
                      AmountInWords="@_d.AmountInWords" Entry="p.JournalEntry" History="_d.History" PrintHref="@NavModel.Href(Company, $"print/partner-payment/{Id}")"
-                     CanVoid="@Shell.Can(PermissionKeys.DrvSettle)" VoidText="@L["prt.voidText"]" OnVoid="Void" />
+                     CanVoid="@Shell.Can(PermissionKeys.DrvSettle)" VoidText="@(ForTrip is null ? L["prt.voidText"] : L["prt.voidNotPaidText"])" OnVoid="Void"
+                     StartVoid="@(StartVoid == "1" && ForTrip is not null)">
+            @* DT-230 (c): from a paid partner trip — the payment was not actually made; voided for that trip (recorded with it). *@
+            <Above>@if (ForTrip is not null && p.Status != "Void") {<Banner Tone="Tone.Warn" Icon="alert" Text="@L["prt.voidNotPaidBanner"]" />}
+                else if (ForTrip is not null) {<Banner Tone="Tone.Ok"><span>@L["prt.voidNotPaidDone"] <a href="@NavModel.Href(Company, $"trips/{Uri.EscapeDataString(ForTrip)}")">@L["prt.backToTrip"]</a></span></Banner>}</Above>
+        </CashDocView>
     </ChildContent>
 </StateView>
 
@@ -23,6 +28,8 @@
 
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "void")] public string? StartVoid { get; set; }
+    [SupplyParameterFromQuery(Name = "trip")] public string? ForTrip { get; set; }
 
     protected override Task OnParametersSetAsync() => Load();
 
@@ -42,6 +49,7 @@
         new(L["md.partner"], null, @<a href="@NavModel.Href(Company, $"partner-accounts/{p.Partner.Id}")">@p.Partner.Name</a>),
         new(L["trip.date"], Fmt.Date(p.PaymentDate, Shell.DateFormat)),
         new(L["prt.kind"], L["prt.kind." + p.Kind]),   // DT-228: payment to the partner or repayment from it
+        .. (p.DeductedAmount > 0 ? new KeyValue[] { new(L["prt.deducted"], Fmt.Money(p.DeductedAmount)), new(L["prt.dueBeforeDeduction"], Fmt.Money(p.Amount + p.DeductedAmount)) } : []),
         new(L["cash.method"], L["pay." + p.PaymentMethod]),
         new(L["cash.account"], p.Account.Name),
         new(L["cash.reference"], p.Reference),
@@ -52,7 +60,7 @@
     {
         try
         {
-            await Api.PostAsync<PartnerPaymentDetails>(Api.C($"partner-payments/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Payment.RowVersion));
+            await Api.PostAsync<PartnerPaymentDetails>(Api.C($"partner-payments/{Uri.EscapeDataString(Id)}/void"), new CashVoidRequest(reason, _d!.Payment.RowVersion, ForTrip));
             Toasts.Success(L.F("cash.voided", _d.Payment.Number));
             await Load();
             return null;

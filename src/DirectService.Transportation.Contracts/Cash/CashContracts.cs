@@ -22,13 +22,18 @@ public static class CashCodes
     /// <summary>Revision 6 (DT-228): kinds of a partner payment — to the partner, or repaid by a partner who owes the company.</summary>
     public const string Payment = "Payment";
     public const string Repayment = "Repayment";
+    /// <summary>DT-230: what is done with an amount already paid for a partner trip voided or made cheaper.</summary>
+    public const string Return = "Return";
+    public const string Deduct = "Deduct";
+    public const string NotPaid = "NotPaid";
 }
 
 /// <summary>The cash box or bank account of a document.</summary>
 public sealed record MoneyAccountRef(string Kind, string Id, string Name);
 
 /// <summary>Void of a cash document: reason and the version last seen.</summary>
-public sealed record CashVoidRequest(string? Reason, string? RowVersion);
+/// <summary>DT-230: <paramref name="ForTrip"/> — a partner payment voided because it was not actually made, for that trip (recorded with the trip).</summary>
+public sealed record CashVoidRequest(string? Reason, string? RowVersion, string? ForTrip = null);
 
 /// <summary>Count and amount of a filtered list.</summary>
 /// <summary>Register totals: <see cref="Count"/> rows matching the filters (paging), <see cref="Amount"/> and <see cref="Included"/> of the documents in the total (active / posted, DT-155).</summary>
@@ -139,7 +144,8 @@ public sealed record PartnerPaymentRequest(
 
 public sealed record PartnerPaymentResponse(
     string Id, string Number, Ref Partner, DateOnly PaymentDate, decimal Amount, string PaymentMethod, MoneyAccountRef Account, string? Reference, string? Notes,
-    string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion, string Kind = CashCodes.Payment);
+    string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion, string Kind = CashCodes.Payment,
+    decimal DeductedAmount = 0);
 
 public sealed record PartnerPaymentDetails(PartnerPaymentResponse Payment, string AmountInWords, IReadOnlyList<HistoryEntry> History);
 
@@ -156,7 +162,9 @@ public sealed record DriverAccountResponse(
     decimal AdvancesTotal, decimal NetDue, decimal Balance, IReadOnlyList<SettlementResponse> Settlements);
 
 /// <summary>Partner account (FR-084): partner cost of active trips, payments, balance due.</summary>
-public sealed record PartnerAccountResponse(Ref Partner, int Trips, decimal Cost, decimal Paid, decimal BalanceDue, IReadOnlyList<PartnerPaymentResponse> RecentPayments);
+/// <summary>DT-230: <paramref name="ToDeduct"/> — of what the partner owes, the part to be deducted from the next payment(s) (the rest is to be returned).</summary>
+public sealed record PartnerAccountResponse(Ref Partner, int Trips, decimal Cost, decimal Paid, decimal BalanceDue, IReadOnlyList<PartnerPaymentResponse> RecentPayments,
+    decimal ToDeduct = 0);
 
 /// <summary>
 /// A statement line: date, kind (Trip, Advance, Deduction, Settlement, Payment), document, description, amounts that increase or

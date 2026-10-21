@@ -21,6 +21,13 @@ public sealed record ApiProblem
     [JsonPropertyName("endedAt")] public DateTime? EndedAt { get; init; }
     [JsonPropertyName("endedBy")] public string? EndedBy { get; init; }
 
+    /// <summary>A partner trip already paid (DT-230): the amount the partner would owe, the trip's cost and the partner's last payment.</summary>
+    [JsonPropertyName("overpaid")] public decimal? Overpaid { get; init; }
+    [JsonPropertyName("tripCost")] public decimal? TripCost { get; init; }
+    [JsonPropertyName("paymentId")] public string? PaymentId { get; init; }
+    [JsonPropertyName("paymentNumber")] public string? PaymentNumber { get; init; }
+    [JsonPropertyName("paymentAmount")] public decimal? PaymentAmount { get; init; }
+
     /// <summary>A short reference for support (the last part of the trace id).</summary>
     public string? Reference => TraceId is { Length: > 9 } t ? t[^9..].TrimStart(':').ToUpperInvariant() : TraceId;
 }

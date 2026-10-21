@@ -24,6 +24,11 @@ public class PartnerPayment : AuditableEntity, ITenantScoped, ICompanyScoped, IC
     /// Dr cash / bank, Cr partner payable). Same PPY numbering.
     /// </summary>
     public string Kind { get; set; } = "Payment";
+    /// <summary>
+    /// Revision 6 (DT-230): of the partner trips this payment settles, the part already paid earlier for a trip voided or made cheaper that
+    /// the user chose to deduct from the next payment(s) — set off, no money moved (shown on the voucher and the statement).
+    /// </summary>
+    public decimal DeductedAmount { get; set; }
     /// <summary>How the money was paid or received.</summary>
     public string PaymentMethod { get; set; } = string.Empty;
     /// <summary>Cash box the money came from or went to.</summary>

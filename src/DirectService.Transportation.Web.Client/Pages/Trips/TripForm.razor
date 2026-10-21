@@ -115,6 +115,9 @@
 
 <ConfirmDialog @bind-Open="_voiding" Title="@L.F("trip.voidTitle", _trip?.ReceiptNo ?? "")" Danger="true" AskReason="true" ConfirmText="@L["trip.void"]"
                Message="@L["trip.voidText"]" Busy="_saving" Error="@_voidError" OnConfirm="Void" />
+@* DT-230: the trip was already paid to its partner — what to do with the amount (void or a cheaper / other-partner edit). *@
+<PartnerPaidDialog @bind-Open="_paidOpen" Problem="_paidProblem" Company="@Company" TripId="@(_trip?.Id ?? "")" Reason="@_paidReason" Busy="_saving"
+                   Error="@_paidError" OnChoose="PaidChosen" />
 
 @code {
     private TripModel _m = new();
@@ -229,7 +232,30 @@
 
     private Task Invalid() => _summary?.FocusAsync() ?? Task.CompletedTask;
 
-    private async Task Save()
+    // ------------------------------------------------------------ DT-230: a partner trip already paid
+    private bool _paidOpen;
+    private ApiProblem? _paidProblem;
+    private string? _paidReason, _paidError;
+    private Func<string, string, Task>? _paidRetry;
+
+    private void AskPaid(ApiProblem problem, string? reason, Func<string, string, Task> retry)
+    {
+        _paidProblem = problem;
+        _paidReason = reason;
+        _paidError = null;
+        _paidRetry = retry;
+        _voiding = false;
+        _paidOpen = true;
+    }
+
+    private async Task PaidChosen((string Handling, string Reason) choice)
+    {
+        if (_paidRetry is not null) await _paidRetry(choice.Handling, choice.Reason);
+    }
+
+    private Task Save() => SaveWith(null, null);
+
+    private async Task SaveWith(string? paidHandling, string? paidReason)
     {
         if (RO) return;
         _saving = true;
@@ -237,14 +263,23 @@
         _customErrors = null;
         try
         {
-            var req = _m.ToRequest(IsPartnerTrip, _trip is null);
+            var req = _m.ToRequest(IsPartnerTrip, _trip is null) with { PartnerPaidHandling = paidHandling, PartnerPaidReason = paidReason };
             var r = _trip is null
                 ? await Api.PostAsync<TripSaveResult>(Api.C("trips"), req)
                 : await Api.PutAsync<TripSaveResult>(Api.C($"trips/{Uri.EscapeDataString(_trip.Id)}"), req);
+            _paidOpen = false;
             Toasts.Success(L.F(_trip is null ? "trip.saved" : "trip.edited", r.Trip.ReceiptNo, Fmt.Money(r.Trip.Revenue)));
             foreach (var w in r.Warnings) Toasts.Error(w.Message);
             if (_trip is null) Nav.NavigateTo(NavModel.Href(Company, $"trips/{r.Trip.Id}"));
             else await Load();
+        }
+        catch (ApiException e) when (e.Problem.Code == "trip.partnerPaid" && _trip is not null)
+        {
+            AskPaid(e.Problem, paidReason, SaveWith);
+        }
+        catch (ApiException e) when (_paidOpen)
+        {
+            _paidError = e.Problem.Detail;
         }
         catch (ApiException e)
         {
@@ -255,17 +290,25 @@
         finally { _saving = false; }
     }
 
-    private async Task Void(string reason)
+    private Task Void(string reason) => VoidWith(reason, null);
+
+    private async Task VoidWith(string reason, string? paidHandling)
     {
         _saving = true;
         _voidError = null;
         try
         {
-            await Api.PostAsync<TripResponse>(Api.C($"trips/{Uri.EscapeDataString(_trip!.Id)}/void"), new TripVoidRequest(reason, _trip.RowVersion));
+            await Api.PostAsync<TripResponse>(Api.C($"trips/{Uri.EscapeDataString(_trip!.Id)}/void"), new TripVoidRequest(reason, _trip.RowVersion, paidHandling));
             _voiding = false;
+            _paidOpen = false;
             Toasts.Success(L.F("trip.voidedToast", _trip.ReceiptNo));
             await Load();
         }
+        catch (ApiException e) when (e.Problem.Code == "trip.partnerPaid")
+        {
+            AskPaid(e.Problem, reason, (handling, why) => VoidWith(why, handling));
+        }
+        catch (ApiException e) when (_paidOpen) { _paidError = e.Problem.Detail; }
         catch (ApiException e) { _voidError = e.Problem.Detail; }
         finally { _saving = false; }
     }

@@ -13,7 +13,8 @@ public sealed record TripRequest(
     string? ReceiptNo, DateOnly? TripDate, DateOnly? LoadingDate, DateOnly? UnloadingDate,
     string? DriverId, string? CustomerId, string? LoadingSiteId, string? UnloadingSiteId, string? MaterialId, string? PartnerId,
     decimal? LoadedWeight, decimal? UnloadedWeight, decimal? CustomerPrice, decimal? DriverRate, decimal? PartnerRate,
-    string? Notes, IReadOnlyDictionary<string, JsonElement>? CustomValues, string? ClientId, string? RowVersion);
+    string? Notes, IReadOnlyDictionary<string, JsonElement>? CustomValues, string? ClientId, string? RowVersion,
+    string? PartnerPaidHandling = null, string? PartnerPaidReason = null);
 
 /// <summary>A linked document shown by number (invoice, settlement, journal entry).</summary>
 public sealed record DocRef(string Id, string? Number);
@@ -77,7 +78,11 @@ public sealed record TripPage(PagedResult<TripResponse> Page, TripTotals Totals)
 public sealed record QuickEntryDefaults(DateOnly Today, Ref? Driver, Ref? Customer, Ref? Material, Ref? LoadingSite, Ref? UnloadingSite);
 
 /// <summary>Reason for a void (FR-011).</summary>
-public sealed record TripVoidRequest(string? Reason, string? RowVersion);
+/// <summary>
+/// A trip void. DT-230: when the trip was already paid to its partner, <paramref name="PartnerPaidHandling"/> says what to do with the amount
+/// (Return or Deduct; NotPaid is done by voiding the payment first) — without it the void is answered with <c>trip.partnerPaid</c>.
+/// </summary>
+public sealed record TripVoidRequest(string? Reason, string? RowVersion, string? PartnerPaidHandling = null);
 
 /// <summary>Clearing "Needs review" after checking (FR-014).</summary>
 public sealed record TripReviewRequest(string? RowVersion);

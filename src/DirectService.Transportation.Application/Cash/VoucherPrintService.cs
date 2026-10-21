@@ -102,7 +102,10 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
         var body = Voucher(await CompanyAsync(ct).ConfigureAwait(false), repayment ? L("سند قبض — سداد من شريك", "Receipt voucher — partner repayment")
                 : L("سند صرف — دفعة شريك", "Payment voucher — partner payment"), p.Number, p.PaymentDate,
             repayment ? L("قبضنا من", "Received from") : L("صرفنا إلى", "Paid to"), await names.OfAsync("TRN.Partner", payment.PartnerId, "Name", p.Partner.Name, payment.CreatedAt, ct).ConfigureAwait(false), p.Amount, d.AmountInWords, Method(p.PaymentMethod), p.Account, p.Reference,
-            [p.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(p.Notes))],
+            // DT-230: the part of the partner's trips set off against an amount paid earlier for trips voided or made cheaper.
+            [p.DeductedAmount > 0 ? Field(L("مستحق الرحلات قبل الخصم", "Due for trips before the deduction"), N(M(p.Amount + p.DeductedAmount))) : string.Empty,
+             p.DeductedAmount > 0 ? Field(L("خُصم: مدفوع سابقاً عن رحلات ملغاة أو معدّلة", "Deducted: paid earlier for voided / changed trips"), N(M(p.DeductedAmount))) : string.Empty,
+             p.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(p.Notes))],
             repayment ? [L("دفع بواسطة", "Paid by"), L("قبض بواسطة", "Received by")] : [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]);
         return await printer.OutputAsync(printer.Shell(p.Number, body, p.Status == CashCodes.Void ? "VOID" : null, mark), format, p.Number, ct).ConfigureAwait(false);
     }

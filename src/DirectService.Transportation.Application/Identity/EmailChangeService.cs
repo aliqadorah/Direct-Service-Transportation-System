@@ -56,8 +56,23 @@ public sealed partial class EmailChangeService(
         var user = await admin.AccountTargetAsync(userToken, ct).ConfigureAwait(false);
         if (user.Id == ctx.UserId) throw Fail.Rule(ErrorCodes.EmailOwnInProfile);
         var mail = Address(r.NewEmail);
+        await EnsureDailyLimitsAsync(user.Id, ct).ConfigureAwait(false);
         await StartAsync(user, mail, byAdministrator: true, ct).ConfigureAwait(false);
         return new EmailChangeResponse(user.Email, user.PendingEmail);
+    }
+
+    /// <summary>Owner decision 21 Oct 2026 (DT-230, security review F9): administrator-started changes per 24 hours, by the administrator and by the user.</summary>
+    public const int DailyLimitPerAdministrator = 5;
+    public const int DailyLimitPerUser = 3;
+
+    private async Task EnsureDailyLimitsAsync(long targetId, CancellationToken ct)
+    {
+        var since = clock.GetUtcNow().UtcDateTime.AddHours(-24);
+        var started = db.Set<AuditLog>().IgnoreQueryFilters().Where(a => a.Action == "EmailChangeStarted" && a.EntityType == "CORE.User" && a.OccurredAt >= since);
+        if (await started.CountAsync(a => a.UserId == ctx.UserId, ct).ConfigureAwait(false) >= DailyLimitPerAdministrator)
+            throw new AppException(ErrorCodes.EmailChangeLimitAdmin, 429, null, DailyLimitPerAdministrator);
+        if (await started.CountAsync(a => a.EntityId == targetId, ct).ConfigureAwait(false) >= DailyLimitPerUser)
+            throw new AppException(ErrorCodes.EmailChangeLimitUser, 429, null, DailyLimitPerUser);
     }
 
     public async Task<EmailChangeResponse> CancelOwnAsync(CancellationToken ct) => await CancelAsync(await SelfAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false);

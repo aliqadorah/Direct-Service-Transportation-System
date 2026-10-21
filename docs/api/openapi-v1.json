@@ -65355,6 +65355,12 @@
               "null",
               "string"
             ]
+          },
+          "forTrip": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -73573,6 +73579,15 @@
             "items": {
               "$ref": "#/components/schemas/PartnerPaymentResponse"
             }
+          },
+          "toDeduct": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
           }
         }
       },
@@ -73784,6 +73799,15 @@
           "kind": {
             "type": "string",
             "default": "Payment"
+          },
+          "deductedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
           }
         }
       },
@@ -79213,6 +79237,18 @@
               "null",
               "string"
             ]
+          },
+          "partnerPaidHandling": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "partnerPaidReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -79656,6 +79692,12 @@
             ]
           },
           "rowVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "partnerPaidHandling": {
             "type": [
               "null",
               "string"

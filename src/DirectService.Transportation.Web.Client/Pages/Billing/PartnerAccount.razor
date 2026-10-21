@@ -25,7 +25,12 @@
             </Actions>
         </PageHeader>
         <Figures Items="@([new Figure(L["prt.trips"], Fmt.Count(a.Trips)), new Figure(L["prt.cost"], Fmt.Money(a.Cost)), new Figure(L["prt.paid"], Fmt.Money(a.Paid)), new Figure(L["prt.balance"], Fmt.Money(a.BalanceDue))])" />
-        @if (a.BalanceDue < 0) {<Banner Tone="Tone.Warn" Text="@L.F("prt.owesCompany", a.Partner.Name, Fmt.Money(-a.BalanceDue))" />}
+        @if (a.BalanceDue < 0)
+        {
+            @* DT-230: the part chosen to be deducted from the next payment(s), and the part to be returned. *@
+            @if (a.ToDeduct > 0) {<Banner Tone="Tone.Info" Text="@L.F("prt.toDeduct", a.Partner.Name, Fmt.Money(a.ToDeduct))" />}
+            @if (-a.BalanceDue - a.ToDeduct > 0) {<Banner Tone="Tone.Warn" Text="@L.F("prt.owesCompany", a.Partner.Name, Fmt.Money(-a.BalanceDue - a.ToDeduct))" />}
+        }
         <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@a.Partner.Name" />
         <Box NoPad="true" Class="fill">
             @switch (_tab)

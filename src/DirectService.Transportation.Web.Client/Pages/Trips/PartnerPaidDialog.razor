@@ -1,0 +1,95 @@
+@*
+  Owner decision 21 Oct 2026 on DT-228 (DT-230): a partner trip voided or made cheaper after the partner was paid. The server answered
+  trip.partnerPaid with the amount and the partner's last payment; the user gives a reason and chooses what to do with the amount paid:
+  (a) the partner returns it, (b) deduct it from the next payment(s), (c) the payment was not actually made — go to that payment voucher to
+  void it with its own reason (a payment that covered several trips is voided for all of them: the user may cancel instead).
+*@
+@inject Loc L
+@inject NavigationManager Nav
+
+<Modal Open="Open" OpenChanged="OpenChanged" Title="@L["trip.paidTitle"]" Icon="alert" Busy="Busy">
+    <ChildContent>
+        <div class="stack">
+            <Banner Tone="Tone.Warn" Text="@L.F("trip.paidWarn", Fmt.Money(Problem?.Overpaid ?? 0))" />
+            <fieldset class="stack paid-choices" style="border:0;margin:0;padding:0">
+                <legend class="lbl">@L["trip.paidChoose"] <span class="req" aria-hidden="true">*</span></legend>
+                @foreach (var (value, label, help) in Choices)
+                {
+                    <label class="chk" style="align-items:flex-start">
+                        <input type="radio" name="paid-choice" value="@value" checked="@(_choice == value)" @onchange="() => _choice = value" />
+                        <span><strong>@L[label]</strong><span class="help" style="display:block">@L.F(help, Fmt.Money(Problem?.Overpaid ?? 0))</span></span>
+                    </label>
+                }
+            </fieldset>
+            @if (_choice == "NotPaid")
+            {
+                @if (Problem?.PaymentId is null)
+                {
+                    <Banner Tone="Tone.Err" Text="@L["trip.paidNoPayment"]" />
+                }
+                else
+                {
+                    <Banner Tone="Tone.Info" Text="@L.F("trip.paidPayment", Problem.PaymentNumber ?? "", Fmt.Money(Problem.PaymentAmount ?? 0))" />
+                    @if (CoversOtherTrips) {<Banner Tone="Tone.Warn" Icon="alert" Text="@L["trip.paidSeveral"]" />}
+                }
+            }
+            else
+            {
+                <div class="field">
+                    <label for="paid-reason">@L["ui.reason"] <span class="req" aria-hidden="true">*</span></label>
+                    <textarea id="paid-reason" class="input" rows="2" maxlength="400" @bind="_reason" @bind:event="oninput"></textarea>
+                </div>
+            }
+            @if (Error is not null) {<Banner Tone="Tone.Err" Text="@Error" />}
+        </div>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => OpenChanged.InvokeAsync(false)" />
+        @if (_choice == "NotPaid")
+        {
+            <Btn Primary="true" Icon="cash" Text="@L["trip.paidGoToPayment"]" Disabled="@(Problem?.PaymentId is null)" OnClick="GoToPayment" />
+        }
+        else
+        {
+            <Btn DangerPrimary="true" Text="@L["trip.paidConfirm"]" Busy="Busy" Disabled="@(_choice is null || string.IsNullOrWhiteSpace(_reason))" OnClick="Confirm" />
+        }
+    </Footer>
+</Modal>
+
+@code {
+    private static readonly (string Value, string Label, string Help)[] Choices =
+    [
+        ("Return", "trip.paidReturn", "trip.paidReturnHelp"),
+        ("Deduct", "trip.paidDeduct", "trip.paidDeductHelp"),
+        ("NotPaid", "trip.paidNotPaid", "trip.paidNotPaidHelp"),
+    ];
+
+    private string? _choice, _reason;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public ApiProblem? Problem { get; set; }
+    [Parameter] public string Company { get; set; } = "";
+    [Parameter] public string TripId { get; set; } = "";
+    /// <summary>The reason already typed (the void dialog's), shown for editing.</summary>
+    [Parameter] public string? Reason { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    /// <summary>(a) or (b) chosen with the reason: the caller sends the change again with them.</summary>
+    [Parameter] public EventCallback<(string Handling, string Reason)> OnChoose { get; set; }
+
+    private bool CoversOtherTrips => Problem is { PaymentAmount: decimal paid, TripCost: decimal cost } && paid > cost;
+
+    private bool _wasOpen;
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_wasOpen) { _choice = null; _reason = Reason; }
+        _wasOpen = Open;
+    }
+
+    private Task Confirm() => _choice is { } c && !string.IsNullOrWhiteSpace(_reason) ? OnChoose.InvokeAsync((c, _reason.Trim())) : Task.CompletedTask;
+
+    private void GoToPayment() =>
+        Nav.NavigateTo(NavModel.Href(Company, $"partner-accounts/payments/{Uri.EscapeDataString(Problem!.PaymentId!)}?void=1&trip={Uri.EscapeDataString(TripId)}"));
+}
