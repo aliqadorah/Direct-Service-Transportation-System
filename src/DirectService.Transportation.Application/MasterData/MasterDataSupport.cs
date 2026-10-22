@@ -62,9 +62,9 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     /// </summary>
     public async Task<T> ChooseAsync<T>(string field, string? token, long? currentId, Func<T, string> name, CancellationToken ct) where T : AuditableEntity
     {
-        var publicId = tokens.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        var publicId = tokens.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
         var record = await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.PublicId == publicId, ct).ConfigureAwait(false)
-            ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+            ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
         ArgumentNullException.ThrowIfNull(name);
         if (record is IArchivable { Status: MasterCodes.Archived } && record.Id != currentId) throw Fail.RuleOn(field, ErrorCodes.RecordArchived, name(record));
         return record;
@@ -92,7 +92,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
             if (await ExistingAsync<T>(clientId, ct).ConfigureAwait(false) is { } existing) return existing;
             var g = clientId.Value;
             if (await db.Set<T>().IgnoreQueryFilters().AnyAsync(x => x.PublicId == g, ct).ConfigureAwait(false))
-                throw Fail.Field("clientId", ErrorCodes.ValidationFormat, "clientId");
+                throw Fail.Field("clientId", ErrorCodes.ValidationFormat, new FieldRef("clientId"));
             throw;
         }
     }
@@ -105,7 +105,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
         null or "" or "active" => q.Where(x => x.Status == MasterCodes.Active),
         "archived" => q.Where(x => x.Status == MasterCodes.Archived),
         "all" => q,
-        _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+        _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
     };
 
     /// <summary>Sort by a white-listed field ("-" prefix for descending); anything else → 400 (API-04).</summary>
@@ -115,7 +115,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
         var text = string.IsNullOrWhiteSpace(sort) ? defaultField : sort.Trim();
         var descending = text.StartsWith('-');
         var key = descending ? text[1..] : text;
-        if (!fields.TryGetValue(key, out var selector)) throw Fail.Field("sort", ErrorCodes.ValidationFormat, "sort");
+        if (!fields.TryGetValue(key, out var selector)) throw Fail.Field("sort", ErrorCodes.ValidationFormat, new FieldRef("sort"));
         return descending ? q.OrderByDescending(selector) : q.OrderBy(selector);
     }
 

@@ -12,8 +12,8 @@
     <SideNav Groups="Groups" Company="@(Shell.Company?.Id ?? "")" Foot="@Shell.PlanText" Provider="Provider" />
     <div class="main">
         <TopBar Provider="Provider" Environment="@Shell.Me?.Environment" Companies="@(Shell.SupportEnded is null ? Shell.Me?.Companies ?? [] : [])" CurrentCompany="@Shell.Company?.Id" UserName="@Shell.Me?.FullName"
-                Unread="Shell.UnreadNotifications" Density="@Shell.Density" OnCompany="OnCompany" OnCommandBar="OpenCommandBar" OnNotifications="OnNotifications"
-                OnProfile="OnProfile" OnMenu="() => _menuOpen = !_menuOpen" MenuOpen="_menuOpen" OnDensity="SetDensity" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
+                Unread="Shell.UnreadNotifications" Theme="@Shell.Theme" OnCompany="OnCompany" OnCommandBar="OpenCommandBar" OnNotifications="OnNotifications"
+                OnProfile="OnProfile" OnMenu="() => _menuOpen = !_menuOpen" MenuOpen="_menuOpen" OnTheme="SetTheme" OnLanguage="OnLanguage" OnSignOut="OnSignOut" />
         <main class="content @(Fixed ? "fixed" : null)" id="content" tabindex="-1">
             @if (Shell.PageExpired)
             {
@@ -72,7 +72,7 @@
     /// <summary>The direction and language of the whole document follow the interface language at once.</summary>
     private void LanguageChanged() => _ = InvokeAsync(async () =>
     {
-        await Js.ApplyRoot(Shell.Density, L.Language);
+        await Js.ApplyRoot(L.Language);
         StateHasChanged();
     });
 
@@ -83,9 +83,11 @@
         await Js.RegisterShortcuts(_ref);
         // Start in the language the server rendered (the profile's), so an English page is not switched back to RTL.
         L.SetLanguage(Shell.Me?.LanguageCode ?? await Js.RootLang());
-        var density = await Js.GetPref("density");
-        if (density is not null && density != Shell.Density) Shell.SetDensity(density);
-        await Js.ApplyRoot(Shell.Density, L.Language);
+        await Js.ApplyRoot(L.Language);
+        // The user's theme on this device (DT-244); none saved yet = follow the device. It also becomes the device's last choice, which
+        // the next page applies before its first paint.
+        Shell.SetTheme(await Js.GetPref(Shell.ThemeKey));
+        await Js.ApplyTheme(Shell.Theme);
     }
 
     [JSInvokable]
@@ -96,11 +98,11 @@
         return Task.CompletedTask;
     }
 
-    private async Task SetDensity(string density)
+    private async Task SetTheme(string theme)
     {
-        Shell.SetDensity(density);
-        await Js.SetPref("density", Shell.Density);
-        await Js.ApplyRoot(Shell.Density, L.Language);
+        Shell.SetTheme(theme);
+        await Js.SetPref(Shell.ThemeKey, Shell.Theme);
+        await Js.ApplyTheme(Shell.Theme);
     }
 
     private void Refresh() => _ = InvokeAsync(StateHasChanged);

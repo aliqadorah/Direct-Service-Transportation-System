@@ -56,7 +56,7 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
             .Where(a => a.CompanyId == companyId || (a.CompanyId == null && a.TenantId == tenantId && (a.EntityType == null || TenantTypes.Contains(a.EntityType))));
         if (!string.IsNullOrWhiteSpace(q.User))
         {
-            var pid = support.Decode<User>(q.User) ?? throw Fail.Field("user", ErrorCodes.ValidationFormat, "user");
+            var pid = support.Decode<User>(q.User) ?? throw Fail.Field("user", ErrorCodes.ValidationFormat, new FieldRef("user"));
             query = query.Where(a => a.User != null && a.User.PublicId == pid);
         }
         if (!string.IsNullOrWhiteSpace(q.Action)) query = query.Where(a => a.Action == q.Action);

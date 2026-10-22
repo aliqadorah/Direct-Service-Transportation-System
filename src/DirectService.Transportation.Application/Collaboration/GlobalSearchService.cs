@@ -25,7 +25,7 @@ public sealed class GlobalSearchService(IAppDbContext db, IRequestContext ctx, M
     public async Task<SearchResponse> SearchAsync(string? q, CancellationToken ct)
     {
         var text = TextNormalizer.CleanText(TextNormalizer.ToAsciiDigits(q));
-        if (text is null || text.Length < 2) throw Fail.Field("q", ErrorCodes.ValidationRange, "q");
+        if (text is null || text.Length < 2) throw Fail.Field("q", ErrorCodes.ValidationRange, new FieldRef("q"));
         if (text.Length > 100) text = text[..100];
         var folded = SqlText.FoldText(text);
         var compact = MasterDataSupport.Compact(text) ?? text;

@@ -39,7 +39,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
         first = new DateOnly(first.Year, first.Month, 1);
         last = new DateOnly(last.Year, last.Month, 1);
         var count = (last.Year - first.Year) * 12 + last.Month - first.Month + 1;
-        if (count < 1 || count > MaxStripMonths) throw Fail.Field("to", ErrorCodes.ValidationRange, "to");
+        if (count < 1 || count > MaxStripMonths) throw Fail.Field("to", ErrorCodes.ValidationRange, new FieldRef("to"));
         var months = Enumerable.Range(0, count).Select(i => PricingRules.Month(first.AddMonths(i))).ToList();
 
         var activeSites = await db.Set<LoadingSite>().AsNoTracking().Where(s => s.Status == MasterCodes.Active).Select(s => s.Id).ToListAsync(ct).ConfigureAwait(false);
@@ -93,8 +93,8 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
         ArgumentNullException.ThrowIfNull(r);
         var m = MonthOrFail(month, "month");
         var items = r.Sites ?? [];
-        if (items.Count == 0) throw Fail.Field("sites", ErrorCodes.ValidationRequired, "sites");
-        if (items.Count > 2000) throw Fail.Field("sites", ErrorCodes.ValidationRange, "sites");
+        if (items.Count == 0) throw Fail.Field("sites", ErrorCodes.ValidationRequired, new FieldRef("sites"));
+        if (items.Count > 2000) throw Fail.Field("sites", ErrorCodes.ValidationRange, new FieldRef("sites"));
         var decimals = await tariffs.DecimalsAsync(ct).ConfigureAwait(false);
 
         // Validate every row first so the client gets all field problems at once (sites[i].ownFleetRate …).
@@ -119,7 +119,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
         {
             var s = items[i];
             var field = $"sites[{i}].loadingSiteId";
-            if (publicIds[i] is not Guid publicId || !sites.TryGetValue(publicId, out var site)) throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+            if (publicIds[i] is not Guid publicId || !sites.TryGetValue(publicId, out var site)) throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
             if (!seen.Add(site.Id)) throw Fail.Field(field, ErrorCodes.ImportDuplicate, site.Name);
             var rate = existing.FirstOrDefault(x => x.LoadingSiteId == site.Id);
             var clearing = s.OwnFleetRate is null && s.ExternalFleetRate is null;
@@ -136,7 +136,7 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
             if (rate.OwnFleetRate == s.OwnFleetRate && rate.ExternalFleetRate == s.ExternalFleetRate) continue;
             await locks.EnsureNotLockedByOthersAsync(EntityType, rate.Id, ct).ConfigureAwait(false);
             // Several managers may edit the same month grid: changing stored rates needs the version last seen (review M1).
-            if (string.IsNullOrEmpty(s.RowVersion)) throw Fail.Field($"sites[{i}].rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+            if (string.IsNullOrEmpty(s.RowVersion)) throw Fail.Field($"sites[{i}].rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
             db.ExpectRowVersion(rate, s.RowVersion);
             var before = Snapshot(m, site.Name, rate.OwnFleetRate, rate.ExternalFleetRate);
             if (clearing)
@@ -217,5 +217,5 @@ public sealed class MonthlyRateService(IAppDbContext db, IRequestContext ctx, Ma
     /// <summary>The rates of a month for export/print (FR-028): every listed site with its two rates.</summary>
     internal Task<MonthRatesResponse> ForExportAsync(string month, CancellationToken ct) => LoadAsync(MonthOrFail(month, "month"), ct);
 
-    private static string MonthOrFail(string? month, string field) => PricingRules.ParseMonth(month) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+    private static string MonthOrFail(string? month, string field) => PricingRules.ParseMonth(month) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
 }

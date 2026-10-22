@@ -153,15 +153,31 @@ export function placeFly(fly, focus) {
   if (document.activeElement !== first) requestAnimationFrame(() => { placeFly(fly, false); first.focus(); });
 }
 
-/** Per-device preferences (DT-69: density is stored in the browser, not in core.Users). Storage may be unavailable. */
+/** Per-device preferences (stored in the browser, not in core.Users). Storage may be unavailable. */
 export function getPref(key) { try { return localStorage.getItem("dst." + key); } catch { return null; } }
 export function setPref(key, value) { try { localStorage.setItem("dst." + key, value); } catch { /* storage unavailable */ } }
 
-/** Applies density and language direction to the document root. */
-export function applyRoot(density, lang) {
+// The display density was removed (DT-244): its stored value is dropped and never read.
+try { localStorage.removeItem("dst.density"); } catch { /* storage unavailable */ }
+
+/** Applies the language direction to the document root. */
+export function applyRoot(lang) {
   const r = document.documentElement;
-  r.dataset.density = density === "comfortable" ? "comfortable" : "compact";
   if (lang) { r.lang = lang; r.dir = lang === "en" ? "ltr" : "rtl"; }
+}
+
+/**
+ * Theme (DT-244): "light", "dark" or "system" (follow the device). Sets <html data-theme-choice> and the resolved data-theme, and keeps
+ * the choice as this device's last one ("dst.theme"), which the inline script in App.razor applies before the first paint of the next
+ * page. The same script follows the device's setting while "system" is chosen.
+ */
+export function applyTheme(choice) {
+  const c = choice === "light" || choice === "dark" ? choice : "system";
+  const r = document.documentElement;
+  const dark = c === "dark" || (c === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+  r.dataset.themeChoice = c;
+  r.dataset.theme = dark ? "dark" : "light";
+  setPref("theme", c);
 }
 
 /** The language the server rendered into <html lang> (profile language, or the browser's for anonymous pages). */
@@ -170,6 +186,18 @@ export function rootLang() { return document.documentElement.lang || "ar"; }
 export function focusById(id) { const el = document.getElementById(id); if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); } }
 
 export function scrollIntoView(el) { if (el) el.scrollIntoView({ block: "nearest" }); }
+
+/**
+ * DT-246: brings a panel of a list-plus-panel page into view when the narrow layout stacked it under the lists (its grid has one column),
+ * smoothly — at once when the user asked for reduced motion. Beside the lists it is already in view: nothing happens.
+ */
+export function revealStacked(selector) {
+  const el = document.querySelector(selector);
+  const grid = el?.parentElement;
+  if (!el || !grid || getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length > 1) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
+}
 
 /** Combo box: arrow keys move in the list instead of the caret, Enter picks instead of submitting the form while the list is open. */
 export function guardComboKeys(el) {

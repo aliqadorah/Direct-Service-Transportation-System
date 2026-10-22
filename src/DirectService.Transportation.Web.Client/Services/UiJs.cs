@@ -36,7 +36,8 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     /// <summary>Seconds since the user last pressed a key, clicked, typed or scrolled (record-lock heartbeat, BR-039).</summary>
     public ValueTask<int> IdleSeconds() => Get<int>("idleSeconds");
     public ValueTask SetPref(string key, string value) => Call("setPref", key, value);
-    public ValueTask ApplyRoot(string density, string? lang) => Call("applyRoot", density, lang);
+    public ValueTask ApplyRoot(string? lang) => Call("applyRoot", lang);
+    public ValueTask ApplyTheme(string theme) => Call("applyTheme", theme);
     public ValueTask<string?> RootLang() => Get<string?>("rootLang");
     public ValueTask FocusById(string id) => Call("focusById", id);
     public ValueTask GuardComboKeys(Microsoft.AspNetCore.Components.ElementReference el) => Call("guardComboKeys", el);
@@ -46,6 +47,9 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask SaveFile(string name, string contentType, byte[] bytes) => Call("saveFile", name, contentType, bytes);
     public ValueTask PrintHtml(Microsoft.AspNetCore.Components.ElementReference el, string html) => Call("printHtml", el, html);
     public ValueTask ScrollIntoView(Microsoft.AspNetCore.Components.ElementReference el) => Call("scrollIntoView", el);
+
+    /// <summary>Brings a panel into view when it is stacked under the lists (DT-246); nothing when it stands beside them.</summary>
+    public ValueTask RevealStacked(string selector) => Call("revealStacked", selector);
 
     /// <summary>An open combo list as an overlay fixed to the window (never clipped by a scrolling table or panel); <see cref="UnfloatList"/> ends it.</summary>
     public ValueTask FloatList(Microsoft.AspNetCore.Components.ElementReference wrap, string id) => Call("floatList", wrap, id);

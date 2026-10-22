@@ -46,7 +46,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     public async Task<UnbilledTripsResponse> UnbilledAsync(UnbilledTripsQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
-        var customer = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationRequired, "customer");
+        var customer = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationRequired, new FieldRef("customer"));
         var query = db.Set<Trip>().AsNoTracking().Where(t => t.Customer.PublicId == customer && t.Status == TripService.Active && t.InvoiceId == null);
         if (q.From is DateOnly from) query = query.Where(t => t.TripDate >= from);
         if (q.To is DateOnly to) query = query.Where(t => t.TripDate <= to);
@@ -59,7 +59,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     }
 
     private Guid? Pid<T>(string? token, string field) =>
-        string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
 
     // ============================================================ drafts and approval
 
@@ -175,7 +175,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
 
     private static void RequireRowVersion(string? rowVersion)
     {
-        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
     }
 
     /// <summary>The validated content of a request: header values on the invoice, the trips or manual lines to write.</summary>
@@ -188,14 +188,14 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             null or "" => isNew ? null : inv.InvoiceType,
             var x when string.Equals(x, InvoiceCodes.Trip, StringComparison.OrdinalIgnoreCase) => InvoiceCodes.Trip,
             var x when string.Equals(x, InvoiceCodes.Manual, StringComparison.OrdinalIgnoreCase) => InvoiceCodes.Manual,
-            _ => throw Fail.Field("invoiceType", ErrorCodes.ValidationFormat, "invoiceType"),
+            _ => throw Fail.Field("invoiceType", ErrorCodes.ValidationFormat, new FieldRef("invoiceType")),
         };
         var layout = (r.LayoutType?.Trim()) switch
         {
             null or "" => isNew ? InvoiceCodes.Claim : inv.LayoutType,   // rev. 5 / D-02 default; an edit keeps the stored layout (review L1)
             var x when string.Equals(x, InvoiceCodes.Claim, StringComparison.OrdinalIgnoreCase) => InvoiceCodes.Claim,
             var x when string.Equals(x, InvoiceCodes.TaxInvoice, StringComparison.OrdinalIgnoreCase) => InvoiceCodes.TaxInvoice,
-            _ => throw Fail.Field("layoutType", ErrorCodes.ValidationFormat, "layoutType"),
+            _ => throw Fail.Field("layoutType", ErrorCodes.ValidationFormat, new FieldRef("layoutType")),
         };
         var notes = TextNormalizer.CleanText(r.Notes);
         var feesText = TextNormalizer.CleanText(r.ExtraFeesDescription);
@@ -221,11 +221,11 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         if (type == InvoiceCodes.Trip)
         {
             var tokens = (r.TripIds ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.Ordinal).ToList();
-            if (tokens.Count == 0) throw Fail.Field("tripIds", ErrorCodes.ValidationRequired, "tripIds");
-            if (tokens.Count > 5000) throw Fail.Field("tripIds", ErrorCodes.ValidationRange, "tripIds");
-            var ids = tokens.Select(t => support.Decode<Trip>(t) ?? throw Fail.Field("tripIds", ErrorCodes.ValidationFormat, "tripIds")).ToList();
+            if (tokens.Count == 0) throw Fail.Field("tripIds", ErrorCodes.ValidationRequired, new FieldRef("tripIds"));
+            if (tokens.Count > 5000) throw Fail.Field("tripIds", ErrorCodes.ValidationRange, new FieldRef("tripIds"));
+            var ids = tokens.Select(t => support.Decode<Trip>(t) ?? throw Fail.Field("tripIds", ErrorCodes.ValidationFormat, new FieldRef("tripIds"))).ToList();
             tripList = await db.Set<Trip>().Where(t => ids.Contains(t.PublicId)).ToListAsync(ct).ConfigureAwait(false);
-            if (tripList.Count != ids.Count) throw Fail.Field("tripIds", ErrorCodes.ValidationFormat, "tripIds");
+            if (tripList.Count != ids.Count) throw Fail.Field("tripIds", ErrorCodes.ValidationFormat, new FieldRef("tripIds"));
             foreach (var t in tripList)
             {
                 // Only the customer's active trips not on another invoice (FR-038, FR-044).
@@ -236,8 +236,8 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         else
         {
             var lines = r.Lines ?? [];
-            if (lines.Count == 0) throw Fail.Field("lines", ErrorCodes.ValidationRequired, "lines");
-            if (lines.Count > 500) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
+            if (lines.Count == 0) throw Fail.Field("lines", ErrorCodes.ValidationRequired, new FieldRef("lines"));
+            if (lines.Count > 500) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines"));
             var v = new Validator();
             for (var i = 0; i < lines.Count; i++)
             {
@@ -252,7 +252,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         }
 
         var linesTotal = type == InvoiceCodes.Trip ? tripList.Sum(t => t.Revenue) : manual.Sum(m => m.Item4);
-        if (discount > linesTotal) throw Fail.Field("discount", ErrorCodes.ValidationRange, "discount");
+        if (discount > linesTotal) throw Fail.Field("discount", ErrorCodes.ValidationRange, new FieldRef("discount"));
         var totals = InvoiceCalculator.Invoice(linesTotal, discount, fees, company.TaxRate, company.TaxInclusive, company.Decimals);
         var terms = await db.Set<Customer>().AsNoTracking().Where(c => c.Id == customer.Id).Select(c => c.PaymentTermsDays).SingleAsync(ct).ConfigureAwait(false);
 
@@ -492,7 +492,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             "closed" => query.Where(i => i.Status == InvoiceCodes.Closed),
             "void" => query.Where(i => i.Status == InvoiceCodes.Void),
             "active" => query.Where(i => i.Status == InvoiceCodes.Approved || i.Status == InvoiceCodes.Closed),
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         if (Pid<Customer>(q.Customer, "customer") is Guid c) query = query.Where(i => i.Customer.PublicId == c);
         if (q.From is DateOnly from) query = query.Where(i => i.InvoiceDate >= from);
@@ -503,7 +503,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             "paid" => query.Where(i => i.Status == InvoiceCodes.Closed),
             "unpaid" => query.Where(i => i.Status == InvoiceCodes.Approved && i.PaidAmount == 0 && i.ReturnedAmount == 0),
             "partial" => query.Where(i => i.Status == InvoiceCodes.Approved && (i.PaidAmount > 0 || i.ReturnedAmount > 0)),
-            _ => throw Fail.Field("paid", ErrorCodes.ValidationFormat, "paid"),
+            _ => throw Fail.Field("paid", ErrorCodes.ValidationFormat, new FieldRef("paid")),
         };
         if (q.Overdue == true) query = query.Where(i => i.Status == InvoiceCodes.Approved && i.RemainingAmount > 0 && i.DueDate < today);
         if (!string.IsNullOrWhiteSpace(q.EInvoice))

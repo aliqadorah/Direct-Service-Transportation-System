@@ -4,7 +4,7 @@ namespace DirectService.Transportation.Web.Client.Services;
 
 /// <summary>
 /// What the shell shows for the signed-in user: profile (language, date format), companies with their roles and permissions, the
-/// current company, density (per device, DT-69), unread notifications and whether the setup checklist is still open. Filled from
+/// current company, theme (per user on this device, DT-244), unread notifications and whether the setup checklist is still open. Filled from
 /// <c>GET /api/v1/me</c> and the company endpoints (step 8); components re-render on <see cref="Changed"/>.
 /// </summary>
 public sealed class ShellState : IDisposable
@@ -13,7 +13,8 @@ public sealed class ShellState : IDisposable
 
     public CompanyAccess? Company { get; private set; }
 
-    public string Density { get; private set; } = "compact";
+    /// <summary>"light", "dark" or "system" (follow the device, the default).</summary>
+    public string Theme { get; private set; } = "system";
 
     public int UnreadNotifications { get; private set; }
 
@@ -100,11 +101,15 @@ public sealed class ShellState : IDisposable
         Changed?.Invoke();
     }
 
-    public void SetDensity(string density)
+    /// <summary>Any other value (unknown, unreadable) means "system".</summary>
+    public void SetTheme(string? theme)
     {
-        Density = density == "comfortable" ? "comfortable" : "compact";
+        Theme = theme is "light" or "dark" ? theme : "system";
         Changed?.Invoke();
     }
+
+    /// <summary>Device preference key of the user's theme (DT-244).</summary>
+    public string ThemeKey => "theme." + (Me?.Id ?? "-");
 
     public void SetNotifications(int unread)
     {

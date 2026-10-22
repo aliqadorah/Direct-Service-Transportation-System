@@ -39,7 +39,7 @@ public sealed class JournalExportService(IAppDbContext db, INumberingService num
             .Check(AccountingCodes.IsMonth(r.PeriodTo), "periodTo")
             .Check(format is "JSON" or "CSV", "format")
             .ThrowIfInvalid();
-        if (string.CompareOrdinal(r.PeriodFrom, r.PeriodTo) > 0) throw Fail.Field("periodTo", ErrorCodes.ValidationRange, "periodTo");
+        if (string.CompareOrdinal(r.PeriodFrom, r.PeriodTo) > 0) throw Fail.Field("periodTo", ErrorCodes.ValidationRange, new FieldRef("periodTo"));
 
         var entries = await journal.ExportRowsAsync(new JournalQuery(r.PeriodFrom, r.PeriodTo, null, null, null, null, null, null, null, null),
             200_000, ct).ConfigureAwait(false);

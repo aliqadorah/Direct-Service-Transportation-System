@@ -287,8 +287,9 @@ public static class ErrorCatalog
     };
 
     /// <summary>
-    /// Formats the message of a code in the given language ("ar" or "en"). An argument that is a field name or path ("entryIds",
-    /// "lines[2].accountId") or a party type code is shown by its label (DT-241, <see cref="FieldLabels"/>).
+    /// Formats the message of a code in the given language ("ar" or "en"). A <see cref="FieldRef"/> argument — a field name or path
+    /// ("entryIds", "lines[2].accountId") or a party type code — is shown by its label (DT-241, <see cref="FieldLabels"/>); every other
+    /// argument (names, numbers, values typed by a user) is shown as it is, even when it equals a field name (DT-245).
     /// </summary>
     public static string Format(string code, string language, params object?[] args)
     {
@@ -296,7 +297,7 @@ public static class ErrorCatalog
             return code;
         var template = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? m.En : m.Ar;
         if (args.Length == 0) return template;
-        args = [.. args.Select(a => a is string s && FieldLabels.TryLabel(s, language, out var label) ? label : a)];
+        args = [.. args.Select(a => a is FieldRef f ? FieldLabels.TryLabel(f.Name, language, out var label) ? label : f.Name : a)];
         // Missing arguments render as empty text instead of failing (messages take up to 5 placeholders).
         var padded = args.Length >= 5 ? args : [.. args, .. Enumerable.Repeat<object?>(string.Empty, 5 - args.Length)];
         return string.Format(CultureInfo.InvariantCulture, template, padded);

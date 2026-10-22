@@ -75,7 +75,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         var money = await cash.ChooseAsync(r.PaymentMethod, r.CashBoxId, r.BankAccountId, r.Reference, ct).ConfigureAwait(false);
         var kind = string.IsNullOrWhiteSpace(r.Kind) ? CashCodes.Payment
             : new[] { CashCodes.Payment, CashCodes.Repayment }.FirstOrDefault(k => string.Equals(k, r.Kind.Trim(), StringComparison.OrdinalIgnoreCase))
-              ?? throw Fail.Field("kind", ErrorCodes.ValidationFormat, "kind");
+              ?? throw Fail.Field("kind", ErrorCodes.ValidationFormat, new FieldRef("kind"));
         var payment = new PartnerPayment
         {
             Kind = kind,
@@ -202,7 +202,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         var query = CashSupport.WithStatus(db.Set<PartnerPayment>().AsNoTracking(), q.Status);
         if (!string.IsNullOrWhiteSpace(q.Partner))
         {
-            var g = support.Decode<Partner>(q.Partner) ?? throw Fail.Field("partner", ErrorCodes.ValidationFormat, "partner");
+            var g = support.Decode<Partner>(q.Partner) ?? throw Fail.Field("partner", ErrorCodes.ValidationFormat, new FieldRef("partner"));
             query = query.Where(p => p.Partner.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(p => p.PaymentDate >= from);

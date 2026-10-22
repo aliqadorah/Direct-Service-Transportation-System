@@ -38,7 +38,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
         null or "" => null,
         "supplier" => ApArCodes.Supplier,
         "customer" => ApArCodes.Customer,
-        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, field),
+        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field)),
     };
 
     public async Task<PagedResult<ApArPartyResponse>> ListAsync(ApArPartyListQuery q, CancellationToken ct)
@@ -61,7 +61,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
     /// <summary>Choices for a document: active accounting parties of the role and, for receivables, active transport customers.</summary>
     public async Task<IReadOnlyList<ApArPartyOption>> OptionsAsync(string? role, CancellationToken ct)
     {
-        var r = Role(role) ?? throw Fail.Field("role", ErrorCodes.ValidationRequired, "role");
+        var r = Role(role) ?? throw Fail.Field("role", ErrorCodes.ValidationRequired, new FieldRef("role"));
         var parties = (await db.Set<ApArParty>().AsNoTracking().Where(p => p.PartyRole == r && p.Status == ApArCodes.Active).OrderBy(p => p.Name)
                 .Select(p => new { p.PublicId, p.Name, p.TaxNumber, p.PaymentTermsDays }).ToListAsync(ct).ConfigureAwait(false))
             .Select(p => new ApArPartyOption(AccountingCodes.PartyApAr, support.Token<ApArParty>(p.PublicId), p.Name, p.TaxNumber, p.PaymentTermsDays)).ToList();
@@ -86,7 +86,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
         ArgumentNullException.ThrowIfNull(r);
         var clientId = MasterIds.ClientId(r.ClientId);
         if (await support.ExistingAsync<ApArParty>(clientId, ct).ConfigureAwait(false) is { } again) return ((await ResponsesAsync([again.Id], ct).ConfigureAwait(false))[0], false);
-        var p = new ApArParty { PartyRole = Role(r.Role) ?? throw Fail.Field("role", ErrorCodes.ValidationRequired, "role"), Status = ApArCodes.Active };
+        var p = new ApArParty { PartyRole = Role(r.Role) ?? throw Fail.Field("role", ErrorCodes.ValidationRequired, new FieldRef("role")), Status = ApArCodes.Active };
         if (clientId is Guid id) p.PublicId = id;
         await ApplyAsync(p, r, ct).ConfigureAwait(false);
         db.Set<ApArParty>().Add(p);
@@ -180,7 +180,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
     internal static void EnsureControlAccount(Account a, string role, bool hasChildren)
     {
         if (!a.IsControlAccount || a.ControlPartyType != role || a.Status != AccountingCodes.Active || !a.IsPostable || hasChildren)
-            throw Fail.RuleOn("controlAccountId", ErrorCodes.ApArControlAccount, role);
+            throw Fail.RuleOn("controlAccountId", ErrorCodes.ApArControlAccount, new FieldRef(role));
     }
 
     private async Task EnsureUniqueNameAsync(string role, string name, long id, CancellationToken ct)

@@ -21,7 +21,7 @@ public sealed class TripExportService(TripService trips, ISpreadsheetService she
         {
             null or "" or "xlsx" or "pdf" or "html" => false,
             "csv" => true,
-            _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
+            _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format")),
         };
         var en = ctx.Language == "en";
         var rules = await fields.RulesAsync(FieldCatalog.Trip, ct).ConfigureAwait(false);

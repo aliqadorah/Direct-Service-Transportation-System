@@ -42,8 +42,8 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         await locks.EnsureNotLockedByOthersAsync(InvoiceService.EntityType, inv.Id, ct).ConfigureAwait(false);
         var company = await invoices.CompanyAsync(ct).ConfigureAwait(false);
         if (inv.Status is not (InvoiceCodes.Approved or InvoiceCodes.Closed)) throw Fail.Rule(ErrorCodes.CreditInvoiceNotApproved, inv.Number);
-        if (r.CreditDate > company.Today) throw Fail.Field("creditDate", ErrorCodes.DateFuture, "creditDate");
-        if (r.CreditDate < inv.InvoiceDate) throw Fail.Field("creditDate", ErrorCodes.ValidationRange, "creditDate");
+        if (r.CreditDate > company.Today) throw Fail.Field("creditDate", ErrorCodes.DateFuture, new FieldRef("creditDate"));
+        if (r.CreditDate < inv.InvoiceDate) throw Fail.Field("creditDate", ErrorCodes.ValidationRange, new FieldRef("creditDate"));
 
         var cn = new CreditNote { InvoiceId = inv.Id, CustomerId = inv.CustomerId, CreditDate = r.CreditDate!.Value, Reason = reason!, Status = InvoiceCodes.Posted };
         if (clientId is Guid id) cn.PublicId = id;
@@ -125,9 +125,9 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         for (var i = 0; i < items.Count; i++)
         {
             var field = $"lines[{i}].invoiceLineId";
-            var pid = support.Decode<InvoiceLine>(items[i].InvoiceLineId) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
-            var line = invLines.FirstOrDefault(l => l.PublicId == pid) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
-            if (!seen.Add(line.Id)) throw Fail.Field(field, ErrorCodes.ImportDuplicate, field);
+            var pid = support.Decode<InvoiceLine>(items[i].InvoiceLineId) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
+            var line = invLines.FirstOrDefault(l => l.PublicId == pid) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
+            if (!seen.Add(line.Id)) throw Fail.Field(field, ErrorCodes.ImportDuplicate, new FieldRef(field));
             var (doneQty, doneAmount) = returnedQty.GetValueOrDefault(line.Id);
             var openQty = line.Quantity - doneQty;
             if (openQty <= 0) throw Fail.RuleOn(field, ErrorCodes.CreditLineReturned);
@@ -136,7 +136,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             else
             {
                 qty = items[i].Quantity ?? openQty;
-                if (qty <= 0 || decimal.Round(qty, 3) != qty || qty > openQty) throw Fail.Field($"lines[{i}].quantity", ErrorCodes.ValidationRange, "quantity");
+                if (qty <= 0 || decimal.Round(qty, 3) != qty || qty > openQty) throw Fail.Field($"lines[{i}].quantity", ErrorCodes.ValidationRange, new FieldRef("quantity"));
             }
             // The last open part of a line takes exactly what is left of its amount (no rounding residue on the line).
             var amount = qty == openQty ? line.Amount - doneAmount : InvoiceCalculator.LineAmount(qty, line.UnitPrice, decimals);
@@ -169,7 +169,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         var cn = await support.FindAsync<CreditNote>(token, ct).ConfigureAwait(false);
         await locks.EnsureNotLockedByOthersAsync(EntityType, cn.Id, ct).ConfigureAwait(false);
         if (cn.Status == InvoiceCodes.Void) throw Fail.Rule(ErrorCodes.CreditIsVoid, cn.Number);
-        if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+        if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
         db.ExpectRowVersion(cn, r.RowVersion);
         await db.InTransactionAsync(async c =>
         {
@@ -282,16 +282,16 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             null or "" => query,
             "posted" => query.Where(c => c.Status == InvoiceCodes.Posted),
             "void" => query.Where(c => c.Status == InvoiceCodes.Void),
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         if (!string.IsNullOrWhiteSpace(q.Customer))
         {
-            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, "customer");
+            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, new FieldRef("customer"));
             query = query.Where(c => c.Customer.PublicId == g);
         }
         if (!string.IsNullOrWhiteSpace(q.Invoice))
         {
-            var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, "invoice");
+            var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, new FieldRef("invoice"));
             query = query.Where(c => c.Invoice.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(c => c.CreditDate >= from);

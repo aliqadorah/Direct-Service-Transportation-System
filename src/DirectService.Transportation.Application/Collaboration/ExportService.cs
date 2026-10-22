@@ -75,7 +75,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
                 break;
             case "saved":
                 if (!ctx.HasPermission(PermissionKeys.ReportsView)) throw Fail.Forbidden();
-                await saved.GetAsync(r.Report ?? throw Fail.Field("report", ErrorCodes.ValidationRequired, "report"), ct).ConfigureAwait(false);
+                await saved.GetAsync(r.Report ?? throw Fail.Field("report", ErrorCodes.ValidationRequired, new FieldRef("report")), ct).ConfigureAwait(false);
                 break;
             case "standard":
                 if (!standard.CatalogFor().Any(c => c.Key == r.Key && c.Path is null)) throw Fail.Forbidden();
@@ -89,7 +89,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
                 break;
         }
         if (r.Format is not null && r.Format.Trim().ToLowerInvariant() is not ("xlsx" or "excel" or "csv" or "pdf" or "html"))
-            throw Fail.Field("format", ErrorCodes.ValidationFormat, "format");
+            throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
         var job = new ExportJob(Guid.NewGuid(), ctx.TenantId ?? throw Fail.Forbidden(), ctx.CompanyId ?? throw Fail.Forbidden(), ctx.UserId ?? throw Fail.Forbidden(),
             ctx.UserPublicId ?? throw Fail.Forbidden(), ctx.UserName, ctx.Language, r with { Kind = kind });
         if (!queue.Enqueue(job)) throw new AppException(ErrorCodes.RateLimited, 429);
@@ -99,7 +99,7 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
     private static string Kind(string? kind) => (kind?.Trim().ToLowerInvariant()) switch
     {
         "builder" or "saved" or "standard" or "audit-log" or "company" => kind.Trim().ToLowerInvariant(),
-        _ => throw Fail.Field("kind", ErrorCodes.ValidationFormat, "kind"),
+        _ => throw Fail.Field("kind", ErrorCodes.ValidationFormat, new FieldRef("kind")),
     };
 
     /// <summary>Runs a job inside a scope prepared for the requester (worker); stores the file and notifies.</summary>

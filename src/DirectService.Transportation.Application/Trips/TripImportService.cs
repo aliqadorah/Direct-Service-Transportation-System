@@ -125,7 +125,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
         {
             null or "" or "strict" => "Strict",
             "tolerant" => "Tolerant",
-            _ => throw Fail.Field("mode", ErrorCodes.ValidationFormat, "mode"),
+            _ => throw Fail.Field("mode", ErrorCodes.ValidationFormat, new FieldRef("mode")),
         };
         var tolerant = mode == "Tolerant";
         var mapping = ImportMapping.Parse(mappingJson);
@@ -306,7 +306,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             {
                 if (ex.Errors.Count > 0)
                     foreach (var e in ex.Errors)
-                        problems.AddAt(row.RowNumber, receipt, Col(e.Field), e.Code, null, e.Args.Length > 0 && e.Args[0] is string f ? [rules.Label(f), .. e.Args.Skip(1)] : e.Args);
+                        problems.AddAt(row.RowNumber, receipt, Col(e.Field), e.Code, null, e.Args.Length > 0 && e.Args[0] is FieldRef f ? [rules.Label(f.Name), .. e.Args.Skip(1)] : e.Args);
                 // Rules tied to a field name its column; a closed period concerns the dates of the row.
                 else problems.AddAt(row.RowNumber, receipt, ex.Field is not null ? Col(ex.Field) : ex.Code == ErrorCodes.PeriodClosed ? Col("tripDate") : null, ex.Code, null, ex.Args);
             }

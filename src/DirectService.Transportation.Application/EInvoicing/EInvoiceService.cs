@@ -378,7 +378,7 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
                 "notrequired" => query.Where(s => s.Status == EInvoiceCodes.NotRequired),
                 // The Rejected/Failed list (FR-061): what needs attention.
                 "attention" => query.Where(s => s.Status == EInvoiceCodes.Rejected || (s.Status == EInvoiceCodes.Queued && s.LastError != null)),
-                _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+                _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
             };
         }
         query = (q.DocumentType?.Trim().ToLowerInvariant()) switch
@@ -386,11 +386,11 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
             null or "" => query,
             "invoice" => query.Where(s => s.DocumentType == EInvoiceCodes.Invoice),
             "creditnote" => query.Where(s => s.DocumentType == EInvoiceCodes.CreditNote),
-            _ => throw Fail.Field("documentType", ErrorCodes.ValidationFormat, "documentType"),
+            _ => throw Fail.Field("documentType", ErrorCodes.ValidationFormat, new FieldRef("documentType")),
         };
         if (!string.IsNullOrWhiteSpace(q.Customer))
         {
-            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, "customer");
+            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, new FieldRef("customer"));
             query = query.Where(s => s.InvoiceId != null ? s.Invoice!.Customer.PublicId == g : s.CreditNote!.Customer.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(s => (s.InvoiceId != null ? s.Invoice!.InvoiceDate : s.CreditNote!.CreditDate) >= from);

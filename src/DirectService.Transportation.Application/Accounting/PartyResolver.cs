@@ -22,7 +22,7 @@ public sealed class PartyResolver(IAppDbContext db, IUrlTokenService tokens)
     public async Task<PostingParty?> ResolveAsync(PartyRequest? party, string field, CancellationToken ct)
     {
         if (party is null || (string.IsNullOrEmpty(party.Type) && string.IsNullOrEmpty(party.Id))) return null;
-        if (party.Type is null || !Types.Contains(party.Type)) throw Fail.Field(field + ".type", ErrorCodes.ValidationFormat, field + ".type");
+        if (party.Type is null || !Types.Contains(party.Type)) throw Fail.Field(field + ".type", ErrorCodes.ValidationFormat, new FieldRef(field + ".type"));
         var found = party.Type switch
         {
             AccountingCodes.PartyCustomer => await FindAsync<Customer>(party.Id, c => c.Status, ct).ConfigureAwait(false),
@@ -30,8 +30,8 @@ public sealed class PartyResolver(IAppDbContext db, IUrlTokenService tokens)
             AccountingCodes.PartyPartner => await FindAsync<Partner>(party.Id, p => p.Status, ct).ConfigureAwait(false),
             _ => await FindAsync<ApArParty>(party.Id, p => p.Status, ct).ConfigureAwait(false),
         };
-        if (found is null) throw Fail.Field(field + ".id", ErrorCodes.ValidationFormat, field + ".id");
-        if (found.Value.Status == AccountingCodes.Archived) throw Fail.RuleOn(field, ErrorCodes.RecordArchived, party.Type);
+        if (found is null) throw Fail.Field(field + ".id", ErrorCodes.ValidationFormat, new FieldRef(field + ".id"));
+        if (found.Value.Status == AccountingCodes.Archived) throw Fail.RuleOn(field, ErrorCodes.RecordArchived, new FieldRef(party.Type));
         return new PostingParty(ModuleOf(party.Type), party.Type, found.Value.Id);
     }
 

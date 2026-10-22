@@ -52,4 +52,23 @@ public sealed partial class FieldMessageTests(ApiFactory f)
         Assert.All(messages, m => Assert.DoesNotMatch(RawName(), m));
         Assert.Contains(messages, m => m.Contains("السطر 2 · الحساب", StringComparison.Ordinal) || m.Contains("Line 2 · Account", StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// DT-245: a record whose name equals a field name — here a journal template called "name", refused on the field "name" — keeps its
+    /// name in the message; only the field reference of a message is labelled, never a value.
+    /// </summary>
+    [Fact]
+    public async Task A_record_named_like_a_field_keeps_its_name_in_the_message()
+    {
+        var w = await ApArTests.WorldAsync(f);
+        var o = w.Owner;
+        var request = new JournalTemplateRequest("name", null, null,
+            [new JournalTemplateLineRequest(w.Accounts["5203"].Id, 0, 0, null, null), new JournalTemplateLineRequest(w.Accounts["110101"].Id, 0, 0, null, null)]);
+        Assert.True((await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-templates"), request)).IsSuccessStatusCode);
+
+        var messages = await MessagesAsync(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-templates"), request));
+
+        Assert.Contains(messages, m => m.Contains("«name»", StringComparison.Ordinal) || m.Contains("“name”", StringComparison.Ordinal));
+        Assert.DoesNotContain(messages, m => m.Contains("«الاسم»", StringComparison.Ordinal) || m.Contains("“Name”", StringComparison.Ordinal));
+    }
 }

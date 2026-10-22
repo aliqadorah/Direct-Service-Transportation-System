@@ -33,7 +33,7 @@ public sealed class StandardFieldService(IAppDbContext db, IRequestContext ctx, 
         ArgumentNullException.ThrowIfNull(r);
         EnsureEntity(entityType);
         var changes = r.Fields ?? [];
-        if (changes.Count > FieldCatalog.For(entityType).Count) throw Fail.Field("fields", ErrorCodes.ValidationRange, "fields");
+        if (changes.Count > FieldCatalog.For(entityType).Count) throw Fail.Field("fields", ErrorCodes.ValidationRange, new FieldRef("fields"));
         var errors = new List<FieldError>();
         foreach (var c in changes)
         {
@@ -44,7 +44,7 @@ public sealed class StandardFieldService(IAppDbContext db, IRequestContext ctx, 
                 continue;
             }
             var label = Common.TextNormalizer.CleanText(c.Label);
-            if (label is { Length: > 100 }) errors.Add(new FieldError(f.Key, ErrorCodes.ValidationRange, [f.Key]));
+            if (label is { Length: > 100 }) errors.Add(new FieldError(f.Key, ErrorCodes.ValidationRange, [new FieldRef(f.Key)]));
             // An always-required field stays required whatever IsRequired says; only hiding it is refused.
             if (c.IsHidden && f.IsCore) throw Fail.RuleOn(f.Key, ErrorCodes.FieldCore, label ?? DefaultLabel(f));
             if (c.IsHidden && f.AlwaysRequired) throw Fail.RuleOn(f.Key, ErrorCodes.FieldAlwaysRequired, label ?? DefaultLabel(f));
@@ -52,7 +52,7 @@ public sealed class StandardFieldService(IAppDbContext db, IRequestContext ctx, 
             if (c.IsRequired && FieldCatalog.CannotRequire(entityType, f.Key)) throw Fail.RuleOn(f.Key, ErrorCodes.FieldCannotRequire, label ?? DefaultLabel(f));
         }
         if (changes.Select(c => c.FieldKey).Distinct(StringComparer.Ordinal).Count() != changes.Count)
-            errors.Add(new FieldError("fields", ErrorCodes.ImportDuplicate, ["fieldKey"]));
+            errors.Add(new FieldError("fields", ErrorCodes.ImportDuplicate, [new FieldRef("fieldKey")]));
         if (errors.Count > 0) throw Fail.Fields(errors);
 
         var overrides = await OverridesAsync(entityType, tracked: true, ct).ConfigureAwait(false);

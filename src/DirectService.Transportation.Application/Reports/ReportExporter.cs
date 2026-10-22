@@ -99,7 +99,7 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
                 var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
                 return await printer.OutputAsync(Html(table, company), f, Safe(fileName), ct).ConfigureAwait(false);
             default:
-                throw Fail.Field("format", ErrorCodes.ValidationFormat, "format");
+                throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
         }
     }
 

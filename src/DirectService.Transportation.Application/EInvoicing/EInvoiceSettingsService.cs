@@ -51,7 +51,7 @@ public sealed class EInvoiceSettingsService(IAppDbContext db, IRequestContext ct
         var row = await db.Set<EInvoiceSettings>().SingleOrDefaultAsync(ct).ConfigureAwait(false);
         if (row is not null)
         {
-            if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+            if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
             db.ExpectRowVersion(row, r.RowVersion);
         }
         var connector = string.IsNullOrWhiteSpace(r.Connector) ? row?.Connector ?? EInvoiceCodes.JoFotara : r.Connector.Trim();

@@ -260,7 +260,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
     /// </summary>
     private static void RequireRowVersion(string? rowVersion)
     {
-        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
     }
 
     /// <summary>Edit and void only while active, unbilled and unsettled (7.1.2, FR-010, FR-011).</summary>
@@ -616,14 +616,14 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             null or "" or "active" => query.Where(t => t.Status == Active),
             "void" => query.Where(t => t.Status == Void),
             "all" => query,
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         query = (q.Billing?.Trim().ToLowerInvariant()) switch
         {
             null or "" => query,
             "unbilled" => query.Where(t => t.InvoiceId == null),
             "invoiced" => query.Where(t => t.InvoiceId != null),
-            _ => throw Fail.Field("billing", ErrorCodes.ValidationFormat, "billing"),
+            _ => throw Fail.Field("billing", ErrorCodes.ValidationFormat, new FieldRef("billing")),
         };
         query = YesNo(q.Settled, "settled") switch { true => query.Where(t => t.SettlementId != null), false => query.Where(t => t.SettlementId == null), _ => query };
         query = (q.Fleet?.Trim().ToLowerInvariant()) switch
@@ -631,7 +631,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             null or "" => query,
             "own" => query.Where(t => t.FleetClass == MasterCodes.Own),
             "external" => query.Where(t => t.FleetClass == MasterCodes.External),
-            _ => throw Fail.Field("fleet", ErrorCodes.ValidationFormat, "fleet"),
+            _ => throw Fail.Field("fleet", ErrorCodes.ValidationFormat, new FieldRef("fleet")),
         };
         query = YesNo(q.PartnerTrips, "partnerTrips") switch { true => query.Where(t => t.PartnerId != null), false => query.Where(t => t.PartnerId == null), _ => query };
         if (q.Shortage is bool sh) query = query.Where(t => t.IsShortageFlagged == sh);
@@ -650,14 +650,14 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
     }
 
     private Guid? Pid<T>(string? token, string field) =>
-        string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
 
     private static bool? YesNo(string? text, string field) => (text?.Trim().ToLowerInvariant()) switch
     {
         null or "" => null,
         "yes" or "true" => true,
         "no" or "false" => false,
-        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, field),
+        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field)),
     };
 
     /// <summary>The last ten trips saved by the current user (FR-008).</summary>

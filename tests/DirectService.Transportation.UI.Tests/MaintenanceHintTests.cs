@@ -42,6 +42,33 @@ public sealed class MaintenanceHintTests : PageTestBase
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#mnt-word")));
     }
 
+    /// <summary>DT-246: the list says how many entries are ticked, and only the first tick brings the (stacked) preview into view.</summary>
+    [Theory]
+    [InlineData("ar")]
+    [InlineData("en")]
+    public void The_count_of_ticked_entries_is_shown_and_the_first_tick_reveals_the_preview(string language)
+    {
+        L.SetLanguage(language);
+        Respond("accounting/journal-entries", new PagedResult<JournalEntrySummary>([Entry("je1", "JE-1"), Entry("je2", "JE-2")], 1, 200, 2));
+        var cut = Render<Maintenance>(p => p.Add(x => x.Company, Company));
+        Act(() => cut.FindAll("input[type=radio]")[0].Change(true));
+        cut.WaitForAssertion(() => Assert.Equal(L["mnt.pickedNone"], cut.Find(".mnt-picked[role=status]").TextContent.Trim()));
+        int Reveals() => UiModule.Invocations.Count(i => i.Identifier == "revealStacked");
+
+        Act(() => cut.FindAll("tbody input[type=checkbox]")[0].Change(true));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#mnt-word")));
+        Assert.Equal(L.F("mnt.picked", "1"), cut.Find(".mnt-picked").TextContent.Trim());
+        cut.WaitForAssertion(() => Assert.Equal(1, Reveals()));
+        Assert.Equal(".mnt-preview", UiModule.Invocations.Last(i => i.Identifier == "revealStacked").Arguments[0]);
+        Assert.Contains("mnt-preview", cut.Find("section.box.mnt-preview").ClassName, StringComparison.Ordinal);
+
+        // A second tick updates the count and the preview but does not move the page again.
+        Act(() => cut.FindAll("tbody input[type=checkbox]")[1].Change(true));
+        cut.WaitForAssertion(() => Assert.Equal(L.F("mnt.picked", "2"), cut.Find(".mnt-picked").TextContent.Trim()));
+        cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#mnt-word")));
+        Assert.Equal(1, Reveals());
+    }
+
     [Fact]
     public void Without_manual_entries_the_hint_says_there_are_none()
     {

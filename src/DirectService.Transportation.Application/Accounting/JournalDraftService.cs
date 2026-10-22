@@ -75,7 +75,7 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         for (var i = 0; i < lines.Count; i++)
         {
             var l = lines[i];
-            if (l.AccountId is null) throw Fail.Field($"lines[{i}].accountId", ErrorCodes.ValidationRequired, $"lines[{i}].accountId");
+            if (l.AccountId is null) throw Fail.Field($"lines[{i}].accountId", ErrorCodes.ValidationRequired, new FieldRef($"lines[{i}].accountId"));
             var party = l.PartyType is not null && l.PartyId is long pid ? new PostingParty(PartyResolver.ModuleOf(l.PartyType), l.PartyType, pid) : null;
             posting.Add(new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, party, l.Note));
         }
@@ -171,19 +171,19 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         {
             var l = input[i];
             var field = $"lines[{i}]";
-            if (l.Debit < 0 || l.Credit < 0) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, field + ".debit");
+            if (l.Debit < 0 || l.Credit < 0) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
             long? accountId = null, centreId = null;
             if (!string.IsNullOrEmpty(l.AccountId))
             {
-                var pid = tokens.Decode<Account>(l.AccountId) ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, field + ".accountId");
+                var pid = tokens.Decode<Account>(l.AccountId) ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
                 accountId = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == pid).Select(a => (long?)a.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                    ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, field + ".accountId");
+                    ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
             }
             if (!string.IsNullOrEmpty(l.CostCentreId))
             {
-                var pid = tokens.Decode<CostCentre>(l.CostCentreId) ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, field + ".costCentreId");
+                var pid = tokens.Decode<CostCentre>(l.CostCentreId) ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
                 centreId = await db.Set<CostCentre>().AsNoTracking().Where(c => c.PublicId == pid).Select(c => (long?)c.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                    ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, field + ".costCentreId");
+                    ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             }
             var party = l.Party is { Type: not null } && !string.IsNullOrEmpty(l.Party.Id)
                 ? await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false) : null;

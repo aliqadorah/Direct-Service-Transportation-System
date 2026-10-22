@@ -54,7 +54,7 @@
                 @if (_preview is null) {<p class="muted">@L["ui.loading"]</p>}
                 else
                 {
-                    <iframe srcdoc="@_preview" title="@L["lay.preview"]" sandbox="" style="width:min(100%,820px);height:100%;min-height:600px;border:1px solid var(--border);background:#fff"></iframe>
+                    <iframe srcdoc="@_preview" title="@L["lay.preview"]" sandbox="" style="width:min(100%,820px);height:100%;min-height:600px;border:1px solid var(--border);background:var(--doc-bg)"></iframe>
                 }
             </div>
         </div>

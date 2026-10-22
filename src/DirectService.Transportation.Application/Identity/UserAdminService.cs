@@ -340,7 +340,7 @@ public sealed class UserAdminService(
     private static void RequireReason(string? reason)
     {
         if (string.IsNullOrWhiteSpace(reason)) throw Fail.Field("reason", ErrorCodes.ReasonRequired);
-        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, "reason");
+        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
     }
 
     internal static void RequireReasonPublic(string? reason) => RequireReason(reason);

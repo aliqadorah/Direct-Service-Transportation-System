@@ -111,7 +111,7 @@ public sealed class DocumentPrinter(IAppDbContext db, IRequestContext ctx, IPdfR
                 await db.SaveChangesAsync(ct).ConfigureAwait(false);
                 return new GeneratedFile(safe + ".pdf", "application/pdf", bytes);
             default:
-                throw Fail.Field("format", ErrorCodes.ValidationFormat, "format");
+                throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
         }
     }
 }

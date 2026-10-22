@@ -40,10 +40,10 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
         var (_, decimals) = await cash.CurrencyAsync(ct).ConfigureAwait(false);
         var amount = CashSupport.Amount(r.Amount, decimals);
         var date = await cash.DateAsync(r.PaymentDate, "paymentDate", ct).ConfigureAwait(false);
-        var pid = support.Decode<ApArDocument>(r.DocumentId) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, "documentId");
-        var doc = await db.Set<ApArDocument>().SingleOrDefaultAsync(d => d.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, "documentId");
+        var pid = support.Decode<ApArDocument>(r.DocumentId) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, new FieldRef("documentId"));
+        var doc = await db.Set<ApArDocument>().SingleOrDefaultAsync(d => d.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, new FieldRef("documentId"));
         await locks.EnsureNotLockedByOthersAsync(ApArDocumentService.EntityType, doc.Id, ct).ConfigureAwait(false);
-        if (date < doc.DocumentDate) throw Fail.Field("paymentDate", ErrorCodes.ValidationRange, "paymentDate");
+        if (date < doc.DocumentDate) throw Fail.Field("paymentDate", ErrorCodes.ValidationRange, new FieldRef("paymentDate"));
         var money = await cash.ChooseAsync(r.PaymentMethod, r.CashBoxId, r.BankAccountId, r.Reference, ct).ConfigureAwait(false);
 
         var payment = new ApArPayment
@@ -150,12 +150,12 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
         var query = CashSupport.WithStatus(db.Set<ApArPayment>().AsNoTracking().Where(p => p.Document.DocumentKind == kind), q.Status);
         if (!string.IsNullOrWhiteSpace(q.Party))
         {
-            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
             query = query.Where(p => p.Document.Party.PublicId == g);
         }
         if (!string.IsNullOrWhiteSpace(q.Document))
         {
-            var g = support.Decode<ApArDocument>(q.Document) ?? throw Fail.Field("document", ErrorCodes.ValidationFormat, "document");
+            var g = support.Decode<ApArDocument>(q.Document) ?? throw Fail.Field("document", ErrorCodes.ValidationFormat, new FieldRef("document"));
             query = query.Where(p => p.Document.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(p => p.PaymentDate >= from);

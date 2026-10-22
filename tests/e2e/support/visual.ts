@@ -7,11 +7,12 @@ import { layoutProblems, type LayoutProblem } from "./layout";
 
 /** Window sizes of the check (desktop is the target, UX-14) and a laptop-like visible height. */
 export const WIDTHS: readonly number[] = process.env.VISUAL_WIDTHS ? process.env.VISUAL_WIDTHS.split(",").map(Number) : [1280, 1366];
-export const DENSITIES = ["compact", "comfortable"] as const;
+/** Both themes (DT-244; they replaced the two densities). Set as the choice too, so theme.js does not switch it back. */
+export const THEMES = (process.env.VISUAL_THEMES ? process.env.VISUAL_THEMES.split(",") : ["light", "dark"]) as readonly string[];
 const HEIGHT = 680;
 
 /** A layout problem at one size, or a screen/dialog that could not be shown (so it was not checked). */
-export type Finding = Omit<LayoutProblem, "kind"> & { kind: LayoutProblem["kind"] | "not-shown"; screen: string; lang: Lang; width: number; density: string };
+export type Finding = Omit<LayoutProblem, "kind"> & { kind: LayoutProblem["kind"] | "not-shown"; screen: string; lang: Lang; width: number; theme: string };
 
 export const VISUAL_DIR = path.join(ROOT, "TestResults", "visual");
 
@@ -38,17 +39,17 @@ export class VisualRun {
   }
 
   /**
-   * Checks the current screen at every width and density: first at a laptop-like height (dialogs, sticky parts, the visible area), then —
+   * Checks the current screen at every width and theme: first at a laptop-like height (dialogs, sticky parts, the visible area), then —
    * for full screens — at the height of the whole content, so that text below the fold is checked as well. Saves a screenshot of each.
    */
   async check(page: Page, screen: string, opts: { full?: boolean } = {}): Promise<void> {
     console.log(`visual ${new Date().toISOString().slice(11, 19)} ${this.lang} ${screen}`);
     for (const width of WIDTHS) {
-      for (const density of DENSITIES) {
+      for (const theme of THEMES) {
         await page.setViewportSize({ width, height: HEIGHT });
-        await page.evaluate((d) => { document.documentElement.dataset.density = d; }, density);
+        await page.evaluate((t) => { const r = document.documentElement; r.dataset.themeChoice = t; r.dataset.theme = t; }, theme);
         await settle(page);
-        await this.record(page, screen, width, density, "");
+        await this.record(page, screen, width, theme, "");
         if (opts.full) {
           const tall = await page.evaluate(() => {
             const c = document.querySelector("main.content, .content, .auth .formside") as HTMLElement | null;
@@ -57,20 +58,21 @@ export class VisualRun {
           if (tall > HEIGHT + 8) {
             await page.setViewportSize({ width, height: tall });
             await settle(page);
-            await this.record(page, screen, width, density, "-full");
+            await this.record(page, screen, width, theme, "-full");
           }
         }
       }
     }
     await page.setViewportSize({ width: 1366, height: 860 });
-    await page.evaluate(() => { document.documentElement.dataset.density = localStorage.getItem("dst.density") === "comfortable" ? "comfortable" : "compact"; });
+    // Back to the stored choice: theme.js applies it again once the attributes are gone.
+    await page.evaluate(() => { const r = document.documentElement; delete r.dataset.themeChoice; delete r.dataset.theme; });
     fs.writeFileSync(this.file, JSON.stringify(this.findings, null, 2));
   }
 
-  private async record(page: Page, screen: string, width: number, density: string, suffix: string): Promise<void> {
-    for (const p of await layoutProblems(page)) this.findings.push({ ...p, screen, lang: this.lang, width, density });
+  private async record(page: Page, screen: string, width: number, theme: string, suffix: string): Promise<void> {
+    for (const p of await layoutProblems(page)) this.findings.push({ ...p, screen, lang: this.lang, width, theme });
     if (!this.screenshots) return;
-    const file = path.join(VISUAL_DIR, this.lang, `${width}-${density}`, `${slug(screen)}${suffix}.png`);
+    const file = path.join(VISUAL_DIR, this.lang, `${width}-${theme}`, `${slug(screen)}${suffix}.png`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     await page.screenshot({ path: file, animations: "disabled", caret: "hide" });
     this.shots.push(file);

@@ -173,7 +173,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
         {
             null or "" or "xlsx" or "pdf" or "html" => false,
             "csv" => true,
-            _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
+            _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format")),
         };
         var entity = CustomEntity(kind);
         var rules = entity is null ? null : await fields.RulesAsync(entity, ct).ConfigureAwait(false);

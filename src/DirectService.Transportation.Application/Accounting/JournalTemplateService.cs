@@ -140,15 +140,15 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
             var l = input[i];
             var field = $"lines[{i}]";
             var accountId = tokens.Decode<Account>(l.AccountId) is Guid g && accounts.TryGetValue(g, out var a) ? a
-                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat, field + ".accountId");
-            if (!Money.IsValidAmount(l.Debit, decimals)) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, field + ".debit");
-            if (!Money.IsValidAmount(l.Credit, decimals) || (l.Debit > 0 && l.Credit > 0)) throw Fail.Field(field + ".credit", ErrorCodes.ValidationRange, field + ".credit");
+                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
+            if (!Money.IsValidAmount(l.Debit, decimals)) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
+            if (!Money.IsValidAmount(l.Credit, decimals) || (l.Debit > 0 && l.Credit > 0)) throw Fail.Field(field + ".credit", ErrorCodes.ValidationRange, new FieldRef(field + ".credit"));
             long? centreId = null;
             if (!string.IsNullOrEmpty(l.CostCentreId))
                 centreId = tokens.Decode<CostCentre>(l.CostCentreId) is Guid cg && centres.TryGetValue(cg, out var c) ? c
-                    : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, field + ".costCentreId");
+                    : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             var note = TextNormalizer.CleanText(l.Note);
-            if (note is { Length: > 500 }) throw Fail.Field(field + ".note", ErrorCodes.ValidationRange, field + ".note");
+            if (note is { Length: > 500 }) throw Fail.Field(field + ".note", ErrorCodes.ValidationRange, new FieldRef(field + ".note"));
             lines.Add(new TemplateLine(accountId, centreId, note, l.Debit, l.Credit));
         }
         t.Name = name!;

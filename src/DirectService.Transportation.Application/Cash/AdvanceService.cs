@@ -197,7 +197,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         var query = CashSupport.WithStatus(db.Set<Advance>().AsNoTracking(), q.Status);
         if (!string.IsNullOrWhiteSpace(q.Driver))
         {
-            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, "driver");
+            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, new FieldRef("driver"));
             query = query.Where(a => a.Driver.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(a => a.AdvanceDate >= from);
@@ -208,7 +208,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
             null or "" => query,
             "yes" or "true" => query.Where(a => a.SettlementId != null),
             "no" or "false" => query.Where(a => a.SettlementId == null),
-            _ => throw Fail.Field("settled", ErrorCodes.ValidationFormat, "settled"),
+            _ => throw Fail.Field("settled", ErrorCodes.ValidationFormat, new FieldRef("settled")),
         };
         if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(a => a.Number.Contains(text) || (a.Reference != null && a.Reference.Contains(text)));
         return query;

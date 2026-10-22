@@ -13,7 +13,7 @@ public static class MasterIds
     public static Guid? ClientId(string? clientId)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return null;
-        if (!Guid.TryParse(clientId, out var id) || id == Guid.Empty) throw Fail.Field("clientId", ErrorCodes.ValidationFormat, "clientId");
+        if (!Guid.TryParse(clientId, out var id) || id == Guid.Empty) throw Fail.Field("clientId", ErrorCodes.ValidationFormat, new FieldRef("clientId"));
         return id;
     }
 

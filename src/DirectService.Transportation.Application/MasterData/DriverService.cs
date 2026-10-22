@@ -73,7 +73,7 @@ public sealed partial class DriverService(IAppDbContext db, MasterDataSupport su
                 query = query.Where(d => d.OwnershipType.FleetClass == fleet);
                 break;
             default:
-                throw Fail.Field("fleet", ErrorCodes.ValidationFormat, "fleet");
+                throw Fail.Field("fleet", ErrorCodes.ValidationFormat, new FieldRef("fleet"));
         }
         if (!string.IsNullOrEmpty(q.OwnershipTypeId))
         {
@@ -95,7 +95,7 @@ public sealed partial class DriverService(IAppDbContext db, MasterDataSupport su
                 "expiring" => query.Where(d => (d.LicenceExpiry >= today && d.LicenceExpiry <= limit) || (d.RegistrationExpiry >= today && d.RegistrationExpiry <= limit)
                     || (d.InsuranceExpiry >= today && d.InsuranceExpiry <= limit) || (d.InspectionExpiry >= today && d.InspectionExpiry <= limit)),
                 "alerts" => query.Where(d => d.LicenceExpiry <= limit || d.RegistrationExpiry <= limit || d.InsuranceExpiry <= limit || d.InspectionExpiry <= limit),
-                _ => throw Fail.Field("expiry", ErrorCodes.ValidationFormat, "expiry"),
+                _ => throw Fail.Field("expiry", ErrorCodes.ValidationFormat, new FieldRef("expiry")),
             };
         }
         return query;

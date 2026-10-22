@@ -41,7 +41,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         // Revision 6: allocations to one or more invoices; "InvoiceId" alone = one invoice for the whole amount (as before).
         var requested = r.Allocations is { Count: > 0 } list ? list.Select((a, i) => (Field: $"allocations[{i}]", a.InvoiceId, a.Amount)).ToList()
             : string.IsNullOrWhiteSpace(r.InvoiceId) ? [] : [(Field: "invoiceId", r.InvoiceId, Amount: (decimal?)amount)];
-        if (requested.Count > 200) throw Fail.Field("allocations", ErrorCodes.ValidationRange, "allocations");
+        if (requested.Count > 200) throw Fail.Field("allocations", ErrorCodes.ValidationRange, new FieldRef("allocations"));
         // On account: an active customer (7.4.1); against an invoice an archived customer can still pay it (DT-97).
         var customer = requested.Count == 0
             ? await support.ChooseAsync<Customer>("customerId", r.CustomerId, null, c => c.Name, ct).ConfigureAwait(false)
@@ -50,8 +50,8 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         foreach (var (field, invoiceToken, allocated) in requested)
         {
             var invoiceField = field == "invoiceId" ? field : field + ".invoiceId";
-            var pid = support.Decode<Invoice>(invoiceToken) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, invoiceField);
-            var inv = await db.Set<Invoice>().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, invoiceField);
+            var pid = support.Decode<Invoice>(invoiceToken) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, new FieldRef(invoiceField));
+            var inv = await db.Set<Invoice>().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(invoiceField, ErrorCodes.ValidationFormat, new FieldRef(invoiceField));
             if (allocations.Any(a => a.Invoice.Id == inv.Id)) throw Fail.RuleOn(invoiceField, ErrorCodes.ReceiptAllocationDuplicate, inv.Number);
             var share = CashSupport.Amount(allocated, decimals, field == "invoiceId" ? "amount" : field + ".amount");
             await locks.EnsureNotLockedByOthersAsync(InvoiceService.EntityType, inv.Id, ct).ConfigureAwait(false);
@@ -189,7 +189,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         var query = CashSupport.WithStatus(db.Set<Receipt>().AsNoTracking(), q.Status);
         if (!string.IsNullOrWhiteSpace(q.Customer))
         {
-            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, "customer");
+            var g = support.Decode<Customer>(q.Customer) ?? throw Fail.Field("customer", ErrorCodes.ValidationFormat, new FieldRef("customer"));
             query = query.Where(r => r.Customer.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(r => r.ReceiptDate >= from);
@@ -197,12 +197,12 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         if (CashSupport.Method(q.Method) is { } m) query = query.Where(r => r.PaymentMethod == m);
         if (!string.IsNullOrWhiteSpace(q.CashBox))
         {
-            var g = support.Decode<CashBox>(q.CashBox) ?? throw Fail.Field("cashBox", ErrorCodes.ValidationFormat, "cashBox");
+            var g = support.Decode<CashBox>(q.CashBox) ?? throw Fail.Field("cashBox", ErrorCodes.ValidationFormat, new FieldRef("cashBox"));
             query = query.Where(r => r.CashBox != null && r.CashBox.PublicId == g);
         }
         if (!string.IsNullOrWhiteSpace(q.BankAccount))
         {
-            var g = support.Decode<BankAccount>(q.BankAccount) ?? throw Fail.Field("bankAccount", ErrorCodes.ValidationFormat, "bankAccount");
+            var g = support.Decode<BankAccount>(q.BankAccount) ?? throw Fail.Field("bankAccount", ErrorCodes.ValidationFormat, new FieldRef("bankAccount"));
             query = query.Where(r => r.BankAccount != null && r.BankAccount.PublicId == g);
         }
         query = (q.Applied?.Trim().ToLowerInvariant()) switch
@@ -212,11 +212,11 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
             "account" => query.Where(r => !r.Allocations.Any()),
             // Revision 6 part B (accounting dashboard reminder): any part not allocated to invoices.
             "unallocated" => query.Where(r => r.Amount > (r.Allocations.Sum(a => (decimal?)a.Amount) ?? 0)),
-            _ => throw Fail.Field("applied", ErrorCodes.ValidationFormat, "applied"),
+            _ => throw Fail.Field("applied", ErrorCodes.ValidationFormat, new FieldRef("applied")),
         };
         if (!string.IsNullOrWhiteSpace(q.Invoice))
         {
-            var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, "invoice");
+            var g = support.Decode<Invoice>(q.Invoice) ?? throw Fail.Field("invoice", ErrorCodes.ValidationFormat, new FieldRef("invoice"));
             query = query.Where(r => r.Allocations.Any(a => a.Invoice.PublicId == g));
         }
         if (MasterDataSupport.SearchText(q.Q) is { } text)

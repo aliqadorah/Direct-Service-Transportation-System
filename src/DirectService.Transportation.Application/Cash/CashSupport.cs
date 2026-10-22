@@ -45,16 +45,16 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
     /// <summary>A document date: required, not in the future (company time).</summary>
     public async Task<DateOnly> DateAsync(DateOnly? date, string field, CancellationToken ct)
     {
-        if (date is not DateOnly d) throw Fail.Field(field, ErrorCodes.ValidationRequired, field);
-        if (d > await support.TodayAsync(ct).ConfigureAwait(false)) throw Fail.Field(field, ErrorCodes.DateFuture, field);
+        if (date is not DateOnly d) throw Fail.Field(field, ErrorCodes.ValidationRequired, new FieldRef(field));
+        if (d > await support.TodayAsync(ct).ConfigureAwait(false)) throw Fail.Field(field, ErrorCodes.DateFuture, new FieldRef(field));
         return d;
     }
 
     /// <summary>A party chosen on a cash document: any status (archived parties settle and pay their open items, DT-97).</summary>
     public async Task<T> PartyAsync<T>(string field, string? token, CancellationToken ct) where T : Domain.Common.AuditableEntity
     {
-        var pid = support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
-        return await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        var pid = support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
+        return await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
     }
 
     /// <summary>Method, cash box or bank account; the stored box/bank of an edited document stays allowed even if archived since.</summary>
@@ -66,22 +66,22 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
             "cash" => CashCodes.Cash,
             "bank" or "transfer" => CashCodes.Bank,
             "cliq" => CashCodes.CliQ,
-            null or "" => throw Fail.Field("paymentMethod", ErrorCodes.ValidationRequired, "paymentMethod"),
-            _ => throw Fail.Field("paymentMethod", ErrorCodes.ValidationFormat, "paymentMethod"),
+            null or "" => throw Fail.Field("paymentMethod", ErrorCodes.ValidationRequired, new FieldRef("paymentMethod")),
+            _ => throw Fail.Field("paymentMethod", ErrorCodes.ValidationFormat, new FieldRef("paymentMethod")),
         };
         var refText = TextNormalizer.CleanText(TextNormalizer.ToAsciiDigits(reference));
-        if (refText is { Length: > 100 }) throw Fail.Field("reference", ErrorCodes.ValidationRange, "reference");
+        if (refText is { Length: > 100 }) throw Fail.Field("reference", ErrorCodes.ValidationRange, new FieldRef("reference"));
         if (m == CashCodes.Cash)
         {
-            if (!string.IsNullOrWhiteSpace(bankAccount)) throw Fail.Field("bankAccountId", ErrorCodes.ValidationFormat, "bankAccountId");
-            if (string.IsNullOrWhiteSpace(cashBox)) throw Fail.Field("cashBoxId", ErrorCodes.ValidationRequired, "cashBoxId");
+            if (!string.IsNullOrWhiteSpace(bankAccount)) throw Fail.Field("bankAccountId", ErrorCodes.ValidationFormat, new FieldRef("bankAccountId"));
+            if (string.IsNullOrWhiteSpace(cashBox)) throw Fail.Field("cashBoxId", ErrorCodes.ValidationRequired, new FieldRef("cashBoxId"));
             var box = await support.ChooseAsync<CashBox>("cashBoxId", cashBox, null, b => b.Name, ct).ConfigureAwait(false);
             if (box.Status != AccountingCodes.Active && box.Id != currentCashBoxId) throw Fail.RuleOn("cashBoxId", ErrorCodes.RecordArchived, box.Name);
             return new MoneyChoice(m, box.Id, null, box.AccountId, refText);
         }
-        if (!string.IsNullOrWhiteSpace(cashBox)) throw Fail.Field("cashBoxId", ErrorCodes.ValidationFormat, "cashBoxId");
-        if (string.IsNullOrWhiteSpace(bankAccount)) throw Fail.Field("bankAccountId", ErrorCodes.ValidationRequired, "bankAccountId");
-        if (refText is null) throw Fail.Field("reference", ErrorCodes.ValidationRequired, "reference");   // transfers and CliQ (7.4.1)
+        if (!string.IsNullOrWhiteSpace(cashBox)) throw Fail.Field("cashBoxId", ErrorCodes.ValidationFormat, new FieldRef("cashBoxId"));
+        if (string.IsNullOrWhiteSpace(bankAccount)) throw Fail.Field("bankAccountId", ErrorCodes.ValidationRequired, new FieldRef("bankAccountId"));
+        if (refText is null) throw Fail.Field("reference", ErrorCodes.ValidationRequired, new FieldRef("reference"));   // transfers and CliQ (7.4.1)
         var bank = await support.ChooseAsync<BankAccount>("bankAccountId", bankAccount, null, b => b.Name, ct).ConfigureAwait(false);
         if (bank.Status != AccountingCodes.Active && bank.Id != currentBankAccountId) throw Fail.RuleOn("bankAccountId", ErrorCodes.RecordArchived, bank.Name);
         return new MoneyChoice(m, null, bank.Id, bank.AccountId, refText);
@@ -125,13 +125,13 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
 
     public static void RequireRowVersion(string? rowVersion)
     {
-        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+        if (string.IsNullOrEmpty(rowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
     }
 
     /// <summary>Amount > 0 in the currency's decimals.</summary>
     public static decimal Amount(decimal? amount, int decimals, string field = "amount")
     {
-        if (amount is not decimal a || a <= 0 || decimal.Round(a, decimals) != a) throw Fail.Field(field, ErrorCodes.ValidationRange, field);
+        if (amount is not decimal a || a <= 0 || decimal.Round(a, decimals) != a) throw Fail.Field(field, ErrorCodes.ValidationRange, new FieldRef(field));
         return a;
     }
 
@@ -141,7 +141,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
         null or "" or "active" => q.Where(d => d.Status == CashCodes.Active),
         "void" => q.Where(d => d.Status == CashCodes.Void),
         "all" => q,
-        _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+        _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
     };
 
     /// <summary>Method filter.</summary>
@@ -151,7 +151,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
         "cash" => CashCodes.Cash,
         "bank" => CashCodes.Bank,
         "cliq" => CashCodes.CliQ,
-        _ => throw Fail.Field("method", ErrorCodes.ValidationFormat, "method"),
+        _ => throw Fail.Field("method", ErrorCodes.ValidationFormat, new FieldRef("method")),
     };
 }
 

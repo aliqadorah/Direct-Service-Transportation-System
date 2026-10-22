@@ -6,8 +6,8 @@ namespace DirectService.Transportation.Contracts.Errors;
 /// <summary>
 /// Display labels of the request fields that error messages name (DT-241): a message never shows an internal field name
 /// ("entryIds", "lines[2].accountId") or a raw code value ("ApArParty") but the field's label in the reader's language
-/// ("Entries", "Line 3 · Account"). <see cref="ErrorCatalog.Format"/> applies it to every message argument, so the API's problem details,
-/// the account pages and import problems all go through this one place. A test requires a label for every field name the services use.
+/// ("Entries", "Line 3 · Account"). <see cref="ErrorCatalog.Format"/> applies it to every <see cref="FieldRef"/> argument (never to other
+/// values, DT-245), so the API's problem details, the account pages and import problems all go through this one place. A test requires a label for every field name the services use.
 /// </summary>
 public static partial class FieldLabels
 {
@@ -220,8 +220,9 @@ public static partial class FieldLabels
         ["viewKey"] = ("العرض", "View"),
         ["warningThreshold"] = ("حد التنبيه", "Warning threshold"),
         ["year"] = ("السنة", "Year"),
-        // Party types (code values a refusal may name).
+        // Party types and party roles (code values a refusal may name, passed as FieldRef).
         ["Customer"] = ("العميل", "Customer"),
+        ["Supplier"] = ("المورد", "Supplier"),
         ["Driver"] = ("السائق", "Driver"),
         ["Partner"] = ("الشريك", "Partner"),
         ["ApArParty"] = ("الطرف المحاسبي", "Accounting party"),

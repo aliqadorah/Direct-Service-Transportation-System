@@ -81,7 +81,7 @@ public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService
     {
         null or "" or "xlsx" or "pdf" or "html" => false,
         "csv" => true,
-        _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, "format"),
+        _ => throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format")),
     };
 
     private GeneratedFile File(string name, bool csv, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows) => csv

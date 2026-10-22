@@ -41,7 +41,7 @@ public class AppException : Exception
     public IReadOnlyList<FieldError> Errors { get; init; } = [];
 }
 
-/// <summary>One field error (field name, code, arguments).</summary>
+/// <summary>One field error (field name, code, arguments; an argument naming a field is a <see cref="FieldRef"/>, DT-245).</summary>
 public sealed record FieldError(string Field, string Code, object?[] Args);
 
 /// <summary>Factory helpers for the common failures.</summary>
@@ -77,20 +77,20 @@ public sealed class Validator
     public Validator Require(string field, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            _errors.Add(new FieldError(field, ErrorCodes.ValidationRequired, [field]));
+            _errors.Add(new FieldError(field, ErrorCodes.ValidationRequired, [new FieldRef(field)]));
         return this;
     }
 
     public Validator Check(bool ok, string field, string code = ErrorCodes.ValidationFormat)
     {
-        if (!ok) _errors.Add(new FieldError(field, code, [field]));
+        if (!ok) _errors.Add(new FieldError(field, code, [new FieldRef(field)]));
         return this;
     }
 
     public Validator MaxLength(string field, string? value, int max)
     {
         if (value is not null && value.Length > max)
-            _errors.Add(new FieldError(field, ErrorCodes.ValidationRange, [field]));
+            _errors.Add(new FieldError(field, ErrorCodes.ValidationRange, [new FieldRef(field)]));
         return this;
     }
 

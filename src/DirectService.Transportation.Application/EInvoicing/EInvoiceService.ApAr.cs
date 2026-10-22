@@ -110,7 +110,7 @@ public sealed partial class EInvoiceService
             "rejected" => query.Where(s => s.Status == EInvoiceCodes.Rejected),
             "notrequired" => query.Where(s => s.Status == EInvoiceCodes.NotRequired),
             "attention" => query.Where(s => s.Status == EInvoiceCodes.Rejected || (s.Status == EInvoiceCodes.Queued && s.LastError != null)),
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         if (from is DateOnly f) query = query.Where(s => (s.ApArDocumentId != null ? s.ApArDocument!.DocumentDate : s.ApArReturn!.ReturnDate) >= f);
         if (to is DateOnly t) query = query.Where(s => (s.ApArDocumentId != null ? s.ApArDocument!.DocumentDate : s.ApArReturn!.ReturnDate) <= t);

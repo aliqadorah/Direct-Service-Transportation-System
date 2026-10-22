@@ -19,7 +19,7 @@ public static class ImportMapping
         }
         catch (JsonException)
         {
-            throw Fail.Field("mapping", ErrorCodes.ValidationFormat, "mapping");
+            throw Fail.Field("mapping", ErrorCodes.ValidationFormat, new FieldRef("mapping"));
         }
     }
 }

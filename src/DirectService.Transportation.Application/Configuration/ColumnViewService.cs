@@ -70,7 +70,7 @@ public sealed partial class ColumnViewService(IAppDbContext db, IRequestContext 
         if (view is null)
         {
             if (userId is not null && await db.Set<TableColumnView>().CountAsync(v => v.UserId == userId, ct).ConfigureAwait(false) >= MaxViewsPerUser)
-                throw Fail.Field("viewKey", ErrorCodes.ValidationRange, "viewKey");
+                throw Fail.Field("viewKey", ErrorCodes.ValidationRange, new FieldRef("viewKey"));
             view = new TableColumnView { ViewKey = viewKey, UserId = userId, Columns = json };
             db.Set<TableColumnView>().Add(view);
         }

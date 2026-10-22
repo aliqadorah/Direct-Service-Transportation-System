@@ -265,7 +265,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
     /// <summary>A postable, active asset leaf account not linked to another cash box or bank account (DT-25).</summary>
     private async Task<Account> LinkableAccountAsync(string? token, long? exceptCashBoxId, long? exceptBankId, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(token)) throw Fail.Field("accountId", ErrorCodes.ValidationRequired, "accountId");
+        if (string.IsNullOrEmpty(token)) throw Fail.Field("accountId", ErrorCodes.ValidationRequired, new FieldRef("accountId"));
         var account = await accounts.FindAsync(token, tracked: false, ct).ConfigureAwait(false);
         var hasChildren = await db.Set<Account>().AnyAsync(a => a.ParentId == account.Id, ct).ConfigureAwait(false);
         if (account.Status != AccountingCodes.Active || !account.IsPostable || hasChildren)

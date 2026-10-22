@@ -58,7 +58,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             "mine" => query.Where(r => r.OwnerUserId == me),
             "shared" => query.Where(r => r.IsShared),
             "pinned" => query.Where(r => db.Set<DashboardPin>().Any(p => p.SavedReportId == r.Id && p.UserId == me)),
-            _ => throw Fail.Field("scope", ErrorCodes.ValidationFormat, "scope"),
+            _ => throw Fail.Field("scope", ErrorCodes.ValidationFormat, new FieldRef("scope")),
         };
         if (!string.IsNullOrWhiteSpace(q.Source)) query = query.Where(r => r.Source == q.Source);
         if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(r => r.Name.Contains(text));
@@ -216,7 +216,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     public async Task<DashboardPinResponse> PinAsync(DashboardPinRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", ErrorCodes.ValidationRequired, "savedReportId"), ct).ConfigureAwait(false);
+        var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", ErrorCodes.ValidationRequired, new FieldRef("savedReportId")), ct).ConfigureAwait(false);
         var measures = Parse(report.Definition).Measures?.Count ?? 0;
         var measure = r.Measure ?? 0;
         new Validator().Check(measure >= 0 && measure < measures, "measure", ErrorCodes.ReportMeasure)
@@ -258,8 +258,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         var order = r.PinIds ?? [];
         for (var i = 0; i < order.Count; i++)
         {
-            var pid = support.Decode<DashboardPin>(order[i]) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, "pinIds");
-            var pin = pins.SingleOrDefault(p => p.PublicId == pid) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, "pinIds");
+            var pid = support.Decode<DashboardPin>(order[i]) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, new FieldRef("pinIds"));
+            var pin = pins.SingleOrDefault(p => p.PublicId == pid) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, new FieldRef("pinIds"));
             pin.SortOrder = (i + 1) * 10;
             changes.SetAction(pin, "Reorder");
         }

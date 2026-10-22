@@ -52,7 +52,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
     {
         ArgumentNullException.ThrowIfNull(r);
         var reason = TextNormalizer.CleanText(r.Reason) ?? throw Fail.Field("reason", ErrorCodes.ReasonRequired);
-        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, "reason");
+        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
         var original = await FindManualAsync(token, ct).ConfigureAwait(false);
         await locks.EnsureNotLockedByOthersAsync(EntityType, original.Id, ct).ConfigureAwait(false);
         db.ExpectRowVersion(original, r.RowVersion);
@@ -92,11 +92,11 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             var l = lines[i];
             var field = $"lines[{i}]";
             if (l.AccountId is null || !accountIds.TryGetValue(l.AccountId, out var accountId))
-                throw Fail.Field(field + ".accountId", ErrorCodes.ValidationRequired, field + ".accountId");
+                throw Fail.Field(field + ".accountId", ErrorCodes.ValidationRequired, new FieldRef(field + ".accountId"));
             long? centreId = null;
             if (!string.IsNullOrEmpty(l.CostCentreId))
             {
-                if (!centreIds.TryGetValue(l.CostCentreId, out var cc)) throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, field + ".costCentreId");
+                if (!centreIds.TryGetValue(l.CostCentreId, out var cc)) throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
                 centreId = cc;
             }
             var party = await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false);

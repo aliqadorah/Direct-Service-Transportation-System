@@ -131,7 +131,7 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         var t = to ?? today;
         var f = from ?? new DateOnly(t.Year, t.Month, 1);
-        if (f > t) throw Fail.Field("from", ErrorCodes.ValidationRange, "from");
+        if (f > t) throw Fail.Field("from", ErrorCodes.ValidationRange, new FieldRef("from"));
         return (f, t);
     }
 

@@ -33,7 +33,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         var t = to ?? today;
         var f = from ?? new DateOnly(t.Year, t.Month, 1);
-        if (f > t) throw Fail.Field("from", ErrorCodes.ValidationRange, "from");
+        if (f > t) throw Fail.Field("from", ErrorCodes.ValidationRange, new FieldRef("from"));
         return (f, t);
     }
 
@@ -86,9 +86,9 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     private async Task<long?> CostCentreAsync(string? token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var g = support.Decode<CostCentre>(token) ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, "costCentre");
+        var g = support.Decode<CostCentre>(token) ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, new FieldRef("costCentre"));
         return await db.Set<CostCentre>().AsNoTracking().Where(c => c.PublicId == g).Select(c => (long?)c.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-            ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, "costCentre");
+            ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, new FieldRef("costCentre"));
     }
 
     private async Task<Ref?> CostCentreRefAsync(long? id, CancellationToken ct) => id is long cc
@@ -111,7 +111,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     public async Task<LedgerReport> LedgerAsync(LedgerQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
-        var account = await support.FindAsync<Account>(q.Account ?? throw Fail.Field("account", ErrorCodes.ValidationRequired, "account"), ct).ConfigureAwait(false);
+        var account = await support.FindAsync<Account>(q.Account ?? throw Fail.Field("account", ErrorCodes.ValidationRequired, new FieldRef("account")), ct).ConfigureAwait(false);
         return await LedgerOfAsync(account, q, ct).ConfigureAwait(false);
     }
 
@@ -127,8 +127,8 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         PostingParty? party = null;
         if (!string.IsNullOrWhiteSpace(q.PartyType) || !string.IsNullOrWhiteSpace(q.Party))
         {
-            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, "partyType");
-            var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
+            var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
             party = new PostingParty(PartyResolver.ModuleOf(q.PartyType), q.PartyType, pid);
         }
 
@@ -180,7 +180,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     public async Task<LedgerReport> LedgerAllAsync(LedgerQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
-        var account = await support.FindAsync<Account>(q.Account ?? throw Fail.Field("account", ErrorCodes.ValidationRequired, "account"), ct).ConfigureAwait(false);
+        var account = await support.FindAsync<Account>(q.Account ?? throw Fail.Field("account", ErrorCodes.ValidationRequired, new FieldRef("account")), ct).ConfigureAwait(false);
         return await AllOfAsync(account, q, ct).ConfigureAwait(false);
     }
 
@@ -203,8 +203,8 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         PostingParty? party = null;
         if (!string.IsNullOrWhiteSpace(q.PartyType) || !string.IsNullOrWhiteSpace(q.Party))
         {
-            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, "partyType");
-            var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
+            var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
             party = new PostingParty(PartyResolver.ModuleOf(q.PartyType), q.PartyType, pid);
         }
 
@@ -216,11 +216,11 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             chosen = [];
             foreach (var token in q.Accounts!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal))
             {
-                var g = support.Decode<Account>(token) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, "accounts");
-                var node = tree.Values.FirstOrDefault(n => n.Account.PublicId == g) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, "accounts");
+                var g = support.Decode<Account>(token) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, new FieldRef("accounts"));
+                var node = tree.Values.FirstOrDefault(n => n.Account.PublicId == g) ?? throw Fail.Field("accounts", ErrorCodes.ValidationFormat, new FieldRef("accounts"));
                 chosen.Add(node.Account.Id);
             }
-            if (chosen.Count > 500) throw Fail.Field("accounts", ErrorCodes.ValidationRange, "accounts");
+            if (chosen.Count > 500) throw Fail.Field("accounts", ErrorCodes.ValidationRange, new FieldRef("accounts"));
             foreach (var a in chosen)
             {
                 for (var p = tree[a].Account.ParentId; p is long pid && tree.ContainsKey(pid); p = tree[pid].Account.ParentId)
@@ -231,7 +231,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         {
             var lo = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeFrom);
             var hi = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeTo);
-            if (lo is not null && hi is not null && string.CompareOrdinal(lo, hi) > 0) throw Fail.Field("codeFrom", ErrorCodes.ValidationRange, "codeFrom");
+            if (lo is not null && hi is not null && string.CompareOrdinal(lo, hi) > 0) throw Fail.Field("codeFrom", ErrorCodes.ValidationRange, new FieldRef("codeFrom"));
             chosen = tree.Values.Where(n => n.Children.Count == 0
                     && (lo is null || string.CompareOrdinal(n.Account.Code, lo) >= 0)
                     && (hi is null || string.CompareOrdinal(n.Account.Code, hi) <= 0 || n.Account.Code.StartsWith(hi, StringComparison.Ordinal)))
@@ -283,7 +283,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var tree = await TreeAsync(ct).ConfigureAwait(false);
         var maxLevel = tree.Count == 0 ? 1 : tree.Values.Max(n => n.Depth);
         var level = q.Level ?? maxLevel;
-        if (level < 1 || level > 20) throw Fail.Field("level", ErrorCodes.ValidationRange, "level");
+        if (level < 1 || level > 20) throw Fail.Field("level", ErrorCodes.ValidationRange, new FieldRef("level"));
         var sums = await SumsAsync(from, to, null, ct).ConfigureAwait(false);
 
         // Each account with movements is shown at its ancestor of the chosen level (or as itself when shallower).
@@ -405,7 +405,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         (DateOnly From, DateOnly To)? cmp = null;
         if (q.CompareFrom is not null || q.CompareTo is not null)
         {
-            if (q.CompareFrom is null || q.CompareTo is null) throw Fail.Field("compareFrom", ErrorCodes.ValidationRequired, "compareFrom");
+            if (q.CompareFrom is null || q.CompareTo is null) throw Fail.Field("compareFrom", ErrorCodes.ValidationRequired, new FieldRef("compareFrom"));
             cmp = await PeriodAsync(q.CompareFrom, q.CompareTo, ct).ConfigureAwait(false);
             compare = await SumsAsync(cmp.Value.From, cmp.Value.To, cc, ct).ConfigureAwait(false);
         }
@@ -500,7 +500,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         ArgumentNullException.ThrowIfNull(q);
         MoneyAccountRef money;
         long accountId;
-        if (!string.IsNullOrWhiteSpace(q.CashBox) == !string.IsNullOrWhiteSpace(q.BankAccount)) throw Fail.Field("cashBox", ErrorCodes.ValidationRequired, "cashBox");
+        if (!string.IsNullOrWhiteSpace(q.CashBox) == !string.IsNullOrWhiteSpace(q.BankAccount)) throw Fail.Field("cashBox", ErrorCodes.ValidationRequired, new FieldRef("cashBox"));
         if (!string.IsNullOrWhiteSpace(q.CashBox))
         {
             var box = await support.FindAsync<CashBox>(q.CashBox, ct).ConfigureAwait(false);

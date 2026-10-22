@@ -78,12 +78,12 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
             case MaintenanceActions.DeleteEntries:
             {
                 var requested = r.EntryIds ?? [];
-                if (requested.Count == 0) throw Fail.Field("entryIds", ErrorCodes.ValidationRequired, "entryIds");
-                if (requested.Count > 5000) throw Fail.Field("entryIds", ErrorCodes.ValidationRange, "entryIds");
-                var pids = requested.Select(t => tokens.Decode<JournalEntry>(t) ?? throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, "entryIds")).Distinct().ToList();
+                if (requested.Count == 0) throw Fail.Field("entryIds", ErrorCodes.ValidationRequired, new FieldRef("entryIds"));
+                if (requested.Count > 5000) throw Fail.Field("entryIds", ErrorCodes.ValidationRange, new FieldRef("entryIds"));
+                var pids = requested.Select(t => tokens.Decode<JournalEntry>(t) ?? throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, new FieldRef("entryIds"))).Distinct().ToList();
                 var chosen = await entries.Where(e => pids.Contains(e.PublicId)).Select(e => new { e.Id, e.SourceId, e.SourceType, e.ReversesEntryId, e.ReversedByEntryId })
                     .ToListAsync(ct).ConfigureAwait(false);
-                if (chosen.Count != pids.Count) throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, "entryIds");
+                if (chosen.Count != pids.Count) throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, new FieldRef("entryIds"));
                 // The opening entry belongs to the opening balances (cleared only by a full reset, review L6).
                 var linked = chosen.Count(e => e.SourceId != null || e.SourceType == AccountingCodes.SourceOpening);
                 if (linked > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceLinked, ctx.Language, linked));
@@ -117,7 +117,7 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
                 counts["CashBoxes"] = await db.Set<CashBox>().CountAsync(ct).ConfigureAwait(false);
                 counts["BankAccounts"] = await db.Set<BankAccount>().CountAsync(ct).ConfigureAwait(false);
                 if (r.ChartSource is not null && r.ChartSource.Trim().ToLowerInvariant() is not ("template" or "empty"))
-                    throw Fail.Field("chartSource", ErrorCodes.ValidationFormat, "chartSource");
+                    throw Fail.Field("chartSource", ErrorCodes.ValidationFormat, new FieldRef("chartSource"));
                 return new Plan(counts, 0, blockers, []);
             }
             case MaintenanceActions.Reset:
@@ -157,7 +157,7 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
         if (!string.Equals(typed, WordAr, StringComparison.Ordinal) && !string.Equals(typed, WordEn, StringComparison.OrdinalIgnoreCase))
             throw Fail.RuleOn("confirmation", ErrorCodes.MaintenanceConfirmation, Word);
         var reason = TextNormalizer.CleanText(r.Reason) ?? (En ? "Maintenance zone: " : "منطقة الصيانة: ") + name;
-        if (reason.Length > 450) throw Fail.Field("reason", ErrorCodes.ValidationRange, "reason");
+        if (reason.Length > 450) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
         var now = clock.GetUtcNow().UtcDateTime;
         var user = UserId;
         Dictionary<string, int> counts = [];

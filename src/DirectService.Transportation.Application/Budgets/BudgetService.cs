@@ -295,7 +295,7 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
     /// </summary>
     private async Task<List<(long AccountId, long? CostCentreId, decimal[] Months)>> ResolveLinesAsync(IReadOnlyList<BudgetLineRequest> input, CancellationToken ct)
     {
-        if (input.Count > MaxLines) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
+        if (input.Count > MaxLines) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines"));
         var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var accounts = await AccountsAsync(ct).ConfigureAwait(false);
         var byPublic = accounts.ToDictionary(a => a.Value.PublicId, a => a.Key);
@@ -306,14 +306,14 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
             var l = input[i];
             var field = $"lines[{i}]";
             var accountId = support.Decode<Account>(l.AccountId) is Guid g && byPublic.TryGetValue(g, out var a) ? a
-                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat, field + ".accountId");
+                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
             if (!IsBudgetType(accounts[accountId].Type)) throw Fail.Field(field + ".accountId", ErrorCodes.BudgetAccountType, accounts[accountId].Code);
             long? centreId = null;
             if (!string.IsNullOrEmpty(l.CostCentreId))
                 centreId = support.Decode<CostCentre>(l.CostCentreId) is Guid cg && centres.TryGetValue(cg, out var c) ? c
-                    : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, field + ".costCentreId");
+                    : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             var months = l.Months?.ToArray() ?? [];
-            if (months.Length != 12 || months.Any(m => !BudgetMath.IsValidAmount(m, decimals))) throw Fail.Field(field + ".months", ErrorCodes.ValidationRange, field + ".months");
+            if (months.Length != 12 || months.Any(m => !BudgetMath.IsValidAmount(m, decimals))) throw Fail.Field(field + ".months", ErrorCodes.ValidationRange, new FieldRef(field + ".months"));
             result.Add((accountId, centreId, months));
         }
         if (BudgetMath.FindConflict(result.Select(r => (r.Item1, r.Item2)).ToList(), id => accounts.TryGetValue(id, out var x) ? x.ParentId : null) is { } conflict)

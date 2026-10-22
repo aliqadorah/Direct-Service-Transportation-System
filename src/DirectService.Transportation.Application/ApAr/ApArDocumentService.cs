@@ -63,7 +63,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         if (!string.IsNullOrWhiteSpace(r.PartyId))
         {
             party = await support.ChooseAsync<ApArParty>("partyId", r.PartyId, null, p => p.Name, ct).ConfigureAwait(false);
-            if (party.PartyRole != ApArRules.RoleOf(k)) throw Fail.RuleOn("partyId", ErrorCodes.ApArPartyRole, party.Name, ApArRules.RoleOf(k));
+            if (party.PartyRole != ApArRules.RoleOf(k)) throw Fail.RuleOn("partyId", ErrorCodes.ApArPartyRole, party.Name, new FieldRef(ApArRules.RoleOf(k)));
         }
         else
         {
@@ -72,7 +72,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         }
         var terms = party?.PaymentTermsDays ?? customer!.PaymentTermsDays;
         var due = r.DueDate ?? date.AddDays(terms);
-        if (due < date) throw Fail.Field("dueDate", ErrorCodes.ValidationRange, "dueDate");
+        if (due < date) throw Fail.Field("dueDate", ErrorCodes.ValidationRange, new FieldRef("dueDate"));
 
         var lines = await LinesAsync(k, r.Lines!, company.TaxRate, decimals, ct).ConfigureAwait(false);
         var subtotal = lines.Sum(l => l.Amount);
@@ -84,8 +84,8 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             await NoteDeductionAttemptAsync(ct).ConfigureAwait(false);
             throw Fail.Rule(ErrorCodes.ApArDeductionKeyMissing);
         }
-        if (total > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
-        if (total <= 0) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines");
+        if (total > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines"));
+        if (total <= 0) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines"));
 
         // The buyer's tax number is sent when known and may be missing (PRD 7.8.2; same rule as transport invoices: DT-86, DT-102 as revised by the owner).
 
@@ -137,22 +137,22 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             var r = requests[i] ?? new ApArLineRequest(null, null, null, null, null);
             var f = $"lines[{i}]";
             var description = TextNormalizer.CleanText(r.Description);
-            if (description is null) errors.Add(new FieldError(f + ".description", ErrorCodes.ValidationRequired, [f + ".description"]));
-            else if (description.Length > 300) errors.Add(new FieldError(f + ".description", ErrorCodes.ValidationRange, [f + ".description"]));
+            if (description is null) errors.Add(new FieldError(f + ".description", ErrorCodes.ValidationRequired, [new FieldRef(f + ".description")]));
+            else if (description.Length > 300) errors.Add(new FieldError(f + ".description", ErrorCodes.ValidationRange, [new FieldRef(f + ".description")]));
             if (r.Amount is not decimal amount || amount <= 0 || !Money.IsValidAmount(amount, decimals))
-                errors.Add(new FieldError(f + ".amount", ErrorCodes.ValidationRange, [f + ".amount"]));
+                errors.Add(new FieldError(f + ".amount", ErrorCodes.ValidationRange, [new FieldRef(f + ".amount")]));
             var rate = r.TaxRate ?? companyRate;
             if (rate is < 0 or > 100 || decimal.Round(rate, 2) != rate)
-                errors.Add(new FieldError(f + ".taxRate", ErrorCodes.ValidationRange, [f + ".taxRate"]));
+                errors.Add(new FieldError(f + ".taxRate", ErrorCodes.ValidationRange, [new FieldRef(f + ".taxRate")]));
             // Revision 6: a deduction only on supplier-bill lines, 0 ≤ deduction ≤ the line amount.
             if (r.Deduction is decimal ded && ded != 0)
             {
                 if (kind != ApArCodes.SupplierBill) errors.Add(new FieldError(f + ".deduction", ErrorCodes.ApArDeductionNotAllowed, []));
                 else if (ded < 0 || !Money.IsValidAmount(ded, decimals) || (r.Amount is decimal a && ded > a))
-                    errors.Add(new FieldError(f + ".deduction", ErrorCodes.ValidationRange, [f + ".deduction"]));
+                    errors.Add(new FieldError(f + ".deduction", ErrorCodes.ValidationRange, [new FieldRef(f + ".deduction")]));
             }
             if (string.IsNullOrWhiteSpace(r.AccountId))
-                errors.Add(new FieldError(f + ".accountId", ErrorCodes.ValidationRequired, [f + ".accountId"]));
+                errors.Add(new FieldError(f + ".accountId", ErrorCodes.ValidationRequired, [new FieldRef(f + ".accountId")]));
         }
         if (errors.Count > 0) throw Fail.Fields(errors);
 
@@ -273,7 +273,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             null or "" or "active" or "posted" => query.Where(d => d.Status == ApArCodes.Posted),
             "void" => query.Where(d => d.Status == ApArCodes.Void),
             "all" => query,
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         query = (q.Payment?.Trim().ToLowerInvariant()) switch
@@ -286,11 +286,11 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
             "overdue" => query.Where(d => d.RemainingAmount > 0 && d.DueDate < today),
             // Revision 6 part B (accounting dashboard reminder): open and due within the next 7 days.
             "due-soon" => query.Where(d => d.RemainingAmount > 0 && d.DueDate >= today && d.DueDate <= today.AddDays(Accounting.AccountingDashboardService.DueSoonDays)),
-            _ => throw Fail.Field("payment", ErrorCodes.ValidationFormat, "payment"),
+            _ => throw Fail.Field("payment", ErrorCodes.ValidationFormat, new FieldRef("payment")),
         };
         if (!string.IsNullOrWhiteSpace(q.Party))
         {
-            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
             query = query.Where(d => d.Party.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(d => d.DocumentDate >= from);

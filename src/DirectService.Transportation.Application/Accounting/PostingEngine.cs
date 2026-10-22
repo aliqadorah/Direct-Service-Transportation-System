@@ -143,12 +143,12 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 if (l.Party is not null && !PartyMatches(account.ControlPartyType, l.Party, apArRoles))
                     throw Fail.Rule(ErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
             }
-            if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", ErrorCodes.ValidationRange, "note");
+            if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", ErrorCodes.ValidationRange, new FieldRef("note"));
             totalDebit += l.Debit;
             totalCredit += l.Credit;
         }
         if (totalDebit != totalCredit) throw Fail.Rule(ErrorCodes.JournalUnbalanced, Money.Format(totalDebit), Money.Format(totalCredit));
-        if (totalDebit > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, "lines"); // entry totals are DECIMAL(18,3)
+        if (totalDebit > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines")); // entry totals are DECIMAL(18,3)
 
         // The number lock serialises posting per company; the period is checked again after it, so a period closed
         // concurrently (PeriodService takes the same lock) is always seen (BR-036).

@@ -30,7 +30,7 @@ public sealed class AgeingService(IAppDbContext db, MasterDataSupport support, R
         {
             "payables" => "Payables",
             "receivables" => "Receivables",
-            _ => throw Fail.Field("kind", ErrorCodes.ValidationFormat, "kind"),
+            _ => throw Fail.Field("kind", ErrorCodes.ValidationFormat, new FieldRef("kind")),
         };
         var date = asOf ?? await support.TodayAsync(ct).ConfigureAwait(false);
         var dues = new List<Due>();

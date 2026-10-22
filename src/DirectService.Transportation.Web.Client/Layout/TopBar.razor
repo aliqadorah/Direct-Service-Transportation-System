@@ -1,6 +1,6 @@
 @*
-  Top bar: company switcher, Ctrl+K command bar trigger, notifications bell with unread count, user menu (profile, density with
-  "saved on this device", language, sign out). Provider console variant shows the environment and tenant search.
+  Top bar: company switcher, Ctrl+K command bar trigger, notifications bell with unread count, user menu (profile, theme with
+  "saved for you on this device" (DT-244), language, sign out). Provider console variant shows the environment and tenant search.
 *@
 @inject Loc L
 <header class="top">
@@ -33,9 +33,11 @@
     <MenuButton Icon="user" Text="@UserName" AriaLabel="@L["shell.userMenu"]">
         @if (!Provider) {<button type="button" role="menuitem" @onclick="OnProfile"><Icon Name="user" />@L["shell.profile"]</button>}
         <hr />
-        <div class="mh">@L["shell.density"] · @L["shell.densityNote"]</div>
-        <button type="button" role="menuitemradio" aria-checked="@(Density == "compact" ? "true" : "false")" @onclick="@(() => OnDensity.InvokeAsync("compact"))"><Icon Name="density" />@L["shell.compact"]</button>
-        <button type="button" role="menuitemradio" aria-checked="@(Density == "comfortable" ? "true" : "false")" @onclick="@(() => OnDensity.InvokeAsync("comfortable"))"><Icon Name="density" />@L["shell.comfortable"]</button>
+        <div class="mh">@L["shell.theme"] · @L["shell.themeNote"]</div>
+        @foreach (var (value, icon, key) in Themes)
+        {
+            <button type="button" role="menuitemradio" data-theme-option="@value" aria-checked="@(Theme == value ? "true" : "false")" @onclick="@(() => OnTheme.InvokeAsync(value))"><Icon Name="@icon" />@L[key]</button>
+        }
         <hr />
         <div class="mh">@L["shell.language"]</div>
         <button type="button" role="menuitemradio" lang="ar" aria-checked="@(!L.En ? "true" : "false")" @onclick="@(() => OnLanguage.InvokeAsync("ar"))"><Icon Name="globe" />العربية</button>
@@ -51,7 +53,7 @@
     [Parameter] public string? CurrentCompany { get; set; }
     [Parameter] public string? UserName { get; set; }
     [Parameter] public int Unread { get; set; }
-    [Parameter] public string Density { get; set; } = "compact";
+    [Parameter] public string Theme { get; set; } = "system";
     [Parameter] public EventCallback<string> OnCompany { get; set; }
     [Parameter] public EventCallback OnCommandBar { get; set; }
     /// <summary>Phones (UX-14): the menu button opens the side menu as a drawer.</summary>
@@ -59,7 +61,7 @@
     [Parameter] public bool MenuOpen { get; set; }
     [Parameter] public EventCallback OnNotifications { get; set; }
     [Parameter] public EventCallback OnProfile { get; set; }
-    [Parameter] public EventCallback<string> OnDensity { get; set; }
+    [Parameter] public EventCallback<string> OnTheme { get; set; }
     [Parameter] public EventCallback<string> OnLanguage { get; set; }
     [Parameter] public EventCallback OnSignOut { get; set; }
 
@@ -78,6 +80,10 @@
         "Development" => (Tone.Info, L["shell.development"]),
         _ => (Tone.Info, L.F("shell.environment", environment)),
     };
+
+    /// <summary>Theme choices (DT-244), in the menu and on the profile page.</summary>
+    internal static readonly (string Value, string Icon, string Key)[] Themes =
+        [("system", "monitor", "shell.themeSystem"), ("light", "sun", "shell.themeLight"), ("dark", "moon", "shell.themeDark")];
 
     private string? CurrentCompanyName => Companies.FirstOrDefault(c => c.Id == CurrentCompany) is { } c ? L.Pick(c.Name, c.NameEn) : null;
 }

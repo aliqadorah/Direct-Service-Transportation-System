@@ -59,7 +59,7 @@ public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, 
         else
         {
             // Saving over a stored layout needs the version last seen (review L8).
-            if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, "rowVersion");
+            if (string.IsNullOrEmpty(r.RowVersion)) throw Fail.Field("rowVersion", ErrorCodes.ValidationRequired, new FieldRef("rowVersion"));
             db.ExpectRowVersion(row, r.RowVersion);
         }
         row.Title = title;
@@ -106,7 +106,7 @@ public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, 
     {
         "claim" => InvoiceCodes.Claim,
         "taxinvoice" or "tax-invoice" => InvoiceCodes.TaxInvoice,
-        _ => throw Fail.Field("layoutType", ErrorCodes.ValidationFormat, "layoutType"),   // review L3
+        _ => throw Fail.Field("layoutType", ErrorCodes.ValidationFormat, new FieldRef("layoutType")),   // review L3
     };
 
     private InvoiceLayoutResponse Default(string type, IReadOnlyList<string> available) => new(type,

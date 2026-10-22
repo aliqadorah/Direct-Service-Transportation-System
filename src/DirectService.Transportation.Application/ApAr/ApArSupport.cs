@@ -20,7 +20,7 @@ public static class ApArRules
     {
         "bills" or "bill" or "supplierbill" or "supplier-bills" or "payables" => ApArCodes.SupplierBill,
         "receivables" or "receivable" => ApArCodes.Receivable,
-        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, field),
+        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field)),
     };
 
     public static string? KindOrNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : Kind(value);

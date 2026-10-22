@@ -20,7 +20,7 @@ internal static class CompanyEndpoints
         s.MapPut("/logo", async (IFormFile file, CompanySettingsService svc, CancellationToken ct) =>
         {
             if (file.Length > CompanySettingsService.MaxLogoBytes)
-                throw new AppException(Contracts.Errors.ErrorCodes.ValidationRange, 400, "logo", "logo");
+                throw new AppException(Contracts.Errors.ErrorCodes.ValidationRange, 400, "logo", new Contracts.Errors.FieldRef("logo"));
             using var ms = new MemoryStream();
             await file.CopyToAsync(ms, ct).ConfigureAwait(false);
             await svc.SetLogoAsync(ms.ToArray(), ct).ConfigureAwait(false);

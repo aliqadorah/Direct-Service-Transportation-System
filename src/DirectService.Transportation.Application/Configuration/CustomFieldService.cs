@@ -54,7 +54,7 @@ public sealed partial class CustomFieldService(IAppDbContext db, IUrlTokenServic
                 .AnyAsync(d => d.EntityType == entityType && d.FieldKey == key, ct).ConfigureAwait(false))
             throw Fail.Conflict(ErrorCodes.DuplicateKey, key!);
         var count = await db.Set<CustomFieldDefinition>().CountAsync(d => d.EntityType == entityType, ct).ConfigureAwait(false);
-        if (count >= MaxFieldsPerEntity) throw Fail.Field("fieldKey", ErrorCodes.ValidationRange, "fieldKey");
+        if (count >= MaxFieldsPerEntity) throw Fail.Field("fieldKey", ErrorCodes.ValidationRange, new FieldRef("fieldKey"));
 
         var d = new CustomFieldDefinition { EntityType = entityType, FieldKey = key!, SortOrder = r.SortOrder ?? (count + 1) * 10 };
         if (clientId is Guid id) d.PublicId = id;
@@ -68,7 +68,7 @@ public sealed partial class CustomFieldService(IAppDbContext db, IUrlTokenServic
     {
         ArgumentNullException.ThrowIfNull(r);
         var d = await FindAsync(token, ct).ConfigureAwait(false);
-        if (r.FieldKey is not null && r.FieldKey.Trim() != d.FieldKey) throw Fail.Field("fieldKey", ErrorCodes.ValidationFormat, "fieldKey");
+        if (r.FieldKey is not null && r.FieldKey.Trim() != d.FieldKey) throw Fail.Field("fieldKey", ErrorCodes.ValidationFormat, new FieldRef("fieldKey"));
         var hasData = await HasDataAsync(d.EntityType, d.FieldKey, ct).ConfigureAwait(false);
         var oldOptions = ReadOptions(d.Options);
         db.ExpectRowVersion(d, r.RowVersion);
@@ -128,7 +128,7 @@ public sealed partial class CustomFieldService(IAppDbContext db, IUrlTokenServic
 
         var defaultText = TextNormalizer.CleanText(r.DefaultValue);
         if (defaultText is null) d.DefaultValue = null;
-        else if (defaultText.Length > 200 || !TryParseCell(d, defaultText, out _)) throw Fail.Field("defaultValue", ErrorCodes.ValidationFormat, "defaultValue");
+        else if (defaultText.Length > 200 || !TryParseCell(d, defaultText, out _)) throw Fail.Field("defaultValue", ErrorCodes.ValidationFormat, new FieldRef("defaultValue"));
         else d.DefaultValue = defaultText;
     }
 
@@ -178,7 +178,7 @@ public sealed partial class CustomFieldService(IAppDbContext db, IUrlTokenServic
         input ??= new Dictionary<string, JsonElement>();
         if (input.Count > MaxFieldsPerEntity)
         {
-            errors.Add(new FieldError("customValues", ErrorCodes.ValidationRange, ["customValues"]));
+            errors.Add(new FieldError("customValues", ErrorCodes.ValidationRange, [new FieldRef("customValues")]));
             return storedJson;
         }
 

@@ -71,7 +71,7 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
         ArgumentNullException.ThrowIfNull(r);
         var previous = await CurrentOpeningEntryAsync(tracked: true, ct).ConfigureAwait(false);
         var date = r.EntryDate ?? previous?.EntryDate;
-        if (date is null) throw Fail.Field("entryDate", ErrorCodes.ValidationRequired, "entryDate");
+        if (date is null) throw Fail.Field("entryDate", ErrorCodes.ValidationRequired, new FieldRef("entryDate"));
 
         var accounts = await db.Set<Account>().AsNoTracking().Where(a => a.OpeningDebit > 0 || a.OpeningCredit > 0)
             .OrderBy(a => a.Code).ToListAsync(ct).ConfigureAwait(false);

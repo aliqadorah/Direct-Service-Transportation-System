@@ -45,8 +45,8 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
 
     private async Task<Plan> ActivePlanAsync(string? token, CancellationToken ct)
     {
-        var p = await support.FindAsync<Plan>(token ?? throw Fail.Field("planId", ErrorCodes.ValidationRequired, "planId"), ct).ConfigureAwait(false);
-        return p.IsActive ? p : throw Fail.Field("planId", ErrorCodes.ValidationFormat, "planId");
+        var p = await support.FindAsync<Plan>(token ?? throw Fail.Field("planId", ErrorCodes.ValidationRequired, new FieldRef("planId")), ct).ConfigureAwait(false);
+        return p.IsActive ? p : throw Fail.Field("planId", ErrorCodes.ValidationFormat, new FieldRef("planId"));
     }
 
     /// <summary>Checkout (P-04, P-06): an invoice and the gateway's payment page.</summary>

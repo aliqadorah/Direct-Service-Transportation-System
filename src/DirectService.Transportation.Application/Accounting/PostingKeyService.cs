@@ -35,7 +35,7 @@ public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IU
     {
         ArgumentNullException.ThrowIfNull(r);
         var definition = PostingKeys.Find(postingKey) ?? throw Fail.NotFound();
-        var accountPublicId = tokens.Decode<Account>(r.AccountId) ?? throw Fail.Field("accountId", ErrorCodes.ValidationRequired, "accountId");
+        var accountPublicId = tokens.Decode<Account>(r.AccountId) ?? throw Fail.Field("accountId", ErrorCodes.ValidationRequired, new FieldRef("accountId"));
         var account = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == accountPublicId)
             .Select(a => new { a.Id, a.Code, a.Status, a.IsPostable, HasChildren = a.Children.Any() })
             .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.NotFound();

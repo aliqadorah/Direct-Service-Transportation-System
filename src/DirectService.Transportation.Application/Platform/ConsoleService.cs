@@ -50,7 +50,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var code = TextNormalizer.CleanCode(r.Code)?.ToUpperInvariant();
         var nameAr = TextNormalizer.CleanText(r.NameAr);
         var nameEn = TextNormalizer.CleanText(r.NameEn);
-        var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", ErrorCodes.ValidationFormat, "billingCycle");
+        var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", ErrorCodes.ValidationFormat, new FieldRef("billingCycle"));
         new Validator().Require("code", code).MaxLength("code", code, 30).Require("nameAr", nameAr).MaxLength("nameAr", nameAr, 100).Require("nameEn", nameEn).MaxLength("nameEn", nameEn, 100)
             .Check(r.Price is >= 0 && Accounting.Money.IsValidAmount(r.Price.Value), "price", ErrorCodes.ValidationRange)
             .Check(r.MaxCompanies is > 0, "maxCompanies", ErrorCodes.ValidationRange).Check(r.MaxActiveUsers is > 0, "maxActiveUsers", ErrorCodes.ValidationRange)
@@ -286,7 +286,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     {
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
-        if (r.Days is not (>= 1 and <= 90)) throw Fail.Field("days", ErrorCodes.ValidationRange, "days");
+        if (r.Days is not (>= 1 and <= 90)) throw Fail.Field("days", ErrorCodes.ValidationRange, new FieldRef("days"));
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
         var suspendedTrial = t.Status == LifecycleCodes.Suspended && t.CurrentPeriodEnd is null;
         if (t.Status != LifecycleCodes.Trial && !suspendedTrial) throw Fail.Rule(ErrorCodes.ValidationFailed);
@@ -308,13 +308,13 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
-        var pid = support.Decode<SubscriptionInvoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
+        var pid = support.Decode<SubscriptionInvoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
         var invoice = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid && i.TenantId == t.Id && !i.IsDeleted, ct).ConfigureAwait(false)
-            ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, "invoiceId");
+            ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
         if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) throw Fail.Rule(ErrorCodes.SubscriptionInvoiceNotDue, invoice.Number);
         var decimals = options.Value.CurrencyDecimals;
         if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Accounting.Money.IsValidAmount(credit, decimals))
-            throw Fail.Field("amount", ErrorCodes.ValidationRange, "amount");
+            throw Fail.Field("amount", ErrorCodes.ValidationRange, new FieldRef("amount"));
         return await ApplyCreditAsync(invoice, credit, why, ct).ConfigureAwait(false);
     }
 
@@ -471,7 +471,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var reason = TextNormalizer.CleanText(r.Reason);
         new Validator().Require("reason", reason).MaxLength("reason", reason, 500).ThrowIfInvalid();
-        var t = await FindTenantAsync(r.TenantId ?? throw Fail.Field("tenantId", ErrorCodes.ValidationRequired, "tenantId"), ct).ConfigureAwait(false);
+        var t = await FindTenantAsync(r.TenantId ?? throw Fail.Field("tenantId", ErrorCodes.ValidationRequired, new FieldRef("tenantId")), ct).ConfigureAwait(false);
         var grant = new SupportAccessGrant { TenantId = t.Id, RequestedBy = StaffId, Reason = reason!, Status = LifecycleCodes.Requested };
         db.Set<SupportAccessGrant>().Add(grant);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);

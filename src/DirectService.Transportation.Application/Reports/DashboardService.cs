@@ -41,7 +41,7 @@ public sealed class DashboardService(IAppDbContext db, IRequestContext ctx, Mast
         {
             null or "" or "mtd" or "month" => "mtd",
             "today" => "today",
-            _ => throw Fail.Field("period", ErrorCodes.ValidationFormat, "period"),
+            _ => throw Fail.Field("period", ErrorCodes.ValidationFormat, new FieldRef("period")),
         };
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         var from = p == "today" ? today : new DateOnly(today.Year, today.Month, 1);

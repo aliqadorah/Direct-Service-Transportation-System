@@ -1,17 +1,23 @@
 /*
   Direct Service Transportation — design tokens (step 7).
   Source: the approved step 6 board (docs/step6/index.html), direction A · Ledger with C's saved views, filter row, Ctrl+K bar and density switch.
-  Brand per PRD UX-06 / UX-07: primary teal, IBM Plex Sans Arabic + Inter, light theme only (UX-10). Every colour pair used for text meets
-  WCAG 2.1 AA (4.5:1) on its background; see docs/step7/Design_System.md for the contrast table.
+  Brand per PRD UX-06 / UX-07: primary teal, IBM Plex Sans Arabic + Inter. Every colour pair used for text meets WCAG 2.1 AA (4.5:1) on
+  its background; see docs/step7/Design_System.md for the contrast table.
+  Themes (DT-244): light (below) and dark ([data-theme="dark"], at the end), both from the company website's palette (directservicetech.com:
+  light = its light theme, the same values as before; dark = its dark theme, petrol lightened for text and darkened for filled buttons to
+  reach AA). Pages and components use these tokens only — never a colour of their own. Printing always uses the light tokens.
 */
 :root {
   color-scheme: light;
 
   /* ---- colour: brand */
-  --primary: #0F4C5C;
+  --primary: #0F4C5C;          /* links, active tabs, focus, accents */
   --primary-dark: #0A3540;
   --primary-hover: #0C3F4D;
+  --primary-fill: var(--primary);   /* filled buttons and switches, with --on-primary text */
+  --on-primary: #FFFFFF;
   --tint: #E4EDEE;
+  --on-tint: var(--primary-dark);   /* text of selected chips and brand badges on --tint */
   --focus-ring: rgba(15, 76, 92, .22);
 
   /* ---- colour: neutrals */
@@ -39,15 +45,31 @@
   --warn: #8A5300; --warn-bg: #FFF2D6; --warn-line: #F1D9A6;
   --err: #B42318;  --err-bg: #FDECEA;  --err-line: #F0B8B1; --err-input: #FFFBFA; --danger-line: #E7B4AE;
   --info: #1D5C9E; --info-bg: #E7F0FA; --info-line: #C3D7EE;
+  --err-fill: var(--err);      /* filled danger buttons, error toasts, unread count — white text */
+  --chart-amber: #B26A10;      /* expenses / warnings in the dashboard charts (bars, not text) */
+  --stamp: rgba(180, 35, 24, .18);
+  --doc-bg: #FFFFFF;           /* always white in both themes: printed documents and their previews, QR codes */
 
-  /* ---- colour: side menu (dark) */
+  /* ---- colour: side menu (dark in both themes) */
   --side-bg: var(--primary-dark);
   --side-bg-provider: #1E2A2E;
   --side-text: #DCE7E9;
   --side-group: #C3D5D9;
   --side-foot: #9FB8BD;
+  --side-strong: #FFFFFF;      /* open section, current entry, brand */
+  --side-mark: #FFFFFF;        /* the current entry's inline-start bar */
   --side-line: rgba(255, 255, 255, .12);
   --side-current: rgba(255, 255, 255, .12);
+  --side-hover: rgba(255, 255, 255, .06);
+  --side-press: rgba(255, 255, 255, .08);
+  --side-scroll: rgba(255, 255, 255, .25);
+
+  /* ---- colour: toasts and the account pages' brand panel */
+  --toast-bg: var(--primary-dark);
+  --toast-text: #FFFFFF;
+  --toast-link: #BFE0E6;
+  --brand-panel: var(--primary-dark);
+  --brand-panel-text: #DCE7E9;
 
   /* ---- typography */
   --font-ar: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
@@ -90,6 +112,8 @@
   --shadow-panel: -6px 0 24px rgba(10, 53, 64, .12);
   --shadow-toast: 0 6px 20px rgba(10, 53, 64, .25);
   --shadow-dialog: 0 12px 40px rgba(10, 30, 36, .3);
+  --shadow-panel-ltr: 6px 0 24px rgba(10, 53, 64, .12);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .25);
   --scrim: rgba(10, 30, 36, .32);
 
   /* ---- motion */
@@ -114,15 +138,75 @@
   --dialog-w: 480px;
   --panel-w: 360px;
 
-  /* ---- density (DT-67: compact by default; comfortable = 40 px rows) */
-  --row: 32px;
-  --ctl: 32px;
-  --fs: var(--fs-base);
-  --ic: 17px;
-}
-
-[data-density="comfortable"] {
+  /* ---- rows and controls (DT-244: the former "comfortable" density is the only one) */
   --row: 40px;
   --ctl: 36px;
   --fs: 14.5px;
+  --ic: 17px;
+}
+
+/*
+  Dark theme (DT-244). <html data-theme> is "light" or "dark": "Follow device" is resolved by ui.js (and the inline script in App.razor
+  before the first paint) from prefers-color-scheme. Base from the website's dark theme: --bg #0B1416 → page, --paper #101B1E → surfaces
+  and side menu, --ink #EEF3F3 → text, --muted #A6B4B6 → muted, --line #223034 → borders, --petrol #17869B → lightened to #4FB8CC for
+  text and accents (the site's petrol is 4.1–4.4:1 on its dark backgrounds) and darkened to #147A8C for filled buttons (white 5.0:1).
+  Screen only: printing and print previews stay light.
+*/
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --primary: #4FB8CC;
+    --primary-dark: #0A3540;
+    --primary-hover: #0F6475;
+    --primary-fill: #147A8C;
+    --on-primary: #FFFFFF;
+    --tint: #123940;
+    --on-tint: #A8DFE8;
+    --focus-ring: rgba(79, 184, 204, .4);
+
+    --text: #EEF3F3;
+    --muted: #A6B4B6;
+    --placeholder: #849598;
+    --page: #0B1416;
+    --surface: #101B1E;
+    --surface-sunk: #0D171A;
+    --surface-head: #142225;
+    --surface-foot: #132124;
+    --surface-filter: #17282C;
+    --surface-group: #15262A;
+    --surface-mute: #1C2E32;
+    --border: #223034;
+    --border-control: #3A5056;
+    --border-input: #6A8086;
+    --line-strong: #2E4146;
+    --skeleton-a: #16252A;
+    --skeleton-b: #1D3034;
+    --live-row: #2B2614;
+
+    --ok: #5DCB91;   --ok-bg: #0F2A1E;   --ok-line: #1F5138;
+    --warn: #E9B455; --warn-bg: #2B2110; --warn-line: #5A4419;
+    --err: #F4877D;  --err-bg: #2E1614;  --err-line: #5F2A25; --err-input: #1E1413; --danger-line: #6B302A;
+    --info: #86BCF0; --info-bg: #0F2238; --info-line: #234A73;
+    --err-fill: #B42318;
+    --chart-amber: #E09A3A;
+    --stamp: rgba(244, 135, 125, .22);
+
+    --side-bg: #101B1E;
+    --side-bg-provider: #161E21;
+    --side-line: #223034;
+    --side-current: #17343B;
+    --side-mark: #4FB8CC;
+
+    --toast-bg: #1F3A41;
+    --toast-link: #A8DFE8;
+
+    --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, .5);
+    --shadow-panel: -6px 0 24px rgba(0, 0, 0, .45);
+    --shadow-panel-ltr: 6px 0 24px rgba(0, 0, 0, .45);
+    --shadow-toast: 0 6px 20px rgba(0, 0, 0, .55);
+    --shadow-dialog: 0 12px 40px rgba(0, 0, 0, .6);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, .6);
+    --scrim: rgba(0, 0, 0, .6);
+  }
 }

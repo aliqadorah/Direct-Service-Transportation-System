@@ -121,8 +121,8 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
     private async Task<Filters> FiltersAsync(StandardReportQuery q, CancellationToken ct)
     {
         var (from, to) = await ledger.PeriodAsync(q.From, q.To, ct).ConfigureAwait(false);
-        if (to.Year - from.Year > MaxYears || to.Year > 9000) throw Fail.Field("to", ErrorCodes.ValidationRange, "to");   // review B10-7
-        Guid? G<T>(string? token, string field) => string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        if (to.Year - from.Year > MaxYears || to.Year > 9000) throw Fail.Field("to", ErrorCodes.ValidationRange, new FieldRef("to"));   // review B10-7
+        Guid? G<T>(string? token, string field) => string.IsNullOrWhiteSpace(token) ? null : support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
         return new Filters(from, to, G<Customer>(q.Customer, "customer"), G<Driver>(q.Driver, "driver"), G<Partner>(q.Partner, "partner"),
             G<LoadingSite>(q.LoadingSite, "loadingSite"), G<UnloadingSite>(q.UnloadingSite, "unloadingSite"), G<Material>(q.Material, "material"));
     }
@@ -207,7 +207,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         {
             null or "" or "customer" or "customers" => "customer",
             "partner" or "partners" => "partner",
-            _ => throw Fail.Field("side", ErrorCodes.ValidationFormat, "side"),
+            _ => throw Fail.Field("side", ErrorCodes.ValidationFormat, new FieldRef("side")),
         };
         var query = Trips(f).Where(t => t.IsTariffBreach && t.TariffPrice != null);
         if (side == "partner") query = query.Where(t => t.PartnerId != null);
@@ -354,7 +354,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             "route" => "route",
             "driver" => "driver",
             "month" => "month",
-            _ => throw Fail.Field("groupBy", ErrorCodes.ValidationFormat, "groupBy"),
+            _ => throw Fail.Field("groupBy", ErrorCodes.ValidationFormat, new FieldRef("groupBy")),
         };
         var trips = Trips(f);
         List<(string Label, DrillLink Link, Agg A)> rows = by switch
@@ -424,7 +424,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
 
     private async Task<ReportResult> CustomerStatementAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(q.Customer)) throw Fail.Field("customer", ErrorCodes.ValidationRequired, "customer");
+        if (string.IsNullOrWhiteSpace(q.Customer)) throw Fail.Field("customer", ErrorCodes.ValidationRequired, new FieldRef("customer"));
         var customer = await support.FindAsync<Customer>(q.Customer, ct).ConfigureAwait(false);
         var f = await FiltersAsync(q, ct).ConfigureAwait(false);
         var invoices = db.Set<Invoice>().AsNoTracking().Where(i => i.CustomerId == customer.Id && (i.Status == InvoiceCodes.Approved || i.Status == InvoiceCodes.Closed));
@@ -474,9 +474,9 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
     /// </summary>
     private async Task<ReportResult> SupplierStatementAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(q.Supplier)) throw Fail.Field("supplier", ErrorCodes.ValidationRequired, "supplier");
+        if (string.IsNullOrWhiteSpace(q.Supplier)) throw Fail.Field("supplier", ErrorCodes.ValidationRequired, new FieldRef("supplier"));
         var supplier = await support.FindAsync<ApArParty>(q.Supplier, ct).ConfigureAwait(false);
-        if (supplier.PartyRole != "Supplier") throw Fail.Field("supplier", ErrorCodes.ValidationFormat, "supplier");
+        if (supplier.PartyRole != "Supplier") throw Fail.Field("supplier", ErrorCodes.ValidationFormat, new FieldRef("supplier"));
         var f = await FiltersAsync(q, ct).ConfigureAwait(false);
         var bills = db.Set<ApArDocument>().AsNoTracking().Where(x => x.PartyId == supplier.Id && x.DocumentKind == ApArCodes.SupplierBill && x.Status == ApArCodes.Posted);
         var returns = db.Set<ApArReturn>().AsNoTracking().Where(x => x.Document.PartyId == supplier.Id && x.Document.DocumentKind == ApArCodes.SupplierBill && x.Status == ApArCodes.Posted);

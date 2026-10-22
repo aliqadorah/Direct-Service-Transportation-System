@@ -21,7 +21,7 @@ public sealed class PeriodService(IAppDbContext db, INumberingService numbering,
     public async Task<IReadOnlyList<PeriodResponse>> ListAsync(int? year, CancellationToken ct)
     {
         var y = year ?? clock.GetUtcNow().Year;
-        if (y is < 2000 or > 2100) throw Fail.Field("year", ErrorCodes.ValidationRange, "year");
+        if (y is < 2000 or > 2100) throw Fail.Field("year", ErrorCodes.ValidationRange, new FieldRef("year"));
         var prefix = y.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-";
         var rows = await db.Set<Period>().AsNoTracking().Where(p => p.PeriodMonth.StartsWith(prefix))
             .Select(p => new { p.PeriodMonth, p.Status, p.ClosedAt, ClosedBy = p.ClosedByUser == null ? null : p.ClosedByUser.FullName, p.Reason, p.RowVersion })
@@ -65,7 +65,7 @@ public sealed class PeriodService(IAppDbContext db, INumberingService numbering,
         EnsureMonth(month);
         var reason = RequireReason(r.Reason);
         if (string.CompareOrdinal(month, AccountingCodes.Month(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime))) > 0)
-            throw Fail.Field("periodMonth", ErrorCodes.ValidationRange, "periodMonth");
+            throw Fail.Field("periodMonth", ErrorCodes.ValidationRange, new FieldRef("periodMonth"));
         await db.InTransactionAsync(async c =>
         {
             await numbering.LockAsync(DocumentTypes.JournalEntry, c).ConfigureAwait(false);
@@ -114,7 +114,7 @@ public sealed class PeriodService(IAppDbContext db, INumberingService numbering,
 
     private static void EnsureMonth(string month)
     {
-        if (!AccountingCodes.IsMonth(month)) throw Fail.Field("periodMonth", ErrorCodes.ValidationFormat, "periodMonth");
+        if (!AccountingCodes.IsMonth(month)) throw Fail.Field("periodMonth", ErrorCodes.ValidationFormat, new FieldRef("periodMonth"));
     }
 
     private static string RequireReason(string? reason)

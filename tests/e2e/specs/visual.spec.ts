@@ -21,8 +21,8 @@ const HelpTopics = {
 
 /**
  * Visual layout check (owner feedback 12 Oct 2026, SCR-05 and SCR-76): every screen and dialog in Arabic RTL and English, at 1280 and
- * 1366 px wide, in compact and comfortable density. Fails on overlapping text, text cut off by its box and sideways page scroll
- * (support/layout.ts). Screenshots of every combination go to TestResults/visual/<lang>/<width>-<density>/ (VISUAL_SHOTS=0 skips them).
+ * 1366 px wide, in the light and dark themes. Fails on overlapping text, text cut off by its box and sideways page scroll
+ * (support/layout.ts). Screenshots of every combination go to TestResults/visual/<lang>/<width>-<theme>/ (VISUAL_SHOTS=0 skips them).
  */
 
 /** Sign-up, then the first sign-in with the two-step set-up (SCR-05) and the recovery codes checked on the way. */
@@ -108,7 +108,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
   return [
     "", "setup", "profile",
     "trips", "trips/list", "trips/new", "trips/import", "trips/shortage", `trips/${ids.trip}`,
-    "invoices", "invoices/new", "invoices/manual", `invoices/${ids.invoice}`, "credit-notes", `credit-notes/new?invoice=${ids.invoice}`, "e-invoicing",
+    "invoices", "invoices/new", "invoices/manual", `invoices/${ids.invoice}`, `print/invoice/${ids.invoice}`, "credit-notes", `credit-notes/new?invoice=${ids.invoice}`, "e-invoicing",
     "receipts", "receipts/new", `receipts/new?customer=${w.customer}&invoice=${ids.invoice}`, ids.receipt ? `receipts/${ids.receipt}` : null,
     "driver-accounts", `driver-accounts/${w.driver}`, `driver-accounts/${w.driver}/advance`, `driver-accounts/${w.driver}/settle`,
     "driver-accounts/advances", "driver-accounts/advances/new", ids.advance ? `driver-accounts/advances/${ids.advance}` : null, "driver-accounts/settlements",
@@ -228,7 +228,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     for (const route of companyRoutes(company, w, ids)) {
       if (!wanted(route.replace(`/c/${company}`, "") || "dashboard")) continue;
       if (!(await open(page, route))) {
-        run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, density: "" });
+        run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, theme: "" });
         continue;
       }
       await run.check(page, route.replace(`/c/${company}`, "") || "dashboard", { full: true });
@@ -514,11 +514,11 @@ async function sweepStates(page: Page, run: VisualRun, lang: Lang, company: stri
   page.setDefaultTimeout(15_000);   // a step that cannot be done fails the state quickly instead of waiting for the test's time limit
   for (const s of states) {
     const route = s.route ? `/c/${company}/${s.route}` : `/c/${company}`;
-    if (!(await open(page, route))) { run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: s.name, lang, width: 0, density: "" }); continue; }
+    if (!(await open(page, route))) { run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: s.name, lang, width: 0, theme: "" }); continue; }
     try {
       await s.act(page, t);
     } catch (e) {
-      run.findings.push({ kind: "not-shown", text: `state not reached: ${String(e).split("\n")[0].slice(0, 160)}`, where: route, screen: s.name, lang, width: 0, density: "" });
+      run.findings.push({ kind: "not-shown", text: `state not reached: ${String(e).split("\n")[0].slice(0, 160)}`, where: route, screen: s.name, lang, width: 0, theme: "" });
       continue;
     }
     await run.check(page, s.name, { full: true });
@@ -530,7 +530,7 @@ async function sweepPopups(page: Page, run: VisualRun, lang: Lang, company: stri
   page.setDefaultTimeout(15_000);   // an opener that cannot act (e.g. no row to click) fails that popup instead of waiting for the test's limit
   for (const p of popups.filter((x) => wanted(x.name, x.route))) {
     const route = p.route.startsWith("/") ? p.route : `/c/${company}${p.route ? `/${p.route}` : ""}`;
-    const fail = (why: string) => run.findings.push({ kind: "not-shown", text: `not opened: ${why}`, where: route, screen: p.name, lang, width: 0, density: "" });
+    const fail = (why: string) => run.findings.push({ kind: "not-shown", text: `not opened: ${why}`, where: route, screen: p.name, lang, width: 0, theme: "" });
     if (!(await open(page, route))) { fail("screen did not render"); continue; }
     try {
       await p.open(page, t);
@@ -569,7 +569,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
     for (const route of ["/console/tenants", "/console/plans", "/console/announcements", "/console/support-access", "/console/staff", "/console/health", "/console/help/console-staff"]) {
       if (!wanted(route)) continue;
       if (await open(page, route)) await run.check(page, route.slice(1), { full: true });
-      else run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, density: "" });
+      else run.findings.push({ kind: "not-shown", text: "screen did not render", where: route, screen: route, lang, width: 0, theme: "" });
     }
     await sweepPopups(page, run, lang, null, [
       { name: "console-tenants#panel", route: "/console/tenants", open: firstRow },

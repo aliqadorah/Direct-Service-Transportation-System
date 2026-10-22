@@ -81,9 +81,9 @@ public sealed class PricingResolver(IAppDbContext db, IRequestContext ctx, Maste
         Driver? driver = null;
         if (!string.IsNullOrWhiteSpace(q.Driver))
         {
-            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, "driver");
+            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, new FieldRef("driver"));
             driver = await db.Set<Driver>().AsNoTracking().Include(d => d.OwnershipType).SingleOrDefaultAsync(d => d.PublicId == g, ct).ConfigureAwait(false)
-                ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, "driver");
+                ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, new FieldRef("driver"));
             // An own-fleet driver cannot carry a partner trip (DT-48, BR-029; review L9).
             if (partner is not null && driver.OwnershipType.FleetClass == MasterCodes.Own)
                 throw Fail.RuleOn("partner", ErrorCodes.DriverPartnerOwnFleet,
@@ -129,8 +129,8 @@ public sealed class PricingResolver(IAppDbContext db, IRequestContext ctx, Maste
     private async Task<long?> IdAsync<T>(string? token, string field, CancellationToken ct) where T : AuditableEntity
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var g = support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+        var g = support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
         return await db.Set<T>().AsNoTracking().Where(x => x.PublicId == g).Select(x => (long?)x.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-            ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, field);
+            ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
     }
 }

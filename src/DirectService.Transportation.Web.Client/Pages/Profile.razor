@@ -1,5 +1,5 @@
 @page "/c/{Company}/profile"
-@* SCR-08 my profile (FR-176, FR-178): language, default company and date format; density on this device (DT-69); active sessions with
+@* SCR-08 my profile (FR-176, FR-178): language, default company and date format; theme for this user on this device (DT-244); active sessions with
    sign-out of one or all others; password change by an emailed link (the reset flow of SCR-04, DT-143), or here with the current password for a
    user without email (revision 6); two-step verification: state, and turning it on (QR code, first code, recovery codes).
    DT-229: name and username are read-only here (an Owner / Administrator sees "Edit" to their row in Users & roles); "Change email" asks for
@@ -37,7 +37,7 @@
             <SelectField TValue="string" @bind-Value="_form.LanguageCode" Options="Languages" Label="@L["shell.language"]" />
             <SelectField TValue="string?" @bind-Value="_form.DefaultCompany" Options="Companies" Label="@L["profile.defaultCompany"]" />
             <SelectField TValue="string" @bind-Value="_form.DateFormat" Options="DateFormats" Label="@L["profile.dateFormat"]" />
-            <SelectField TValue="string" Value="@Shell.Density" ValueChanged="Density" ValueExpression="() => _densityShown" Options="Densities" Label="@L["shell.density"]" Help="@L["shell.densityNote"]" />
+            <SelectField TValue="string" Value="@Shell.Theme" ValueChanged="Theme" ValueExpression="() => _themeShown" Options="Themes" Label="@L["shell.theme"]" Help="@L["shell.themeNote"]" />
             <div class="formbar"><Btn Type="submit" Primary="true" Text="@L["profile.save"]" Busy="_saving" /></div>
             @* DT-232: the account actions in their own row (they overflowed the card next to Save). *@
             <div class="formbar start acct-actions">
@@ -455,7 +455,7 @@
     private string? _reference;
     private bool _saving;
     private bool _sendingLink;
-    private readonly string? _nameShown = null, _emailShown = null, _densityShown = null;
+    private readonly string? _nameShown = null, _emailShown = null, _themeShown = null;
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -501,11 +501,12 @@
         finally { _saving = false; }
     }
 
-    private async Task Density(string density)
+    /// <summary>Applied at once, without Save (DT-244), like the menu's quick switch.</summary>
+    private async Task Theme(string theme)
     {
-        Shell.SetDensity(density);
-        await Js.SetPref("density", Shell.Density);
-        await Js.ApplyRoot(Shell.Density, L.Language);
+        Shell.SetTheme(theme);
+        await Js.SetPref(Shell.ThemeKey, Shell.Theme);
+        await Js.ApplyTheme(Shell.Theme);
     }
 
     /// <summary>An emailed link for users with an email (DT-143); here with the current password for a user without one (revision 6).</summary>
@@ -612,7 +613,7 @@
     private IReadOnlyList<Option<string>> Languages => [new("ar", "العربية"), new("en", "English")];
     private IReadOnlyList<Option<string?>> Companies => (Shell.Me?.Companies ?? []).Select(c => new Option<string?>(c.Id, L.Pick(c.Name, c.NameEn))).ToList();
     private IReadOnlyList<Option<string>> DateFormats => [new("yyyy-MM-dd", "2026-10-31 (YYYY-MM-DD)"), new("dd/MM/yyyy", "31/10/2026 (DD/MM/YYYY)"), new("MM/dd/yyyy", "10/31/2026 (MM/DD/YYYY)")];
-    private IReadOnlyList<Option<string>> Densities => [new("compact", L["shell.compact"]), new("comfortable", L["shell.comfortable"])];
+    private IReadOnlyList<Option<string>> Themes => TopBar.Themes.Select(t => new Option<string>(t.Value, L[t.Key])).ToList();
 
     private sealed class PreferencesForm
     {

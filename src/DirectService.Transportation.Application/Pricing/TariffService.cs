@@ -80,24 +80,24 @@ public sealed class TariffService(IAppDbContext db, IRequestContext ctx, MasterD
         {
             if (support.Decode<Customer>(q.Party) is Guid customer) query = query.Where(t => t.Customer != null && t.Customer.PublicId == customer);
             else if (support.Decode<Partner>(q.Party) is Guid partner) query = query.Where(t => t.Partner != null && t.Partner.PublicId == partner);
-            else throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            else throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
         }
         if (IsAll(q.Material)) query = query.Where(t => t.MaterialId == null);
         else if (!string.IsNullOrWhiteSpace(q.Material))
         {
-            var g = support.Decode<Material>(q.Material) ?? throw Fail.Field("material", ErrorCodes.ValidationFormat, "material");
+            var g = support.Decode<Material>(q.Material) ?? throw Fail.Field("material", ErrorCodes.ValidationFormat, new FieldRef("material"));
             query = query.Where(t => t.Material != null && t.Material.PublicId == g);
         }
         if (IsAll(q.LoadingSite)) query = query.Where(t => t.LoadingSiteId == null);
         else if (!string.IsNullOrWhiteSpace(q.LoadingSite))
         {
-            var g = support.Decode<LoadingSite>(q.LoadingSite) ?? throw Fail.Field("loadingSite", ErrorCodes.ValidationFormat, "loadingSite");
+            var g = support.Decode<LoadingSite>(q.LoadingSite) ?? throw Fail.Field("loadingSite", ErrorCodes.ValidationFormat, new FieldRef("loadingSite"));
             query = query.Where(t => t.LoadingSite != null && t.LoadingSite.PublicId == g);
         }
         if (IsAll(q.UnloadingSite)) query = query.Where(t => t.UnloadingSiteId == null);
         else if (!string.IsNullOrWhiteSpace(q.UnloadingSite))
         {
-            var g = support.Decode<UnloadingSite>(q.UnloadingSite) ?? throw Fail.Field("unloadingSite", ErrorCodes.ValidationFormat, "unloadingSite");
+            var g = support.Decode<UnloadingSite>(q.UnloadingSite) ?? throw Fail.Field("unloadingSite", ErrorCodes.ValidationFormat, new FieldRef("unloadingSite"));
             query = query.Where(t => t.UnloadingSite != null && t.UnloadingSite.PublicId == g);
         }
         if (q.ValidOn is DateOnly on) query = query.Where(t => (t.ValidFrom == null || t.ValidFrom <= on) && (t.ValidTo == null || t.ValidTo >= on));
@@ -342,7 +342,7 @@ public sealed class TariffService(IAppDbContext db, IRequestContext ctx, MasterD
         "" => null,
         "CUSTOMER" or "عميل" or "العميل" or "عملاء" => PartyTypes.Customer,
         "PARTNER" or "شريك" or "الشريك" or "شركاء" => PartyTypes.Partner,
-        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, field),
+        _ => throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field)),
     };
 
     // ------------------------------------------------------------ snapshots and responses

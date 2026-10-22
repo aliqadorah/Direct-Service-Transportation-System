@@ -182,7 +182,7 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
         {
             // Only an active receivable (Customer) party of shared Accounting; the stored link stays valid if it was archived since (review M3).
             party = await support.ChooseAsync<ApArParty>("apArPartyId", r.ApArPartyId, c.ApArPartyId, p => p.Name, ct).ConfigureAwait(false);
-            if (party.PartyRole != AccountingCodes.PartyCustomer) throw Fail.Field("apArPartyId", ErrorCodes.ValidationFormat, "apArPartyId");
+            if (party.PartyRole != AccountingCodes.PartyCustomer) throw Fail.Field("apArPartyId", ErrorCodes.ValidationFormat, new FieldRef("apArPartyId"));
             if (party.Status != MasterCodes.Active && party.Id != c.ApArPartyId) throw Fail.RuleOn("apArPartyId", ErrorCodes.RecordArchived, party.Name);
         }
         if (c.Status == MasterCodes.Active) await EnsureUniqueNameAsync(name!, c.Id, ct).ConfigureAwait(false);

@@ -45,10 +45,10 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
         var (_, decimals) = await cash.CurrencyAsync(ct).ConfigureAwait(false);
         var amount = CashSupport.Amount(r.Amount, decimals);
         var date = await cash.DateAsync(r.ReturnDate, "returnDate", ct).ConfigureAwait(false);
-        var pid = support.Decode<ApArDocument>(r.DocumentId) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, "documentId");
-        var doc = await db.Set<ApArDocument>().SingleOrDefaultAsync(d => d.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, "documentId");
+        var pid = support.Decode<ApArDocument>(r.DocumentId) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, new FieldRef("documentId"));
+        var doc = await db.Set<ApArDocument>().SingleOrDefaultAsync(d => d.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field("documentId", ErrorCodes.ValidationFormat, new FieldRef("documentId"));
         await locks.EnsureNotLockedByOthersAsync(ApArDocumentService.EntityType, doc.Id, ct).ConfigureAwait(false);
-        if (date < doc.DocumentDate) throw Fail.Field("returnDate", ErrorCodes.ValidationRange, "returnDate");
+        if (date < doc.DocumentDate) throw Fail.Field("returnDate", ErrorCodes.ValidationRange, new FieldRef("returnDate"));
 
         var ret = new ApArReturn { DocumentId = doc.Id, ReturnDate = date, Amount = amount, Reason = reason!, Status = ApArCodes.Posted };
         if (clientId is Guid id) ret.PublicId = id;
@@ -185,16 +185,16 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
             null or "" or "active" or "posted" => query.Where(x => x.Status == ApArCodes.Posted),
             "void" => query.Where(x => x.Status == ApArCodes.Void),
             "all" => query,
-            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, "status"),
+            _ => throw Fail.Field("status", ErrorCodes.ValidationFormat, new FieldRef("status")),
         };
         if (!string.IsNullOrWhiteSpace(q.Party))
         {
-            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, "party");
+            var g = support.Decode<ApArParty>(q.Party) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
             query = query.Where(x => x.Document.Party.PublicId == g);
         }
         if (!string.IsNullOrWhiteSpace(q.Document))
         {
-            var g = support.Decode<ApArDocument>(q.Document) ?? throw Fail.Field("document", ErrorCodes.ValidationFormat, "document");
+            var g = support.Decode<ApArDocument>(q.Document) ?? throw Fail.Field("document", ErrorCodes.ValidationFormat, new FieldRef("document"));
             query = query.Where(x => x.Document.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(x => x.ReturnDate >= from);

@@ -4,11 +4,13 @@
 @using DirectService.Transportation.Application.Abstractions
 @inject IRequestContext RequestContext
 <!DOCTYPE html>
-<html lang="@Lang" dir="@(Lang == "en" ? "ltr" : "rtl")" data-density="compact">
+<html lang="@Lang" dir="@(Lang == "en" ? "ltr" : "rtl")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* Theme before the first paint (DT-244): a blocking script, so the page never shows light and then dark. *@
+    <script src="@Assets["js/theme.js"]"></script>
     <link rel="preload" href="@Assets["fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2"]" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="@Assets["css/fonts.css"]" />
     <link rel="stylesheet" href="@Assets["css/tokens.css"]" />

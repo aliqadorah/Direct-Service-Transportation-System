@@ -4,6 +4,8 @@
   unlinked entries, delete all entries (linked and opening entries kept), replace the chart (template or empty, only when nothing is
   posted), full accounting reset. Each shows what it would delete and what blocks it, then needs the typed confirmation word and a
   reason. The maintenance log lists every action with its counts.
+  DT-246: the entry list says how many entries are ticked; at 1366 px the preview is under the lists (DT-234), so the first tick brings it
+  into view (smoothly, at once with reduced motion).
 *@
 @inject Api Api
 @inject Loc L
@@ -38,18 +40,21 @@
         @if (_action == MaintenanceActions.DeleteEntries)
         {
             <Box Title="@L["mnt.pickEntries"]" NoPad="true">
-                @if (_entries.Count == 0) {<p class="muted pad" style="margin:0">@L["mnt.noManual"]</p>}
-                else
-                {
-                    <DataGrid TItem="JournalEntrySummary" Items="_entries" Key="e => e.Id" Caption="@L["mnt.pickEntries"]" Selectable="true" Selected="_picked" SelectedChanged="Picked">
-                        <Columns>
-                            <GridColumn TItem="JournalEntrySummary" Title="@L["doc.number"]" Value="e => e.Number" Ltr="true" />
-                            <GridColumn TItem="JournalEntrySummary" Title="@L["trip.date"]" Value="e => Fmt.Date(e.EntryDate, Shell.DateFormat)" Ltr="true" />
-                            <GridColumn TItem="JournalEntrySummary" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
-                            <GridColumn TItem="JournalEntrySummary" Title="@L["inv.amount"]" Value="e => Fmt.Money(e.TotalDebit)" Numeric="true" />
-                        </Columns>
-                    </DataGrid>
-                }
+                <Actions>@if (_entries.Count > 0) {<span class="muted mnt-picked" role="status">@(_picked.Count == 0 ? L["mnt.pickedNone"] : L.F("mnt.picked", Fmt.Count(_picked.Count)))</span>}</Actions>
+                <ChildContent>
+                    @if (_entries.Count == 0) {<p class="muted pad" style="margin:0">@L["mnt.noManual"]</p>}
+                    else
+                    {
+                        <DataGrid TItem="JournalEntrySummary" Items="_entries" Key="e => e.Id" Caption="@L["mnt.pickEntries"]" Selectable="true" Selected="_picked" SelectedChanged="Picked">
+                            <Columns>
+                                <GridColumn TItem="JournalEntrySummary" Title="@L["doc.number"]" Value="e => e.Number" Ltr="true" />
+                                <GridColumn TItem="JournalEntrySummary" Title="@L["trip.date"]" Value="e => Fmt.Date(e.EntryDate, Shell.DateFormat)" Ltr="true" />
+                                <GridColumn TItem="JournalEntrySummary" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
+                                <GridColumn TItem="JournalEntrySummary" Title="@L["inv.amount"]" Value="e => Fmt.Money(e.TotalDebit)" Numeric="true" />
+                            </Columns>
+                        </DataGrid>
+                    }
+                </ChildContent>
             </Box>
         }
         <Box Title="@L["mnt.log"]" NoPad="true">
@@ -67,7 +72,7 @@
             }
         </Box>
     </div>
-    <Box Title="@L["mnt.preview"]">
+    <Box Title="@L["mnt.preview"]" Class="mnt-preview">
         @if (_action is null) {<p class="muted" style="margin:0">@L["mnt.pickAction"]</p>}
         else if (_previewHint is not null) {<p class="muted mnt-hint" style="margin:0">@_previewHint</p>}
         else if (_previewError is not null) {<Banner Tone="Tone.Err" Text="@_previewError" />}
@@ -108,6 +113,7 @@
     private IReadOnlySet<object> _picked = new HashSet<object>();
     private bool _busy;
     private int _previewVersion;
+    private bool _reveal;   // the first entry was just ticked: show the preview once it is drawn (DT-246)
 
     [Parameter] public string Company { get; set; } = "";
 
@@ -134,7 +140,19 @@
         await Preview();
     }
 
-    private Task Picked(IReadOnlySet<object> s) { _picked = s; return Preview(); }
+    private Task Picked(IReadOnlySet<object> s)
+    {
+        _reveal = _picked.Count == 0 && s.Count > 0;
+        _picked = s;
+        return Preview();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_reveal || (_preview is null && _previewError is null)) return;
+        _reveal = false;
+        await Js.RevealStacked(".mnt-preview");
+    }
 
     private MaintenanceRequest Request() => new(_word?.Trim(), _reason?.Trim(),
         _action == MaintenanceActions.DeleteEntries ? _picked.Select(k => k.ToString()!).ToList() : null,

@@ -190,15 +190,15 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
     {
         var result = new List<DeductionInput>();
         var items = lines ?? [];
-        if (items.Count > 50) throw Fail.Field("deductions", ErrorCodes.ValidationRange, "deductions");
+        if (items.Count > 50) throw Fail.Field("deductions", ErrorCodes.ValidationRange, new FieldRef("deductions"));
         for (var i = 0; i < items.Count; i++)
         {
             var type = DeductionTypes.FirstOrDefault(t => string.Equals(t, items[i].Type?.Trim(), StringComparison.OrdinalIgnoreCase))
-                ?? throw Fail.Field($"deductions[{i}].type", ErrorCodes.ValidationFormat, "type");
-            if (items[i].Amount is not decimal a || a < 0 || decimal.Round(a, decimals) != a) throw Fail.Field($"deductions[{i}].amount", ErrorCodes.ValidationRange, "amount");
+                ?? throw Fail.Field($"deductions[{i}].type", ErrorCodes.ValidationFormat, new FieldRef("type"));
+            if (items[i].Amount is not decimal a || a < 0 || decimal.Round(a, decimals) != a) throw Fail.Field($"deductions[{i}].amount", ErrorCodes.ValidationRange, new FieldRef("amount"));
             var note = TextNormalizer.CleanText(items[i].Note);
-            if (note is { Length: > 300 }) throw Fail.Field($"deductions[{i}].note", ErrorCodes.ValidationRange, "note");
-            if (type == CashCodes.Other && note is null) throw Fail.Field($"deductions[{i}].note", ErrorCodes.ValidationRequired, "note");
+            if (note is { Length: > 300 }) throw Fail.Field($"deductions[{i}].note", ErrorCodes.ValidationRange, new FieldRef("note"));
+            if (type == CashCodes.Other && note is null) throw Fail.Field($"deductions[{i}].note", ErrorCodes.ValidationRequired, new FieldRef("note"));
             if (a > 0) result.Add(new DeductionInput(type, a, note));
         }
         return result;
@@ -213,7 +213,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         var picked = new List<T>();
         for (var i = 0; i < tokens.Count; i++)
         {
-            var g = decode(tokens[i]) ?? throw Fail.Field($"{field}[{i}]", ErrorCodes.ValidationFormat, field);
+            var g = decode(tokens[i]) ?? throw Fail.Field($"{field}[{i}]", ErrorCodes.ValidationFormat, new FieldRef(field));
             var item = all.FirstOrDefault(x => pid(x) == g) ?? throw Fail.RuleOn($"{field}[{i}]", ErrorCodes.SettlementItemUnavailable, i + 1);   // DT-241: its place in the list, never the token
             if (!picked.Contains(item)) picked.Add(item);
         }
@@ -328,7 +328,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         var query = CashSupport.WithStatus(db.Set<Settlement>().AsNoTracking(), q.Status);
         if (!string.IsNullOrWhiteSpace(q.Driver))
         {
-            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, "driver");
+            var g = support.Decode<Driver>(q.Driver) ?? throw Fail.Field("driver", ErrorCodes.ValidationFormat, new FieldRef("driver"));
             query = query.Where(s => s.Driver.PublicId == g);
         }
         if (q.From is DateOnly from) query = query.Where(s => s.SettlementDate >= from);
