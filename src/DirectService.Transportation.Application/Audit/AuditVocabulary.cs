@@ -87,6 +87,9 @@ public static class AuditVocabulary
         ["CORE.Announcement"] = E("إعلان", "Announcement", "الإعلان", "announcement"),
         ["CORE.TermsAcceptance"] = E("قبول الشروط", "Terms acceptance", "قبول الشروط", "the terms acceptance"),
         ["CORE.MaintenanceLog"] = E("منطقة الصيانة", "Maintenance", "عملية الصيانة", "maintenance"),
+        // System email (DT-250, DT-251).
+        ["CORE.SystemEmailSetting"] = E("إعدادات البريد الإلكتروني للنظام", "System email settings", "إعدادات البريد", "the system email settings"),
+        ["CORE.EmailOutbox"] = E("رسالة بريد", "Email", "رسالة البريد", "the email"),
     };
 
     /// <summary>The words of a record type; an unknown type shows its last part ("Widget").</summary>
@@ -123,6 +126,8 @@ public static class AuditVocabulary
         ["Reorder"] = A("إعادة ترتيب", "Reordered", "إعادة ترتيب {r}", "reordered {r}"),
         ["Clear"] = A("مسح", "Cleared", "مسح {r}", "cleared {r}"),
         ["Reviewed"] = A("مراجعة", "Reviewed", "اعتماد مراجعة {r}", "marked {r} as reviewed"),
+        // System email (DT-250): a test email with the settings (sent or not is in its values).
+        ["EmailTest"] = A("رسالة تجريبية", "Test email", "إرسال رسالة تجريبية بـ{r}", "sent a test email with {r}"),
         // Trips on invoices, settlements and credit notes
         ["AddedToInvoice"] = A("إضافة إلى فاتورة", "Added to invoice", "إضافة {r} إلى {d}", "added {r} to {d}"),
         ["RemovedFromInvoice"] = A("إزالة من فاتورة", "Removed from invoice", "إزالة {r} من {d}", "removed {r} from {d}"),
@@ -546,6 +551,23 @@ public static class AuditVocabulary
         ["CORE.Company.TaxRate"] = F("نسبة الضريبة", "Tax rate", Kind.Percent),
         ["CORE.Plan.Code"] = F("رمز الخطة", "Plan code"),
         ["CORE.SupportAccessGrant.Reason"] = F("سبب الطلب", "Reason"),
+        // System email (DT-250): the secret itself is never written ("***").
+        ["CORE.SystemEmailSetting.State"] = F("الحالة", "State", Kind.Code),
+        ["CORE.SystemEmailSetting.EntraTenantId"] = F("معرّف المستأجر (Tenant ID)", "Tenant ID"),
+        ["CORE.SystemEmailSetting.EntraClientId"] = F("معرّف التطبيق (Client ID)", "Client ID"),
+        ["CORE.SystemEmailSetting.ClientSecretEncrypted"] = F("سرّ التطبيق", "Client secret", Kind.Masked),
+        ["CORE.SystemEmailSetting.SecretSavedAt"] = F("حُفظ السرّ في", "Secret saved", Kind.DateTime),
+        ["CORE.SystemEmailSetting.SecretExpiresOn"] = F("ينتهي السرّ في", "Secret expires on", Kind.Date),
+        ["CORE.SystemEmailSetting.SenderMailbox"] = F("صندوق بريد المرسل", "Sender mailbox"),
+        ["CORE.SystemEmailSetting.DisplayName"] = F("اسم المرسل", "Sender name"),
+        ["CORE.SystemEmailSetting.ReplyTo"] = F("عنوان الرد", "Reply-to address"),
+        ["CORE.SystemEmailSetting.ActivatedAt"] = F("فُعّلت في", "Activated", Kind.DateTime),
+        ["CORE.SystemEmailSetting.LastTestAt"] = F("آخر رسالة تجريبية", "Last test email", Kind.DateTime),
+        ["CORE.SystemEmailSetting.LastTestOk"] = F("نجحت الرسالة التجريبية", "Test email sent", Kind.Bool),
+        ["CORE.SystemEmailSetting.LastTestError"] = F("سبب فشل الرسالة التجريبية", "Why the test failed"),
+        ["CORE.SystemEmailSetting.ExpiryWarnedDays"] = F("أُرسل تنبيه انتهاء السرّ (أيام)", "Expiry warning sent (days)", Kind.Number),
+        ["CORE.EmailOutbox.Template"] = F("نوع الرسالة", "Email type"),
+        ["CORE.EmailOutbox.How"] = F("طريقة إعادة الإرسال", "Resent as"),
         ["CFG.CompanySetting.SettingValue"] = F("القيمة", "Value"),
         // Revision 6 part B: budgets (month names as in the budget screen and its Excel template).
         ["ACC.Budget.FiscalYear"] = F("السنة المالية", "Fiscal year", Kind.Number),
@@ -590,6 +612,9 @@ public static class AuditVocabulary
         ["Partial"] = new("مدفوعة جزئياً", "Partly paid"),
         ["Posted"] = new("مرحّل", "Posted"),
         ["Pending"] = new("معلّق", "Pending"),
+        ["Retired"] = new("مستبدلة", "Replaced"),
+        ["Development"] = new("التطوير (حفظ في مجلد)", "Development (save to folder)"),
+        ["Microsoft365"] = new("Microsoft 365", "Microsoft 365"),
         ["Reversed"] = new("معكوس", "Reversed"),
         ["Disabled"] = new("معطّل", "Disabled"),
         ["Invited"] = new("مدعو", "Invited"),

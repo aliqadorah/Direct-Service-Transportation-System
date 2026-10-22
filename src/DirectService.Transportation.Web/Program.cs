@@ -84,6 +84,7 @@ if (config.GetValue("Jobs:Enabled", true))
     builder.Services.AddHostedService<TenantLifecycleWorker>();
     builder.Services.AddHostedService<SessionCleanupWorker>();   // DT-211
     builder.Services.AddHostedService<SupportWindowWorker>();   // DT-220
+    builder.Services.AddHostedService<EmailOutboxWorker>();   // DT-251
 }
 
 var app = builder.Build();
@@ -184,6 +185,9 @@ if (args is ["create-staff", var staffEmail, .. var staffName])
     using var opsScope = app.Services.CreateScope();
     var outcome = await opsScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Application.Platform.StaffAccountService>()
         .CreateAsync(staffEmail, string.Join(' ', staffName), CancellationToken.None).ConfigureAwait(false);
+    // The email went into the outbox (DT-251); the command sends it now rather than leave it to the next start of the host.
+    using (var sendScope = app.Services.CreateScope())
+        await sendScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Infrastructure.Email.EmailDispatcher>().RunOnceAsync(CancellationToken.None).ConfigureAwait(false);
     Console.WriteLine(outcome);
     return;
 }

@@ -1,0 +1,364 @@
+@page "/console/system-email"
+@*
+  Provider console → System email (owner decision 22 Oct 2026, option A; DT-250…DT-252). The settings: Development (save to folder) or
+  Microsoft 365 (tenant ID, client ID, client secret — write-only, shown only as "saved on / expires on" — sender mailbox, name, reply-to).
+  A change of mode, mailbox, tenant, client ID or secret is saved as pending and becomes active only after a test email with it has been
+  sent; until then the active settings keep sending (both are shown). Saving asks for a fresh code from the authenticator app. A test email
+  to a typed address says in plain words why it failed. Status (working / failing, last success, waiting, failed), a banner 30 days before the
+  secret expires, and the delivery log (no content, no links) with Resend for failed emails.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<PageHeader Title="@L["nav.systemEmail"]" Crumbs="@([new Crumb(L["shell.console"]), new Crumb(L["nav.systemEmail"])])" />
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <ChildContent>
+        @{ var d = _data!; var s = d.Status; }
+        @if (s.SecretDaysLeft is int left && left <= 30)
+        {
+            <Banner Tone="@(left <= 7 ? Tone.Err : Tone.Warn)" Icon="key" Text="@(left < 0 ? L["sem.secretExpired"] : L.F("sem.secretExpires", Day(d.Active.SecretExpiresOn), left))" />
+        }
+        @if (d.Pending is { } pending)
+        {
+            <Banner Tone="Tone.Info" Icon="clock" Text="@L.F("sem.pendingBanner", ModeName(pending.Mode))" />
+        }
+        <div class="cols flow lp sem" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start">
+            <Box Title="@L[d.Pending is null ? "sem.settings" : "sem.pendingSettings"]">
+                <EditForm EditContext="_ctx" OnValidSubmit="AskCode" id="sem-form" class="stack">
+                    <ProblemValidator @ref="_problems" />
+                    <ErrorSummary Extra="_extra" />
+                    <fieldset class="stack" style="border:0;margin:0;padding:0">
+                        <legend class="lbl" style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:4px">@L["sem.mode"]</legend>
+                        @foreach (var mode in Modes)
+                        {
+                            var m = mode;
+                            <label class="chk"><input type="radio" name="sem-mode" value="@m" checked="@(_m.Mode == m)" @onchange="() => SetMode(m)" /> @ModeName(m)</label>
+                        }
+                        <p class="help">@L[_m.Mode == Microsoft365 ? "sem.modeM365Help" : "sem.modeDevHelp"]</p>
+                    </fieldset>
+                    @if (_m.Mode == Microsoft365)
+                    {
+                        <div class="fg" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+                            <TextField @bind-Value="_m.EntraTenantId" Label="@L["sem.tenantId"]" Required="true" Ltr="true" MaxLength="100" Autocomplete="off" Help="@L["sem.tenantIdHelp"]" />
+                            <TextField @bind-Value="_m.EntraClientId" Label="@L["sem.clientId"]" Required="true" Ltr="true" MaxLength="100" Autocomplete="off" Help="@L["sem.clientIdHelp"]" />
+                            <TextField @bind-Value="_m.ClientSecret" Label="@L["sem.clientSecret"]" Type="password" Ltr="true" MaxLength="400" Autocomplete="new-password"
+                                       Required="@(!HasSecret)" Placeholder="@(HasSecret ? L["sem.secretKeep"] : null)" Help="@SecretHelp" />
+                            <DateField @bind-Value="_m.SecretExpiresOn" Label="@L["sem.secretExpiresOn"]" Required="true" Help="@L["sem.secretExpiresHelp"]" />
+                            <TextField @bind-Value="_m.SenderMailbox" Label="@L["sem.mailbox"]" Type="email" Required="true" Ltr="true" MaxLength="254" Help="@L["sem.mailboxHelp"]" />
+                        </div>
+                    }
+                    <div class="fg" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+                        <TextField @bind-Value="_m.DisplayName" Label="@L["sem.displayName"]" Required="true" MaxLength="100" />
+                        <TextField @bind-Value="_m.ReplyTo" Label="@L["sem.replyTo"]" Type="email" Ltr="true" MaxLength="254" Help="@L["sem.replyToHelp"]" />
+                    </div>
+                    <p class="help">@L["sem.saveHelp"]</p>
+                    <div class="formbar">
+                        <Btn Type="submit" Primary="true" Icon="lock" Text="@L["sem.save"]" Busy="_busy" />
+                    </div>
+                </EditForm>
+            </Box>
+            <div class="stack">
+                <Box Title="@L["sem.status"]">
+                    <dl class="kv sem-kv">
+                        <dt>@L["sem.state"]</dt>
+                        <dd>
+                            @if (s.Working is null) {<Badge Tone="Tone.Mute" Icon="clock" Text="@L["sem.notYet"]" />}
+                            else if (s.Working == true) {<Badge Tone="Tone.Ok" Icon="check" Text="@L["sem.working"]" />}
+                            else {<Badge Tone="Tone.Err" Icon="alert" Text="@L["sem.failing"]" /> <span class="help">@Kind(s.LastErrorKind)</span>}
+                        </dd>
+                        <dt>@L["sem.activeMode"]</dt><dd>@ModeName(d.Active.Mode)</dd>
+                        <dt>@L["sem.sender"]</dt><dd><bdi dir="ltr">@d.Active.SenderMailbox</bdi> · @d.Active.DisplayName</dd>
+                        @if (d.Active.ActivatedAt is { } at) {<dt>@L["sem.activatedAt"]</dt><dd><bdi class="num">@When(at)</bdi></dd>}
+                        @if (d.Active.HasSecret)
+                        {
+                            <dt>@L["sem.secretSaved"]</dt>
+                            <dd><bdi class="num">@When(d.Active.SecretSavedAt)</bdi> · @L.F("sem.expiresOn", Day(d.Active.SecretExpiresOn))</dd>
+                        }
+                        <dt>@L["sem.lastSuccess"]</dt><dd><bdi class="num">@(s.LastSuccessAt is { } ok ? When(ok) : "—")</bdi></dd>
+                        <dt>@L["sem.waiting"]</dt><dd><bdi class="num">@s.Waiting</bdi></dd>
+                        <dt>@L["sem.failed"]</dt><dd><bdi class="num">@s.Failed</bdi> @if (s.FailedLast24Hours > 0) {<span class="help">@L.F("sem.failedDay", s.FailedLast24Hours)</span>}</dd>
+                        <dt>@L["sem.limit"]</dt><dd>@L.F("sem.perMinute", s.PerMinute)</dd>
+                    </dl>
+                    @if (d.Pending is { } p)
+                    {
+                        <p class="help" style="margin-top:var(--sp-5)">@L.F("sem.pendingWhat", ModeName(p.Mode), p.SenderMailbox ?? "—")</p>
+                    }
+                </Box>
+                <Box Title="@L["sem.test"]">
+                    <div class="stack">
+                        <p class="help">@L[d.Pending is null ? "sem.testHelpActive" : "sem.testHelpPending"]</p>
+                        <div class="row" style="flex-wrap:wrap;align-items:flex-end">
+                            <div class="field" style="flex:1 1 220px">
+                                <label for="sem-test">@L["sem.testAddress"]</label>
+                                <input id="sem-test" class="input" type="email" dir="ltr" maxlength="254" autocomplete="email" @bind="_testAddress" @bind:event="oninput"
+                                       aria-invalid="@(_testError is null ? null : "true")" aria-describedby="@(_testError is null ? null : "sem-test-err")" />
+                                @if (_testError is not null) {<span class="help err" id="sem-test-err"><Icon Name="alert" />@_testError</span>}
+                            </div>
+                            <Btn Icon="send" Text="@L["sem.sendTest"]" Busy="_testing" OnClick="Test" />
+                        </div>
+                        <div role="status" aria-live="polite">
+                            @if (_test is { } t)
+                            {
+                                if (t.Sent)
+                                {
+                                    <Banner Tone="Tone.Ok" Icon="check" Text="@(t.Activated ? L.F("sem.testOkActivated", _testedTo) : L.F("sem.testOk", _testedTo))" />
+                                    @foreach (var w in t.Warnings) {<Banner Tone="Tone.Warn" Icon="shield" Text="@L["sem.warn." + w]" />}
+                                }
+                                else
+                                {
+                                    <Banner Tone="Tone.Err" Icon="alert" Text="@(L["sem.testFailed"] + " " + Kind(t.ErrorKind))" />
+                                    @if (t.Detail is { Length: > 0 } detail)
+                                    {
+                                        <details class="refunded"><summary>@L["sem.technical"]</summary><p class="tech">@detail</p></details>
+                                    }
+                                }
+                            }
+                        </div>
+                    </div>
+                </Box>
+            </div>
+        </div>
+        <Box Title="@L["sem.log"]" NoPad="true">
+            <Actions>
+                <select class="input" style="height:28px;width:auto" aria-label="@L["sem.filterStatus"]" @onchange="FilterStatus">
+                    <option value="">@L["sem.allStatuses"]</option>
+                    @foreach (var st in Statuses) {<option value="@st" selected="@(_status == st)">@L["sem.st." + st]</option>}
+                </select>
+                <input class="input" style="height:28px;width:200px" type="search" dir="ltr" placeholder="@L["sem.searchRecipient"]" aria-label="@L["sem.searchRecipient"]"
+                       @bind="_q" @bind:event="onchange" @bind:after="() => Go(1)" />
+            </Actions>
+            <ChildContent>
+                @if (_log is null || _log.Items.Count == 0)
+                {
+                    <EmptyState Icon="mail" Title="@L["sem.noEmails"]" />
+                }
+                else
+                {
+                    <DataGrid TItem="EmailLogItem" Items="_log.Items" Key="e => e.Id" Caption="@L["sem.log"]">
+                        <Columns>
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.when"]" Value="e => When(e.CreatedAt)" Ltr="true" />
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.type"]" Value="e => TemplateName(e.Template)" />
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.recipient"]" Value="e => e.Recipient" Ltr="true" Clip="true" />
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.language"]" Value="@(e => e.Language == "en" ? "English" : "العربية")" />
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.statusCol"]">
+                                <Template><Badge Tone="@StatusTone(context.Status)" Icon="@StatusIcon(context.Status)" Text="@L["sem.st." + context.Status]" /></Template>
+                            </GridColumn>
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.attempts"]" Value="e => e.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture)" Numeric="true" />
+                            <GridColumn TItem="EmailLogItem" Title="@L["sem.reason"]" Wrap="true">
+                                <Template>
+                                    @if (context.Status == "Sent") {<span class="muted">@When(context.SentAt)</span>}
+                                    else if (context.ErrorKind is { } k) {<span title="@context.Error">@Kind(k)</span>}
+                                    @if (context.Status == "Pending" && context.NextAttemptAt is { } next) {<span class="help"> · @L.F("sem.nextAttempt", When(next))</span>}
+                                    @if (context.ResentAt is { } r) {<span class="help"> · @L.F("sem.resentAt", When(r))</span>}
+                                </Template>
+                            </GridColumn>
+                            <GridColumn TItem="EmailLogItem" Title="@L["profile.action"]" HideTitle="true">
+                                <Template>
+                                    @if (context.Resend is { } how)
+                                    {
+                                        <Btn Small="true" Icon="refresh" Text="@L["sem.resend"]" Title="@L["sem.resend." + how]" AriaLabel="@L.F("sem.resendTo", context.Recipient)"
+                                             Busy="@(_busyRow == context.Id)" OnClick="() => Resend(context)" />
+                                    }
+                                    else if (context.ResendNote is { } note) {<span class="help">@L["sem.note." + note]</span>}
+                                </Template>
+                            </GridColumn>
+                        </Columns>
+                    </DataGrid>
+                    <Pager Page="_page" PageSize="25" Total="_log.TotalCount" Sizes="@([25])" OnPage="Go" />
+                }
+            </ChildContent>
+        </Box>
+        <p class="help" style="margin:0">@L["sem.logHelp"]</p>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_asking" Title="@L["sem.codeTitle"]" Icon="lock" Busy="_busy">
+    <ChildContent>
+        <form id="sem-code" class="stack" @onsubmit="Save" @onsubmit:preventDefault="true">
+            <p>@L["sem.codeText"]</p>
+            <div class="field">
+                <label for="sem-code-input">@L["sem.code"] <span class="req" aria-hidden="true">*</span></label>
+                <input id="sem-code-input" class="input num w160" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" @bind="_code" @bind:event="oninput"
+                       aria-invalid="@(_codeError is null ? null : "true")" aria-describedby="@(_codeError is null ? null : "sem-code-err")" />
+                @if (_codeError is not null) {<span class="help err" id="sem-code-err"><Icon Name="alert" />@_codeError</span>}
+            </div>
+        </form>
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _asking = false" />
+        <Btn Type="submit" Primary="true" Icon="check" Text="@L["sem.save"]" Busy="_busy" form="sem-code" />
+    </Footer>
+</Modal>
+
+@code {
+    private const string Microsoft365 = "Microsoft365";
+    private static readonly string[] Modes = ["Development", Microsoft365];
+    private static readonly string[] Statuses = ["Pending", "Sending", "Sent", "Failed", "Suppressed"];
+
+    private SystemEmailResponse? _data;
+    private PagedResult<EmailLogItem>? _log;
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _status, _q, _busyRow, _code, _codeError, _testAddress, _testError, _testedTo;
+    private int _page = 1;
+    private bool _busy, _asking, _testing;
+    private SystemEmailTestResponse? _test;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    /// <summary>The settings the form edits: the pending ones when there are, else the active ones.</summary>
+    private SystemEmailSettingsView Edited => _data!.Pending ?? _data.Active;
+
+    /// <summary>A secret is saved for the app in the form (same tenant and client): the field may stay empty.</summary>
+    private bool HasSecret => new[] { _data?.Pending, _data?.Active }.Any(v => v is { HasSecret: true, Mode: Microsoft365 } && v.EntraTenantId == _m.EntraTenantId?.Trim()
+        && v.EntraClientId == _m.EntraClientId?.Trim());
+
+    private string SecretHelp => HasSecret && new[] { _data?.Pending, _data?.Active }.FirstOrDefault(v => v is { HasSecret: true }) is { } v
+        ? L.F("sem.secretSavedHelp", When(v.SecretSavedAt), Day(v.SecretExpiresOn))
+        : L["sem.secretHelp"];
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _data = await Api.GetAsync<SystemEmailResponse>("api/v1/platform/system-email");
+            Fill();
+            await LoadLog();
+            _state = LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Fill()
+    {
+        var v = Edited;
+        _m = new Model
+        {
+            Mode = v.Mode, EntraTenantId = v.EntraTenantId, EntraClientId = v.EntraClientId, SecretExpiresOn = v.SecretExpiresOn,
+            SenderMailbox = v.Mode == Microsoft365 ? v.SenderMailbox : null, DisplayName = v.DisplayName, ReplyTo = v.ReplyTo,
+        };
+        _ctx = new EditContext(_m);
+    }
+
+    private async Task LoadLog()
+    {
+        var q = $"?page={_page}&pageSize=25" + (_status is { Length: > 0 } s ? "&status=" + s : "") + (_q is { Length: > 0 } t ? "&q=" + Uri.EscapeDataString(t.Trim()) : "");
+        _log = await Api.GetAsync<PagedResult<EmailLogItem>>("api/v1/platform/system-email/log" + q);
+    }
+
+    private async Task Go(int page)
+    {
+        _page = page;
+        try { await LoadLog(); } catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+    }
+
+    private Task FilterStatus(ChangeEventArgs e)
+    {
+        _status = e.Value?.ToString();
+        return Go(1);
+    }
+
+    private void SetMode(string mode) => _m.Mode = mode;
+
+    /// <summary>The form is valid: ask for a fresh code from the authenticator app, then save.</summary>
+    private void AskCode()
+    {
+        _code = null;
+        _codeError = null;
+        _extra = null;
+        _asking = true;
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_code)) { _codeError = L["sem.codeRequired"]; return; }
+        _busy = true;
+        _codeError = null;
+        try
+        {
+            _data = await Api.PutAsync<SystemEmailResponse>("api/v1/platform/system-email", new SaveSystemEmailRequest(_m.Mode, _m.EntraTenantId, _m.EntraClientId,
+                _m.ClientSecret, _m.SecretExpiresOn, _m.SenderMailbox, _m.DisplayName, _m.ReplyTo, _code.Trim(), Edited.RowVersion));
+            _asking = false;
+            _test = null;
+            Fill();
+            Toasts.Success(L[_data.Pending is null ? "sem.saved" : "sem.savedPending"]);
+        }
+        catch (ApiException e)
+        {
+            if (e.Problem.Errors?.FirstOrDefault(x => x.Field == "code") is { } code) { _codeError = code.Message; }
+            else
+            {
+                // A field of the form: close the dialog and mark the field.
+                _asking = false;
+                if (_problems?.Show(e.Problem) is { } other) _extra = [other];
+            }
+        }
+        finally { _busy = false; _code = null; }
+    }
+
+    private async Task Test()
+    {
+        _testError = string.IsNullOrWhiteSpace(_testAddress) ? L["sem.testAddressRequired"] : null;
+        if (_testError is not null) return;
+        _testing = true;
+        _test = null;
+        try
+        {
+            _testedTo = _testAddress!.Trim();
+            _test = await Api.PostAsync<SystemEmailTestResponse>("api/v1/platform/system-email/test", new SystemEmailTestRequest(_testedTo));
+            var activated = _test.Activated;
+            _data = _test.Settings;
+            if (activated) Fill();
+            await LoadLog();
+        }
+        catch (ApiException e) { _testError = e.Problem.Errors?.FirstOrDefault()?.Message ?? e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _testing = false; }
+    }
+
+    private async Task Resend(EmailLogItem e)
+    {
+        _busyRow = e.Id;
+        try
+        {
+            var r = await Api.PostAsync<EmailResendResponse>($"api/v1/platform/system-email/log/{Uri.EscapeDataString(e.Id)}/resend", new { });
+            Toasts.Success(L[r.How == "newLink" ? "sem.resentNewLink" : "sem.resentSame"]);
+            _data = await Api.GetAsync<SystemEmailResponse>("api/v1/platform/system-email");
+            await LoadLog();
+        }
+        catch (ApiException ex) { Toasts.Error(ex.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busyRow = null; }
+    }
+
+    private string ModeName(string mode) => L["sem.mode." + mode];
+
+    private string Kind(string? kind) => kind is null ? "" : L["sem.err." + kind];
+
+    private string TemplateName(string template) => UiText.All.ContainsKey("sem.tpl." + template) ? L["sem.tpl." + template] : template;
+
+    private string When(DateTime? utc) => utc is { } d
+        ? Fmt.Date(DateOnly.FromDateTime(d.ToLocalTime()), Shell.DateFormat) + " " + d.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+        : "—";
+
+    private string Day(DateOnly? d) => d is { } x ? Fmt.Date(x, Shell.DateFormat) : "—";
+
+    private static Tone StatusTone(string status) => status switch { "Sent" => Tone.Ok, "Failed" => Tone.Err, "Suppressed" => Tone.Warn, _ => Tone.Info };
+
+    private static string StatusIcon(string status) => status switch { "Sent" => "check", "Failed" or "Suppressed" => "alert", _ => "clock" };
+
+    private sealed class Model
+    {
+        public string Mode { get; set; } = "Development";
+        public string? EntraTenantId { get; set; }
+        public string? EntraClientId { get; set; }
+        public string? ClientSecret { get; set; }
+        public DateOnly? SecretExpiresOn { get; set; }
+        public string? SenderMailbox { get; set; }
+        public string? DisplayName { get; set; }
+        public string? ReplyTo { get; set; }
+    }
+}

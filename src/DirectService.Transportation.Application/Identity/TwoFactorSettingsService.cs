@@ -138,7 +138,7 @@ public sealed partial class TwoFactorSettingsService(
         var link = options.Value.PublicBaseUrl.TrimEnd('/') + "/sign-in";
         try
         {
-            await email.SendAsync(EmailTemplates.TwoFactorChanged(user.Email, user.FullName, whatAr, whatEn, clock.GetUtcNow().UtcDateTime, ctx.IpAddress, link), ct)
+            await email.SendAsync(EmailTemplates.TwoFactorChanged(user.Email, user.FullName, whatAr, whatEn, clock.GetUtcNow().UtcDateTime, ctx.IpAddress, link, user.LanguageCode), ct)
                 .ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // the change is saved and audited; a mail failure must not cost the user their session or the codes shown once

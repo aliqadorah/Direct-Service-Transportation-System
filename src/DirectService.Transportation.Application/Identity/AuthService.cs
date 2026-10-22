@@ -210,6 +210,24 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     }
 
     /// <summary>
+    /// A fresh two-step code for a sensitive platform change (system email settings, DT-250): a current authenticator code, used once
+    /// (DT-212); recovery codes are not taken here. Wrong codes count towards the lockout like sign-in failures (DT-204).
+    /// </summary>
+    public async Task VerifyFreshCodeAsync(User user, string? code, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        if (user.TwoFactorEnabledAt is null) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (string.IsNullOrWhiteSpace(code)) throw Fail.Field("code", ErrorCodes.SystemEmailFreshCode);
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("code", ErrorCodes.TwoFactorInvalid);
+        if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Clean(code)).ConfigureAwait(false))
+        {
+            await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
+            throw Fail.Field("code", ErrorCodes.TwoFactorInvalid);
+        }
+        throttle.Reset(user.Id, ctx.IpAddress);
+    }
+
+    /// <summary>
     /// DT-229: re-authentication for a sensitive change of the user's own account (the email address): the current password, and with
     /// two-step verification on also a current code or a recovery code (<see cref="VerifyStepUpAsync"/>). Failures count towards the
     /// lockout like sign-in failures; while blocked the ordinary "wrong password" answer is given.

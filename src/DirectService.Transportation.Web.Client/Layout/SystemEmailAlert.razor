@@ -1,0 +1,52 @@
+@*
+  System email needs attention (DT-252), on every console page: emails that could not be sent in the last 24 hours, sending failing, or the
+  Microsoft 365 secret expiring within 30 days — with a link to the System email page (which shows its own banner, so none is drawn there).
+  Read when the console opens and again on each page change, at most once a minute.
+*@
+@using DirectService.Transportation.Contracts.Platform
+@implements IDisposable
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+
+@if (_alert is { } a && !OnPage && Text(a) is { } text)
+{
+    <Banner Tone="@(a.Failing || a.SecretDaysLeft is <= 7 ? Tone.Err : Tone.Warn)" Icon="mail" Text="@text">
+        <Actions><a href="/console/system-email">@L["sem.alertOpen"]</a></Actions>
+    </Banner>
+}
+
+@code {
+    private SystemEmailAlertResponse? _alert;
+    private DateTime _readAt;
+
+    private bool OnPage => Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath.StartsWith("/console/system-email", StringComparison.Ordinal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += Changed;
+        await Read();
+    }
+
+    private void Changed(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(async () => { if (DateTime.UtcNow - _readAt > TimeSpan.FromMinutes(1)) await Read(); StateHasChanged(); });
+
+    private async Task Read()
+    {
+        _readAt = DateTime.UtcNow;
+        try { _alert = await Api.GetAsync<SystemEmailAlertResponse>("api/v1/platform/system-email/alert"); }
+        catch (ApiException) { _alert = null; }
+    }
+
+    private string? Text(SystemEmailAlertResponse a)
+    {
+        var parts = new List<string>();
+        if (a.Failing) parts.Add(L["sem.alertFailing"]);
+        if (a.FailedLast24Hours > 0) parts.Add(L.F("sem.alertFailed", a.FailedLast24Hours));
+        if (a.SecretDaysLeft is int d) parts.Add(d < 0 ? L["sem.secretExpired"] : L.F("sem.alertSecret", d));
+        return parts.Count == 0 ? null : string.Join(" ", parts);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= Changed;
+}

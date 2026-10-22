@@ -170,7 +170,7 @@ public sealed class InvitationService(
         var company = await db.Set<Company>().IgnoreQueryFilters(TenantFilter).Where(c => c.Id == inv.CompanyId).Select(c => c.Name).SingleAsync(ct).ConfigureAwait(false);
         var inviter = ctx.UserName ?? string.Empty;
         var link = $"{options.Value.PublicBaseUrl.TrimEnd('/')}/accept-invitation?t={Uri.EscapeDataString(token)}";
-        await email.SendAsync(EmailTemplates.Invitation(inv.Email, company, inviter, options.Value.InvitationDays, link), ct).ConfigureAwait(false);
+        await email.SendAsync(EmailTemplates.Invitation(inv.Email, company, inviter, options.Value.InvitationDays, link, ctx.Language), ct).ConfigureAwait(false);
     }
 
     private bool IsUsable(Invitation inv) => inv.AcceptedAt is null && inv.ExpiresAt > Now;

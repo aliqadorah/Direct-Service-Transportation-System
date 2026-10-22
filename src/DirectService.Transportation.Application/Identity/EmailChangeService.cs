@@ -129,7 +129,7 @@ public sealed partial class EmailChangeService(
         // Like a password change: the account's other sessions end (this one stays).
         await sessions.RevokeAllAsync(user.Id, "Email changed", ctx.SessionId, ct).ConfigureAwait(false);
         if (previous is not null && !string.Equals(previous, mail, StringComparison.OrdinalIgnoreCase))
-            await SendQuietlyAsync(EmailTemplates.EmailChanged(previous, user.FullName, Mask(mail), now, Base() + "/sign-in"), user.Id, ct).ConfigureAwait(false);
+            await SendQuietlyAsync(EmailTemplates.EmailChanged(previous, user.FullName, Mask(mail), now, Base() + "/sign-in", user.LanguageCode), user.Id, ct).ConfigureAwait(false);
         return user;
     }
 
@@ -154,10 +154,10 @@ public sealed partial class EmailChangeService(
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var token = await users.GenerateUserTokenAsync(user, users.Options.Tokens.EmailConfirmationTokenProvider, Purpose(user)).ConfigureAwait(false);
         var link = $"{Base()}/confirm-email-change?u={Uri.EscapeDataString(urlTokens.Encode<User>(user.PublicId))}&t={Uri.EscapeDataString(token)}";
-        await email.SendAsync(EmailTemplates.ConfirmEmailChange(mail, user.FullName, byAdministrator, link), ct).ConfigureAwait(false);
+        await email.SendAsync(EmailTemplates.ConfirmEmailChange(mail, user.FullName, byAdministrator, link, user.LanguageCode), ct).ConfigureAwait(false);
         // F8: the current (verified) address hears of the request at once, not only after the change.
         if (user.Email is { } current && user.EmailConfirmedAt is not null)
-            await SendQuietlyAsync(EmailTemplates.EmailChangeAsked(current, user.FullName, Mask(mail), byAdministrator, Base() + "/sign-in"), user.Id, ct).ConfigureAwait(false);
+            await SendQuietlyAsync(EmailTemplates.EmailChangeAsked(current, user.FullName, Mask(mail), byAdministrator, Base() + "/sign-in", user.LanguageCode), user.Id, ct).ConfigureAwait(false);
     }
 
     private async Task<EmailChangeResponse> CancelAsync(User user, CancellationToken ct)

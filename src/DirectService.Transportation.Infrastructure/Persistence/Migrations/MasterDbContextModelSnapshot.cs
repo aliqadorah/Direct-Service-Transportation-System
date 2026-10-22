@@ -5045,6 +5045,153 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Core.EmailOutbox", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int")
+                        .HasColumnOrder(7)
+                        .HasDefaultValueSql("0", "DF_EmailOutbox_Attempts");
+
+                    b.Property<DateTime?>("ClaimedUntil")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(9);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(10)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_EmailOutbox_CreatedAt");
+
+                    b.Property<string>("ErrorKind")
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnOrder(14);
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(13);
+
+                    b.Property<bool>("HasSecretLink")
+                        .HasColumnType("bit")
+                        .HasColumnOrder(17)
+                        .HasDefaultValueSql("0", "DF_EmailOutbox_HasSecretLink");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(5)")
+                        .HasColumnOrder(4);
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(11);
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)")
+                        .HasColumnOrder(15);
+
+                    b.Property<string>("Mode")
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnOrder(16);
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(8);
+
+                    b.Property<byte[]>("PayloadEncrypted")
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnOrder(18);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_EmailOutbox_PublicId");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)")
+                        .HasColumnOrder(5);
+
+                    b.Property<DateTime?>("ResentAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(20);
+
+                    b.Property<long?>("ResentFromId")
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(19);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnOrder(21);
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(12);
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnOrder(6);
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)")
+                        .HasColumnOrder(3);
+
+                    b.Property<long?>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(2);
+
+                    b.HasKey("Id")
+                        .HasName("PK_EmailOutbox");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "IX_EmailOutbox_CreatedAt");
+
+                    b.HasIndex(new[] { "Recipient", "Template", "CreatedAt" }, "IX_EmailOutbox_Recipient_Template_CreatedAt");
+
+                    b.HasIndex(new[] { "SentAt" }, "IX_EmailOutbox_SentAt")
+                        .HasFilter("[SentAt] IS NOT NULL");
+
+                    b.HasIndex(new[] { "Status", "NextAttemptAt" }, "IX_EmailOutbox_Status_NextAttemptAt");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_EmailOutbox_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("EmailOutbox", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_EmailOutbox_Attempts", "[Attempts] >= 0");
+
+                            t.HasCheckConstraint("CK_EmailOutbox_FailedAt", "[Status] <> 'Failed' OR [FailedAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_EmailOutbox_LanguageCode", "[LanguageCode] IN ('ar','en')");
+
+                            t.HasCheckConstraint("CK_EmailOutbox_PayloadEncrypted", "[PayloadEncrypted] IS NULL OR [Status] IN ('Pending','Sending') OR ([Status] = 'Failed' AND [HasSecretLink] = 0)");
+
+                            t.HasCheckConstraint("CK_EmailOutbox_SentAt", "[Status] <> 'Sent' OR [SentAt] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_EmailOutbox_Status", "[Status] IN ('Pending','Sending','Sent','Failed','Suppressed')");
+                        });
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Core.Invitation", b =>
                 {
                     b.Property<long>("Id")
@@ -6468,6 +6615,163 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_SupportAccessGrants_EndsAt", "[EndsAt] > [StartsAt]");
 
                             t.HasCheckConstraint("CK_SupportAccessGrants_Status", "[Status] IN ('Requested','Approved','Rejected','Expired')");
+                        });
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SystemEmailSetting", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(12);
+
+                    b.Property<byte[]>("ClientSecretEncrypted")
+                        .HasColumnType("varbinary(max)")
+                        .HasColumnOrder(6);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(17)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_SystemEmailSettings_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(18);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnOrder(24);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(22);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(23);
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnOrder(10);
+
+                    b.Property<string>("EntraClientId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnOrder(5);
+
+                    b.Property<string>("EntraTenantId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnOrder(4);
+
+                    b.Property<int?>("ExpiryWarnedDays")
+                        .HasColumnType("int")
+                        .HasColumnOrder(16);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnOrder(21)
+                        .HasDefaultValueSql("0", "DF_SystemEmailSettings_IsDeleted");
+
+                    b.Property<DateTime?>("LastTestAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(13);
+
+                    b.Property<string>("LastTestError")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)")
+                        .HasColumnOrder(15);
+
+                    b.Property<bool?>("LastTestOk")
+                        .HasColumnType("bit")
+                        .HasColumnOrder(14);
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnOrder(3);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_SystemEmailSettings_PublicId");
+
+                    b.Property<string>("ReplyTo")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)")
+                        .HasColumnOrder(11);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnOrder(25);
+
+                    b.Property<DateOnly?>("SecretExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnOrder(8);
+
+                    b.Property<DateTime?>("SecretSavedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(7);
+
+                    b.Property<string>("SenderMailbox")
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)")
+                        .HasColumnOrder(9);
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnOrder(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnOrder(19);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnOrder(20);
+
+                    b.HasKey("Id")
+                        .HasName("PK_SystemEmailSettings");
+
+                    b.HasIndex(new[] { "State" }, "UX_SystemEmailSettings_Active")
+                        .IsUnique()
+                        .HasFilter("[State] = 'Active' AND [IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "State" }, "UX_SystemEmailSettings_Pending")
+                        .IsUnique()
+                        .HasFilter("[State] = 'Pending' AND [IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_SystemEmailSettings_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("SystemEmailSettings", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_SystemEmailSettings_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_SystemEmailSettings_ExpiryWarnedDays", "[ExpiryWarnedDays] IS NULL OR [ExpiryWarnedDays] > 0");
+
+                            t.HasCheckConstraint("CK_SystemEmailSettings_Microsoft365", "[Mode] <> 'Microsoft365' OR ([EntraTenantId] IS NOT NULL AND [EntraClientId] IS NOT NULL AND [ClientSecretEncrypted] IS NOT NULL AND [SenderMailbox] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_SystemEmailSettings_Mode", "[Mode] IN ('Development','Microsoft365')");
+
+                            t.HasCheckConstraint("CK_SystemEmailSettings_State", "[State] IN ('Active','Pending','Retired')");
                         });
                 });
 
@@ -13229,6 +13533,21 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_Companies_Users_UpdatedBy");
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Core.EmailOutbox", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.EmailOutbox", null)
+                        .WithMany()
+                        .HasForeignKey("ResentFromId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_EmailOutbox_EmailOutbox_ResentFromId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_EmailOutbox_Tenants_TenantId");
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Core.Invitation", b =>
                 {
                     b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
@@ -13546,6 +13865,27 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("ApprovedByUser");
 
                     b.Navigation("RequestedByUser");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SystemEmailSetting", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_SystemEmailSettings_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_SystemEmailSettings_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_SystemEmailSettings_Users_UpdatedBy");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Core.Tenant", b =>

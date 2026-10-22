@@ -171,3 +171,46 @@ Reference data only, no schema change. New permission key 26 `acc.acct.postentry
 
 ## Rollback of B7 and B9 (GitHub CI run of 21 Oct 2026, DT-231) — no schema change
 `CK_TRN_Settlements_NetPayable` is unchanged and correct: `[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [RepaidAmount] + [CarriedForward]`. **Upgrading** is safe for existing data: settlements made before `Rev6_SettlementRepayment` already satisfy `NetPayable = Gross − Advances − Deductions ≥ 0` (the old constraint), and the new columns are added with 0 before the new constraint is created, so every old row satisfies it with no data step; partner payments get `Kind` 'Payment' and `DeductedAmount` 0, advances no `CarriedFromSettlementId` — the accounting meaning of the old rows. Only **rolling back** could fail: the old constraint cannot hold a settlement with a driver repayment (net shown as 0, the shortfall repaid / carried). The Down methods of `Rev6_SettlementRepayment` and `Rev6_PartnerOverpayments` now refuse first, in the same transaction, with the reason (`THROW 50231` / `50232`) while such rows exist (repayments, carried advances, partner repayments; choices for paid partner trips, payment deductions), instead of failing half-way or silently dropping recorded data.
+
+## B10. System email via Microsoft 365 (owner decision 22 Oct 2026, option A; DT-250…DT-253) — migration `Rev6_SystemEmail`
+Two new **platform-wide** tables (schema `core`, no `TenantId` filter: only platform staff read them, through the provider console). The migration only creates them: **no existing row or column changes**, so the upgrade is safe for existing data. Rolling it back drops both tables (the settings can be entered again; the delivery log is lost).
+
+**`core.SystemEmailSettings`** — how the platform sends email (standard audit columns: `Id`, `PublicId`, `CreatedAt/By`, `UpdatedAt/By`, soft delete, `RowVersion`; every change is in `core.AuditLogs`, the secret written as `"***"`).
+
+| Column | Type | Rule |
+|---|---|---|
+| `State` | VARCHAR(10) NOT NULL | `CK_SystemEmailSettings_State`: Active / Pending / Retired. **At most one Active** (`UX_SystemEmailSettings_Active`, filtered `State='Active' AND IsDeleted=0`) **and one Pending** (`UX_SystemEmailSettings_Pending`). No row = the development folder |
+| `Mode` | VARCHAR(20) NOT NULL | `CK_SystemEmailSettings_Mode`: Development / Microsoft365 (another provider is a new value) |
+| `EntraTenantId`, `EntraClientId` | NVARCHAR(100) NULL | the Entra app's directory (tenant) ID and application (client) ID |
+| `ClientSecretEncrypted` | VARBINARY(MAX) NULL | the client secret, ASP.NET Core Data Protection, purpose `DST.SystemEmail.ClientSecret.v1`; never returned by the API |
+| `SecretSavedAt` | DATETIME2(3) NULL | when the secret was saved |
+| `SecretExpiresOn` | DATE NULL | the expiry date staff entered (as Entra shows it) |
+| `SenderMailbox` | NVARCHAR(254) NULL | the mailbox the emails are sent as |
+| `DisplayName` | NVARCHAR(100) NOT NULL | sender name |
+| `ReplyTo` | NVARCHAR(254) NULL | reply-to address |
+| `ActivatedAt` | DATETIME2(3) NULL | when the row became Active |
+| `LastTestAt`, `LastTestOk`, `LastTestError` | DATETIME2(3) / BIT / NVARCHAR(400) NULL | the last test email with these settings and, when it failed, "kind: detail" (no secret) |
+| `ExpiryWarnedDays` | INT NULL | the expiry warning already sent to platform staff (30, then 7); `CK_SystemEmailSettings_ExpiryWarnedDays` > 0 |
+
+`CK_SystemEmailSettings_Microsoft365`: a Microsoft365 row has tenant ID, client ID, secret and mailbox. Index `UX_SystemEmailSettings_PublicId`. FKs to `core.Users` for CreatedBy / UpdatedBy / DeletedBy.
+
+**`core.EmailOutbox`** — the delivery queue and log of every email. Not an `AuditableEntity` and not written to the audit log (a technical log of its own; resends by staff are audited as `CORE.EmailOutbox` / Resend).
+
+| Column | Type | Rule |
+|---|---|---|
+| `Id`, `PublicId` | BIGINT identity, UNIQUEIDENTIFIER | `UX_EmailOutbox_PublicId` (the console's reference) |
+| `TenantId` | BIGINT NULL | FK `core.Tenants`; the tenant of the user whose action caused the email (masked with the tenant's data on deletion) |
+| `Template` | VARCHAR(40) NOT NULL | VerifyEmail, PasswordReset, Invitation, StaffInvitation, ConfirmEmailChange, EmailChangeAsked, EmailChanged, TwoFactorChanged, SupportDecision, SupportEnded, TenantDeleted, TestEmail, SystemEmailFailures, SecretExpiring |
+| `LanguageCode` | VARCHAR(5) NOT NULL | `CK_EmailOutbox_LanguageCode`: ar / en (the recipient's) |
+| `Recipient` | NVARCHAR(254) NOT NULL | replaced by "(removed)" after `Email:LogRetentionDays` (180) and when the tenant is deleted |
+| `Status` | VARCHAR(10) NOT NULL | `CK_EmailOutbox_Status`: Pending / Sending / Sent / Failed / Suppressed |
+| `Attempts` | INT NOT NULL DEFAULT 0 | ≥ 0 |
+| `NextAttemptAt`, `ClaimedUntil`, `CreatedAt`, `LastAttemptAt`, `SentAt`, `FailedAt` | DATETIME2(3) | `CK_EmailOutbox_SentAt` (Sent ⇒ SentAt), `CK_EmailOutbox_FailedAt` (Failed ⇒ FailedAt) |
+| `ErrorKind`, `LastError` | VARCHAR(40) / NVARCHAR(400) NULL | wrongSecret, missingPermission, throttled, … and Microsoft's message — never a secret or a link |
+| `Mode` | VARCHAR(20) NULL | the mode it was (last) tried with |
+| `HasSecretLink` | BIT NOT NULL DEFAULT 0 | the email holds a single-use link |
+| `PayloadEncrypted` | VARBINARY(MAX) NULL | recipient, subject, text and HTML, Data Protection purpose `DST.SystemEmail.Outbox.v1`. `CK_EmailOutbox_PayloadEncrypted`: only while Pending / Sending, or Failed **without** a single-use link (so it can be resent as it was) — wiped once sent |
+| `ResentFromId`, `ResentAt` | BIGINT NULL (FK to itself), DATETIME2(3) NULL | a resend's original; when a failed row was resent |
+| `RowVersion` | ROWVERSION | |
+
+Indexes: `IX_EmailOutbox_Status_NextAttemptAt` (the worker's queue), `IX_EmailOutbox_SentAt` filtered `SentAt IS NOT NULL` (the 30-a-minute throttle, last success), `IX_EmailOutbox_CreatedAt` (log, retention), `IX_EmailOutbox_Recipient_Template_CreatedAt` (5 of a kind per address an hour). The worker claims due rows with `UPDLOCK, READPAST, ROWLOCK` (raw SQL, listed in BUILD_STATUS.md). The application user `dst_app` needs no new right (insert / update only; `DENY DELETE` on `core` stays).

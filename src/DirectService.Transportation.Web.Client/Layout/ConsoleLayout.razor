@@ -18,7 +18,11 @@ else
         <ChildContent>
             @if (_state == LoadState.Error) {<ErrorState Reference="@_reference" OnRetry="Load" />}
             else if (_state == LoadState.Empty) {<NotFoundView />}
-            else {<div @key="Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath" style="display:contents">@Body</div>}
+            else
+            {
+                <SystemEmailAlert />
+                <div @key="Nav.ToAbsoluteUri(Nav.Uri).AbsolutePath" style="display:contents">@Body</div>
+            }
         </ChildContent>
     </AppShell>
 }

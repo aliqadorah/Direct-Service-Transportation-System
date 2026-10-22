@@ -44,6 +44,9 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public CapturingEmailSender Emails { get; } = new();
 
+    /// <summary>Microsoft sign-in and Graph for the system email tests (DT-250).</summary>
+    public DirectService.Transportation.Tests.Email.FakeGraph Graph { get; } = new();
+
     /// <summary>Live messages the application published (record changes, locks, notifications), recorded instead of SignalR.</summary>
     public RecordingNotifier Live { get; } = new();
 
@@ -68,6 +71,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             s.RemoveAll<IEmailSender>();
             s.AddSingleton<IEmailSender>(Emails);
+            // System email (DT-250): Microsoft sign-in and Graph are the test double in every API test — never a real credential or email.
+            s.AddHttpClient(DirectService.Transportation.Infrastructure.Email.GraphEmailTransport.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Graph);
             s.RemoveAll<IRealtimeNotifier>();
             s.AddSingleton<IRealtimeNotifier>(Live);
             s.AddTransient<IStartupFilter, TestClientIpFilter>();
@@ -142,6 +147,9 @@ public sealed partial class CapturingEmailSender : IEmailSender
         _sent.Enqueue(message);
         return Task.CompletedTask;
     }
+
+    /// <summary>How many emails of a template were sent to an address.</summary>
+    public int CountOf(string to, string template) => _sent.Count(m => string.Equals(m.To, to, StringComparison.OrdinalIgnoreCase) && m.Template == template);
 
     public EmailMessage Last(string to, string template) =>
         _sent.Reverse().First(m => string.Equals(m.To, to, StringComparison.OrdinalIgnoreCase) && m.Template == template);
@@ -350,4 +358,29 @@ public sealed class TripListMigrationFactory : ApiFactory
 public sealed class SettlementUpgradeFactory : ApiFactory
 {
     protected override string DatabaseName => "DirectServiceMaster_UpgradeTests";
+}
+
+/// <summary>
+/// System email (DT-250…DT-252) on its own database: the settings are platform-wide, so these tests never meet another class's settings or
+/// outbox. Flows still go to the captured emails (sign-up helpers); the tests use the outbox writer and the dispatcher directly.
+/// </summary>
+public sealed class SystemEmailFactory : ApiFactory
+{
+    protected override string DatabaseName => "DirectServiceMaster_EmailTests";
+
+    /// <summary>The development mode's folder of this run.</summary>
+    public string DropFolder { get; } = Path.Combine(Path.GetTempPath(), "dst-email-tests-" + Guid.NewGuid().ToString("N"));
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Email:DropFolder", DropFolder);
+        builder.ConfigureServices(s => s.AddScoped<DirectService.Transportation.Infrastructure.Email.OutboxEmailSender>());
+    }
+}
+
+[CollectionDefinition(Name)]
+public sealed class SystemEmailCollection : ICollectionFixture<SystemEmailFactory>
+{
+    public const string Name = "SystemEmail";
 }

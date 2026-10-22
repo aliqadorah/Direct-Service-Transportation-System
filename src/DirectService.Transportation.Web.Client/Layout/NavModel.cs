@@ -140,6 +140,7 @@ public static class NavModel
         ("nav.supportAccess", "/console/support-access", "shield"),
         ("nav.announcements", "/console/announcements", "megaphone"),
         ("nav.staff", "/console/staff", "idcard"),
+        ("nav.systemEmail", "/console/system-email", "mail"),
         ("nav.health", "/console/health", "activity"),
     ];
 

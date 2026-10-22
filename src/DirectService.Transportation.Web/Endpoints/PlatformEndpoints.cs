@@ -58,6 +58,14 @@ internal static class PlatformEndpoints
         p.MapGet("/refunds", async (ConsoleService s, CancellationToken ct) => TypedResults.Ok(await s.RefundsAsync(ct).ConfigureAwait(false)));
         p.MapPost("/refunds/{invoice}/refunded", async (string invoice, MarkRefundedRequest r, ConsoleService s, CancellationToken ct) =>
             TypedResults.Ok(await s.MarkRefundedAsync(invoice, r, ct).ConfigureAwait(false)));
+        // System email (DT-250…DT-252): settings (the secret is write-only), test email, status, delivery log, resend.
+        p.MapGet("/system-email", async (SystemEmailService s, CancellationToken ct) => TypedResults.Ok(await s.GetAsync(ct).ConfigureAwait(false)));
+        p.MapPut("/system-email", async (SaveSystemEmailRequest r, SystemEmailService s, CancellationToken ct) => TypedResults.Ok(await s.SaveAsync(r, ct).ConfigureAwait(false)));
+        p.MapPost("/system-email/test", async (SystemEmailTestRequest r, SystemEmailService s, CancellationToken ct) => TypedResults.Ok(await s.TestAsync(r, ct).ConfigureAwait(false)));
+        p.MapGet("/system-email/alert", async (SystemEmailService s, CancellationToken ct) => TypedResults.Ok(await s.AlertAsync(ct).ConfigureAwait(false)));
+        p.MapGet("/system-email/log", async ([AsParameters] EmailLogQuery q, SystemEmailService s, CancellationToken ct) => TypedResults.Ok(await s.LogAsync(q, ct).ConfigureAwait(false)));
+        p.MapPost("/system-email/log/{id}/resend", async (string id, SystemEmailService s, CancellationToken ct) =>
+            TypedResults.Ok(await s.ResendAsync(id, ct).ConfigureAwait(false)));
         // Platform staff (owner feedback 13 Oct 2026, item 8b): list, invitations, deactivation.
         p.MapGet("/staff", async (StaffService s, CancellationToken ct) => TypedResults.Ok(await s.ListAsync(ct).ConfigureAwait(false)));
         p.MapPost("/staff/invitations", async (StaffInviteRequest r, StaffService s, CancellationToken ct) => TypedResults.Ok(await s.InviteAsync(r, ct).ConfigureAwait(false)));

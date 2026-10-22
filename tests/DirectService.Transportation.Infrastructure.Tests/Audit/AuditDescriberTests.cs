@@ -46,7 +46,7 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
     // ================================================================= vocabulary coverage (no database)
 
     /// <summary>Record types never written to the audit log (high-frequency technical rows, the log itself).</summary>
-    private static readonly HashSet<string> NotAudited = ["CORE.UserSession", "CFG.RecordLock", "CORE.AuditLog", "TRN.RateHistory", "CORE.Notification", "CORE.Permission",
+    private static readonly HashSet<string> NotAudited = ["CORE.UserSession", "CFG.RecordLock", "CORE.AuditLog", "TRN.RateHistory", "CORE.Notification", "CORE.Permission", "CORE.EmailOutbox",
         "CORE.MaintenanceLog"];
 
     private static IEnumerable<(string Name, Type Type)> AuditedTypes() =>
@@ -93,7 +93,7 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
         "MigrationComplete", "SetupDone", "SetupReopened", "Cancel", "Resubmit", "Accepted", "Rejected", "Failed", "SignIn", "SignInFailed",
         "EmailVerified", "PasswordReset", "TwoFactorEnabled", "TwoFactorReset", "Unlock", "Disable", "Enable", "RoleChange", "PermissionChange",
         "Resend", "Accept", "Anonymise", "Paid", "PaidNotApplied", "Refunded", "PaymentFailed", "Credit", "ExtendTrial", "Suspend", "Reactivate",
-        "Downgrade", "TrialEnded", "GraceEnded", "Reject", "End", "SupportRequest",
+        "Downgrade", "TrialEnded", "GraceEnded", "Reject", "End", "SupportRequest", "EmailTest",
     ];
 
     [Fact]

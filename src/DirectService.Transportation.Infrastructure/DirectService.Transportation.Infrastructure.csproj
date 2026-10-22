@@ -9,6 +9,7 @@
   <ItemGroup>
     <!-- The PDF engine's test hook (a browser that dies during a print, DT-222). -->
     <InternalsVisibleTo Include="DirectService.Transportation.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="DirectService.Transportation.Api.Tests" />
   </ItemGroup>
   <ItemGroup>
     <!-- ASP.NET Core Identity token providers and Data Protection -->
@@ -20,9 +21,15 @@
     <PackageReference Include="CsvHelper" />
     <PackageReference Include="PuppeteerSharp" />
     <PackageReference Include="QRCoder" />
+    <!-- System email, Microsoft 365 (DT-250): the Entra client-secret token for Microsoft Graph (already in the graph through Microsoft.Data.SqlClient). -->
+    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The logo of every email (inline image "cid:logo", DT-253). -->
+    <EmbeddedResource Include="..\..\assets\logo.png" LogicalName="DST.Email.Logo.png" />
   </ItemGroup>
 </Project>

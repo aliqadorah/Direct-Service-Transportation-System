@@ -836,6 +836,48 @@ for (const lang of ["ar", "en"] as Lang[]) {
 }
 
 /**
+ * System email of 22 Oct (DT-250…DT-252): the console screen as it opens (development folder), with Microsoft 365 chosen (the write-only
+ * secret field, help under every field), the fresh-code dialog of Save (nothing saved), and a test email (the development folder: nothing
+ * leaves the machine) with its result and the delivery log.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — system email (${lang})`, async ({ page }) => {
+    test.skip(!wanted("mail22#"), "not among VISUAL_ONLY");
+    test.setTimeout(10 * 60_000);
+    const run = new VisualRun(lang, "mail22");
+    const t = texts(lang);
+    await staffSignIn(page, lang);
+    expect(await open(page, "/console/system-email")).toBe(true);
+    await expect(page.locator("main h2", { hasText: t("sem.log") })).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "mail22#opened", { full: true });
+
+    await page.locator("input[type=radio][value=Microsoft365]").check();
+    await expect(page.locator("input[type=password]")).toBeVisible({ timeout: 15_000 });
+    await page.getByLabel(t("sem.tenantId")).fill("11111111-2222-3333-4444-555555555555");
+    await page.getByLabel(t("sem.clientId")).fill("66666666-7777-8888-9999-000000000000");
+    await page.getByLabel(t("sem.mailbox")).fill("no-reply@directservicetech.com");
+    await run.check(page, "mail22#microsoft365", { full: true });
+
+    await page.locator("input[type=password]").fill("visual-check-not-a-secret");
+    await button(page.locator("#sem-form"), t("sem.save")).click();
+    if (await page.locator("#sem-code-input").isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await run.check(page, "mail22#code-dialog");
+      await page.keyboard.press("Escape");
+    }
+
+    // Back to the settings in use (development folder) and a test email: written to the host's mail folder, never sent.
+    await page.reload();
+    await expect(page.locator("#sem-test")).toBeVisible({ timeout: 30_000 });
+    await page.locator("#sem-test").fill(`visual-${lang}@e2e.test`);
+    await button(page.locator("main"), t("sem.sendTest")).click();
+    await expect(page.locator("[role=status] .banner.ok")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("main table.grid tbody tr").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "mail22#tested", { full: true });
+    run.assertClean();
+  });
+}
+
+/**
  * Side menu of 22 Oct (DT-235…DT-239): expanded with icons on every entry and the labelled parts of Accounting; collapsed to the icon rail;
  * a section's entries opened with the keyboard beside the rail; Ctrl+K finding a menu page by its name in the other language.
  */

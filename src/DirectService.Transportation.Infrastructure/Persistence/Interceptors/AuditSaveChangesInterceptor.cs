@@ -30,14 +30,16 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
     private static readonly HashSet<string> MaskedColumns = new(StringComparer.Ordinal)
     {
         "PasswordHash", "SecurityStamp", "TwoFactorSecret", "CodeHash", "TokenHash",
-        "ClientIdEncrypted", "SecretKeyEncrypted",
+        "ClientIdEncrypted", "SecretKeyEncrypted", "ClientSecretEncrypted",
+        // System email (DT-251): the outbox is its own log; its encrypted message never goes anywhere else.
+        "PayloadEncrypted",
         // E-invoice documents and responses are kept on the submission row itself; the audit log only notes that they changed (B7).
         "RequestPayload", "ResponsePayload", "QrCode",
     };
 
     /// <summary>High-frequency technical rows whose changes are not business events.</summary>
     // trn.TRN_RateHistory is itself the change log of tariffs and monthly rates (their rows are also audited in core.AuditLogs).
-    private static readonly HashSet<Type> NotAudited = [typeof(UserSession), typeof(RecordLock), typeof(AuditLog), typeof(RateHistory), typeof(Notification)];
+    private static readonly HashSet<Type> NotAudited = [typeof(UserSession), typeof(RecordLock), typeof(AuditLog), typeof(RateHistory), typeof(Notification), typeof(EmailOutbox)];
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -240,8 +242,8 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
                     var action = changes.GetAction(entity);
                     // A restore flips IsDeleted from 1 to 0. Marking the whole entry Modified (row-version check) flags every
                     // property as modified, so the original value decides, not the IsModified flag.
-                    var deletedFlag = entry.Property(nameof(ISoftDeletable.IsDeleted));
-                    if (action is null && entity is ISoftDeletable { IsDeleted: false } && deletedFlag.IsModified && Equals(deletedFlag.OriginalValue, true))
+                    if (action is null && entity is ISoftDeletable { IsDeleted: false } && entry.Property(nameof(ISoftDeletable.IsDeleted)) is { IsModified: true } deletedFlag
+                        && Equals(deletedFlag.OriginalValue, true))
                         action = "Restore";
                     Track(entry, action ?? "Update", state);
                     break;

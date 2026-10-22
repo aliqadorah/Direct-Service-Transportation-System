@@ -118,8 +118,8 @@ public sealed class AccountService(
         var token = await users.GenerateEmailConfirmationTokenAsync(user).ConfigureAwait(false);
         var link = Link("verify-email", urlTokens.Encode<User>(user.PublicId), token);
         await email.SendAsync(user.UserName is { } name
-            ? EmailTemplates.VerifyAddedEmail(user.Email, user.FullName, name, link)
-            : EmailTemplates.VerifyEmail(user.Email, user.FullName, link), ct).ConfigureAwait(false);
+            ? EmailTemplates.VerifyAddedEmail(user.Email, user.FullName, name, link, user.LanguageCode)
+            : EmailTemplates.VerifyEmail(user.Email, user.FullName, link, user.LanguageCode), ct).ConfigureAwait(false);
     }
 
     /// <summary>Anonymous resend; always succeeds silently (does not reveal whether the email exists).</summary>
@@ -167,7 +167,7 @@ public sealed class AccountService(
         if (user.Email is null) return;   // no email: only an administrator can set a new password (revision 6)
         var token = await users.GeneratePasswordResetTokenAsync(user).ConfigureAwait(false);
         var link = Link("reset-password", urlTokens.Encode<User>(user.PublicId), token);
-        await email.SendAsync(EmailTemplates.PasswordReset(user.Email, user.FullName, link), ct).ConfigureAwait(false);
+        await email.SendAsync(EmailTemplates.PasswordReset(user.Email, user.FullName, link, user.LanguageCode), ct).ConfigureAwait(false);
     }
 
     public async Task ResetPasswordAsync(string userToken, string token, string newPassword, CancellationToken ct)

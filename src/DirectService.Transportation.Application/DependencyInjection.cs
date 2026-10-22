@@ -173,6 +173,7 @@ public static class DependencyInjection
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<CompanyExportService>();
         services.AddScoped<PersonalDataService>();
+        services.AddScoped<SystemEmailService>();   // DT-250
 
         // Collaboration (B11)
         services.AddScoped<NotificationService>();

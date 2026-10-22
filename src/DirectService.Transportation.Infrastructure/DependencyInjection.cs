@@ -90,8 +90,17 @@ public static class DependencyInjection
         services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
         services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
-        services.AddOptions<EmailOptions>().Bind(configuration.GetSection(EmailOptions.Section));
-        services.AddSingleton<IEmailSender, FileEmailSender>();
+        // System email (DT-250…DT-253): every email into the outbox; the worker sends it with the active mode's transport.
+        services.AddOptions<Application.Platform.SystemEmailOptions>().Bind(configuration.GetSection(Application.Platform.SystemEmailOptions.Section));
+        services.AddScoped<IEmailSender, OutboxEmailSender>();
+        services.AddSingleton<Application.Platform.IEmailProtector, DataProtectionEmailProtector>();
+        services.AddSingleton<EmailOutboxSignal>();
+        services.AddSingleton<Application.Platform.IEmailOutboxSignal>(sp => sp.GetRequiredService<EmailOutboxSignal>());
+        services.AddSingleton<EmailDispatchState>();
+        services.AddScoped<EmailDispatcher>();
+        services.AddSingleton<Application.Platform.IEmailTransport, FileEmailTransport>();
+        services.AddSingleton<Application.Platform.IEmailTransport, GraphEmailTransport>();
+        services.AddHttpClient(GraphEmailTransport.HttpClientName).RedactLoggedHeaders(["Authorization"]);
         return services;
     }
 }

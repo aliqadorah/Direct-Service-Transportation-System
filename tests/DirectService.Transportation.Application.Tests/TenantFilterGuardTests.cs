@@ -19,6 +19,10 @@ public sealed class TenantFilterGuardTests
     {
         // Provider console and platform staff (tenant users get 404 before any query: StaffId / staff-only routes).
         ["ConsoleService"] = "Provider console, platform staff only; every tenant query names the tenant id or token explicitly.",
+        // System email (DT-250, DT-251): platform-wide tables and platform staff accounts (no tenant).
+        ["SystemEmailService.SaveAsync|ResendAsync"] = "Provider console, platform staff only: the acting staff member's own account (fresh code) and a platform staff invitee by address.",
+        ["EmailDispatcher.StaffAsync"] = "The platform staff accounts (no tenant) who are warned about failed emails and an expiring secret.",
+        ["EmailDispatcher.ClaimAsync"] = "Raw SQL on core.EmailOutbox only (a platform-wide queue): claims due rows with UPDLOCK / READPAST.",
         ["StaffService"] = "Platform staff accounts (no tenant): staff rows by IsPlatformStaff, scope set to the acting staff member.",
         ["StaffAccountService"] = "Operations command creating a staff account: system scope, no tenant data.",
         ["ProviderSetupService"] = "First provider set-up (operations): staff rows by IsPlatformStaff under the system account.",

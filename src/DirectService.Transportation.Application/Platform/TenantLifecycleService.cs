@@ -132,12 +132,12 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         try
         {
             var staff = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy && u.IsPlatformStaff && !u.IsDeleted && u.Email != null)
-                .Select(u => new { u.Email, u.FullName }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+                .Select(u => new { u.Email, u.FullName, u.LanguageCode }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
             if (staff is null) return;
             var tenant = await db.Set<Tenant>().AsNoTracking().Where(t => t.Id == g.TenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
             var link = $"{app.Value.PublicBaseUrl.TrimEnd('/')}/console/support-access";
             await email.SendAsync(EmailTemplates.SupportDecision(staff.Email!, staff.FullName, tenant, ctx.UserName ?? string.Empty,
-                g.StartsAt, g.EndsAt, refusal, link), ct).ConfigureAwait(false);
+                g.StartsAt, g.EndsAt, refusal, link, staff.LanguageCode), ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -194,7 +194,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         try
         {
             var staff = await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy && u.IsPlatformStaff && !u.IsDeleted)
-                .Select(u => new { u.PublicId, u.Email, u.FullName }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+                .Select(u => new { u.PublicId, u.Email, u.FullName, u.LanguageCode }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
             if (staff is null) return;
             var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => c.TenantId == g.TenantId && !c.IsDeleted)
                 .Select(c => c.PublicId).ToListAsync(ct).ConfigureAwait(false);
@@ -205,7 +205,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
             if (staff.Email is null) return;
             var tenant = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).SingleAsync(ct).ConfigureAwait(false);
             await email.SendAsync(EmailTemplates.SupportEnded(staff.Email, staff.FullName, tenant, endedBy, at,
-                $"{app.Value.PublicBaseUrl.TrimEnd('/')}/console/support-access"), ct).ConfigureAwait(false);
+                $"{app.Value.PublicBaseUrl.TrimEnd('/')}/console/support-access", staff.LanguageCode), ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -401,11 +401,11 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
             new Dictionary<string, string?> { ["days"] = NotificationTexts.Number(O.GraceDays) }, "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
     }
 
-    private async Task<List<(long Id, string? Email, string Name)>> OwnersAsync(long tenantId, CancellationToken ct) =>
+    private async Task<List<(long Id, string? Email, string Name, string Language)>> OwnersAsync(long tenantId, CancellationToken ct) =>
         (await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.User.Status == "Active" && x.Role.IsPreset && x.Role.Name == PresetRoles.Owner)
-            .Select(x => new { x.UserId, x.User.Email, x.User.FullName }).Distinct().ToListAsync(ct).ConfigureAwait(false))
-        .Select(x => (x.UserId, x.Email, x.FullName)).ToList();
+            .Select(x => new { x.UserId, x.User.Email, x.User.FullName, x.User.LanguageCode }).Distinct().ToListAsync(ct).ConfigureAwait(false))
+        .Select(x => (x.UserId, x.Email, x.FullName, x.LanguageCode)).ToList();
 
     private static readonly MethodInfo SoftDeleteMethod = typeof(TenantLifecycleService).GetMethod(nameof(SoftDeleteAllAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
@@ -427,13 +427,10 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
             changes.SetAction(t, "Delete", RetentionReason);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
-        var encoded = System.Net.WebUtility.HtmlEncode(tenantName);
-        foreach (var (_, address, name) in owners)
+        foreach (var (_, address, name, language) in owners)
         {
             if (address is null) continue;   // an Owner created with a username and no email (revision 6)
-            await email.SendAsync(new EmailMessage(address, "Your data has been deleted / تم حذف بياناتكم",
-                $"<p>Dear {System.Net.WebUtility.HtmlEncode(name)}, the retention period of {encoded} has ended; its data is no longer accessible.</p><p dir=\"rtl\">انتهت فترة الاحتفاظ ببيانات {encoded} ولم تعد متاحة.</p>",
-                $"The retention period of {tenantName} has ended; its data is no longer accessible. / انتهت فترة الاحتفاظ ببيانات {tenantName} ولم تعد متاحة.", "TenantDeleted"), ct).ConfigureAwait(false);
+            await email.SendAsync(EmailTemplates.TenantDeleted(address, name, tenantName, language), ct).ConfigureAwait(false);
         }
     }
 
@@ -459,6 +456,9 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
                 .SetProperty(x => x.PasswordHash, string.Empty).SetProperty(x => x.SecurityStamp, x => "anonymised-" + x.PublicId).SetProperty(x => x.TwoFactorSecret, (byte[]?)null)
                 .SetProperty(x => x.Status, "Archived")
                 .SetProperty(x => x.UpdatedAt, now), ct).ConfigureAwait(false);
+        // System email (DT-251): the delivery log keeps no address (nor message) of the deleted tenant's emails.
+        await db.Set<EmailOutbox>().Where(e => e.TenantId == tenantId && e.Status != EmailStatus.Pending && e.Status != EmailStatus.Sending)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.Recipient, "(removed)").SetProperty(x => x.PayloadEncrypted, (byte[]?)null), ct).ConfigureAwait(false);
         await db.Set<Driver>().IgnoreQueryFilters(none).Where(d => d.TenantId == tenantId)
             // Placeholders from the public id: internal ids never become data (review R11).
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.FullName, "Deleted driver").SetProperty(x => x.NationalId, x => ("X" + x.PublicId.ToString()).Substring(0, 9))

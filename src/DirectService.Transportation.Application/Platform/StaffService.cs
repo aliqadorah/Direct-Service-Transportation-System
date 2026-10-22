@@ -216,7 +216,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var inviter = await db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == ctx.UserId).Select(u => u.FullName).SingleAsync(ct).ConfigureAwait(false);
         var token = await users.GenerateUserTokenAsync(user, InvitationTokenProvider, InvitationPurpose).ConfigureAwait(false);
         var link = $"{options.Value.PublicBaseUrl.TrimEnd('/')}/accept-staff-invitation?u={Uri.EscapeDataString(urlTokens.Encode<User>(user.PublicId))}&t={Uri.EscapeDataString(token)}";
-        await email.SendAsync(EmailTemplates.StaffInvitation(user.Email!, user.FullName, inviter, InvitationHours, link), ct).ConfigureAwait(false);
+        await email.SendAsync(EmailTemplates.StaffInvitation(user.Email!, user.FullName, inviter, InvitationHours, link, ctx.Language), ct).ConfigureAwait(false);
     }
 
     private async Task<User> FindAsync(string token, CancellationToken ct)

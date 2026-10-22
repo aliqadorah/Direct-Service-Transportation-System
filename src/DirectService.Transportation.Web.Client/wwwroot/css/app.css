@@ -574,6 +574,9 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
 .rep-list .btn[aria-current="page"] { background: var(--tint); color: var(--on-tint); font-weight: var(--fw-semibold); box-shadow: inset -3px 0 0 var(--primary); }
 [dir="ltr"] .rep-list .btn[aria-current="page"] { box-shadow: inset 3px 0 0 var(--primary); }
 .rep-list .btn[aria-current="page"] .rep-code { color: inherit; }
+/* System email (DT-250): the status as label · value rows. */
+.sem-kv { grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; }
+.sem-kv dd { overflow-wrap: anywhere; }
 .rep-head { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rep-head h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); overflow-wrap: anywhere; }
 @media (forced-colors: active) { .rep-list .btn[aria-current="page"] { outline: 2px solid CanvasText; outline-offset: -2px; } }
