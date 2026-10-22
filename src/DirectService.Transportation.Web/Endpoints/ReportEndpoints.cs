@@ -34,7 +34,7 @@ internal static class ReportEndpoints
         }).RequirePermission(PermissionKeys.ReportsView);
 
         var r = company.MapGroup("/reports").WithTags("Reports");
-        r.MapGet("/catalog", (StandardReportService svc) => TypedResults.Ok(svc.CatalogFor())).RequireMember();
+        r.MapGet("/catalog", async (StandardReportService svc, CancellationToken ct) => TypedResults.Ok(await svc.CatalogAsync(ct).ConfigureAwait(false))).RequireMember();
         r.MapGet("/standard/{key}", async (string key, [AsParameters] StandardReportQuery q, StandardReportService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.RunAsync(key, q, ct).ConfigureAwait(false))).RequireMember();
         r.MapGet("/standard/{key}/export", async (string key, [AsParameters] StandardReportQuery q, string? format, StandardReportService svc, CancellationToken ct) =>

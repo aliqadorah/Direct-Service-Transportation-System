@@ -29,7 +29,7 @@
         </EmptyState>
     </Empty>
     <ChildContent>
-        <div class="cols fill lp" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start;min-height:0">
+        <div class="cols flow lp" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start;min-height:0">
             <div class="stack" style="min-width:0">
                 <Box Title="@L["cb.boxes"]" NoPad="true">
                     <DataGrid TItem="CashBoxResponse" Items="_boxes" Key="b => b.Id" Caption="@L["cb.boxes"]" OnRowClick="b => Show(CashCodes.CashBox, b.Id, b.Name)"

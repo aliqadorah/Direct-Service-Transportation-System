@@ -62,9 +62,54 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         new("reconciliation", "RPT-23", "financial", "مطابقة الحسابات المساعدة", "Sub-ledger reconciliation", "/accounting/reports/reconciliation", ["asOf"], PermissionKeys.AcctView),
     ];
 
+    /// <summary>What each report shows, one line in both languages (DT-248: shown under the report's title).</summary>
+    private static readonly Dictionary<string, (string Ar, string En)> Descriptions = new(StringComparer.Ordinal)
+    {
+        ["trips"] = ("كل رحلات الفترة مع العميل والسائق والمواقع والأوزان والمبالغ.", "Every trip of the period with its customer, driver, sites, weights and amounts."),
+        ["unbilled-trips"] = ("الرحلات التي لم تدخل في فاتورة حتى التاريخ المختار، لكل عميل مع أقدم رحلة.", "Trips not yet on an invoice up to the chosen date, per customer, with the oldest trip."),
+        ["shortage"] = ("الفرق بين الوزن المحمّل والوزن المفرّغ لكل سائق وموقع تحميل.", "The difference between loaded and unloaded weight per driver and loading site."),
+        ["tariff-breach"] = ("الرحلات التي سُعّرت بغير سعر التعرفة، مع سعر الرحلة وسعر التعرفة والفرق.", "Trips priced differently from the tariff, with the trip price, the tariff price and the difference."),
+        ["driver-productivity"] = ("عدد الرحلات والأطنان والإيراد لكل سائق في الفترة.", "Trips, tonnes and revenue per driver in the period."),
+        ["customer-revenue"] = ("إيراد كل عميل في الفترة بعد الخصومات، مع عدد الرحلات والأطنان.", "Revenue per customer in the period after discounts, with trips and tonnes."),
+        ["routes"] = ("الرحلات والأطنان والإيراد لكل مسار من موقع التحميل إلى موقع التفريغ.", "Trips, tonnes and revenue per route from loading site to unloading site."),
+        ["materials"] = ("الأطنان المنقولة من كل مادة، شهراً بشهر.", "Tonnes carried of each material, month by month."),
+        ["partner-shipments"] = ("رحلات كل شريك في الفترة وكلفتها وما دُفع له.", "Each partner's trips in the period, their cost and what was paid."),
+        ["margin"] = ("الإيراد والكلفة والهامش، مجمّعة حسب العميل أو المسار أو السائق أو الشهر.", "Revenue, cost and margin, grouped by customer, route, driver or month."),
+        ["monthly-summary"] = ("لكل شهر: الرحلات والأطنان والإيراد والفواتير والمقبوضات.", "Per month: trips, tonnes, revenue, invoices and receipts."),
+        ["customer-statement"] = ("حركة حساب العميل في الفترة: الفواتير والإشعارات الدائنة والمقبوضات والرصيد.", "The customer's account in the period: invoices, credit notes, receipts and the balance."),
+        ["supplier-statement"] = ("حركة حساب المورد: الفواتير والمرتجعات والمدفوعات والرصيد.", "The supplier's account: bills, returns, payments and the balance."),
+        ["driver-statement"] = ("حركة حساب السائق: الأجور والسلف والتسويات والرصيد.", "The driver's account: wages, advances, settlements and the balance."),
+        ["partner-statement"] = ("حركة حساب الشريك: كلفة الرحلات والدفعات والرصيد.", "The partner's account: trip costs, payments and the balance."),
+        ["account-statement"] = ("حركة حساب أو أكثر من دليل الحسابات مع الرصيد الافتتاحي والجاري.", "Movements of one or more ledger accounts with the opening and running balance."),
+        ["cash-bank-statement"] = ("حركة صندوق أو حساب بنكي مع الرصيد.", "Movements of a cash box or bank account with the balance."),
+        ["receivables-ageing"] = ("ما على العملاء موزّعاً حسب أيام التأخير في تاريخ محدد.", "What customers owe, by days overdue on a given date."),
+        ["payables-ageing"] = ("ما للموردين موزّعاً حسب أيام التأخير في تاريخ محدد.", "What is owed to suppliers, by days overdue on a given date."),
+        ["driver-balances"] = ("رصيد كل سائق في تاريخ محدد: الأجور المستحقة ناقص السلف والتسويات.", "Each driver's balance on a date: wages earned less advances and settlements."),
+        ["partner-balances"] = ("رصيد كل شريك في تاريخ محدد: كلفة الرحلات ناقص الدفعات.", "Each partner's balance on a date: trip costs less payments."),
+        ["registers"] = ("سجلات الفواتير والإشعارات الدائنة والمقبوضات والسلف والتسويات ودفعات الشركاء.", "Registers of invoices, credit notes, receipts, advances, settlements and partner payments."),
+        ["e-invoicing"] = ("حالة إرسال الفواتير إلى الفوترة الإلكترونية: المقبولة والمرفوضة والتي تنتظر.", "E-invoice submissions: accepted, rejected and waiting."),
+        ["reconciliation"] = ("أرصدة الحسابات المساعدة (العملاء والسائقون والشركاء) مقارنة بحساباتها في الأستاذ.", "Sub-ledger balances (customers, drivers, partners) compared with their ledger control accounts."),
+    };
+
     /// <summary>Reports the caller may run: reports.view opens all (PRD 3.4), otherwise the module's view permission.</summary>
     public IReadOnlyList<ReportCatalogEntry> CatalogFor() => Catalog.Where(Allowed)
-        .Select(d => new ReportCatalogEntry(d.Key, d.Code, d.Group, En ? d.En : d.Ar, d.Path, d.Parameters, d.Required ?? [])).ToList();
+        .Select(d => new ReportCatalogEntry(d.Key, d.Code, d.Group, En ? d.En : d.Ar, d.Path, d.Parameters, d.Required ?? [], Describe(d.Key))).ToList();
+
+    /// <summary>
+    /// The catalogue with each report's description and the values its filters take when left empty (DT-249): the period is the current month
+    /// up to today, "as of" is today, the tariff-breach side is customers, margin is grouped by customer — the same defaults the reports apply.
+    /// </summary>
+    public async Task<IReadOnlyList<ReportCatalogEntry>> CatalogAsync(CancellationToken ct)
+    {
+        var (from, to) = await ledger.PeriodAsync(null, null, ct).ConfigureAwait(false);
+        var defaults = new Dictionary<string, string>(StringComparer.Ordinal) { ["from"] = D(from), ["to"] = D(to), ["asOf"] = D(to), ["side"] = "customer", ["groupBy"] = "customer" };
+        return CatalogFor().Select(e => e with
+        {
+            Defaults = e.Parameters.Where(defaults.ContainsKey).ToDictionary(p => p, p => defaults[p], StringComparer.Ordinal),
+        }).ToList();
+    }
+
+    private string? Describe(string key) => Descriptions.TryGetValue(key, out var d) ? (En ? d.En : d.Ar) : null;
 
     private bool Allowed(Def d) => ctx.HasPermission(PermissionKeys.ReportsView) || ctx.HasPermission(d.AltPermission);
 

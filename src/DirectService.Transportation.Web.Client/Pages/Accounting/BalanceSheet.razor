@@ -26,7 +26,7 @@
         @if (r.OpeningDifference is decimal d && d != 0) {<Banner Tone="Tone.Warn" Text="@L.F("dash.openingDiff", Fmt.Money(d))" />}
         <Figures Items="@([new Figure(L["rep.totalAssets"], Fmt.Money(r.TotalAssets)), new Figure(L["rep.totalLiabilities"], Fmt.Money(r.TotalLiabilities)),
             new Figure(L["rep.totalEquity"], Fmt.Money(r.TotalEquity)), new Figure(L["rep.liabEquity"], Fmt.Money(r.TotalLiabilitiesAndEquity))])" />
-        <div class="cols fill" style="grid-template-columns:1fr 1fr;align-items:start;overflow:auto;min-height:0">
+        <div class="cols flow" style="grid-template-columns:1fr 1fr;align-items:start">
             <Box NoPad="true"><StatementTable Title="@L["rep.assets"]" Rows="r.Assets" TotalLabel="@L["rep.totalAssets"]" Total="r.TotalAssets" To="r.AsOf" /></Box>
             <div class="stack">
                 <Box NoPad="true"><StatementTable Title="@L["rep.liabilities"]" Rows="r.Liabilities" TotalLabel="@L["rep.totalLiabilities"]" Total="r.TotalLiabilities" To="r.AsOf" /></Box>

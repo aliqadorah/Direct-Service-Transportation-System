@@ -91,6 +91,14 @@ public sealed class ReportTests(ApiFactory f)
         Assert.Equal("/apar/ageing/receivables", catalog.Single(c => c.Code == "RPT-17").Path);
         // The customer statement cannot run without its customer: the screen checks it first (owner feedback 13 Oct 2026, RPT-12).
         Assert.Equal(["customer"], catalog.Single(c => c.Code == "RPT-12").Required);
+        // DT-248 / DT-249: every report has a description; the defaults are the ones the reports apply (side customers, month to date).
+        Assert.All(catalog, c => Assert.False(string.IsNullOrWhiteSpace(c.Description), c.Code));
+        var breachEntry = catalog.Single(c => c.Code == "RPT-04");
+        Assert.Equal("customer", breachEntry.Defaults!["side"]);
+        var today = DateOnly.Parse(breachEntry.Defaults["to"], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(new DateOnly(today.Year, today.Month, 1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), breachEntry.Defaults["from"]);
+        Assert.Equal("customer", catalog.Single(c => c.Code == "RPT-10").Defaults!["groupBy"]);
+        Assert.Equal(breachEntry.Defaults["to"], catalog.Single(c => c.Code == "RPT-19").Defaults!["asOf"]);
         Assert.Equal("validation.failed", await (await o.Client.GetAsync(U(o, "/reports/standard/customer-statement"))).ProblemCodeAsync());
 
         var prod = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/driver-productivity")));

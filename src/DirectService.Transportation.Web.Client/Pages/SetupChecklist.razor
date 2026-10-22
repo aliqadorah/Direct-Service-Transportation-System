@@ -14,7 +14,7 @@
 
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
     @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
-    <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
+    <div class="cols flow" style="grid-template-columns:1fr 300px;align-items:start">
         <section class="box" aria-labelledby="setup-progress">
             <div class="bh"><h2 id="setup-progress" style="font-size:inherit"><Tx Value="@L.F("setup.progress", _data!.Done, _data.Total)" /></h2>
                 <span class="a" style="width:180px"><ProgressBar Value="_data.Done" Max="_data.Total" Label="@L.F("setup.progress", _data.Done, _data.Total)" /></span></div>

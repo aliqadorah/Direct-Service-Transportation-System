@@ -18,7 +18,7 @@
         <EmptyState Icon="layers" Title="@L["cc.none"]" Text="@L["cc.noneText"]"><Actions>@if (CanSetup) {<Btn Primary="true" Text="@L["cc.new"]" OnClick="() => Edit(null)" />}</Actions></EmptyState>
     </Empty>
     <ChildContent>
-        <div class="cols fill lp" style="grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;min-height:0">
+        <div class="cols flow lp" style="grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;min-height:0">
             <ListFrame Label="@L["nav.costCentres"]">
                 <DataGrid TItem="CostCentreResponse" Items="_items" Key="c => c.Id" Caption="@L["nav.costCentres"]" OnRowClick="Edit" RowClass="@(c => c.Status == "Active" ? null : "void")">
                     <Columns>

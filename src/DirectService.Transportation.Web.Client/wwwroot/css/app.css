@@ -155,6 +155,10 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
 .box > .bh .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); font-weight: var(--fw-regular); }
 .pad { padding: var(--sp-6) var(--sp-7); }
 .fill { flex: 1; min-height: 0; overflow: auto; }
+/* DT-247: cards that flow down the page at their own height — dashboards and list-plus-panel pages. The page (.content) is the only
+   scroller: no area of its own that scrolls, no height that cuts a card off (a .fill grid there got what was left under the figures). */
+.flow { flex: none; min-height: auto; overflow: visible; }
+.flow .fill { flex: none; }
 /* DT-234: the body of a table card scrolls sideways inside the card; a list-plus-panel page (.cols.lp) stacks the panel under the lists when narrow. */
 .box-x { overflow-x: auto; max-width: 100%; }
 .row { display: flex; gap: var(--sp-5); min-height: 0; }
@@ -560,3 +564,20 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
 .rem-list .rem-items { grid-column: 2 / -1; margin: 0; padding-inline-start: var(--sp-4); list-style: disc; }
 .rem-list .rem-items li { display: list-item; padding: 0; border-top: 0; overflow-wrap: anywhere; }
 .quick-links { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; }
+/* Reports (DT-248): the open report is marked in the list (tint, bar on the start side, bold) and named above its filters; under 1,100 px
+   the list stacks above the report and both flow with the page. */
+.cols.rp { grid-template-columns: 260px minmax(0, 1fr); }
+.rep-nav { overflow: auto; }
+.rep-list { list-style: none; margin: 0; padding: 6px; }
+.rep-list .btn { width: 100%; justify-content: flex-start; text-align: start; height: auto; min-height: var(--ctl); padding: 6px 8px; white-space: normal; }
+.rep-code { color: var(--muted); }
+.rep-list .btn[aria-current="page"] { background: var(--tint); color: var(--on-tint); font-weight: var(--fw-semibold); box-shadow: inset -3px 0 0 var(--primary); }
+[dir="ltr"] .rep-list .btn[aria-current="page"] { box-shadow: inset 3px 0 0 var(--primary); }
+.rep-list .btn[aria-current="page"] .rep-code { color: inherit; }
+.rep-head { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rep-head h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); overflow-wrap: anywhere; }
+@media (forced-colors: active) { .rep-list .btn[aria-current="page"] { outline: 2px solid CanvasText; outline-offset: -2px; } }
+@media (max-width: 1100px) {
+  .cols.rp { grid-template-columns: minmax(0, 1fr); flex: none; overflow: visible; }
+  .rep-nav { overflow: visible; }
+}

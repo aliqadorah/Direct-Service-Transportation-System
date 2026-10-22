@@ -789,6 +789,53 @@ for (const lang of ["ar", "en"] as Lang[]) {
 }
 
 /**
+ * Dashboards and reports of 22 Oct (DT-247…DT-249): the accounting dashboard and the main dashboard flow with one page scrollbar (no area of
+ * their own that scrolls, nothing cut off); a report named above its filters, marked in the list, in the address and the tab's name; the
+ * tariff-breach "Side" box shows Customers.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — dashboards and reports of 22 Oct (${lang})`, async ({ page }) => {
+    test.skip(!wanted("rep22#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const run = new VisualRun(lang, "rep22");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "rep22-enrol", false));
+    const company = companyOf(page);
+    await documents(page, company);
+    /** Elements inside the page that scroll up and down by themselves (the page is the only vertical scroller of these screens). */
+    const ownScrollers = () => page.evaluate(() => [...document.querySelectorAll("main.content *")].filter((e) => {
+      const s = getComputedStyle(e);
+      return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1;
+    }).map((e) => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`));
+
+    for (const route of ["accounting/dashboard", ""]) {
+      expect(await open(page, `/c/${company}${route ? `/${route}` : ""}`)).toBe(true);
+      for (const width of [1366, 1920]) {
+        await page.setViewportSize({ width, height: 680 });
+        expect(await ownScrollers(), `${route || "dashboard"} at ${width}`).toEqual([]);
+      }
+      await run.check(page, `rep22#${route ? "accounting-dashboard" : "dashboard"}`, { full: true });
+    }
+
+    expect(await open(page, `/c/${company}/reports/operational`)).toBe(true);
+    await page.locator(".rep-list button", { hasText: "RPT-04" }).click();
+    await expect(page.locator("#rep-head h2")).toContainText("RPT-04", { timeout: 15_000 });
+    await expect(page).toHaveURL(/report=tariff-breach.*side=customer/);
+    await expect(page).toHaveTitle(/RPT-04/);
+    await expect(page.getByLabel(t("rep.side")).locator("option:checked")).toHaveText(t("trip.customer"));
+    await run.check(page, "rep22#tariff-breach");
+    await page.reload();
+    await expect(page.locator(".rep-list button[aria-current=page]")).toContainText("RPT-04", { timeout: 30_000 });
+
+    expect(await open(page, `/c/${company}/reports/financial?report=driver-balances`)).toBe(true);
+    await expect(page.locator("#rep-head h2")).toContainText("RPT-19", { timeout: 15_000 });
+    await expect(page.getByLabel(t("rep.asOf"))).not.toHaveValue("");
+    await run.check(page, "rep22#driver-balances");
+    run.assertClean();
+  });
+}
+
+/**
  * Side menu of 22 Oct (DT-235…DT-239): expanded with icons on every entry and the labelled parts of Accounting; collapsed to the icon rail;
  * a section's entries opened with the keyboard beside the rail; Ctrl+K finding a menu page by its name in the other language.
  */

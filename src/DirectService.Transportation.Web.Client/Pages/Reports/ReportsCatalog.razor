@@ -5,7 +5,11 @@
   FR-105, FR-128): the catalog of the group the user may run (DT-117); a report's own filters, the result with totals and drill-down,
   Excel / PDF, or a background export for large results (FR-151). Reports served by their own screen (trips list, statements, ledger,
   ageing, registers, e-invoicing) open that screen; the sub-ledger reconciliation (RPT-23) is shown here.
+  DT-248: the open report's code, name and one-line description head the results column; it is marked in the list (aria-current); the
+  report and its filters are kept in the address (?report=…&from=…), so refresh, Back / Forward and bookmarks reopen it, and the browser
+  tab is named after it. DT-249: every filter box shows the value in use, the report's defaults included.
 *@
+@implements IDisposable
 @inject Api Api
 @inject Loc L
 @inject ShellState Shell
@@ -14,29 +18,37 @@
 @inject AccountingLookups AccLookups
 @inject Downloads Files
 @inject NavigationManager Nav
+@inject UiJs Js
 
+<PageTitle>@TabTitle</PageTitle>
 <PageHeader Title="@L[Financial ? "nav.finReports" : "nav.opReports"]" Crumbs="@([new Crumb(L["nav.reports"]), new Crumb(L[Financial ? "nav.finReports" : "nav.opReports"])])" />
-<div class="cols fill" style="grid-template-columns:260px 1fr;min-height:0">
-    <nav class="box" aria-label="@L[Financial ? "nav.finReports" : "nav.opReports"]" style="overflow:auto">
+<div class="cols fill rp">
+    <nav class="box rep-nav" aria-label="@L[Financial ? "nav.finReports" : "nav.opReports"]">
         @if (_catalog is null) {<Skeleton Kind="SkeletonKind.List" />}
         else if (Entries.Count == 0) {<EmptyState Icon="chart" Title="@L["rep.noneAllowed"]" />}
         else
         {
-            <ul class="menu-list" style="list-style:none;margin:0;padding:6px">
+            <ul class="rep-list">
                 @foreach (var e in Entries)
                 {
                     var entry = e;
                     <li>
-                        <button type="button" class="btn ghost" style="width:100%;justify-content:flex-start;text-align:start;height:auto;padding:6px 8px"
-                                aria-current="@(_selected?.Key == entry.Key ? "page" : null)" @onclick="() => Select(entry)">
-                            <span><bdi class="num muted">@entry.Code</bdi> @entry.Title</span>
+                        <button type="button" class="btn ghost" aria-current="@(_selected?.Key == entry.Key ? "page" : null)" @onclick="() => Choose(entry)">
+                            <span><bdi class="num rep-code">@entry.Code</bdi> @entry.Title</span>
                         </button>
                     </li>
                 }
             </ul>
         }
     </nav>
-    <div class="stack" style="min-width:0;min-height:0">
+    <div class="stack rep-main" style="min-width:0;min-height:0">
+        @if (_selected is not null)
+        {
+            <header class="rep-head" id="rep-head">
+                <h2><bdi class="num">@_selected.Code</bdi> · @_selected.Title</h2>
+                @if (_selected.Description is { Length: > 0 } about) {<p class="muted">@about</p>}
+            </header>
+        }
         @if (_selected is null)
         {
             <Box Fill="true"><EmptyState Icon="chart" Title="@L["rep.pick"]" Text="@L["rep.pickText"]" /></Box>
@@ -117,32 +129,114 @@
     /// <summary>The report cannot run without this filter (catalogue "required", e.g. the customer of a customer statement).</summary>
     private bool Needs(string parameter) => _selected?.Required?.Contains(parameter) == true;
 
+    /// <summary>The browser tab: the open report ("RPT-04 · Tariff breach report"), else the page.</summary>
+    private string TabTitle => (_selected is { } s ? $"{s.Code} · {s.Title}" : L[Financial ? "nav.finReports" : "nav.opReports"]) + " · " + L["shell.product"];
+
+    /// <summary>The address this screen last showed or wrote itself (a change to it is not a Back / Forward to follow).</summary>
+    private string? _address;
+
     protected override async Task OnInitializedAsync()
     {
+        Nav.LocationChanged += Navigated;
         try { await Lookups.EnsureAsync(); } catch (ApiException) { }
         try { _catalog = await Api.GetAsync<IReadOnlyList<ReportCatalogEntry>>(Api.C("reports/catalog")); } catch (ApiException) { _catalog = []; }
         if (_catalog.Any(c => c.Parameters.Contains("supplier")))
         {
             try { _suppliers = (await AccLookups.PartiesAsync("Supplier")).Select(p => new Option<string?>(p.Id, p.Name, p.TaxNumber)).ToList(); } catch (ApiException) { }
         }
-        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["report"] is { Length: > 0 } key && Entries.FirstOrDefault(e => e.Key == key) is { } e) await Select(e);
+        await FromAddress();
     }
 
-    private async Task Select(ReportCatalogEntry e)
+    public void Dispose() => Nav.LocationChanged -= Navigated;
+
+    /// <summary>Back / Forward, a bookmark or the other report group (operational ↔ financial) in the same screen: show what the address names.</summary>
+    private void Navigated(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(async () => { if (_catalog is not null && !Same(_address, e.Location)) { await FromAddress(); StateHasChanged(); } });
+
+    /// <summary>Opens the report of the address (?report=…) with the filters it carries; the report's defaults fill the others.</summary>
+    private async Task FromAddress()
+    {
+        _address = Nav.Uri;
+        var query = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        if (query["report"] is { Length: > 0 } key && Entries.FirstOrDefault(e => e.Key == key) is { } e)
+        {
+            await Select(e, k => query[k]);
+        }
+        else
+        {
+            _selected = null;
+            _result = null;
+            _reconciliation = null;
+            _state = LoadState.Empty;
+        }
+    }
+
+    /// <summary>A report chosen in the list: a new entry in the browser's history (Back returns to the report before).</summary>
+    private async Task Choose(ReportCatalogEntry e)
+    {
+        await Select(e, _ => null);
+        await Js.RevealStacked(".rep-main");   // stacked under the list (narrow window): bring the title into view
+    }
+
+    private async Task Select(ReportCatalogEntry e, Func<string, string?> given)
     {
         _selected = e;
         _q = new QueryModel();
+        Fill(_q, k => given(k) is { Length: > 0 } v ? v : null);
+        Fill(_q, k => e.Defaults?.GetValueOrDefault(k));
         _ctx = new EditContext(_q);
         _result = null;
         _reconciliation = null;
         _state = LoadState.Empty;
-        _waiting = e.Required is { Count: > 0 };
+        _waiting = (e.Required ?? []).Any(p => string.IsNullOrWhiteSpace(Value(p)));
+        Remember(push: _address is { } shown && ReportOf(shown) != e.Key);
         // A report that needs a filter (a customer statement needs the customer) waits for it instead of asking the server and failing.
         if ((e.Path is null || e.Key == "reconciliation") && !_waiting)
         {
             StateHasChanged();   // the filters are on screen before the answer, so a refused filter can be marked on its field
             await Run();
         }
+    }
+
+    /// <summary>Puts each empty filter of the report to the value <paramref name="value"/> gives (yyyy-MM-dd for dates).</summary>
+    private void Fill(QueryModel q, Func<string, string?> value)
+    {
+        foreach (var p in _selected!.Parameters)
+        {
+            if (!string.IsNullOrWhiteSpace(Value(p, q)) || value(p) is not { Length: > 0 } v) continue;
+            DateOnly? Day() => DateOnly.TryParseExact(v, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+            switch (p)
+            {
+                case "from": q.From = Day(); break;
+                case "to": q.To = Day(); break;
+                case "asOf": q.AsOf = Day(); break;
+                case "customer": q.Customer = v; break;
+                case "supplier": q.Supplier = v; break;
+                case "driver": q.Driver = v; break;
+                case "partner": q.Partner = v; break;
+                case "loadingSite": q.LoadingSite = v; break;
+                case "unloadingSite": q.UnloadingSite = v; break;
+                case "material": q.Material = v; break;
+                case "groupBy": q.GroupBy = v; break;
+                case "side": q.Side = v; break;
+            }
+        }
+    }
+
+    /// <summary>Two addresses of the same page and query (absolute or relative).</summary>
+    private bool Same(string? a, string b) => a is not null && Nav.ToAbsoluteUri(a).PathAndQuery == Nav.ToAbsoluteUri(b).PathAndQuery;
+
+    private static string? ReportOf(string uri) => System.Web.HttpUtility.ParseQueryString(new Uri(uri).Query)["report"];
+
+    /// <summary>Writes the open report and its filters into the address: a new history entry when the report changes, else in place.</summary>
+    private void Remember(bool push)
+    {
+        var query = Query();
+        var target = NavModel.Href(Company, Financial ? "reports/financial" : "reports/operational") + "?report=" + Uri.EscapeDataString(_selected!.Key)
+            + (query.Length > 0 ? "&" + query[1..] : "");
+        if (Same(_address, target)) return;
+        _address = Nav.ToAbsoluteUri(target).ToString();
+        Nav.NavigateTo(target, replace: !push);
     }
 
     /// <summary>Screens that serve a report listed in the catalog with its own path (7.7.2 / 7.7.3).</summary>
@@ -194,6 +288,8 @@
             return;
         }
         _waiting = false;
+        Fill(_q, k => _selected.Defaults?.GetValueOrDefault(k));   // a box the user emptied shows the value the report uses again
+        Remember(push: false);
         _state = LoadState.Loading;
         try
         {
@@ -218,15 +314,19 @@
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }
 
-    private string? Value(string parameter) => parameter switch
+    private string? Value(string parameter, QueryModel? model = null)
     {
-        "customer" => _q.Customer, "supplier" => _q.Supplier, "driver" => _q.Driver, "partner" => _q.Partner, "loadingSite" => _q.LoadingSite, "unloadingSite" => _q.UnloadingSite,
-        "material" => _q.Material, "groupBy" => _q.GroupBy, "side" => _q.Side,
-        "from" => _q.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-        "to" => _q.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-        "asOf" => _q.AsOf?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-        _ => null,
-    };
+        var q = model ?? _q;
+        return parameter switch
+        {
+            "customer" => q.Customer, "supplier" => q.Supplier, "driver" => q.Driver, "partner" => q.Partner, "loadingSite" => q.LoadingSite, "unloadingSite" => q.UnloadingSite,
+            "material" => q.Material, "groupBy" => q.GroupBy, "side" => q.Side,
+            "from" => q.From?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            "to" => q.To?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            "asOf" => q.AsOf?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            _ => null,
+        };
+    }
 
     private static string FilterLabel(string parameter) => parameter switch
     {
