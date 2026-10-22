@@ -83,6 +83,7 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
   .provider .side.mini .fly { background: var(--side-bg-provider); }
   .side.mini .sec:hover > .fly, .side.mini .sec:focus-within > .fly, .side.mini .sec.flown > .fly { visibility: visible; opacity: 1; }
   .side.mini .sec:focus-within:not(:hover):not(.flown) > .fly .pt { display: none; }
+  .side.mini .sec.hush:not(.flown) > .fly { visibility: hidden; opacity: 0; transition: none; }   /* dismissed with Escape (DT-242) */
   .side.mini .fly .ft { display: block; color: #fff; font-size: 13px; font-weight: var(--fw-semibold); padding: var(--sp-3) var(--sp-4); }
   .side.mini .fly:not(.tip) .ft { border-bottom: 1px solid var(--side-line); margin-bottom: var(--sp-2); }
   .side.mini .fly.tip { min-width: 0; white-space: nowrap; padding: 0; }

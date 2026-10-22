@@ -124,6 +124,20 @@ export function navFlyouts(nav) {
 }
 
 /**
+ * Escape hides a flyout or name shown only because the section is pointed at or focused (DT-242, WCAG 1.4.13), as it closes one opened with
+ * Enter (that one is closed by the menu itself). It shows again once the pointer or the focus has left the section and come back.
+ */
+const hushed = (sec, e) => { if (!sec.contains(e.relatedTarget)) sec.classList.remove("hush"); };
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  for (const sec of document.querySelectorAll(".side.mini .sec:not(.flown)")) {
+    if (sec.matches(":hover") || sec.matches(":focus-within")) sec.classList.add("hush");
+  }
+});
+document.addEventListener("pointerout", (e) => { const sec = e.target.closest && e.target.closest(".side .sec.hush"); if (sec) hushed(sec, e); });
+document.addEventListener("focusout", (e) => { const sec = e.target.closest && e.target.closest(".side .sec.hush"); if (sec) hushed(sec, e); });
+
+/**
  * Places a flyout beside its section, inside the window. With focus: its entries were just opened with Enter or a click (the flyout grew) —
  * placed again and the first entry focused, once more on the next frame if the focus did not take while the flyout was being shown.
  */

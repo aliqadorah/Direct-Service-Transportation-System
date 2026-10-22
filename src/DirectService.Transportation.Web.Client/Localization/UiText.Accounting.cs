@@ -353,6 +353,7 @@ public static partial class UiText
         ["mnt.empty"] = ("فارغ", "Empty"),
         ["mnt.pickEntries"] = ("اختر القيود اليدوية", "Choose the manual entries"),
         ["mnt.noManual"] = ("لا قيود يدوية مرحّلة.", "No posted manual entries."),
+        ["mnt.pickHint"] = ("حدّد في قائمة القيود اليدوية ما تريد حذفه، فيظهر هنا ما سيُحذف.", "Select the entries you want to delete from the list of manual entries; what will be deleted is shown here."),
         ["mnt.preview"] = ("ما سيُحذف", "What will be deleted"),
         ["mnt.pickAction"] = ("اختر إجراءً لعرض أثره.", "Choose an action to see its effect."),
         ["mnt.blocked"] = ("لا يمكن التنفيذ:", "It cannot run:"),

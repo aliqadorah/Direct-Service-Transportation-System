@@ -69,7 +69,9 @@
     </div>
     <Box Title="@L["mnt.preview"]">
         @if (_action is null) {<p class="muted" style="margin:0">@L["mnt.pickAction"]</p>}
-        else if (_preview is null) {<p class="muted" style="margin:0">@(_previewError ?? L["ui.loading"])</p>}
+        else if (_previewHint is not null) {<p class="muted mnt-hint" style="margin:0">@_previewHint</p>}
+        else if (_previewError is not null) {<Banner Tone="Tone.Err" Text="@_previewError" />}
+        else if (_preview is null) {<p class="muted" style="margin:0">@L["ui.loading"]</p>}
         else
         {
             @if (_preview.Blockers.Count > 0)
@@ -99,7 +101,7 @@
 
 @code {
     private static readonly string[] Actions = [MaintenanceActions.DeleteEntries, MaintenanceActions.DeleteAllEntries, MaintenanceActions.ReplaceChart, MaintenanceActions.Reset];
-    private string? _action, _chartSource = "template", _reason, _word, _previewError, _runError;
+    private string? _action, _chartSource = "template", _reason, _word, _previewError, _previewHint, _runError;
     private MaintenancePreview? _preview;
     private IReadOnlyList<MaintenanceLogEntry> _log = [];
     private IReadOnlyList<JournalEntrySummary> _entries = [];
@@ -145,6 +147,9 @@
         var version = ++_previewVersion;
         _preview = null;
         _previewError = null;
+        // Nothing ticked yet (DT-240): a hint where the preview will be, not a refusal of the server.
+        _previewHint = _action == MaintenanceActions.DeleteEntries && _picked.Count == 0 ? L[_entries.Count == 0 ? "mnt.noManual" : "mnt.pickHint"] : null;
+        if (_previewHint is not null) return;
         try
         {
             var p = await Api.PostAsync<MaintenancePreview>(Api.C($"accounting/maintenance/{_action}/preview"), Request());

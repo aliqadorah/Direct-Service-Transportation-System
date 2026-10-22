@@ -829,3 +829,41 @@ for (const lang of ["ar", "en"] as Lang[]) {
     run.assertClean();
   });
 }
+
+/**
+ * Maintenance zone of 22 Oct (DT-240): "Delete selected entries" with nothing ticked shows a hint (no technical message); with an entry
+ * ticked the preview with the confirmation fields; another action's preview.
+ */
+for (const lang of ["ar", "en"] as Lang[]) {
+  test(`Visual — maintenance zone (${lang})`, async ({ page }) => {
+    test.skip(!wanted("mnt22#"), "not among VISUAL_ONLY");
+    test.setTimeout(10 * 60_000);
+    const run = new VisualRun(lang, "mnt22");
+    const t = texts(lang);
+    await enrol(page, lang, new VisualRun(lang, "mnt22-enrol", false));
+    const company = companyOf(page);
+    await buildWorld(page, company);   // chart of accounts, periods and posting set-up
+    const chart = await api<{ id: string; code: string; isPostable: boolean; isControlAccount: boolean; accountType: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    const postable = chart.filter((x) => x.isPostable && !x.isControlAccount);
+    const expense = postable.find((x) => /expens/i.test(x.accountType)) ?? postable[postable.length - 1];
+    const cash = postable.find((x) => /asset/i.test(x.accountType)) ?? postable[0];
+    const day = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    await api(page, "POST", c(company, "accounting/journal-entries"), { entryDate: day, description: lang === "ar" ? "إنترنت أكتوبر" : "Internet October",
+      lines: [{ accountId: expense.id, debit: 50, credit: 0 }, { accountId: cash.id, debit: 0, credit: 50 }] });
+
+    expect(await open(page, `/c/${company}/accounting/maintenance`)).toBe(true);
+    await page.locator("input[name=mnt-action]").first().check();
+    await expect(page.locator(".mnt-hint")).toHaveText(t("mnt.pickHint"), { timeout: 15_000 });
+    await expect(page.getByText("entryIds")).toHaveCount(0);
+    await run.check(page, "mnt22#nothing-ticked");
+
+    await page.locator("tbody input[type=checkbox]").first().check();
+    await expect(page.locator("#mnt-word")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "mnt22#ticked");
+
+    await page.locator("input[name=mnt-action]").nth(1).check();
+    await expect(page.locator("#mnt-word")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "mnt22#delete-all");
+    run.assertClean();
+  });
+}

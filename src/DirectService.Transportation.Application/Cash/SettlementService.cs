@@ -214,7 +214,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         for (var i = 0; i < tokens.Count; i++)
         {
             var g = decode(tokens[i]) ?? throw Fail.Field($"{field}[{i}]", ErrorCodes.ValidationFormat, field);
-            var item = all.FirstOrDefault(x => pid(x) == g) ?? throw Fail.RuleOn($"{field}[{i}]", ErrorCodes.SettlementItemUnavailable, tokens[i]);
+            var item = all.FirstOrDefault(x => pid(x) == g) ?? throw Fail.RuleOn($"{field}[{i}]", ErrorCodes.SettlementItemUnavailable, i + 1);   // DT-241: its place in the list, never the token
             if (!picked.Contains(item)) picked.Add(item);
         }
         return picked;

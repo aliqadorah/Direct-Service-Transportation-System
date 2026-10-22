@@ -286,13 +286,17 @@ public static class ErrorCatalog
         [ErrorCodes.ReportThresholds] = ("حد التنبيه يجب ألا يتجاوز الحد الحرج.", "The warning threshold must not be above the critical threshold."),
     };
 
-    /// <summary>Formats the message of a code in the given language ("ar" or "en").</summary>
+    /// <summary>
+    /// Formats the message of a code in the given language ("ar" or "en"). An argument that is a field name or path ("entryIds",
+    /// "lines[2].accountId") or a party type code is shown by its label (DT-241, <see cref="FieldLabels"/>).
+    /// </summary>
     public static string Format(string code, string language, params object?[] args)
     {
         if (!Messages.TryGetValue(code, out var m))
             return code;
         var template = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? m.En : m.Ar;
         if (args.Length == 0) return template;
+        args = [.. args.Select(a => a is string s && FieldLabels.TryLabel(s, language, out var label) ? label : a)];
         // Missing arguments render as empty text instead of failing (messages take up to 5 placeholders).
         var padded = args.Length >= 5 ? args : [.. args, .. Enumerable.Repeat<object?>(string.Empty, 5 - args.Length)];
         return string.Format(CultureInfo.InvariantCulture, template, padded);
