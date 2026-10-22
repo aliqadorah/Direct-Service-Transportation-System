@@ -42,12 +42,12 @@ public sealed class SupportAccessPageTests : PageTestBase
         Console();
         var cut = Render<SupportAccess>();
         cut.WaitForAssertion(() => Assert.Contains("Ali Transportation", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["con.requestSupport"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["con.requestSupport"], StringComparison.Ordinal)).Click());
 
         var send = () => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["con.sendRequest"], StringComparison.Ordinal));
         Assert.True(send().HasAttribute("disabled"));
 
-        cut.Find("#support-tenant").Input("Ali");
+        Act(() => cut.Find("#support-tenant").Input("Ali"));
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("[role=option]").Count));
         var options = cut.FindAll("[role=option] span").Select(o => o.TextContent).ToList();
         // Each entry: name · owner email · plan · signed-up date — the two "Ali Transportation" read differently.
@@ -56,17 +56,17 @@ public sealed class SupportAccessPageTests : PageTestBase
         Assert.NotEqual(options[0], options[1]);
 
         // Typed text alone never makes a request: a subscriber must be picked.
-        cut.Find("textarea").Input("Invoice printing");
+        Act(() => cut.Find("textarea").Input("Invoice printing"));
         Assert.True(send().HasAttribute("disabled"));
 
-        cut.FindAll("[role=option]")[1].PointerDown();
+        Act(() => cut.FindAll("[role=option]")[1].PointerDown());
         cut.WaitForAssertion(() => Assert.Contains("aliabdelqader311@gmail.com", cut.Find("[data-testid=chosen-tenant]").TextContent));
         Assert.DoesNotContain("ali@gmail.com", cut.Find("[data-testid=chosen-tenant]").TextContent.Replace("aliabdelqader311@gmail.com", "", StringComparison.Ordinal),
             StringComparison.Ordinal);
         Assert.Contains(L["con.chosenSubscriber"], cut.Markup);
         Assert.False(send().HasAttribute("disabled"));
 
-        send().Click();
+        Act(() => send().Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST"));
         var post = Assert.Single(Requests, r => r.Method == "POST");
         Assert.Equal("/platform/support-access", post.Path);
@@ -81,8 +81,8 @@ public sealed class SupportAccessPageTests : PageTestBase
         Respond("/platform/support-access/tenants", new[] { Ali1 with { MatchedEmail = "driver@ali.test" } });
         var cut = Render<SupportAccess>();
         cut.WaitForAssertion(() => Assert.Contains("Ali Transportation", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["con.requestSupport"], StringComparison.Ordinal)).Click();
-        cut.Find("#support-tenant").Input("driver@");
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["con.requestSupport"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find("#support-tenant").Input("driver@"));
         cut.WaitForAssertion(() => Assert.Contains(L.F("con.matchedBy", "driver@ali.test"), cut.Find("[role=option] small").TextContent));
         Assert.Contains("q=driver%40", Requests.Last(r => r.Path.StartsWith("/platform/support-access/tenants", StringComparison.Ordinal)).Path, StringComparison.Ordinal);
     }
@@ -116,9 +116,9 @@ public sealed class SupportAccessPageTests : PageTestBase
             ? new[] { Pending with { Status = "Approved", StartsAt = DateTime.UtcNow, EndsAt = DateTime.UtcNow.AddDays(1) } } : new[] { Pending });
         var cut = Render<SupportApprovals>();
         cut.WaitForAssertion(() => Assert.Contains("Direct Service Admin", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
         Assert.Contains(L["ten.day"], cut.Find(".dialog select").TextContent, StringComparison.Ordinal);
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ten.endNow"], cut.Markup));
         var post = Assert.Single(Requests, r => r.Method == "POST");
         Assert.Equal("/tenant/support-access/g1/approve", post.Path);
@@ -136,8 +136,8 @@ public sealed class SupportAccessPageTests : PageTestBase
         });
         var cut = Render<SupportApprovals>();
         cut.WaitForAssertion(() => Assert.Contains("Direct Service Admin", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("This access request was not found in your subscription", cut.Find(".dialog").TextContent, StringComparison.Ordinal));
         Assert.Equal(2, reads);
         Assert.DoesNotContain("غير موجود", cut.Find(".dialog").TextContent, StringComparison.Ordinal);
@@ -153,13 +153,13 @@ public sealed class SupportAccessPageTests : PageTestBase
             : new[] { Pending });
         var cut = Render<SupportApprovals>();
         cut.WaitForAssertion(() => Assert.Contains("Direct Service Admin", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click();
-        cut.Find(".dialog textarea").Input("Not needed now");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find(".dialog textarea").Input("Not needed now"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("no longer waiting for a decision", cut.Find(".dialog").TextContent, StringComparison.Ordinal));
 
         fail = false;
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.reject"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("Not needed now", cut.Find("tbody").TextContent, StringComparison.Ordinal));
         Assert.Contains(L["st.refused"], cut.Find("tbody").TextContent, StringComparison.Ordinal);
         var post = Requests.Last(r => r.Method == "POST");

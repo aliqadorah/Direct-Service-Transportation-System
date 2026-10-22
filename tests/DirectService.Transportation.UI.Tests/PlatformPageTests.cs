@@ -73,7 +73,7 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.DoesNotContain("fill", box.ClassList);
         Assert.Equal(24, box.QuerySelectorAll("tbody tr").Length);
         Assert.Contains(L.F("ui.rowsOf", "1", "24", "30"), Text(cut));
-        cut.Find($"button[aria-label='{L.F("ui.page", 2)}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("ui.page", 2)}']").Click());
         cut.WaitForAssertion(() => Assert.Contains("SUB-000006", cut.Markup));
         Assert.DoesNotContain("SUB-000030", cut.Markup);
         Assert.Equal(6, cut.FindAll("section.box").Single(b => b.QuerySelector("caption")?.TextContent == L["ten.invoices"]).QuerySelectorAll("tbody tr").Length);
@@ -157,7 +157,7 @@ public sealed class PlatformPageTests : PageTestBase
         var cut = Render<Plans>();
         cut.WaitForAssertion(() => Assert.Contains("PRO", cut.Markup));
         Assert.Contains(L["con.priceInclusive"], cut.Markup);
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("con.priceInclusiveHelp", "16%"), Text(cut)));
     }
 
@@ -168,9 +168,9 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/tenant/subscription/downgrade", _ => Problem(409, "subscription.downgradeExceeds", "ActiveUsers 18/10"));
         var cut = Render<Subscription>();
         cut.WaitForAssertion(() => Assert.Contains(L["ten.downgrade"], cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.downgrade"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.downgrade"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("ten.downgradeTitle", "أساسية"), cut.Markup));
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.downgrade"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.downgrade"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("ActiveUsers 18/10", Text(cut)));
     }
 
@@ -191,9 +191,9 @@ public sealed class PlatformPageTests : PageTestBase
             : new[] { new CompanyResponse("c1", "شركة الاختبار", "Test company", "Active", false, DateTime.UtcNow, "A") });
         var cut = Render<Companies>();
         cut.WaitForAssertion(() => Assert.Contains("شركة الاختبار", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.newCompany"], StringComparison.Ordinal)).Click();
-        cut.Find("form#company-form input").Change("شركة الشمال");
-        cut.Find("form#company-form").Submit();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.newCompany"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find("form#company-form input").Change("شركة الشمال"));
+        Act(() => cut.Find("form#company-form").Submit());
         cut.WaitForAssertion(() => Assert.Contains("Plan limit reached (3 companies).", Text(cut)));
         Assert.NotNull(cut.Find("a[href='/tenant/subscription']"));
     }
@@ -207,9 +207,9 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/tenant", tenant);
         var cut = Render<Companies>();
         cut.WaitForAssertion(() => Assert.Contains(L["ten.security"], cut.Markup));
-        cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ten.passwordMin"], cut.Markup));
-        cut.Find("form").Submit();
+        Act(() => cut.Find("form").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "/tenant/security" && r.Body!.Contains("\"rowVersion\":\"RV1\"", StringComparison.Ordinal)));
     }
 
@@ -223,14 +223,14 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/tenant", tenant);
         var cut = Render<Companies>();
         cut.WaitForAssertion(() => Assert.Contains(L["ten.security"], cut.Markup));
-        cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ten.require2fa"], cut.Markup));
         Assert.Contains(L["ten.require2faHelp"], cut.Markup);
-        var toggle = cut.FindAll("[role=switch]").Single(s => s.ParentElement!.TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)
+        AngleSharp.Dom.IElement toggle() => cut.FindAll("[role=switch]").Single(s => s.ParentElement!.TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)
             || (s.GetAttribute("aria-labelledby") is { } id && cut.Find("#" + id).TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)));
-        Assert.Equal("false", toggle.GetAttribute("aria-checked"));
-        toggle.Click();
-        cut.Find("form").Submit();
+        Assert.Equal("false", toggle().GetAttribute("aria-checked"));
+        Act(() => toggle().Click());
+        Act(() => cut.Find("form").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "/tenant/security" && r.Body!.Contains("\"requireTwoFactor\":true", StringComparison.Ordinal)));
     }
 
@@ -241,8 +241,8 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/tenant/support-access", r => r.Method == HttpMethod.Post ? new[] { pending with { Status = "Approved", StartsAt = DateTime.UtcNow, EndsAt = DateTime.UtcNow.AddHours(24) } } : new[] { pending });
         var cut = Render<SupportApprovals>();
         cut.WaitForAssertion(() => Assert.Contains("عمر المصري", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ten.approve"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ten.endNow"], cut.Markup));
         var post = Assert.Single(Requests, r => r.Method == "POST");
         Assert.Equal("/tenant/support-access/g1/approve", post.Path);
@@ -258,9 +258,9 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/platform/tenants", new PagedResult<ConsoleTenantResponse>([t], 1, 50, 1));
         var cut = Render<Tenants>();
         cut.WaitForAssertion(() => Assert.Contains("نقليات الجنوب", cut.Markup));
-        cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["st.trial"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["st.trial"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.StartsWith("/platform/tenants?", StringComparison.Ordinal) && r.Path.Contains("status=Trial", StringComparison.Ordinal)));
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(L["con.extendTrial"], cut.Markup));
         Assert.Contains("owner@example.test", Text(cut));
     }
@@ -323,12 +323,12 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Null(Action("SUB-000004"));
         Assert.Null(Action("SUB-000005"));
 
-        cut.Find($"button[aria-label='{L.F("con.cancelInvoiceTitle", "SUB-000002")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("con.cancelInvoiceTitle", "SUB-000002")}']").Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("con.cancelInvoiceText", "SUB-000002", "232.000"), Text(cut)));
         var confirm = cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ui.confirm"], StringComparison.Ordinal));
         Assert.True(confirm.HasAttribute("disabled"));                              // no reason yet
-        cut.Find(".dialog textarea").Input("Plan withdrawn");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ui.confirm"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find(".dialog textarea").Input("Plan withdrawn"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["ui.confirm"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "/platform/tenants/t1/invoices/si2/cancel"));
         Assert.Contains("\"reason\":\"Plan withdrawn\"", Requests.Single(r => r.Path.EndsWith("/cancel", StringComparison.Ordinal)).Body, StringComparison.Ordinal);
         Assert.DoesNotContain(Requests, r => r.Path == "/platform/tenants/t1/credit");
@@ -405,12 +405,12 @@ public sealed class PlatformPageTests : PageTestBase
         var cut = Render<Health>();
         cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
 
-        cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click());
         cut.WaitForAssertion(() => Assert.Contains(L["con.refundReference"], cut.Markup));
         var confirm = cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal));
         Assert.True(confirm.HasAttribute("disabled"));                          // the date is filled in (today); the reference is not
-        cut.Find(".dialog input[maxlength='100']").Input("TRX-778");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find(".dialog input[maxlength='100']").Input("TRX-778"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click());
 
         cut.WaitForAssertion(() => Assert.Contains(L.F("con.refundedN", 1), cut.Markup));
         var body = Requests.Single(r => r.Path == "/platform/refunds/si2/refunded").Body!;
@@ -435,10 +435,10 @@ public sealed class PlatformPageTests : PageTestBase
         });
         var cut = Render<Health>();
         cut.WaitForAssertion(() => Assert.Contains("SUB-000002", cut.Markup));
-        cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("con.markRefundedOf", "SUB-000002")}']").Click());
         cut.WaitForAssertion(() => Assert.Contains(L["con.refundReference"], cut.Markup));
-        cut.Find(".dialog input[maxlength='100']").Input("TRX-1");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find(".dialog input[maxlength='100']").Input("TRX-1"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("between the payment date", Text(cut)));
         Assert.Contains(cut.FindAll(".dialog [aria-invalid=true]"), e => e.TagName == "INPUT");
     }
@@ -481,11 +481,11 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.Contains(L["staff.cancelInvite"], Row("rana@platform.test"));
         Assert.Contains(L["staff.reactivate"], Row("khaled@platform.test"));
 
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["staff.invite"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["staff.invite"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["staff.inviteHelp"], cut.Markup));
-        cut.FindAll(".dialog input")[0].Change("Sara");
-        cut.FindAll(".dialog input")[1].Change("sara@platform.test");
-        cut.Find("form#staff-invite").Submit();
+        Act(() => cut.FindAll(".dialog input")[0].Change("Sara"));
+        Act(() => cut.FindAll(".dialog input")[1].Change("sara@platform.test"));
+        Act(() => cut.Find("form#staff-invite").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "/platform/staff/invitations" && r.Body!.Contains("sara@platform.test", StringComparison.Ordinal)));
         // The help link of the screen opens the console's help page.
         Assert.Contains("href=\"/console/help/console-staff\"", cut.Markup);
@@ -506,7 +506,7 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/platform/plans", new[] { Pro });
         var cut = Render<Plans>();
         cut.WaitForAssertion(() => Assert.Contains("PRO", cut.Markup));
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("con.planInUse", "4"), Text(cut)));
         Assert.DoesNotContain(L["ml.delete"], cut.Find(".dialog").TextContent);
     }
@@ -527,7 +527,7 @@ public sealed class PlatformPageTests : PageTestBase
         Respond("/announcements", new[] { new AnnouncementResponse("a1", "صيانة مجدولة", "الجمعة 02:00", DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(5), "A") });
         var cut = Render<TenantBanners>();
         cut.WaitForAssertion(() => Assert.Contains("صيانة مجدولة", cut.Markup));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["banner.hide"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["banner.hide"], StringComparison.Ordinal)).Click());
         Assert.DoesNotContain("صيانة مجدولة", cut.Markup);
     }
 

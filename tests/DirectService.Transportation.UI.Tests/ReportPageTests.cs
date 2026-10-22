@@ -23,7 +23,7 @@ public sealed class ReportPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(L["rep.chooseFilters"], cut.Markup));
         Assert.DoesNotContain(Requests, r => r.Path.StartsWith("reports/standard", StringComparison.Ordinal));
 
-        cut.FindAll("button").Single(b => b.TextContent.Trim() == L["rep.run"]).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Trim() == L["rep.run"]).Click());
         cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("input[role=combobox]").GetAttribute("aria-invalid")));
         Assert.Contains(L.F("ui.requiredField", L["trip.customer"]), Text(cut));
         Assert.DoesNotContain(L["ui.loadFailed"], cut.Markup);
@@ -41,7 +41,7 @@ public sealed class ReportPageTests : PageTestBase
         Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/reports/financial?report=supplier-statement");
         var cut = Render<ReportsCatalog>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["rep.supplier"], cut.Markup));
-        cut.FindAll("button").Single(b => b.TextContent.Trim() == L["rep.run"]).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Trim() == L["rep.run"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("ui.requiredField", L["rep.supplier"]), Text(cut)));
         Assert.DoesNotContain(Requests, r => r.Path.StartsWith("reports/standard", StringComparison.Ordinal));
     }
@@ -90,7 +90,7 @@ public sealed class ReportPageTests : PageTestBase
         Respond("reports/builder/sources", new[] { TripsSource });
         var cut = Render<ReportBuilder>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => cut.Find("select"));
-        cut.Find("select").Change("0");
+        Act(() => cut.Find("select").Change("0"));
         return cut;
     }
 
@@ -98,7 +98,7 @@ public sealed class ReportPageTests : PageTestBase
     private static AngleSharp.Dom.IElement Control(IRenderedComponent<ReportBuilder> cut, string label) =>
         cut.Find("#" + cut.FindAll("label[for]").First(l => l.TextContent.Trim().TrimEnd('*').Trim() == label).GetAttribute("for"));
 
-    private static void Click(IRenderedComponent<ReportBuilder> cut, string text) => cut.FindAll("button").First(b => b.TextContent.Trim() == text).Click();
+    private void Click(IRenderedComponent<ReportBuilder> cut, string text) => Act(() => cut.FindAll("button").First(b => b.TextContent.Trim() == text).Click());
 
     private int Runs => Requests.Count(r => r.Path == "reports/builder/run");
 
@@ -108,20 +108,20 @@ public sealed class ReportPageTests : PageTestBase
         Respond("reports/builder/run", DetailRows);
         var cut = Builder();
         // A detail report first: its rows are on screen.
-        cut.Find("[role=switch]").Click();
+        Act(() => cut.Find("[role=switch]").Click());
         Assert.Contains(L["rb.detailOnHint"], Text(cut));
-        cut.FindAll("input[type=checkbox]")[0].Change(true);
+        Act(() => cut.FindAll("input[type=checkbox]")[0].Change(true));
         Click(cut, L["rep.run"]);
         cut.WaitForAssertion(() => Assert.Contains("R-2", Text(cut)));
         Assert.Equal(1, Runs);
 
         // The owner's settings: summary, "Trip date by month" chosen as the column grouping, Average of loaded weight and Count.
-        cut.Find("[role=switch]").Click();
+        Act(() => cut.Find("[role=switch]").Click());
         Assert.NotNull(Control(cut, L.F("rb.groupN", 1)));                     // a row grouping is offered at once
-        Control(cut, L["rb.field"]).Change("1");                                 // the column grouping's field: tripDate
-        Control(cut, L.F("rb.measureN", 1)).Change("2");                         // average
+        Act(() => Control(cut, L["rb.field"]).Change("1"));                                 // the column grouping's field: tripDate
+        Act(() => Control(cut, L.F("rb.measureN", 1)).Change("2"));                         // average
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("label[for]").Count(l => l.TextContent.Trim() == L["rb.field"])));
-        cut.FindAll("label[for]").Where(l => l.TextContent.Trim() == L["rb.field"]).Select(l => cut.Find("#" + l.GetAttribute("for"))).Last().Change("0");
+        Act(() => cut.FindAll("label[for]").Where(l => l.TextContent.Trim() == L["rb.field"]).Select(l => cut.Find("#" + l.GetAttribute("for"))).Last().Change("0"));
         Click(cut, L["rb.addMeasure"]);
         Click(cut, L["rep.run"]);
 
@@ -134,7 +134,7 @@ public sealed class ReportPageTests : PageTestBase
         Assert.Equal("true", cut.Find(".stale").GetAttribute("aria-hidden"));
 
         // Choosing the row grouping runs it and clears both marks.
-        Control(cut, L.F("rb.groupN", 1)).Change("1");
+        Act(() => Control(cut, L.F("rb.groupN", 1)).Change("1"));
         Click(cut, L["rep.run"]);
         cut.WaitForAssertion(() => Assert.Equal(2, Runs));
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".stale")));
@@ -154,11 +154,11 @@ public sealed class ReportPageTests : PageTestBase
                 """, Encoding.UTF8, "application/problem+json"),
         });
         var cut = Builder();
-        Control(cut, L.F("rb.groupN", 1)).Change("0");
+        Act(() => Control(cut, L.F("rb.groupN", 1)).Change("0"));
         Click(cut, L["rb.addFilter"]);
         Click(cut, L["rb.addFilter"]);
-        Control(cut, L.F("rb.filterN", 2)).Change("2");                         // filter 2 on loaded weight; filter 1 left empty (not sent)
-        cut.FindAll("label[for]").Where(l => l.TextContent.Trim() == L["rb.value"]).Select(l => cut.Find("#" + l.GetAttribute("for"))).Last().Change("heavy");
+        Act(() => Control(cut, L.F("rb.filterN", 2)).Change("2"));                         // filter 2 on loaded weight; filter 1 left empty (not sent)
+        Act(() => cut.FindAll("label[for]").Where(l => l.TextContent.Trim() == L["rb.value"]).Select(l => cut.Find("#" + l.GetAttribute("for"))).Last().Change("heavy"));
         Click(cut, L["rep.run"]);
 
         cut.WaitForAssertion(() => Assert.Contains("المرشح 1: القيمة لا تناسب الحقل.", Text(cut)));

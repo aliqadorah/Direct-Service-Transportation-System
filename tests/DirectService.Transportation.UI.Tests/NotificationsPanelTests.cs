@@ -35,7 +35,7 @@ public sealed class NotificationsPanelTests : PageTestBase
     {
         var cut = Panel(Note("n1", "invoices/inv1"), Note("n2", "settings/e-invoicing"));
         cut.WaitForElement(".note-open");
-        cut.FindAll(".note-open")[0].Click();
+        Act(() => cut.FindAll(".note-open")[0].Click());
         cut.WaitForAssertion(() => Assert.EndsWith("/c/c1/invoices/inv1", Nav.Uri, StringComparison.Ordinal));
         Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "notifications/n1/read");
         Assert.Equal([false], _openChanges);
@@ -57,7 +57,8 @@ public sealed class NotificationsPanelTests : PageTestBase
     {
         var cut = Panel(Note("n1", null, "missing"));
         var start = Nav.Uri;
-        cut.WaitForElement(".note-open").Click();
+        cut.WaitForElement(".note-open");
+        Act(() => cut.Find(".note-open").Click());
         cut.WaitForAssertion(() => Assert.Equal(L["notif.missing"], cut.Find(".note-p").TextContent));
         Assert.Equal(start, Nav.Uri);
         Assert.Empty(_openChanges);
@@ -70,7 +71,7 @@ public sealed class NotificationsPanelTests : PageTestBase
         var cut = Panel(Note("n1", "invoices/inv1"), Note("n2", "invoices/inv2"), Note("n3", "invoices/inv3", readAt: At));
         cut.WaitForElement(".read-all");
         Assert.Equal(2, cut.FindAll(".note.unread").Count);
-        cut.Find(".read-all").Click();
+        Act(() => cut.Find(".read-all").Click());
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".note.unread")));
         Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "notifications/read-all");
         Assert.Equal(0, Shell.UnreadNotifications);
@@ -87,7 +88,7 @@ public sealed class NotificationsPanelTests : PageTestBase
         Assert.Contains("INV-00007", note.QuerySelector(".note-m")!.TextContent, StringComparison.Ordinal);
         Assert.NotNull(note.QuerySelector(".note-m bdi"));   // the code is isolated inside the Arabic sentence
         Assert.DoesNotContain("HTTP 401", note.TextContent, StringComparison.Ordinal);
-        cut.Find(".note-dt").Click();
+        Act(() => cut.Find(".note-dt").Click());
         var details = cut.Find(".note-x");
         Assert.Equal("ltr", details.GetAttribute("dir"));
         Assert.Contains("CORE-401-001", details.TextContent, StringComparison.Ordinal);

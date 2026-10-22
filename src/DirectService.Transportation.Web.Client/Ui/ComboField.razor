@@ -128,7 +128,8 @@
         }
         var cur = Current;
         _active = _shown.Count == 0 ? -1 : Math.Max(0, cur is null ? 0 : _shown.ToList().FindIndex(o => EqualityComparer<TValue>.Default.Equals(o.Value, cur.Value)));
-        StateHasChanged();
+        // No StateHasChanged here (DT-243): every caller is an event handler, which renders once when it completes. Rendering here as well
+        // drew the found list twice — the second time a moment later, replacing the options someone (or a test) was about to pick.
     }
 
     private async Task Key(KeyboardEventArgs e)

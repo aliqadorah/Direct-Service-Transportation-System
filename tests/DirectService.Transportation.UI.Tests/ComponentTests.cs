@@ -82,10 +82,10 @@ public sealed class ComponentTests : UiTestBase
             .Add(x => x.RowClass, r => r.IsVoid ? "void" : null));
 
         Assert.Equal("ascending", g.Find("th[aria-sort]").GetAttribute("aria-sort"));
-        g.Find("th button.sort").Click();
+        Act(() => g.Find("th button.sort").Click());
         Assert.Equal(("no", true), sorted);
 
-        g.Find("tr.flt input").Change("TRP-2");
+        Act(() => g.Find("tr.flt input").Change("TRP-2"));
         Assert.Equal("TRP-2", filtered!["no"]);
 
         var rows = g.FindAll("tbody tr");
@@ -94,10 +94,10 @@ public sealed class ComponentTests : UiTestBase
         Assert.Equal("15.500", g.Find("tfoot td.n bdi").TextContent);
         Assert.Contains("n", rows[0].QuerySelectorAll("td")[2].ClassList);
 
-        g.Find("thead input[type=checkbox]").Change(true);
+        Act(() => g.Find("thead input[type=checkbox]").Change(true));
         Assert.Equal(2, selected!.Count);
 
-        g.FindAll("tbody tr")[0].KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        Act(() => g.FindAll("tbody tr")[0].KeyDown(new KeyboardEventArgs { Key = "Enter" }));
         Assert.Equal("TRP-1", opened!.No);
         Assert.Equal("0", g.FindAll("tbody tr")[0].GetAttribute("tabindex"));
     }
@@ -111,7 +111,7 @@ public sealed class ComponentTests : UiTestBase
         Assert.Equal(["1", "2", "26"], p.FindAll("button.chip").Select(b => b.TextContent.Trim()));
         Assert.True(p.FindAll(".pg .btn")[0].HasAttribute("disabled"));
         Assert.Equal("page", p.Find("button.chip[aria-current]").GetAttribute("aria-current"));
-        p.FindAll("button.chip")[2].Click();
+        Act(() => p.FindAll("button.chip")[2].Click());
         Assert.Equal(26, page);
     }
 
@@ -138,15 +138,15 @@ public sealed class ComponentTests : UiTestBase
             b.AddComponentParameter(6, "Required", true);
             b.CloseComponent();
         }));
-        var input = cut.Find("input");
-        Assert.Equal("decimal", input.GetAttribute("inputmode"));
-        Assert.Equal(input.Id, cut.Find("label").GetAttribute("for"));
-        Assert.Contains("-u", input.GetAttribute("aria-describedby"));
+        AngleSharp.Dom.IElement input() => cut.Find("input");
+        Assert.Equal("decimal", input().GetAttribute("inputmode"));
+        Assert.Equal(input().Id, cut.Find("label").GetAttribute("for"));
+        Assert.Contains("-u", input().GetAttribute("aria-describedby"));
 
-        input.Change("٣١٫٨٥");
+        Act(() => input().Change("٣١٫٨٥"));
         Assert.Equal(31.85m, model.Weight);
 
-        cut.Find("input").Change("1.23456");
+        Act(() => cut.Find("input").Change("1.23456"));
         Assert.Equal("true", cut.Find("input").GetAttribute("aria-invalid"));
         Assert.Contains("3", cut.Find(".help.err").TextContent);
     }
@@ -159,7 +159,7 @@ public sealed class ComponentTests : UiTestBase
         var cut = Render<DateField>(p => p.Add(x => x.Value, value).Add(x => x.ValueChanged, v => value = v)
             .Add(x => x.ValueExpression, () => value).Add(x => x.Label, "التاريخ"));
         Assert.Equal("10/10/2026", cut.Find("input.input").GetAttribute("value"));
-        cut.Find("input.input").Change("٠١/١١/٢٠٢٦");
+        Act(() => cut.Find("input.input").Change("٠١/١١/٢٠٢٦"));
         Assert.Equal(new DateOnly(2026, 11, 1), value);
         Assert.Equal("فتح التقويم", cut.Find("button.pick").GetAttribute("aria-label"));
     }
@@ -171,20 +171,20 @@ public sealed class ComponentTests : UiTestBase
         IReadOnlyList<Option<string?>> options = [new("d1", "أحمد صالح", "10-11111"), new("d2", "سامي العبادي", "10-22222")];
         var cut = Render<ComboField<string?>>(p => p.Add(x => x.Value, value).Add(x => x.ValueChanged, v => value = v)
             .Add(x => x.ValueExpression, () => value).Add(x => x.Options, options).Add(x => x.Label, "السائق"));
-        var input = cut.Find("input");
-        Assert.Equal("combobox", input.GetAttribute("role"));
-        Assert.Equal("false", input.GetAttribute("aria-expanded"));
+        AngleSharp.Dom.IElement input() => cut.Find("input");
+        Assert.Equal("combobox", input().GetAttribute("role"));
+        Assert.Equal("false", input().GetAttribute("aria-expanded"));
 
-        input.Input("احمد");
+        Act(() => input().Input("احمد"));
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll("[role=option]")));
         Assert.Equal("true", cut.Find("input").GetAttribute("aria-expanded"));
         Assert.Contains("10-11111", cut.Find("[role=option] small").TextContent);
 
-        cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        Act(() => cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" }));
         Assert.Equal("d1", value);
         Assert.Empty(cut.FindAll("[role=listbox]"));
 
-        cut.Find("input").Input("10-222");
+        Act(() => cut.Find("input").Input("10-222"));
         cut.WaitForAssertion(() => Assert.Equal("سامي العبادي", cut.Find("[role=option] span").TextContent));
     }
 
@@ -200,13 +200,13 @@ public sealed class ComponentTests : UiTestBase
         var cut = Render<ComboField<string?>>(p => p.Add(x => x.Value, value).Add(x => x.ValueChanged, v => value = v)
             .Add(x => x.ValueExpression, () => value).Add(x => x.Options, options).Add(x => x.Label, "الحساب"));
         Assert.DoesNotContain(UiModule.Invocations, i => i.Identifier == "floatList");
-        cut.Find("input").Click();
+        Act(() => cut.Find("input").Click());
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll("[role=option]").Count));
         Assert.Contains(UiModule.Invocations, i => i.Identifier == "floatList");
-        cut.Find("input").Input("البنك");
+        Act(() => cut.Find("input").Input("البنك"));
         var placed = UiModule.Invocations.Count(i => i.Identifier == "floatList");
         Assert.True(placed >= 2, "placed again when the list changes");
-        cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        Act(() => cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" }));
         Assert.Equal("a2", value);
         Assert.Contains(UiModule.Invocations, i => i.Identifier == "unfloatList");
     }
@@ -229,7 +229,7 @@ public sealed class ComponentTests : UiTestBase
             b.AddComponentParameter(7, "Id", "weight");
             b.CloseComponent();
         }));
-        cut.Find("form").Submit();
+        Act(() => cut.Find("form").Submit());
         var summary = cut.Find(".errsum");
         Assert.Equal("alert", summary.GetAttribute("role"));
         Assert.Equal("#weight", summary.QuerySelector("a")!.GetAttribute("href"));
@@ -264,7 +264,7 @@ public sealed class ComponentTests : UiTestBase
 
         // A new submit clears the server's messages, so the form can be sent again (review M2).
         model.Weight = 3m;
-        cut.Find("form").Submit();
+        Act(() => cut.Find("form").Submit());
         Assert.Empty(cut.FindAll(".help.err"));
     }
 
@@ -281,7 +281,7 @@ public sealed class ComponentTests : UiTestBase
     {
         decimal? v = null;
         var cut = Render<NumberField>(p => p.Add(x => x.Value, v).Add(x => x.ValueChanged, n => v = n).Add(x => x.ValueExpression, () => v).Add(x => x.Label, "المبلغ"));
-        cut.Find("input").Change("1,5");
+        Act(() => cut.Find("input").Change("1,5"));
         Assert.Null(v);
         Assert.Equal("true", cut.Find("input").GetAttribute("aria-invalid"));
     }
@@ -292,10 +292,10 @@ public sealed class ComponentTests : UiTestBase
         var on = false;
         var cut = Render<ToggleField>(p => p.Add(x => x.Value, on).Add(x => x.ValueChanged, v => on = v).Add(x => x.ValueExpression, () => on)
             .Add(x => x.Label, "اعتماد الفواتير").Add(x => x.Help, "مفعّل: «حفظ» ينشئ مسودة."));
-        var sw = cut.Find("button[role=switch]");
-        Assert.Equal("false", sw.GetAttribute("aria-checked"));
-        Assert.Equal(sw.Id + "-l", sw.GetAttribute("aria-labelledby"));
-        sw.Click();
+        AngleSharp.Dom.IElement sw() => cut.Find("button[role=switch]");
+        Assert.Equal("false", sw().GetAttribute("aria-checked"));
+        Assert.Equal(sw().Id + "-l", sw().GetAttribute("aria-labelledby"));
+        Act(() => sw().Click());
         Assert.True(on);
     }
 
@@ -307,11 +307,11 @@ public sealed class ComponentTests : UiTestBase
         var cut = Render<TabStrip>(p => p.Add(x => x.Items, items).Add(x => x.Selected, selected).Add(x => x.SelectedChanged, v => selected = v));
         Assert.Equal("true", cut.FindAll("[role=tab]")[0].GetAttribute("aria-selected"));
         Assert.Equal("-1", cut.FindAll("[role=tab]")[1].GetAttribute("tabindex"));
-        cut.Find("[role=tab][aria-selected=true]").KeyDown(new KeyboardEventArgs { Key = "ArrowLeft" });   // RTL: left = next
+        Act(() => cut.Find("[role=tab][aria-selected=true]").KeyDown(new KeyboardEventArgs { Key = "ArrowLeft" }));   // RTL: left = next
         Assert.Equal("b", selected);
         L.SetLanguage("en");
         cut.Render(p => p.Add(x => x.Selected, "b"));
-        cut.Find("[role=tab][aria-selected=true]").KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });  // LTR: right = next
+        Act(() => cut.Find("[role=tab][aria-selected=true]").KeyDown(new KeyboardEventArgs { Key = "ArrowRight" }));  // LTR: right = next
         Assert.Equal("c", selected);
     }
 
@@ -325,11 +325,11 @@ public sealed class ComponentTests : UiTestBase
         Assert.Equal("true", cut.Find(".dialog").GetAttribute("aria-modal"));
         IElement Confirm() => cut.FindAll(".df button")[1];
         Assert.True(Confirm().HasAttribute("disabled"));
-        cut.Find("textarea").Input("سعر خاطئ");
+        Act(() => cut.Find("textarea").Input("سعر خاطئ"));
         Assert.True(Confirm().HasAttribute("disabled"));
-        cut.Find("input").Input("حذف");
+        Act(() => cut.Find("input").Input("حذف"));
         Assert.False(Confirm().HasAttribute("disabled"));
-        Confirm().Click();
+        Act(() => Confirm().Click());
         Assert.Equal("سعر خاطئ", reason);
     }
 
@@ -338,9 +338,9 @@ public sealed class ComponentTests : UiTestBase
     {
         var open = true;
         var cut = Render<Modal>(p => p.Add(x => x.Open, open).Add(x => x.OpenChanged, v => open = v).Add(x => x.Title, "تعذّر الاعتماد"));
-        var dlg = cut.Find("[role=dialog]");
-        Assert.Equal("تعذّر الاعتماد", cut.Find("#" + dlg.GetAttribute("aria-labelledby")).TextContent);
-        dlg.KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        AngleSharp.Dom.IElement dlg() => cut.Find("[role=dialog]");
+        Assert.Equal("تعذّر الاعتماد", cut.Find("#" + dlg().GetAttribute("aria-labelledby")).TextContent);
+        Act(() => dlg().KeyDown(new KeyboardEventArgs { Key = "Escape" }));
         Assert.False(open);
     }
 
@@ -364,7 +364,7 @@ public sealed class ComponentTests : UiTestBase
         host.InvokeAsync(() => toasts!.Error("فشل التصدير."));
         host.WaitForAssertion(() => Assert.Contains("فشل التصدير.", host.Find(".toast").TextContent));
         Assert.Equal("polite", host.Find(".toasts").GetAttribute("aria-live"));
-        host.Find(".toast .x").Click();
+        Act(() => host.Find(".toast .x").Click());
         host.WaitForAssertion(() => Assert.Empty(host.FindAll(".toast")));
     }
 }

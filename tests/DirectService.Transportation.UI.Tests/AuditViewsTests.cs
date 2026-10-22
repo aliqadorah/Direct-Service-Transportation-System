@@ -82,16 +82,16 @@ public sealed class AuditViewsTests() : PageTestBase(PermissionKeys.TripsView, P
         Assert.Contains(cut.FindAll("select option"), o => o.TextContent == "رحلة");   // filter choice in words
 
         // Technical details: an administrator asks, the API is asked with technical=true and the stored values appear.
-        var toggle = cut.FindAll("button").Single(b => b.TextContent.Contains(L["aud.technical"], StringComparison.Ordinal));
-        Assert.Equal("false", toggle.GetAttribute("aria-pressed"));
-        toggle.Click();
+        AngleSharp.Dom.IElement toggle() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["aud.technical"], StringComparison.Ordinal));
+        Assert.Equal("false", toggle().GetAttribute("aria-pressed"));
+        Act(() => toggle().Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.StartsWith("audit-log?", StringComparison.Ordinal) && r.Path.Contains("technical=true", StringComparison.Ordinal)));
         cut.WaitForAssertion(() => Assert.Contains("InvoiceId: null → 91", Text(cut)));
         Assert.Contains("AddedToInvoice · TRN.Trip", Text(cut));
         Assert.Equal("true", cut.FindAll("button").Single(b => b.TextContent.Contains(L["aud.technical"], StringComparison.Ordinal)).GetAttribute("aria-pressed"));
 
         // Exports follow the same choice.
-        cut.FindAll("button").First(b => b.TextContent.Contains("CSV", StringComparison.OrdinalIgnoreCase) || b.GetAttribute("aria-label")?.Contains("CSV", StringComparison.OrdinalIgnoreCase) == true).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains("CSV", StringComparison.OrdinalIgnoreCase) || b.GetAttribute("aria-label")?.Contains("CSV", StringComparison.OrdinalIgnoreCase) == true).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.StartsWith("audit-log/export", StringComparison.Ordinal) && r.Path.Contains("technical=true", StringComparison.Ordinal)));
     }
 }

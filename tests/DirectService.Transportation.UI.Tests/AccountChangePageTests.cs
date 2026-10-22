@@ -44,12 +44,12 @@ public sealed class AccountChangePageTests : PageTestBase
         Assert.All(cut.FindAll("input[readonly]"), i => Assert.True(i.HasAttribute("readonly")));
         Assert.Contains(L["profile.nameHelp"], Text(cut));   // name and username stay read-only here
 
-        Button(cut, L["profile.changeEmail"]).Click();
+        Act(() => Button(cut, L["profile.changeEmail"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["profile.changeEmailLead"], Text(cut)));
-        cut.Find("#em-new").Change("new@example.test");
-        cut.Find("#em-password").Change("Passw0rd-1");
-        cut.Find("#em-code").Change("123 456");
-        Button(cut, L["profile.sendEmailLink"]).Click();
+        Act(() => cut.Find("#em-new").Change("new@example.test"));
+        Act(() => cut.Find("#em-password").Change("Passw0rd-1"));
+        Act(() => cut.Find("#em-code").Change("123 456"));
+        Act(() => Button(cut, L["profile.sendEmailLink"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "/me/email"));
         var body = Requests.Last(r => r.Method == "POST" && r.Path == "/me/email").Body!;
         Assert.Contains("\"newEmail\":\"new@example.test\"", body, StringComparison.Ordinal);
@@ -57,7 +57,7 @@ public sealed class AccountChangePageTests : PageTestBase
         Assert.Contains("\"code\":\"123456\"", body, StringComparison.Ordinal);
         cut.WaitForAssertion(() => Assert.Contains(L.F("profile.emailPending", "new@example.test"), Text(cut)));
 
-        Button(cut, L["profile.emailCancel"]).Click();
+        Act(() => Button(cut, L["profile.emailCancel"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "DELETE" && r.Path == "/me/email"));
         cut.WaitForAssertion(() => Assert.DoesNotContain(L.F("profile.emailPending", "new@example.test"), Text(cut)));
     }
@@ -67,7 +67,7 @@ public sealed class AccountChangePageTests : PageTestBase
     {
         ProfileWorld(twoFactor: false);
         var cut = RenderProfile();
-        Button(cut, L["profile.changeEmail"]).Click();
+        Act(() => Button(cut, L["profile.changeEmail"]).Click());
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("#em-password")));
         Assert.Empty(cut.FindAll("#em-code"));
     }
@@ -98,7 +98,7 @@ public sealed class AccountChangePageTests : PageTestBase
         Respond("users/u2/email", new EmailChangeResponse(null, "clerk@example.test"));
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("clerk.one", cut.Markup));
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(L.F("usr.emailPending", "pending@example.test"), Text(cut)));
         return cut;
     }
@@ -110,17 +110,17 @@ public sealed class AccountChangePageTests : PageTestBase
     {
         L.SetLanguage(language);
         var cut = RenderUsers();
-        Button(cut, L["usr.editAccount"]).Click();
+        Act(() => Button(cut, L["usr.editAccount"]).Click());
         cut.WaitForAssertion(() => Assert.Equal("clerk.one", cut.Find("#edit-username").GetAttribute("value")));
         Assert.Equal("كاتب", cut.Find("#edit-name").GetAttribute("value"));
-        cut.Find("#edit-username").Change("bad name!");
-        cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#edit-username").Change("bad name!"));
+        Act(() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["usr.userNameFormat"], Text(cut)));
         Assert.DoesNotContain(Requests, r => r.Method == "PUT");
 
-        cut.Find("#edit-name").Change("كاتب الحسابات");
-        cut.Find("#edit-username").Change("clerk.two");
-        cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#edit-name").Change("كاتب الحسابات"));
+        Act(() => cut.Find("#edit-username").Change("clerk.two"));
+        Act(() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "users/u2"));
         var body = Requests.Single(r => r.Method == "PUT" && r.Path == "users/u2").Body!;
         Assert.Contains("\"userName\":\"clerk.two\"", body, StringComparison.Ordinal);
@@ -132,10 +132,10 @@ public sealed class AccountChangePageTests : PageTestBase
     public void The_email_dialog_starts_a_change_that_the_user_confirms()
     {
         var cut = RenderUsers();
-        Button(cut, L["profile.changeEmail"]).Click();
+        Act(() => Button(cut, L["profile.changeEmail"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["usr.changeEmailNote"], Text(cut)));
-        cut.Find("#email-new").Change("clerk@example.test");
-        cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["profile.sendEmailLink"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#email-new").Change("clerk@example.test"));
+        Act(() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["profile.sendEmailLink"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "users/u2/email"));
         Assert.Contains("\"newEmail\":\"clerk@example.test\"", Requests.Last(r => r.Path == "users/u2/email").Body, StringComparison.Ordinal);
     }

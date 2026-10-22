@@ -91,7 +91,7 @@ public sealed class SupportEndedTests : PageTestBase
             Content = new StringContent($"{{\"status\":403,\"code\":\"support.windowExpired\",\"detail\":\"The support window ended at 08:10 UTC.\",\"traceId\":\"0HN:0000000D\",\"endedAt\":\"{EndedAt:O}\"}}",
                 Encoding.UTF8, "application/problem+json"),
         });
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["dash.today"], StringComparison.Ordinal)).Click();   // the dashboard reloads
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["dash.today"], StringComparison.Ordinal)).Click());   // the dashboard reloads
         AssertEnded(cut, L.F("support.windowEnded", Local(EndedAt)));
     }
 

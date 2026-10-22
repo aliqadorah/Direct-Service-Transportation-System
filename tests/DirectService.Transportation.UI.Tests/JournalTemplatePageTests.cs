@@ -43,9 +43,9 @@ public sealed class JournalTemplatePageTests : PageTestBase
     public void Use_template_fills_description_reference_and_lines()
     {
         var cut = NewEntry();
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["tpl.use"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["tpl.use"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("إيجار شهري", cut.Markup));
-        cut.FindAll("tr").First(r => r.TextContent.Contains("إيجار شهري", StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("tr").First(r => r.TextContent.Contains("إيجار شهري", StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Equal("إيجار المكتب", Value(cut, L["je.description"])));
         Assert.Equal("عقد 12", Value(cut, L["je.reference"]));
         Assert.Contains("500.000", cut.Markup);
@@ -65,12 +65,15 @@ public sealed class JournalTemplatePageTests : PageTestBase
     {
         var cut = NewEntry("?template=t1");
         cut.WaitForAssertion(() => Assert.Equal("إيجار المكتب", Value(cut, L["je.description"])));
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["tpl.saveAs"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["tpl.saveAs"], StringComparison.Ordinal)).Click());
         var name = cut.FindAll("label").Single(l => l.TextContent.Trim().StartsWith(L["tpl.name"], StringComparison.Ordinal)).GetAttribute("for");
-        cut.Find("#" + name).Change("Rent copy");
-        var amounts = cut.FindAll("label").Single(l => l.TextContent.Contains(L["tpl.withAmounts"], StringComparison.Ordinal));
-        (amounts.GetAttribute("for") is { } id ? cut.Find("#" + id) : amounts.QuerySelector("input")!).Change(false);
-        cut.Find("form#tpl-save").Submit();
+        Act(() => cut.Find("#" + name).Change("Rent copy"));
+        Act(() =>
+        {
+            var amounts = cut.FindAll("label").Single(l => l.TextContent.Contains(L["tpl.withAmounts"], StringComparison.Ordinal));
+            (amounts.GetAttribute("for") is { } id ? cut.Find("#" + id) : amounts.QuerySelector("input")!).Change(false);
+        });
+        Act(() => cut.Find("form#tpl-save").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-templates"));
         var body = Requests.Single(r => r.Method == "POST" && r.Path == "accounting/journal-templates").Body!;
         Assert.Contains("\"name\":\"Rent copy\"", body, StringComparison.Ordinal);
@@ -85,10 +88,10 @@ public sealed class JournalTemplatePageTests : PageTestBase
     {
         var cut = Render<JournalTemplates>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("إيجار شهري", cut.Markup));
-        cut.Find($"button[aria-label='{L.F("tpl.renameOne", "إيجار شهري")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("tpl.renameOne", "إيجار شهري")}']").Click());
         var name = cut.FindAll("label").Single(l => l.TextContent.Trim().StartsWith(L["tpl.name"], StringComparison.Ordinal)).GetAttribute("for");
-        cut.Find("#" + name).Change("Rent");
-        cut.Find("form#tpl-rename").Submit();
+        Act(() => cut.Find("#" + name).Change("Rent"));
+        Act(() => cut.Find("form#tpl-rename").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "accounting/journal-templates/t1"));
         var body = Requests.Single(r => r.Method == "PUT").Body!;
         Assert.Contains("\"name\":\"Rent\"", body, StringComparison.Ordinal);
@@ -102,9 +105,9 @@ public sealed class JournalTemplatePageTests : PageTestBase
         var cut = Render<JournalTemplateForm>(p => p.Add(x => x.Company, Company).Add(x => x.Id, "t1"));
         cut.WaitForAssertion(() => Assert.Contains(L["tpl.lineDescription"], cut.Markup));
         Assert.Contains(L["tpl.formHelp"], cut.Markup);
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "accounting/journal-templates/t1"));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["tpl.useShort"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["tpl.useShort"], StringComparison.Ordinal)).Click());
         Assert.EndsWith("accounting/journal/new?template=t1", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
     }
 }

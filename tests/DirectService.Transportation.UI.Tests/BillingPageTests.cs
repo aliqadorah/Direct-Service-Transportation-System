@@ -148,18 +148,18 @@ public sealed class BillingPageTests : PageTestBase
         Assert.False(Confirm().HasAttribute("disabled"));
         Assert.DoesNotContain(L["drv.repayCarried"], Text(cut));
 
-        Field(L["drv.repayAmount"]).Change("40");                                        // above the shortfall
+        Act(() => Field(L["drv.repayAmount"]).Change("40"));                                        // above the shortfall
         cut.WaitForAssertion(() => Assert.Contains(L.F("drv.repayRange", Fmt.Money(30m)), Text(cut)));
         Assert.True(Confirm().HasAttribute("disabled"));
 
-        Field(L["drv.repayAmount"]).Change("10");                                        // part: 20 carried
+        Act(() => Field(L["drv.repayAmount"]).Change("10"));                                        // part: 20 carried
         cut.WaitForAssertion(() => Assert.Contains(L["drv.repayCarried"], Text(cut)));
         Assert.Contains(Fmt.Money(20m), Text(cut));
-        var method = Field(L["cash.method"]);
-        method.Change(method.QuerySelectorAll("option").First(o => o.TextContent.Trim() == L["pay.CliQ"]).GetAttribute("value"));
+        AngleSharp.Dom.IElement method() => Field(L["cash.method"]);
+        Act(() => method().Change(method().QuerySelectorAll("option").First(o => o.TextContent.Trim() == L["pay.CliQ"]).GetAttribute("value")));
         cut.WaitForAssertion(() => Assert.Contains(L["cash.bankAccount"], Text(cut)));
-        Field(L["cash.reference"]).Change("CLIQ-55");
-        Confirm().Click();
+        Act(() => Field(L["cash.reference"]).Change("CLIQ-55"));
+        Act(() => Confirm().Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "settlements"));
         var body = Requests.Last(r => r.Method == "POST" && r.Path == "settlements").Body!;
         Assert.Contains("\"repaidAmount\":10", body, StringComparison.Ordinal);
@@ -208,27 +208,27 @@ public sealed class BillingPageTests : PageTestBase
         Assert.Contains("INV-1", rows[0].TextContent, StringComparison.Ordinal);   // oldest first
 
         // Select all with an empty amount: the amount becomes the total and both invoices are covered.
-        cut.Find("table.alloc thead input[type=checkbox]").Change(true);
+        Act(() => cut.Find("table.alloc thead input[type=checkbox]").Change(true));
         Assert.Equal("400.000", ((AngleSharp.Html.Dom.IHtmlInputElement)AmountInput(cut)).Value.Replace(",", "", StringComparison.Ordinal));
 
         // A smaller amount fills the oldest first: 100 on INV-1, 150 on INV-2 (part payment).
-        AmountInput(cut).Change("250");
+        Act(() => AmountInput(cut).Change("250"));
         Assert.Equal("100.000", Allocated(cut, "INV-1"));
         Assert.Equal("150.000", Allocated(cut, "INV-2"));
 
         // The user changes the last allocation: 50 stays unallocated (on account).
-        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-2")}']").Change("100");
+        Act(() => cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-2")}']").Change("100"));
         Assert.Contains(L["rcpt.restOnAccount"], cut.Markup);
 
         // More than the invoice's balance: an error and no save.
-        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("120");
+        Act(() => cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("120"));
         Assert.Contains(L["rcpt.overRemaining"], cut.Markup);
         Assert.All(cut.FindAll("button").Where(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) || b.TextContent.Contains(L["cash.savePrint"], StringComparison.Ordinal)),
             b => Assert.True(b.HasAttribute("disabled")));
 
         // Back within the balance: saved with both allocations (100 + 100) and 50 left on account.
-        cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("100");
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) && !b.TextContent.Contains(L["cash.savePrint"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find($"input[aria-label='{L.F("rcpt.allocatedTo", "INV-1")}']").Change("100"));
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) && !b.TextContent.Contains(L["cash.savePrint"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "receipts"));
         var body = Requests.Single(r => r.Method == "POST" && r.Path == "receipts").Body!;
         Assert.Contains("\"allocations\":[{\"invoiceId\":\"i1\",\"amount\":100", body, StringComparison.Ordinal);

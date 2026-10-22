@@ -62,7 +62,7 @@ public sealed class PageExpiredTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(L["shell.pageExpired"], Text(cut)));
         Assert.DoesNotContain("antiforgery", cut.Markup, StringComparison.OrdinalIgnoreCase);
 
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["shell.reload"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["shell.reload"], StringComparison.Ordinal)).Click());
         var nav = (Bunit.TestDoubles.BunitNavigationManager)Services.GetRequiredService<NavigationManager>();
         Assert.True(nav.History.First().Options.ForceLoad);   // a full reload: new token, current sign-in
         Assert.EndsWith($"/c/{Company}", nav.History.First().Uri, StringComparison.Ordinal);

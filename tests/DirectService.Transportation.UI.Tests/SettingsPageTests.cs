@@ -23,8 +23,8 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         var cut = Render<AuditLog>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("TRP-1", cut.Markup));
         // Choose an action without pressing Apply, then page: the page request keeps the list's filters.
-        cut.FindAll("select").First(s => s.InnerHtml.Contains("Create", StringComparison.Ordinal) || s.InnerHtml.Contains(L["hist.Create"], StringComparison.Ordinal)).Change("Update");
-        cut.Find($"button[aria-label='{L.F("ui.page", 2)}']").Click();
+        Act(() => cut.FindAll("select").First(s => s.InnerHtml.Contains("Create", StringComparison.Ordinal) || s.InnerHtml.Contains(L["hist.Create"], StringComparison.Ordinal)).Change("Update"));
+        Act(() => cut.Find($"button[aria-label='{L.F("ui.page", 2)}']").Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path.Contains("page=2", StringComparison.Ordinal)));
         Assert.DoesNotContain(Requests, r => r.Path.StartsWith("audit-log?", StringComparison.Ordinal) && r.Path.Contains("action=Update", StringComparison.Ordinal));
     }
@@ -39,13 +39,13 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Respond("users", new PagedResult<UserListItem>([new UserListItem("u1", "المالك", "owner@example.test", "Active", new Ref("r1", "Owner"), false, true, true, null, "A")], 1, 50, 1));
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("owner@example.test", cut.Markup));
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(L["usr.ownerProtected"], cut.Markup));   // Owner-level user: no actions for an Administrator
         Assert.All(cut.FindAll("option[value='r1'], option[value='r2']"), o => Assert.True(o.HasAttribute("disabled")));
 
-        cut.FindAll("[role=tab]").First(t => t.TextContent.Contains(L["usr.roles"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").First(t => t.TextContent.Contains(L["usr.roles"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("مدقق", cut.Markup));
-        cut.FindAll("tbody tr").First(r => r.TextContent.Contains("مدقق", StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("tbody tr").First(r => r.TextContent.Contains("مدقق", StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["usr.roleBeyondCaller"], cut.Markup));
         Assert.DoesNotContain(cut.FindAll(".dialog button"), b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
     }
@@ -60,17 +60,17 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Respond("users", new PagedResult<UserListItem>([], 1, 50, 0));
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click();
-        cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click());
+        Act(() => cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click());
         Assert.Contains(L["usr.createNote"], cut.Markup);
         Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)cut.Find(".dialog input[type=checkbox]")).IsChecked);
-        cut.Find("#new-name").Change("سامر");
-        cut.Find("#new-username").Change("samer.k");
-        cut.Find("#new-password").Input("Passw0rd-1");
-        cut.FindAll(".dialog select").Single().Change("0");   // options are posted by index
-        var create = cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal));
-        Assert.False(create.HasAttribute("disabled"));
-        create.Click();
+        Act(() => cut.Find("#new-name").Change("سامر"));
+        Act(() => cut.Find("#new-username").Change("samer.k"));
+        Act(() => cut.Find("#new-password").Input("Passw0rd-1"));
+        Act(() => cut.FindAll(".dialog select").Single().Change("0"));   // options are posted by index
+        AngleSharp.Dom.IElement create() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal));
+        Assert.False(create().HasAttribute("disabled"));
+        Act(() => create().Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "users"));
         var body = Requests.Single(r => r.Method == "POST" && r.Path == "users").Body!;
         Assert.Contains("\"userName\":\"samer.k\"", body, StringComparison.Ordinal);
@@ -88,12 +88,12 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("samer.k", cut.Markup));
         Assert.Contains(L["usr.mustChangeBadge"], cut.Markup);
-        cut.Find("tbody tr").Click();
+        Act(() => cut.Find("tbody tr").Click());
         cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)));
         Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.passwordReset"], StringComparison.Ordinal));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click();
-        cut.Find("#set-password").Input("N3w-Password-1");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find("#set-password").Input("N3w-Password-1"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["usr.setPassword"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "users/u2/set-password"));
     }
 
@@ -110,7 +110,7 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Respond("users", new PagedResult<UserListItem>([], 1, 50, 0));
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.newRole"], StringComparison.Ordinal)));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.newRole"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.newRole"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".perm-list .perm-row").Count));
         Assert.Equal(["الرحلات", "الإدارة"], cut.FindAll(".perm-group > legend").Select(l => l.TextContent.Trim()));
         var row = cut.FindAll(".perm-row")[0];
@@ -130,7 +130,7 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Respond("custom-fields/", Array.Empty<CustomFieldResponse>());
         var cut = Render<FieldConfiguration>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("رقم السند", cut.Markup));
-        cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["nav.drivers"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["nav.drivers"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("الرقم الوطني", cut.Markup));
         Assert.DoesNotContain("رقم السند", cut.Markup);
         Assert.Equal("true", cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["nav.drivers"], StringComparison.Ordinal)).GetAttribute("aria-selected"));
@@ -183,16 +183,16 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
     {
         var cut = Fields();
         Assert.Equal(["رقم", "تاريخ", "ملاحظات"], StandardOrder(cut));
-        Arrow(cut, L.F("fld.moveDown", "رقم السند")).Click();
+        Act(() => Arrow(cut, L.F("fld.moveDown", "رقم السند")).Click());
         Assert.Equal(["تاريخ", "رقم", "ملاحظات"], StandardOrder(cut));
         Assert.True(Arrow(cut, L.F("fld.moveUp", "تاريخ الرحلة")).HasAttribute("disabled"));   // now first
-        Arrow(cut, L.F("fld.moveUp", "ملاحظات")).Click();
+        Act(() => Arrow(cut, L.F("fld.moveUp", "ملاحظات")).Click());
         Assert.Equal(["تاريخ", "ملاحظات", "رقم"], StandardOrder(cut));
         Assert.True(Arrow(cut, L.F("fld.moveDown", "رقم السند")).HasAttribute("disabled"));    // now last
         // The preview follows the new order before saving.
         Assert.Equal(["تاريخ الرحلة", "ملاحظات", "رقم السند"], cut.FindAll("[role=group] .lbl").Select(l => l.TextContent.Replace("*", "").Trim()).ToArray());
 
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "standard-fields/TRN.Trip"));
         var body = Requests.Single(r => r.Method == "PUT" && r.Path == "standard-fields/TRN.Trip").Body!;
         Assert.Matches("\"fieldKey\":\"tripDate\"[^}]*\"sortOrder\":10", body);
@@ -205,12 +205,12 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
     public void Moving_a_custom_field_saves_the_changed_ones_with_their_values_and_does_not_open_the_dialog()
     {
         var cut = Fields(Custom("c1", "customsNo", "الكشف", 10), Custom("c2", "tolls", "الرسوم", 20), Custom("c3", "seal", "الختم", 30));
-        Arrow(cut, L.F("fld.moveUp", "الختم")).Click();
+        Act(() => Arrow(cut, L.F("fld.moveUp", "الختم")).Click());
         Assert.Empty(cut.FindAll(".dialog"));                                                // the arrow is not a row click
         var grid = cut.FindAll("table.grid")[1];
         Assert.Equal(["الكشف", "الختم", "الرسوم"], grid.QuerySelectorAll("tbody tr").Select(r => r.QuerySelector("td")!.TextContent.Trim()).ToArray());
 
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Equal(2, Requests.Count(r => r.Method == "PUT" && r.Path.StartsWith("custom-fields/field/", StringComparison.Ordinal))));
         using var c3 = System.Text.Json.JsonDocument.Parse(Requests.Single(r => r.Path == "custom-fields/field/c3").Body!);
         var sent = c3.RootElement;
@@ -229,18 +229,18 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
     public void Custom_field_dialog_has_no_order_box()
     {
         var cut = Fields(Custom("c1", "customsNo", "الكشف", 10));
-        cut.FindAll("table.grid")[1].QuerySelector("tbody tr")!.Click();
+        Act(() => cut.FindAll("table.grid")[1].QuerySelector("tbody tr")!.Click());
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll(".dialog")));
         Assert.DoesNotContain(cut.FindAll(".dialog label"), l => l.TextContent.Trim() == L["fld.order"]);
     }
 
     // ------------------------------------------------------------ unsaved list changes survive the custom-field dialog (owner request 14 Oct 2026)
 
-    private static void SaveDialog(IRenderedComponent<FieldConfiguration> cut, string label)
+    private void SaveDialog(IRenderedComponent<FieldConfiguration> cut, string label)
     {
-        cut.FindAll("table.grid")[1].QuerySelectorAll("tbody tr").First(r => r.TextContent.Contains(label, StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("table.grid")[1].QuerySelectorAll("tbody tr").First(r => r.TextContent.Contains(label, StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("form#cf-form")));
-        cut.Find("form#cf-form").Submit();
+        Act(() => cut.Find("form#cf-form").Submit());
     }
 
     private int Gets(string path) => Requests.Count(r => r.Method == "GET" && r.Path == path);
@@ -249,9 +249,9 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
     public void Saving_a_custom_field_keeps_the_unsaved_standard_list()
     {
         var cut = Fields(Custom("c1", "customsNo", "الكشف", 10));
-        Arrow(cut, L.F("fld.moveDown", "رقم السند")).Click();
-        cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق");
-        cut.Find($"input[aria-label='{L.F("fld.hiddenOf", "ملاحظات")}']").Change(true);
+        Act(() => Arrow(cut, L.F("fld.moveDown", "رقم السند")).Click());
+        Act(() => cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق"));
+        Act(() => cut.Find($"input[aria-label='{L.F("fld.hiddenOf", "ملاحظات")}']").Change(true));
 
         SaveDialog(cut, "الكشف");
         cut.WaitForAssertion(() => Assert.Equal(2, Gets("custom-fields/TRN.Trip")));       // only the custom list again
@@ -268,14 +268,14 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
     public void Saving_a_custom_field_keeps_unsaved_custom_moves_which_save_later()
     {
         var cut = Fields(Custom("c1", "customsNo", "الكشف", 10), Custom("c2", "tolls", "الرسوم", 20), Custom("c3", "seal", "الختم", 30));
-        Arrow(cut, L.F("fld.moveUp", "الختم")).Click();
+        Act(() => Arrow(cut, L.F("fld.moveUp", "الختم")).Click());
         SaveDialog(cut, "الكشف");                                                          // the server still has c1, c2, c3
         cut.WaitForAssertion(() => Assert.Equal(2, Gets("custom-fields/TRN.Trip")));
         string[] Order() => cut.FindAll("table.grid")[1].QuerySelectorAll("tbody tr").Select(r => r.QuerySelector("td")!.TextContent.Trim()).ToArray();
         cut.WaitForAssertion(() => Assert.Equal(["الكشف", "الختم", "الرسوم"], Order()));     // the screen order is kept
-        var save = cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
-        Assert.False(save.HasAttribute("disabled"));
-        save.Click();
+        AngleSharp.Dom.IElement save() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal));
+        Assert.False(save().HasAttribute("disabled"));
+        Act(() => save().Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "custom-fields/field/c3"));
         using var c3 = System.Text.Json.JsonDocument.Parse(Requests.Last(r => r.Path == "custom-fields/field/c3").Body!);
         Assert.Equal(20, c3.RootElement.GetProperty("sortOrder").GetInt32());
@@ -293,11 +293,11 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
             : r.Method == HttpMethod.Get ? new[] { Custom("c1", "customsNo", "الكشف", 10) } : Custom("c9", "seal", "الختم", 20));
         var cut = Render<FieldConfiguration>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("رقم السند", cut.Markup));
-        cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق");
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["fld.newCustom"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").Change("ملاحظات السائق"));
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["fld.newCustom"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.NotEmpty(cut.FindAll("form#cf-form")));
-        cut.Find("form#cf-form input").Change("الختم");
-        cut.Find("form#cf-form").Submit();
+        Act(() => cut.Find("form#cf-form input").Change("الختم"));
+        Act(() => cut.Find("form#cf-form").Submit());
         cut.WaitForAssertion(() => Assert.Contains("الختم", cut.FindAll("table.grid")[1].TextContent));
         Assert.Equal("ملاحظات السائق", cut.Find($"input[aria-label='{L.F("fld.labelOf", "ملاحظات")}']").GetAttribute("value"));
     }
@@ -312,7 +312,7 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Assert.EndsWith("/trips", nav.Uri, StringComparison.Ordinal);
         nav.NavigateTo(here);
 
-        Arrow(cut, L.F("fld.moveUp", "تاريخ الرحلة")).Click();
+        Act(() => Arrow(cut, L.F("fld.moveUp", "تاريخ الرحلة")).Click());
         nav.NavigateTo($"/c/{Company}/trips");
         cut.WaitForAssertion(() => Assert.Contains(L["ui.unsavedText"], cut.Markup));
         Assert.Equal(here, nav.Uri);                                                        // stayed until the user decides
@@ -327,7 +327,7 @@ public sealed class SettingsPageTests() : PageTestBase(PermissionKeys.UsersManag
         Respond("invoice-layouts/TaxInvoice", Layout(InvoiceCodes.TaxInvoice, "فاتورة ضريبية"));
         var cut = Render<InvoiceLayoutDesigner>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("مطالبة مالية", cut.Markup));
-        cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["inv.layoutTax"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("[role=tab]").Single(t => t.TextContent.Contains(L["inv.layoutTax"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("فاتورة ضريبية", cut.Markup));
     }
 }

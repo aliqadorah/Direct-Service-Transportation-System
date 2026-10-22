@@ -36,8 +36,8 @@ public sealed class ImportPageTests : PageTestBase
         return cut;
     }
 
-    private static void Click(IRenderedComponent<TripImport> cut, string text) =>
-        cut.FindAll("button").Single(b => b.TextContent.Trim() == text).Click();
+    private void Click(IRenderedComponent<TripImport> cut, string text) =>
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Trim() == text).Click());
 
     [Fact]
     public void Trip_import_moves_back_and_next_keeping_the_file_and_matching_and_lists_each_problem_with_its_column_and_fix()
@@ -49,7 +49,7 @@ public sealed class ImportPageTests : PageTestBase
         // Step 2: every field with its label; required ones marked; the matching is editable.
         Click(cut, L["ui.next"]);
         cut.WaitForAssertion(() => Assert.Contains("موقع التحميل", cut.Markup));
-        cut.Find("#map-notes").Change("Remarks");
+        Act(() => cut.Find("#map-notes").Change("Remarks"));
 
         // Step 3: the file is checked again with the chosen matching; each problem with row, column, problem and fix; a summary.
         Click(cut, L["ui.next"]);
@@ -99,7 +99,7 @@ public sealed class ImportPageTests : PageTestBase
             _ => Render<DirectService.Transportation.Web.Client.Pages.Accounting.ImportPanel>(p => p.Add(x => x.PreviewPath, kind + "/import/preview")
                 .Add(x => x.ImportPath, kind + "/import").Add(x => x.Done, "accounting")),
         };
-        cut.FindAll("button").Single(b => b.TextContent.Trim() == L["imp.template"]).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Trim() == L["imp.template"]).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "GET" && r.Path == kind + "/import/template"));
     }
 
@@ -116,7 +116,7 @@ public sealed class ImportPageTests : PageTestBase
         Click(cut, L["ui.next"]);
         cut.WaitForAssertion(() => Assert.Contains(L["imp.requiredColumn"], cut.Markup));
         Assert.True(cut.FindAll("button").Single(b => b.TextContent.Trim() == L["ui.next"]).HasAttribute("disabled"));
-        cut.Find("#map-driverId").Change("Remarks");
+        Act(() => cut.Find("#map-driverId").Change("Remarks"));
         Click(cut, L["ui.next"]);
         cut.WaitForAssertion(() => Assert.Contains(L["imp.reupload"], cut.Markup));
 

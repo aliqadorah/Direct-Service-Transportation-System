@@ -92,7 +92,7 @@ public sealed partial class NavMenuTests : PageTestBase
     public void Several_sections_stay_open_and_each_change_is_saved_for_this_user()
     {
         var cut = RenderMenu("/c/c1/trips");
-        cut.FindAll("button.g").Single(b => b.TextContent.Contains(L["nav.reports"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button.g").Single(b => b.TextContent.Contains(L["nav.reports"], StringComparison.Ordinal)).Click());
 
         Assert.Equal(2, cut.FindAll(".sec.open").Count);
         var saved = UiModule.Invocations.Where(i => i.Identifier == "setPref").Last();
@@ -104,9 +104,9 @@ public sealed partial class NavMenuTests : PageTestBase
     public void Collapse_shows_icons_only_with_a_name_and_flyout_for_every_section_and_works_with_the_keyboard()
     {
         var cut = RenderMenu("/c/c1/trips");
-        var toggle = cut.Find("button.collapse");
-        Assert.Equal(L["shell.collapseMenu"], toggle.GetAttribute("aria-label"));
-        toggle.Click();
+        AngleSharp.Dom.IElement toggle() => cut.Find("button.collapse");
+        Assert.Equal(L["shell.collapseMenu"], toggle().GetAttribute("aria-label"));
+        Act(() => toggle().Click());
 
         Assert.Contains("mini", cut.Find("aside.side").ClassList);
         Assert.Equal(L["shell.expandMenu"], cut.Find("button.collapse").GetAttribute("aria-label"));
@@ -122,13 +122,13 @@ public sealed partial class NavMenuTests : PageTestBase
         // Enter / click opens the section's entries and moves focus to the first; Escape closes and returns to the section.
         var button = billing.QuerySelector("button.g")!;
         Assert.Equal("false", button.GetAttribute("aria-expanded"));
-        cut.FindAll(".sec").Single(s => s.QuerySelector(".ft")!.TextContent == L["nav.billing"]).QuerySelector("button.g")!.Click();
+        Act(() => cut.FindAll(".sec").Single(s => s.QuerySelector(".ft")!.TextContent == L["nav.billing"]).QuerySelector("button.g")!.Click());
         var flown = cut.Find(".sec.flown");
         Assert.Equal("true", flown.QuerySelector("button.g")!.GetAttribute("aria-expanded"));
         // Placed inside the window and the first entry focused.
         cut.WaitForAssertion(() => Assert.Contains(UiModule.Invocations, i => i.Identifier == "placeFly" && (string?)i.Arguments[0] == flown.QuerySelector(".fly")!.Id && (bool)i.Arguments[1]!));
         Assert.Contains(UiModule.Invocations, i => i.Identifier == "onOutside");
-        cut.Find("nav").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+        Act(() => cut.Find("nav").KeyDown(new KeyboardEventArgs { Key = "Escape" }));
         Assert.Empty(cut.FindAll(".sec.flown"));
         Assert.Contains(UiModule.Invocations, i => i.Identifier == "focusById" && (string?)i.Arguments[0] == button.Id);
         Assert.Contains(UiModule.Invocations, i => i.Identifier == "offOutside");
@@ -163,7 +163,7 @@ public sealed partial class NavMenuTests : PageTestBase
     public void Provider_console_entries_have_icons_and_names_when_collapsed()
     {
         var cut = Render<SideNav>(p => p.Add(x => x.Provider, true));
-        cut.Find("button.collapse").Click();
+        Act(() => cut.Find("button.collapse").Click());
         var links = cut.FindAll(".sec > a.g");
         Assert.Equal(NavModel.Console.Count, links.Count);
         Assert.All(links, a => Assert.NotNull(a.QuerySelector("svg.ic use")));
@@ -181,7 +181,7 @@ public sealed partial class NavMenuTests : PageTestBase
         Shell.SetMe(Shell.Me! with { LanguageCode = language });   // the shell starts in the profile's language
         var cut = Render<AppShell>();
         await cut.InvokeAsync(cut.Instance.OpenCommandBar);
-        cut.Find("input[role=combobox]").Input(typed);
+        Act(() => cut.Find("input[role=combobox]").Input(typed));
 
         var option = Assert.Single(cut.FindAll("li[role=option]"));
         Assert.Contains(L["nav.trialBalance"], option.TextContent, StringComparison.Ordinal);
@@ -199,7 +199,7 @@ public sealed class NavMenuRoleTests() : PageTestBase(PermissionKeys.TripsView)
     {
         Services.GetRequiredService<NavigationManager>().NavigateTo("/c/c1/trips");
         var cut = Render<SideNav>(p => p.Add(x => x.Groups, NavModel.For(Shell.Permissions, setupIncomplete: false)).Add(x => x.Company, Company));
-        cut.Find("button.collapse").Click();
+        Act(() => cut.Find("button.collapse").Click());
 
         var hrefs = cut.FindAll("a.it").Select(a => a.GetAttribute("href")).ToList();
         Assert.Equal(TripPages, hrefs.Where(h => h!.Contains("/trips", StringComparison.Ordinal)));
@@ -216,7 +216,7 @@ public sealed class NavMenuRoleTests() : PageTestBase(PermissionKeys.TripsView)
     {
         var cut = Render<AppShell>();
         await cut.InvokeAsync(cut.Instance.OpenCommandBar);
-        cut.Find("input[role=combobox]").Input(typed);
+        Act(() => cut.Find("input[role=combobox]").Input(typed));
         Assert.Empty(cut.FindAll("li[role=option]"));
     }
 
@@ -225,7 +225,7 @@ public sealed class NavMenuRoleTests() : PageTestBase(PermissionKeys.TripsView)
     {
         var cut = Render<AppShell>();
         await cut.InvokeAsync(cut.Instance.OpenCommandBar);
-        cut.Find("input[role=combobox]").Input("shortage");
+        Act(() => cut.Find("input[role=combobox]").Input("shortage"));
         Assert.Contains(L["nav.shortage"], Assert.Single(cut.FindAll("li[role=option]")).TextContent, StringComparison.Ordinal);
     }
 }

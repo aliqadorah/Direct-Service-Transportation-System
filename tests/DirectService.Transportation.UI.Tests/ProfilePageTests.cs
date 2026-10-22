@@ -75,16 +75,17 @@ public sealed class ProfilePageTests : PageTestBase
         World(On());
         Respond("/me/2fa/disable", _ => Problem("""{"status":400,"code":"validation.failed","detail":"x","errors":[{"field":"code","code":"auth.twoFactorInvalid","message":"The verification code is incorrect."}]}"""));
         var cut = RenderProfile();
-        cut.WaitForAssertion(() => Button(cut, L["profile.tfaTurnOff"]).Click());
+        cut.WaitForAssertion(() => Button(cut, L["profile.tfaTurnOff"]));
+        Act(() => Button(cut, L["profile.tfaTurnOff"]).Click());
         Assert.Contains(L["profile.tfaOffWarn"], Text(cut));
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaTurnOff"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaTurnOff"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("#tfa-password").GetAttribute("aria-invalid")));
         Assert.Equal("true", cut.Find("#tfa-code").GetAttribute("aria-invalid"));
         Assert.DoesNotContain(Requests, r => r.Path == "/me/2fa/disable");
 
-        cut.Find("#tfa-password").Change("Passw0rd-1");
-        cut.Find("#tfa-code").Change("123 456");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaTurnOff"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#tfa-password").Change("Passw0rd-1"));
+        Act(() => cut.Find("#tfa-code").Change("123 456"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaTurnOff"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("The verification code is incorrect.", Text(cut)));
         var body = Requests.Single(r => r.Path == "/me/2fa/disable").Body!;
         Assert.Contains("\"currentPassword\":\"Passw0rd-1\"", body, StringComparison.Ordinal);
@@ -99,12 +100,13 @@ public sealed class ProfilePageTests : PageTestBase
         World(On());
         Respond("/me/2fa/recovery-codes", new RecoveryCodesResponse(["11111-22222", "33333-44444"], Shell.Me!));
         var cut = RenderProfile();
-        cut.WaitForAssertion(() => Button(cut, L["profile.tfaNewCodes"]).Click());
+        cut.WaitForAssertion(() => Button(cut, L["profile.tfaNewCodes"]));
+        Act(() => Button(cut, L["profile.tfaNewCodes"]).Click());
         Assert.Contains(L["profile.tfaCodesWarn"], Text(cut));
-        cut.FindAll(".dialog button.linkbtn").Single().Click();
-        cut.Find("#tfa-password").Change("Passw0rd-1");
-        cut.Find("#tfa-recovery").Change(" ABCDE-12345 ");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaNewCodes"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button.linkbtn").Single().Click());
+        Act(() => cut.Find("#tfa-password").Change("Passw0rd-1"));
+        Act(() => cut.Find("#tfa-recovery").Change(" ABCDE-12345 "));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaNewCodes"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains("33333-44444", Text(cut)));
         Assert.Contains(L["profile.tfaCodesDone"], Text(cut));
         var body = Requests.Single(r => r.Path == "/me/2fa/recovery-codes").Body!;
@@ -119,14 +121,15 @@ public sealed class ProfilePageTests : PageTestBase
         Respond("/me/2fa/change/confirm", Shell.Me!);
         Respond("/me/2fa/change", new TwoFactorSetupResponse("NEWKEY2345ABCDEF", "otpauth://totp/x", "<svg></svg>"));
         var cut = RenderProfile();
-        cut.WaitForAssertion(() => Button(cut, L["profile.tfaChangeApp"]).Click());
-        cut.Find("#tfa-password").Change("Passw0rd-1");
-        cut.Find("#tfa-code").Change("123456");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaContinue"], StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => Button(cut, L["profile.tfaChangeApp"]));
+        Act(() => Button(cut, L["profile.tfaChangeApp"]).Click());
+        Act(() => cut.Find("#tfa-password").Change("Passw0rd-1"));
+        Act(() => cut.Find("#tfa-code").Change("123456"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaContinue"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.True(Text(cut).Contains("NEWKEY2345ABCDEF", StringComparison.Ordinal), Text(cut)[..Math.Min(3000, Text(cut).Length)] + " | " + string.Join(", ", Requests.Select(r => r.Method + " " + r.Path))));
         Assert.Contains(L["profile.tfaChangeLead"], Text(cut));
-        cut.Find("#tfa-new-code").Change("654321");
-        cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaConfirmApp"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#tfa-new-code").Change("654321"));
+        Act(() => cut.FindAll(".dialog button").Last(b => b.TextContent.Contains(L["profile.tfaConfirmApp"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path == "/me/2fa/change/confirm" && r.Body!.Contains("\"code\":\"654321\"", StringComparison.Ordinal)));
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("#tfa-new-code")));   // done: the dialog closed (the toast is shown by the shell)
     }

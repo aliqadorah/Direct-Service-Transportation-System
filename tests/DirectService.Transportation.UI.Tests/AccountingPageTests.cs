@@ -36,7 +36,7 @@ public sealed class AccountingPageTests : PageTestBase
         });
         var cut = Render<ChartOfAccounts>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("الصندوق الرئيسي", cut.Markup));
-        cut.Find($"button[aria-label='{L.F("acc.collapse", "11")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("acc.collapse", "11")}']").Click());
         Assert.DoesNotContain("الصندوق الرئيسي", cut.Markup);
     }
 
@@ -68,8 +68,8 @@ public sealed class AccountingPageTests : PageTestBase
         var cut = Render<JournalEntryForm>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["je.reference"], cut.Markup));
         var reference = cut.FindAll("label").Single(l => l.TextContent.Trim() == L["je.reference"]).GetAttribute("for");
-        cut.Find("#" + reference).Change("R-9");
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["je.saveDraft"], StringComparison.Ordinal)).Click();
+        Act(() => cut.Find("#" + reference).Change("R-9"));
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["je.saveDraft"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-drafts"));
         Assert.Contains("\"reference\":\"R-9\"", Requests.Single(r => r.Method == "POST" && r.Path == "accounting/journal-drafts").Body!, StringComparison.Ordinal);
         Assert.DoesNotContain(Requests, r => r.Method == "POST" && r.Path == "accounting/journal-entries");
@@ -88,7 +88,7 @@ public sealed class AccountingPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains("R-9", cut.Markup));
         Assert.Contains(L["st.draft"], cut.Markup);
         Assert.Contains(cut.FindAll("[role=tab]"), t => t.TextContent.Contains(L["je.draftsView"], StringComparison.Ordinal));
-        cut.FindAll("tbody tr")[0].Click();
+        Act(() => cut.FindAll("tbody tr")[0].Click());
         Assert.EndsWith($"/c/{Company}/accounting/journal/drafts/d1", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
     }
 
@@ -108,16 +108,16 @@ public sealed class AccountingPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains("1101", cut.Markup));
         Assert.Contains(Requests, r => r.Path.StartsWith("accounting/reports/trial-balance?", StringComparison.Ordinal) && r.Path.Contains("tree=true", StringComparison.Ordinal));
 
-        cut.Find($"button[aria-label='{L.F("acc.collapse", "11")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("acc.collapse", "11")}']").Click());
         Assert.DoesNotContain("1101", cut.Markup);
         Assert.Contains("الأصول المتداولة", cut.Markup);
 
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.collapseAll"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.collapseAll"], StringComparison.Ordinal)).Click());
         Assert.DoesNotContain("الأصول المتداولة", cut.Markup);
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandLevel"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandLevel"], StringComparison.Ordinal)).Click());
         Assert.Contains("الأصول المتداولة", cut.Markup);
         Assert.DoesNotContain("1101", cut.Markup);
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandAll"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["rep.expandAll"], StringComparison.Ordinal)).Click());
         Assert.Contains("1101", cut.Markup);
     }
 
@@ -169,8 +169,8 @@ public sealed class AccountingPageTests : PageTestBase
         var cut = Render<ApArDocumentForm>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["ap.deduction"], cut.Markup));
         Assert.Contains(L["ap.deductionHelp"], cut.Markup);
-        cut.Find($"input[aria-label='{L.F("ap.lineAmount", 1)}']").Change("100");
-        cut.Find($"input[aria-label='{L.F("ap.lineDeduction", 1)}']").Change("150");
+        Act(() => cut.Find($"input[aria-label='{L.F("ap.lineAmount", 1)}']").Change("100"));
+        Act(() => cut.Find($"input[aria-label='{L.F("ap.lineDeduction", 1)}']").Change("150"));
         Assert.Contains(L["ap.deductionOver"], cut.Markup);
         Assert.True(cut.FindAll("button").Single(b => b.TextContent.Contains(L["ap.savePost"], StringComparison.Ordinal)).HasAttribute("disabled"));
 
@@ -192,7 +192,7 @@ public sealed class AccountingPageTests : PageTestBase
         Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/accounting/payables/new");
         var cut = Render<ApArDocumentForm>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["ap.deduction"], cut.Markup));
-        cut.FindAll("button").Single(b => b.TextContent.Contains(L["ap.savePost"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").Single(b => b.TextContent.Contains(L["ap.savePost"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ap.deductionKeyMissing"], cut.Markup));
         Assert.NotNull(cut.Find($"a[href='/c/{Company}/settings/mapping']"));
     }

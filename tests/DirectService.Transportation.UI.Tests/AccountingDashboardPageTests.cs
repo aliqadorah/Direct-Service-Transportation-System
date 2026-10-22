@@ -56,7 +56,7 @@ public sealed class AccountingDashboardPageTests : PageTestBase
         var cut = Render<AccountingDashboard>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(L["adash.reminders"], cut.Markup));
         var month = cut.FindAll("label").First(l => l.TextContent.Trim() == L["bud.month"]).GetAttribute("for");
-        cut.Find("#" + month).Change("2");   // option index 2 = March
+        Act(() => cut.Find("#" + month).Change("2"));   // option index 2 = March
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Path == "accounting/dashboard?year=2026&month=3"));
     }
 

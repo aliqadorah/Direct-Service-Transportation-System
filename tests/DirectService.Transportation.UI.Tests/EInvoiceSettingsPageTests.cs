@@ -36,7 +36,7 @@ public sealed class EInvoiceSettingsPageTests : PageTestBase
 
         Assert.Contains(L["eis.regHelp.Sales"], Text(cut));   // the saved type, explained
         Assert.DoesNotContain(L["eis.regHelp.Income"], Text(cut));
-        Registration(cut).Change("0");   // the first option: income tax
+        Act(() => Registration(cut).Change("0"));   // the first option: income tax
         cut.WaitForAssertion(() => Assert.Contains(L["eis.regHelp.Income"], Text(cut)));
         Assert.DoesNotContain(L["eis.regHelp.Sales"], Text(cut));
     }
@@ -66,14 +66,14 @@ public sealed class EInvoiceSettingsPageTests : PageTestBase
         L.SetLanguage(language);
         var cut = Page();
         Assert.DoesNotContain(L["eis.zeroOfferAccept"], Text(cut));   // general sales tax: no offer
-        Registration(cut).Change("0");
+        Act(() => Registration(cut).Change("0"));
         cut.WaitForAssertion(() => Assert.Contains(L.F("eis.zeroOffer", "16%"), Text(cut)));
         Assert.Contains(L["eis.zeroOfferAccept"], Text(cut));
         Assert.Contains(L["eis.regHelp.Income"], Text(cut));   // the warning stays either way
         var box = cut.Find(".banner input[type=checkbox]");
         Assert.False(box.HasAttribute("checked"));            // an explicit choice, never pre-ticked
-        if (accept) box.Change(true);
-        cut.Find("form").Submit();
+        if (accept) Act(() => cut.Find(".banner input[type=checkbox]").Change(true));
+        Act(() => cut.Find("form").Submit());
         cut.WaitForAssertion(() => Assert.NotNull(SavedBody()));
         Assert.Contains("\"setTaxRateToZero\":" + (accept ? "true" : "false"), SavedBody(), StringComparison.Ordinal);
         Assert.Contains("\"registrationType\":\"Income\"", SavedBody(), StringComparison.Ordinal);
@@ -88,7 +88,7 @@ public sealed class EInvoiceSettingsPageTests : PageTestBase
         var cut = Page();
         Assert.DoesNotContain(L["eis.zeroOfferAccept"], Text(cut));
         Assert.Contains(L["eis.zeroDone"], Text(cut));
-        Registration(cut).Change("1");   // general sales tax: nothing about 0%
+        Act(() => Registration(cut).Change("1"));   // general sales tax: nothing about 0%
         cut.WaitForAssertion(() => Assert.DoesNotContain(L["eis.zeroDone"], Text(cut)));
     }
 }

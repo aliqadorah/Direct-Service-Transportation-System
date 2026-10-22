@@ -49,11 +49,11 @@ public sealed class BudgetPageTests : PageTestBase
         var cut = Render<Budgets>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("موازنة 2026", Text(cut)));
         Assert.Contains(L["st.approved"], cut.Markup);
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["bud.new"], StringComparison.Ordinal)).Click();
-        cut.Find("input[type=radio][value=actuals]").Change(true);
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["bud.new"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find("input[type=radio][value=actuals]").Change(true));
         var pct = cut.FindAll("label").Single(l => l.TextContent.Trim().StartsWith(L["bud.increase"], StringComparison.Ordinal)).GetAttribute("for");
-        cut.Find("#" + pct).Change("10");
-        cut.Find("form#bud-new").Submit();
+        Act(() => cut.Find("#" + pct).Change("10"));
+        Act(() => cut.Find("form#bud-new").Submit());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == "accounting/budgets"));
         var body = Requests.Single(r => r.Method == "POST" && r.Path == "accounting/budgets").Body!;
         Assert.Contains("\"copyActuals\":true", body, StringComparison.Ordinal);
@@ -68,12 +68,12 @@ public sealed class BudgetPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(L["bud.lines"], cut.Markup));
         Assert.Contains(L["bud.draftHelp"], cut.Markup);
         Assert.Contains(Fmt.Money(2000), Text(cut));                       // revenue year total
-        var feb = cut.Find($"[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}'] input, input[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}']");
-        feb.Change("50");
+        AngleSharp.Dom.IElement feb() => cut.Find($"[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}'] input, input[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}']");
+        Act(() => feb().Change("50"));
         cut.WaitForAssertion(() => Assert.Contains(Fmt.Money(350), Text(cut)));   // rent 300 + 50
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["bud.addLine"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["bud.addLine"], StringComparison.Ordinal)).Click());
         Assert.Equal(3, cut.FindAll("tbody tr").Count);
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "accounting/budgets/b1"));
         var body = Requests.Single(r => r.Method == "PUT").Body!;
         Assert.Contains("\"accountId\":\"e1\"", body, StringComparison.Ordinal);
@@ -109,7 +109,7 @@ public sealed class BudgetPageTests : PageTestBase
         Assert.Contains(L["bud.st.unfavourable"], cut.Markup);
         Assert.Contains("+" + Fmt.Money(200), Text(cut));
         Assert.Contains("+20%", Text(cut));
-        cut.Find($"button[aria-label='{L.F("acc.collapse", "52")}']").Click();
+        Act(() => cut.Find($"button[aria-label='{L.F("acc.collapse", "52")}']").Click());
         Assert.DoesNotContain("الإيجارات", cut.Markup);
         Assert.Contains("mode=ytd", Requests.First(r => r.Path.StartsWith("accounting/reports/budget-vs-actual", StringComparison.Ordinal)).Path, StringComparison.Ordinal);
     }

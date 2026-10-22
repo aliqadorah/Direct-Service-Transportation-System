@@ -24,7 +24,7 @@ public sealed class PartnerPaidDialogTests : PageTestBase
             .Add(x => x.Problem, new ApiProblem { Code = "trip.partnerPaid", Status = 409, Overpaid = 88m, TripCost = 88m, PaymentId = "pp1", PaymentNumber = "PPY-00004", PaymentAmount = paymentAmount })
             .Add(x => x.OnChoose, EventCallback.Factory.Create<(string, string)>(this, c => _chosen = c)));
 
-    private static void Choose(IRenderedComponent<PartnerPaidDialog> cut, string value) => cut.Find($"input[type=radio][value={value}]").Change(value);
+    private void Choose(IRenderedComponent<PartnerPaidDialog> cut, string value) => Act(() => cut.Find($"input[type=radio][value={value}]").Change(value));
 
     private static AngleSharp.Dom.IElement Button(IRenderedComponent<PartnerPaidDialog> cut, string text) =>
         cut.FindAll("button").Single(b => b.TextContent.Contains(text, StringComparison.Ordinal));
@@ -56,8 +56,8 @@ public sealed class PartnerPaidDialogTests : PageTestBase
         var cut = Dialog(88m, reason: null);
         Choose(cut, handling);
         Assert.True(Button(cut, L["trip.paidConfirm"]).HasAttribute("disabled"));   // no reason yet
-        cut.Find("#paid-reason").Input("Customer cancelled the load");
-        Button(cut, L["trip.paidConfirm"]).Click();
+        Act(() => cut.Find("#paid-reason").Input("Customer cancelled the load"));
+        Act(() => Button(cut, L["trip.paidConfirm"]).Click());
         Assert.Equal((handling, "Customer cancelled the load"), _chosen);
     }
 
@@ -70,7 +70,7 @@ public sealed class PartnerPaidDialogTests : PageTestBase
         Assert.Contains(L.F("trip.paidPayment", "PPY-00004", Fmt.Money(88m)), Text(single));
         Assert.DoesNotContain(L["trip.paidSeveral"], Text(single));
         Assert.Empty(single.FindAll("#paid-reason"));   // the payment is voided with its own reason
-        Button(single, L["trip.paidGoToPayment"]).Click();
+        Act(() => Button(single, L["trip.paidGoToPayment"]).Click());
         Assert.EndsWith($"/c/{Company}/partner-accounts/payments/pp1?void=1&trip=t9", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
         Assert.Null(_chosen);
 

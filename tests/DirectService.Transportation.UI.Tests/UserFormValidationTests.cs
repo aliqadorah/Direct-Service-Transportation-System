@@ -32,22 +32,22 @@ public sealed class UserFormValidationTests() : PageTestBase(PermissionKeys.User
     {
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click();
-        cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click());
+        Act(() => cut.FindAll(".dialog [role=tab]").Single(t => t.TextContent.Contains(L["usr.modeCreate"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["usr.rulesTitle"], Text(cut)));
         return cut;
     }
 
-    private static void Fill(IRenderedComponent<UsersRoles> cut, string password, string userName = "Viewer0")
+    private void Fill(IRenderedComponent<UsersRoles> cut, string password, string userName = "Viewer0")
     {
-        cut.Find("#new-name").Change("Viewer - مطلع");
-        cut.Find("#new-username").Change(userName);
-        cut.Find("#new-password").Input(password);
-        cut.FindAll(".dialog select").Single().Change("0");
+        Act(() => cut.Find("#new-name").Change("Viewer - مطلع"));
+        Act(() => cut.Find("#new-username").Change(userName));
+        Act(() => cut.Find("#new-password").Input(password));
+        Act(() => cut.FindAll(".dialog select").Single().Change("0"));
     }
 
     private void Create(IRenderedComponent<UsersRoles> cut) =>
-        cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.create"], StringComparison.Ordinal)).Click());
 
     [Fact]
     public void Password_rules_are_shown_before_typing_and_ticked_while_typing()
@@ -58,7 +58,7 @@ public sealed class UserFormValidationTests() : PageTestBase(PermissionKeys.User
         Assert.Contains(L["usr.ruleLetter"], Text(cut));
         Assert.Contains(L["usr.ruleDigit"], Text(cut));
         Assert.Empty(cut.FindAll(".pwrules li.met"));
-        cut.Find("#new-password").Input("abc1");
+        Act(() => cut.Find("#new-password").Input("abc1"));
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".pwrules li.met").Count));   // letter and digit, not the length
     }
 
@@ -81,7 +81,7 @@ public sealed class UserFormValidationTests() : PageTestBase(PermissionKeys.User
     {
         World();
         var cut = OpenCreate();
-        cut.Find("#new-username").Change("v");
+        Act(() => cut.Find("#new-username").Change("v"));
         Create(cut);
         cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("#new-name").GetAttribute("aria-invalid")));
         Assert.Equal("true", cut.Find("#new-username").GetAttribute("aria-invalid"));
@@ -108,7 +108,7 @@ public sealed class UserFormValidationTests() : PageTestBase(PermissionKeys.User
         Assert.Contains("at least 10 characters", Text(cut));
         Assert.DoesNotContain("Please correct the highlighted fields.", Text(cut));
 
-        cut.Find("#new-password").Input("Passw0rd-12");
+        Act(() => cut.Find("#new-password").Input("Passw0rd-12"));
         Create(cut);
         cut.WaitForAssertion(() => Assert.Contains("This username or email address is not available.", Text(cut)));
     }
@@ -119,9 +119,9 @@ public sealed class UserFormValidationTests() : PageTestBase(PermissionKeys.User
         World();
         var cut = Render<UsersRoles>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains(cut.FindAll("button"), b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)));
-        cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click();
-        cut.Find("#inv-email").Change("not-an-email");
-        cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.send"], StringComparison.Ordinal)).Click();
+        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["usr.addUser"], StringComparison.Ordinal)).Click());
+        Act(() => cut.Find("#inv-email").Change("not-an-email"));
+        Act(() => cut.FindAll(".dialog button").Single(b => b.TextContent.Contains(L["usr.send"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Equal("true", cut.Find("#inv-email").GetAttribute("aria-invalid")));
         Assert.Contains(L["usr.emailFormat"], Text(cut));
         Assert.DoesNotContain(Requests, r => r.Method == "POST" && r.Path == "invitations");
