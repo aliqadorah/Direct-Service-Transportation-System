@@ -1,4 +1,5 @@
 using System.Globalization;
+using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Ledger;
@@ -143,17 +144,42 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
         return await exporter.ExportAsync(table, format, "cash-bank-statement", ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// RPT-23 export (DT-262): the same figures as the screen for every control account, the documents difference split into manual entries,
+    /// the opening entry and any unexplained rest, the entries behind it (one row each, under their account) and the screen's verdict as the note.
+    /// </summary>
     public async Task<GeneratedFile> ReconciliationAsync(ReconciliationQuery q, string? format, CancellationToken ct)
     {
         var r = await reports.ReconciliationAsync(q, ct).ConfigureAwait(false);
+        var rows = new List<IReadOnlyList<object?>>();
+        foreach (var x in r.Rows)
+        {
+            rows.Add([Name(x.Account), x.PartyType, x.LedgerBalance, x.PartyBalances, x.Difference, x.Parties, x.Unmatched.Count,
+                x.DocumentBalance, x.DocumentDifference, x.ManualAmount, x.OpeningAmount, x.Unexplained]);
+            foreach (var e in x.GapEntries ?? [])
+                rows.Add([$"    ↳ {e.Entry.Number} · {Date(e.Date)} · {e.Description}", e.Kind == AccountingCodes.SourceOpening ? L("القيد الافتتاحي", "Opening entry") : L("قيد يدوي", "Manual entry"),
+                    null, null, null, null, null, null, e.Amount, null, null, null]);
+        }
+        var verdict = r.Level switch
+        {
+            ReconciliationLevels.Differences => L("توجد فروق بين حسابات الرقابة وأرصدة الأطراف.", "Control accounts differ from the party balances."),
+            ReconciliationLevels.Documents => L("حسابات الرقابة مطابقة لأرصدة الأطراف. بعض المبالغ مصدرها قيود يومية يدوية أو القيد الافتتاحي وليس المستندات.",
+                "Control accounts match the party balances. Some amounts come from manual journal entries or the opening entry, not from documents."),
+            _ => L("الحسابات المساعدة مطابقة لحسابات الرقابة.", "The sub-ledgers match the control accounts."),
+        };
+        var note = r.PendingPostings > 0
+            ? verdict + " " + L("ترحيلات معلّقة لم تدخل الأستاذ بعد: ", "Pending postings not in the ledger yet: ") + r.PendingPostings.ToString(CultureInfo.InvariantCulture)
+            : verdict;
+        // Excel / CSV have no note band: the verdict is their last row, so every format says what the screen says.
+        if (!ReportExporter.IsPrintout(format)) rows.Add([note, null, null, null, null, null, null, null, null, null, null, null]);
         var table = new ReportTable(L("مطابقة الحسابات الفرعية", "Sub-ledger reconciliation"), [(L("كما في", "As of"), Date(r.AsOf))],
             [new(L("حساب الرقابة", "Control account")), new(L("نوع الطرف", "Party type")), new(L("رصيد الأستاذ", "Ledger balance"), ReportValue.Money),
              new(L("مجموع أرصدة الأطراف", "Party balances"), ReportValue.Money), new(L("الفرق", "Difference"), ReportValue.Money),
              new(L("الأطراف", "Parties"), ReportValue.Number), new(L("سطور غير مطابقة", "Unmatched lines"), ReportValue.Number),
-             new(L("رصيد المستندات", "Documents balance"), ReportValue.Money), new(L("فرق المستندات", "Documents difference"), ReportValue.Money)],
-            r.Rows.Select(x => (IReadOnlyList<object?>)[Name(x.Account), x.PartyType, x.LedgerBalance, x.PartyBalances, x.Difference, x.Parties, x.Unmatched.Count,
-                x.DocumentBalance, x.DocumentDifference]).ToList(),
-            null, r.PendingPostings > 0 ? L("ترحيلات معلّقة لم تدخل الأستاذ بعد: ", "Pending postings not in the ledger yet: ") + r.PendingPostings.ToString(CultureInfo.InvariantCulture) : null);
+             new(L("الرصيد من المستندات", "Balance from documents"), ReportValue.Money), new(L("فرق المستندات", "Documents difference"), ReportValue.Money),
+             new(L("منه قيود يدوية", "Of which manual entries"), ReportValue.Money), new(L("منه القيد الافتتاحي", "Of which opening entry"), ReportValue.Money),
+             new(L("غير مفسَّر", "Unexplained"), ReportValue.Money)],
+            rows, null, note);
         return await exporter.ExportAsync(table, format, "reconciliation", ct).ConfigureAwait(false);
     }
 }

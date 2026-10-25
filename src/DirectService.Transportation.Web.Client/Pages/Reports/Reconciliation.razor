@@ -1,19 +1,61 @@
 @* Sub-ledger reconciliation (FR-105, RPT-23, DT-104): per control account the ledger balance, the party balances on its lines, the difference
-   (must be 0.000), the document-rebuilt balance, and the unmatched lines (without a party or with a party of another type) with their entries. *@
+   (must be 0.000), the document-rebuilt balance, and the unmatched lines (without a party or with a party of another type) with their entries.
+   DT-262 (owner testing 25 Oct 2026): red only when a control account differs from its party balances; amber when only documents differences
+   exist (amounts from manual entries or the opening entry); every figure explained; every control account has documents figures; the
+   documents difference opens the entries behind it. *@
 @inject Loc L
 @inject ShellState Shell
-@if (Report.Reconciled) {<Banner Tone="Tone.Ok" Text="@L["rec.ok"]" />}
-else {<Banner Tone="Tone.Err" Text="@L["rec.notOk"]" />}
+@switch (Report.Level)
+{
+    case ReconciliationLevels.Differences:
+        <Banner Tone="Tone.Err" Text="@L["rec.notOk"]" />
+        break;
+    case ReconciliationLevels.Documents:
+        <Banner Tone="Tone.Warn" Icon="info" Text="@L["rec.docsOnly"]" />
+        break;
+    default:
+        <Banner Tone="Tone.Ok" Text="@L["rec.ok"]" />
+        break;
+}
+@if (Report.Rows.Where(r => r.Unexplained != 0).Select(r => r.Account.Code).ToList() is { Count: > 0 } unexplained)
+{
+    <Banner Tone="Tone.Warn" Text="@L.F("rec.unexplained", string.Join(L.En ? ", " : "، ", unexplained))" />
+}
 @if (Report.PendingPostings > 0) {<Banner Tone="Tone.Warn" Text="@L.F("per.pending", Report.PendingPostings)" />}
+<Box Title="@L["rec.help.title"]">
+    <dl class="rec-help">
+        <dt>@L["rec.ledger"]</dt><dd>@L["rec.help.ledger"]</dd>
+        <dt>@L["rec.parties"]</dt><dd>@L["rec.help.parties"]</dd>
+        <dt>@L["acc.difference"]</dt><dd>@L["rec.help.difference"]</dd>
+        <dt>@L["rec.documents"]</dt><dd>@L["rec.help.documents"]</dd>
+        <dt>@L["rec.documentDiff"]</dt><dd>@L["rec.help.documentDiff"]</dd>
+    </dl>
+</Box>
 @foreach (var row in Report.Rows)
 {
     var r = row;
+    var open = _open.Contains(r.Account.Id);
     <Box Title="@($"{r.Account.Code} · {L.Pick(r.Account.NameAr, r.Account.NameEn)} — {L["party." + r.PartyType]}")">
         <KeyValues Columns="3" Items="@([
             new KeyValue(L["rec.ledger"], Fmt.Money(r.LedgerBalance)), new KeyValue(L["rec.parties"], Fmt.Money(r.PartyBalances)),
             new KeyValue(L["acc.difference"], Fmt.Money(r.Difference)), new KeyValue(L["rec.partyCount"], Fmt.Count(r.Parties)),
-            new KeyValue(L["rec.documents"], r.DocumentBalance is decimal db ? Fmt.Money(db) : "—"),
-            new KeyValue(L["rec.documentDiff"], r.DocumentDifference is decimal dd ? Fmt.Money(dd) : "—")])" />
+            new KeyValue(L["rec.documents"], null, Documents(r)),
+            new KeyValue(L["rec.documentDiff"], null, DocumentDifference(r, open))])" />
+        @if (open)
+        {
+            <p class="help" style="margin:8px 0">@L.F("rec.breakdown", Fmt.Money(r.ManualAmount), Fmt.Money(r.OpeningAmount), Fmt.Money(r.Unexplained))</p>
+            <DataGrid TItem="DocumentGapEntry" Items="r.GapEntries ?? []" Key="e => e.Entry.Id" Caption="@L["rec.gapTitle"]" NoRowsText="@L["rec.noGapEntries"]">
+                <Columns>
+                    <GridColumn TItem="DocumentGapEntry" Title="@L["trip.date"]" Value="e => Fmt.Date(e.Date, Shell.DateFormat)" Ltr="true" />
+                    <GridColumn TItem="DocumentGapEntry" Title="@L["rep.entry"]">
+                        <Template>@if (Shell.Company is { } c) {<a href="@NavModel.Href(c.Id, $"accounting/journal/{context.Entry.Id}")"><bdi>@context.Entry.Number</bdi></a>}</Template>
+                    </GridColumn>
+                    <GridColumn TItem="DocumentGapEntry" Title="@L["rec.kind"]" Value="@(e => e.Kind == "Opening" ? L["je.src.Opening"] : L["je.manual"])" />
+                    <GridColumn TItem="DocumentGapEntry" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
+                    <GridColumn TItem="DocumentGapEntry" Title="@L["rec.amount"]" Value="e => Fmt.Money(e.Amount)" Numeric="true" />
+                </Columns>
+            </DataGrid>
+        }
         @if (r.Unmatched.Count > 0)
         {
             <DataGrid TItem="UnmatchedLine" Items="r.Unmatched" Key="u => (object)u" Caption="@L["rec.unmatched"]">
@@ -33,5 +75,34 @@ else {<Banner Tone="Tone.Err" Text="@L["rec.notOk"]" />}
 }
 
 @code {
+    private readonly HashSet<string> _open = new(StringComparer.Ordinal);
+
     [Parameter, EditorRequired] public ReconciliationReport Report { get; set; } = default!;
+
+    /// <summary>The balance from documents; "as posted by documents" where the documents cannot rebuild it (DT-262).</summary>
+    private RenderFragment Documents(ReconciliationRow r) => __builder =>
+    {
+        <bdi class="num">@Fmt.Money(r.DocumentBalance ?? 0)</bdi>
+        @if (!r.DocumentsRebuilt) {<small class="muted" style="margin-inline-start:6px">@L["rec.posted"]</small>}
+    };
+
+    /// <summary>The documents difference: a button that shows the manual / opening entries behind it (DT-262).</summary>
+    private RenderFragment DocumentDifference(ReconciliationRow r, bool open) => __builder =>
+    {
+        var amount = r.DocumentDifference ?? 0;
+        if (amount == 0 && (r.GapEntries?.Count ?? 0) == 0)
+        {
+            <bdi class="num">@Fmt.Money(amount)</bdi>
+        }
+        else
+        {
+            <button type="button" class="linkbtn" aria-expanded="@(open ? "true" : "false")" title="@L[open ? "rec.hideEntries" : "rec.showEntries"]"
+                    @onclick="() => Toggle(r.Account.Id)"><bdi class="num">@Fmt.Money(amount)</bdi> · @L.F(open ? "rec.hideEntries" : "rec.entriesCount", r.GapEntries?.Count ?? 0)</button>
+        }
+    };
+
+    private void Toggle(string id)
+    {
+        if (!_open.Remove(id)) _open.Add(id);
+    }
 }

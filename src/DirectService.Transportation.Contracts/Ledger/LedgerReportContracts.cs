@@ -116,11 +116,33 @@ public sealed record ReconciliationQuery(DateOnly? AsOf);
 public sealed record UnmatchedLine(DateOnly Date, EntryLinkRef Entry, string Description, SourceDocumentRef? Source, decimal Debit, decimal Credit, string Problem);
 
 /// <summary>
+/// An entry behind a documents difference (DT-262): a manual journal entry (<paramref name="Kind"/> "Manual") or the opening entry ("Opening") with
+/// lines on the control account, and its net amount there (debit − credit). Voided / reversed entries and their reversals cancel out and are not listed.
+/// </summary>
+public sealed record DocumentGapEntry(DateOnly Date, EntryLinkRef Entry, string Description, string Kind, decimal Amount);
+
+/// <summary>
 /// Per control account: ledger balance, sum of the party balances on its lines, difference (must be 0.000), number of parties, unmatched lines,
-/// and the sub-ledger rebuilt from the documents with its difference to the ledger (null where the documents cannot rebuild it).
+/// the balance from documents and its difference to the ledger. DT-262: every control account has documents figures — rebuilt from the
+/// documents where they can rebuild it (<paramref name="DocumentsRebuilt"/>), otherwise the amount posted by documents (automatic entries).
+/// The documents difference = <paramref name="ManualAmount"/> (manual journal entries) + <paramref name="OpeningAmount"/> (the opening entry,
+/// not a document) + <paramref name="Unexplained"/>; <paramref name="GapEntries"/> lists those entries (at most 200).
 /// </summary>
 public sealed record ReconciliationRow(
     AccountRef Account, string PartyType, decimal LedgerBalance, decimal PartyBalances, decimal Difference, int Parties, IReadOnlyList<UnmatchedLine> Unmatched,
-    decimal? DocumentBalance, decimal? DocumentDifference);
+    decimal? DocumentBalance, decimal? DocumentDifference, bool DocumentsRebuilt = true, decimal ManualAmount = 0, decimal OpeningAmount = 0, decimal Unexplained = 0,
+    IReadOnlyList<DocumentGapEntry>? GapEntries = null);
 
-public sealed record ReconciliationReport(DateOnly AsOf, IReadOnlyList<ReconciliationRow> Rows, bool Reconciled, int PendingPostings);
+/// <summary>
+/// The report. DT-262: <paramref name="Reconciled"/> = every control account equals its party balances; <paramref name="Level"/> = "Ok" (no
+/// difference at all), "Documents" (control accounts match the parties; some amounts come from manual entries or the opening entry, or differ
+/// from the documents) or "Differences" (a control account differs from its party balances).
+/// </summary>
+public sealed record ReconciliationReport(DateOnly AsOf, IReadOnlyList<ReconciliationRow> Rows, bool Reconciled, int PendingPostings, string Level = ReconciliationLevels.Ok);
+
+public static class ReconciliationLevels
+{
+    public const string Ok = "Ok";
+    public const string Documents = "Documents";
+    public const string Differences = "Differences";
+}

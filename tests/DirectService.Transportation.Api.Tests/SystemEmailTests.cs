@@ -19,6 +19,8 @@ namespace DirectService.Transportation.Api.Tests;
 /// only after a successful test email, the outbox retries with back-off and Retry-After and never sends an email twice, fails after the
 /// last attempt (wiping single-use links) and tells staff, warns 30 days before the secret expires, limits floods to one address, and
 /// resends a failed email (the same message, or a new link).
+/// DT-261 (GitHub CI 25 Oct 2026): every test starts from nothing kept in memory either — the Graph transport (a singleton) kept the access
+/// token of the fake app, so a test that ran after an activation never met the refused sign-in; test emails now always ask for a new token.
 /// </summary>
 [Collection(SystemEmailCollection.Name)]
 public sealed class SystemEmailTests(SystemEmailFactory f)
@@ -37,10 +39,14 @@ public sealed class SystemEmailTests(SystemEmailFactory f)
         return (await r.Content.ReadFromJsonAsync<T>(Ct))!;
     }
 
-    /// <summary>A clean start: no settings (development folder), an empty outbox, the fake Graph answering 202.</summary>
+    /// <summary>
+    /// A clean start: no settings (development folder), an empty outbox, no token kept by the Graph transport, the fake Graph answering 202
+    /// and no queue pause — whatever test ran before (the order differs between machines: xUnit orders by IDs that include the assembly path).
+    /// </summary>
     private async Task ResetAsync()
     {
         f.Graph.Reset();
+        f.Services.GetServices<IEmailTransport>().OfType<GraphEmailTransport>().Single().ClearTokens();
         await f.DbAsync(db => db.Database.ExecuteSqlRawAsync("DELETE core.EmailOutbox; DELETE core.SystemEmailSettings;", Ct));
         using var scope = f.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<EmailDispatchState>().PausedUntil = DateTime.MinValue;
@@ -178,6 +184,79 @@ public sealed class SystemEmailTests(SystemEmailFactory f)
         Assert.Null(renamed.Pending);
         Assert.Equal("Direct Service Support", renamed.Active.DisplayName);
         Assert.Equal("Microsoft365", renamed.Active.Mode);
+    }
+
+    /// <summary>DT-261: a test email asks Microsoft sign-in for a new token, so a secret refused now is found even with a token kept from before.</summary>
+    [Fact]
+    public async Task A_test_email_asks_for_a_new_token_so_a_refused_secret_is_found()
+    {
+        await ResetAsync();
+        var staff = await ActiveM365Async();   // a token is now kept for this app and secret
+        await ReadAsync<SystemEmailResponse>(await staff.Client.PutAsJsonAsync(Path, M365(Totp.Code(staff.AuthenticatorKey)) with { SenderMailbox = "ops@directservicetech.com" }, Ct));
+        f.Graph.TokenRefusal = "7000215";
+        var before = f.Graph.TokenRequests;
+        var failed = await ReadAsync<SystemEmailTestResponse>(await staff.Client.PostAsJsonAsync(Path + "/test", new SystemEmailTestRequest("ops@example.test"), Ct));
+        Assert.Equal((false, EmailErrorKinds.WrongSecret, false), (failed.Sent, failed.ErrorKind, failed.Activated));
+        Assert.Equal(before + 1, f.Graph.TokenRequests);
+        Assert.Equal("no-reply@directservicetech.com", failed.Settings.Active.SenderMailbox);   // the active settings stay
+        Assert.Equal("ops@directservicetech.com", failed.Settings.Pending!.SenderMailbox);
+    }
+
+    /// <summary>DT-261: settings changed while a test email is on its way are not made active by it (row version: 409, nothing activated).</summary>
+    [Fact]
+    public async Task A_test_email_never_activates_settings_changed_while_it_was_on_its_way()
+    {
+        await ResetAsync();
+        var staff = await PlatformTests.StaffAsync(f);
+        var first = await ReadAsync<SystemEmailResponse>(await staff.Client.PutAsJsonAsync(Path, M365(Totp.Code(staff.AuthenticatorKey)), Ct));
+        f.Graph.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var test = staff.Client.PostAsJsonAsync(Path + "/test", new SystemEmailTestRequest("ops@example.test"), Ct);
+        await WaitUntilAsync(() => f.Graph.Held == 1);
+        // Meanwhile another staff member (a fresh code) saves other pending settings.
+        var other = await PlatformTests.StaffAsync(f);
+        var changed = await ReadAsync<SystemEmailResponse>(await other.Client.PutAsJsonAsync(Path,
+            M365(Totp.Code(other.AuthenticatorKey), rowVersion: first.Pending!.RowVersion) with { SenderMailbox = "billing@directservicetech.com" }, Ct));
+        Assert.Equal("billing@directservicetech.com", changed.Pending!.SenderMailbox);
+        f.Graph.Hold.SetResult();
+
+        var answer = await test;
+        Assert.Equal(HttpStatusCode.Conflict, answer.StatusCode);
+        var now = await ReadAsync<SystemEmailResponse>(await staff.Client.GetAsync(Path, Ct));
+        Assert.Equal("Development", now.Active.Mode);                                    // nothing activated
+        Assert.Equal("billing@directservicetech.com", now.Pending!.SenderMailbox);         // the changed settings still wait for their own test
+        Assert.Null(now.Pending.LastTestOk);
+    }
+
+    /// <summary>DT-261: two test emails at the same moment make the pending settings active once; the other answer is a conflict or "not activated".</summary>
+    [Fact]
+    public async Task Two_test_emails_at_the_same_time_activate_the_settings_once()
+    {
+        await ResetAsync();
+        var staff = await PlatformTests.StaffAsync(f);
+        await ReadAsync<SystemEmailResponse>(await staff.Client.PutAsJsonAsync(Path, M365(Totp.Code(staff.AuthenticatorKey)), Ct));
+        f.Graph.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var one = staff.Client.PostAsJsonAsync(Path + "/test", new SystemEmailTestRequest("one@example.test"), Ct);
+        var two = staff.Client.PostAsJsonAsync(Path + "/test", new SystemEmailTestRequest("two@example.test"), Ct);
+        await WaitUntilAsync(() => f.Graph.Held == 2);
+        f.Graph.Hold.SetResult();
+        var answers = await Task.WhenAll(one, two);
+
+        var activated = 0;
+        foreach (var a in answers)
+        {
+            if (a.StatusCode == HttpStatusCode.Conflict) continue;
+            if ((await ReadAsync<SystemEmailTestResponse>(a)).Activated) activated++;
+        }
+        Assert.Equal(1, activated);
+        var rows = await f.DbAsync(db => db.Set<SystemEmailSetting>().AsNoTracking().Where(s => s.State != "Retired").Select(s => new { s.State, s.Mode }).ToListAsync(Ct));
+        var row = Assert.Single(rows);
+        Assert.Equal(("Active", "Microsoft365"), (row.State, row.Mode));
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> done)
+    {
+        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        while (!done()) await Task.Delay(20, limit.Token);
     }
 
     [Fact]

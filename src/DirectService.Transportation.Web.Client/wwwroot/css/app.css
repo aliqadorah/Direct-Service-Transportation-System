@@ -224,6 +224,10 @@ table.grid tr.grp td { background: var(--surface-group); font-weight: var(--fw-s
 table.je-lines tr.auto td, table.grid tr.auto td { background: var(--surface-group); color: var(--muted); }
 table.je-lines tr.auto td .num, table.grid tr.auto td .num { color: var(--text); }
 table.je-lines td { vertical-align: middle; }
+/* RPT-23 (DT-262): what each figure means. */
+.rec-help { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-5); margin: 0; font-size: var(--fs-sm); }
+.rec-help dt { font-weight: var(--fw-semibold); }
+.rec-help dd { margin: 0; color: var(--muted); }
 /* Trial balance tree (revision 6): indented names with an expand / collapse button on parent rows. */
 .tb-name { display: inline-flex; align-items: center; gap: 4px; }
 .tb-toggle { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }

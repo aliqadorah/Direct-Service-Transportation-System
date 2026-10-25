@@ -564,6 +564,16 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var apArIds = groups.Where(g => g.PartyType == AccountingCodes.PartyApAr && g.PartyId is not null).Select(g => g.PartyId!.Value).Distinct().ToList();
         var roles = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(p => apArIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.PartyRole, ct).ConfigureAwait(false);
+        // DT-262: what documents posted (automatic entries, not the opening entry) and the manual / opening entries on each control account.
+        var posted = await db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= asOf
+                && !l.JournalEntry.IsManual && l.JournalEntry.SourceType != AccountingCodes.SourceOpening)
+            .GroupBy(l => l.AccountId).Select(g => new { g.Key, B = g.Sum(l => l.Debit - l.Credit) }).ToDictionaryAsync(x => x.Key, x => x.B, ct).ConfigureAwait(false);
+        var gapLines = await db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= asOf
+                && (l.JournalEntry.IsManual || l.JournalEntry.SourceType == AccountingCodes.SourceOpening))
+            .GroupBy(l => new { l.AccountId, l.JournalEntryId }).Select(g => new GapLine(g.Key.AccountId, g.Key.JournalEntryId, g.Sum(l => l.Debit - l.Credit)))
+            .ToListAsync(ct).ConfigureAwait(false);
+        var gapEntryIds = gapLines.Select(g => g.JournalEntryId).Distinct().ToList();
+        var entries = await db.Set<JournalEntry>().AsNoTracking().Where(e => gapEntryIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
         bool Matches(Account a, string? module, string? type, long? id) =>
             module is not null && type is not null && id is long pid && PostingEngine.PartyMatches(a.ControlPartyType, new PostingParty(module, type, pid), roles);
 
@@ -594,13 +604,30 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                     l.SourceType is not null && l.SourceId is long sid && docs.TryGetValue((l.SourceModule, l.SourceType, sid), out var d) ? d : null,
                     l.Debit, l.Credit, l.PartyId is null ? "noParty" : "wrongPartyType")).ToList();
             }
-            var documents = await DocumentBalanceAsync(a, asOf, ct).ConfigureAwait(false);
+            // DT-262: documents figures for every control account — rebuilt from the documents, or (where they cannot rebuild it) what documents posted.
+            var rebuilt = await DocumentBalanceAsync(a, asOf, ct).ConfigureAwait(false);
+            var documents = rebuilt ?? posted.GetValueOrDefault(a.Id);
+            var mineGap = gapLines.Where(g => g.AccountId == a.Id).ToList();
+            var manual = mineGap.Where(g => entries[g.JournalEntryId].IsManual).Sum(g => g.B);
+            var opening = mineGap.Where(g => !entries[g.JournalEntryId].IsManual).Sum(g => g.B);
+            var gapList = mineGap.Select(g => (Line: g, Entry: entries[g.JournalEntryId]))
+                .Where(x => x.Line.B != 0 && x.Entry.Status == AccountingCodes.Posted && x.Entry.ReversesEntryId is null)
+                .OrderBy(x => x.Entry.EntryDate).ThenBy(x => x.Entry.Number, StringComparer.Ordinal).Take(MaxUnmatchedPerAccount)
+                .Select(x => new DocumentGapEntry(x.Entry.EntryDate, new EntryLinkRef(support.Token<JournalEntry>(x.Entry.PublicId), x.Entry.Number), x.Entry.Description,
+                    x.Entry.IsManual ? AccountingCodes.SourceManual : AccountingCodes.SourceOpening, x.Line.B)).ToList();
+            var documentDifference = ledger - documents;
             result.Add(new ReconciliationRow(chart.Ref(a), a.ControlPartyType ?? string.Empty, ledger, partySum, ledger - partySum,
-                matched.Where(g => g.B != 0).Select(g => (g.PartyType, g.PartyId)).Distinct().Count(), unmatched, documents, documents is decimal fromDocuments ? ledger - fromDocuments : null));
+                matched.Where(g => g.B != 0).Select(g => (g.PartyType, g.PartyId)).Distinct().Count(), unmatched, documents, documentDifference,
+                rebuilt is not null, manual, opening, documentDifference - manual - opening, gapList));
         }
         var pending = await db.Set<PendingPosting>().AsNoTracking().CountAsync(p => p.ResolvedAt == null, ct).ConfigureAwait(false);
-        return new ReconciliationReport(asOf, result, result.All(r => r.Difference == 0 && r.DocumentDifference is null or 0), pending);
+        var partiesMatch = result.All(r => r.Difference == 0);
+        var level = !partiesMatch ? ReconciliationLevels.Differences
+            : result.Any(r => r.DocumentDifference is not null and not 0) ? ReconciliationLevels.Documents : ReconciliationLevels.Ok;
+        return new ReconciliationReport(asOf, result, partiesMatch, pending, level);
     }
+
+    private sealed record GapLine(long AccountId, long JournalEntryId, decimal B);
 
     private static string[] AllowedTypes(string? controlType) => controlType switch
     {

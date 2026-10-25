@@ -27,6 +27,16 @@ public sealed class FakeGraph : HttpMessageHandler
 
     public int TokenRequests => _tokenRequests;
 
+    private int _held;
+
+    /// <summary>
+    /// While set, every sendMail waits for it to complete (DT-261: settings changed, or a second test sent, while a test email is on its way);
+    /// <see cref="Held"/> counts the sendMail calls waiting so far.
+    /// </summary>
+    public TaskCompletionSource? Hold { get; set; }
+
+    public int Held => Volatile.Read(ref _held);
+
     /// <summary>The next sendMail calls answer these, in order; afterwards 202 Accepted.</summary>
     public void Answer(HttpStatusCode status, string? code = null, TimeSpan? retryAfter = null) => _sendAnswers.Enqueue((status, code, retryAfter));
 
@@ -34,6 +44,8 @@ public sealed class FakeGraph : HttpMessageHandler
     {
         TokenRefusal = null;
         TenantWideMailSend = false;
+        Hold = null;
+        _held = 0;
         _sendAnswers.Clear();
         Sent.Clear();
     }
@@ -66,6 +78,11 @@ public sealed class FakeGraph : HttpMessageHandler
         }
         if (request.Method == HttpMethod.Post && path.EndsWith("/sendMail", StringComparison.Ordinal))
         {
+            if (Hold is { } hold)
+            {
+                Interlocked.Increment(ref _held);
+                await hold.Task.WaitAsync(TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+            }
             var body = await request.Content!.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var mailbox = Uri.UnescapeDataString(path.Split('/')[^2]);
             if (_sendAnswers.TryDequeue(out var answer))

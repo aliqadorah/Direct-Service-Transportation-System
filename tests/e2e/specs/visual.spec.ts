@@ -856,6 +856,36 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await run.check(page, "rep22#driver-balances");
     run.assertClean();
   });
+
+  /**
+   * RPT-23 of 25 Oct (DT-262): manual entries on 110301 and 110302 — the control accounts match their parties, so an amber note (not the red
+   * banner), the help for every figure, the documents figures on every account, and the entries behind a documents difference opened.
+   */
+  test(`Visual — RPT-23 reconciliation (${lang})`, async ({ page }) => {
+    test.skip(!wanted("rpt23#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const run = new VisualRun(lang, "rpt23");
+    await enrol(page, lang, new VisualRun(lang, "rpt23-enrol", false));
+    const company = companyOf(page);
+    const { w } = await documents(page, company);
+    const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    const code = (x: string) => chart.find((a) => a.code === x)!.id;
+    const party = { type: "Customer", id: w.customer };
+    await api(page, "POST", c(company, "accounting/journal-entries"), { entryDate: today(), description: lang === "ar" ? "رصيد قديم" : "Old balance", lines: [
+      { accountId: code("110301"), debit: 200, credit: 0, costCentreId: null, party, note: null },
+      { accountId: code("4101"), debit: 0, credit: 200, costCentreId: null, party: null, note: null }] });
+    await api(page, "POST", c(company, "accounting/journal-entries"), { entryDate: today(), description: lang === "ar" ? "دفعة مقدمة من عميل" : "Advance from customer", lines: [
+      { accountId: code("110101"), debit: 200, credit: 0, costCentreId: null, party: null, note: null },
+      { accountId: code("110302"), debit: 0, credit: 200, costCentreId: null, party, note: null }] });
+    expect(await open(page, `/c/${company}/reports/financial?report=reconciliation`)).toBe(true);
+    await expect(page.locator("main .banner").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("main .banner.err")).toHaveCount(0);
+    await run.check(page, "rpt23#report", { full: true });
+    await page.locator("main button.linkbtn").first().click();
+    await expect(page.locator("main table a").first()).toBeVisible();
+    await run.check(page, "rpt23#entries", { full: true });
+    run.assertClean();
+  });
 }
 
 /**

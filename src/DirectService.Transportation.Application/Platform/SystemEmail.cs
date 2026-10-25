@@ -66,9 +66,13 @@ public static class EmailSettingStates
 /// <summary>A message ready to go: headers and both bodies (already drawn by the layout).</summary>
 public sealed record OutgoingEmail(string To, string Subject, string Html, string Text, string Template);
 
-/// <summary>How to send: the mode and its settings; the client secret is in clear text only in memory, for the call.</summary>
+/// <summary>
+/// How to send: the mode and its settings; the client secret is in clear text only in memory, for the call. <paramref name="FreshToken"/>
+/// (DT-261): ask Microsoft sign-in for a new token instead of one kept from an earlier email — a test email must prove that the app and its
+/// secret work now (a secret revoked in Entra would otherwise still "work" until the kept token expires).
+/// </summary>
 public sealed record EmailTransportSettings(string Mode, string SenderMailbox, string DisplayName, string? ReplyTo, string? EntraTenantId = null,
-    string? EntraClientId = null, string? ClientSecret = null);
+    string? EntraClientId = null, string? ClientSecret = null, bool FreshToken = false);
 
 /// <summary>
 /// The outcome of one attempt: sent, or the kind of error with its technical detail (no secrets), whether trying again later may help and how

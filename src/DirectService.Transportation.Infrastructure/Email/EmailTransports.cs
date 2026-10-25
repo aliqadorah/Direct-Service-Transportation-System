@@ -66,6 +66,9 @@ public sealed partial class GraphEmailTransport(IHttpClientFactory http, IOption
 
     public string Mode => EmailModes.Microsoft365;
 
+    /// <summary>Forgets every kept token (each next email asks Microsoft sign-in again); the API tests start each test with it.</summary>
+    public void ClearTokens() => _credentials.Clear();
+
     public async Task<EmailDeliveryResult> SendAsync(OutgoingEmail email, EmailTransportSettings settings, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(email);
@@ -78,14 +81,26 @@ public sealed partial class GraphEmailTransport(IHttpClientFactory http, IOption
         string token;
         try
         {
-            var credential = _credentials.GetOrAdd($"{tenant}|{client}|{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)))}", _ =>
-                new ClientSecretCredential(tenant, client, secret, new ClientSecretCredentialOptions
-                {
-                    AuthorityHost = new Uri(o.AuthorityHost),
-                    Transport = new HttpClientTransport(http.CreateClient(HttpClientName)),
-                    Retry = { MaxRetries = 0 },   // the outbox retries with its own back-off
-                }));
-            token = (await credential.GetTokenAsync(new TokenRequestContext([graph.GetLeftPart(UriPartial.Authority) + "/.default"]), ct).ConfigureAwait(false)).Token;
+            var key = $"{tenant}|{client}|{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)))}";
+            ClientSecretCredential New() => new(tenant, client, secret, new ClientSecretCredentialOptions
+            {
+                AuthorityHost = new Uri(o.AuthorityHost),
+                Transport = new HttpClientTransport(http.CreateClient(HttpClientName)),
+                Retry = { MaxRetries = 0 },   // the outbox retries with its own back-off
+            });
+            // DT-261: a test email never uses a kept token; the new credential (and its token) then replaces the kept one. A refused
+            // sign-in drops the kept one, so queued emails meet the problem too instead of riding on an old token.
+            var credential = settings.FreshToken ? New() : _credentials.GetOrAdd(key, _ => New());
+            try
+            {
+                token = (await credential.GetTokenAsync(new TokenRequestContext([graph.GetLeftPart(UriPartial.Authority) + "/.default"]), ct).ConfigureAwait(false)).Token;
+            }
+            catch (AuthenticationFailedException)
+            {
+                _credentials.TryRemove(key, out _);
+                throw;
+            }
+            if (settings.FreshToken) _credentials[key] = credential;
         }
         catch (AuthenticationFailedException ex)
         {

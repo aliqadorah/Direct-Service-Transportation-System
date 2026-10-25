@@ -228,7 +228,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
         var pending = await db.Set<SystemEmailSetting>().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Pending, ct).ConfigureAwait(false);
         var active = await db.Set<SystemEmailSetting>().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Active, ct).ConfigureAwait(false);
         var target = pending ?? active ?? Default(O);
-        var settings = ToTransport(target, protector, O);
+        var settings = ToTransport(target, protector, O) with { FreshToken = true };   // DT-261: proves the secret works now
         var transport = transports.Single(t => t.Mode == target.Mode);
         var message = EmailTemplates.TestEmail(address!, target.Mode == EmailModes.Microsoft365 ? "Microsoft 365" : "Development", settings.SenderMailbox,
             app.Value.PublicBaseUrl.TrimEnd('/') + "/console/system-email", ctx.Language == "en" ? "en" : "ar");
