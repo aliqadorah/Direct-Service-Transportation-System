@@ -84,8 +84,9 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             .ThrowIfInvalid();
         if (lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
 
-        var accountIds = await IdsAsync<Account>(lines.Select(l => l.AccountId), ct).ConfigureAwait(false);
+        var accountIds = await IdsAsync<Account>(lines.Select(l => l.AccountId).Concat(lines.Select(l => l.TaxAccountId)), ct).ConfigureAwait(false);
         var centreIds = await IdsAsync<CostCentre>(lines.Select(l => l.CostCentreId), ct).ConfigureAwait(false);
+        var taxCodeIds = await IdsAsync<TaxCode>(lines.Select(l => l.TaxCodeId), ct).ConfigureAwait(false);
         var posting = new List<PostingLine>(lines.Count);
         for (var i = 0; i < lines.Count; i++)
         {
@@ -100,7 +101,13 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
                 centreId = cc;
             }
             var party = await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false);
-            posting.Add(new PostingLine(null, accountId, l.Debit, l.Credit, centreId, party, l.Note));
+            // DT-255: the tax code and tax account; the engine checks them (active code, tax account for a rate above 0 %) and adds the tax line.
+            long? taxCodeId = null, taxAccountId = null;
+            if (!string.IsNullOrEmpty(l.TaxCodeId))
+                taxCodeId = taxCodeIds.TryGetValue(l.TaxCodeId, out var tc) ? tc : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+            if (taxCodeId is not null && !string.IsNullOrEmpty(l.TaxAccountId))
+                taxAccountId = accountIds.TryGetValue(l.TaxAccountId, out var ta) ? ta : throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+            posting.Add(new PostingLine(null, accountId, l.Debit, l.Credit, centreId, party, l.Note, l.Reference, taxCodeId, taxAccountId));
         }
         return new PostingRequest(r.EntryDate!.Value, r.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true, posting, r.Reference);
     }
@@ -195,12 +202,14 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             new(L("يدوي", "Manual")), new(L("الحالة", "Status")), new(L("السطر", "Line"), ReportValue.Number), new(L("رمز الحساب", "Account code")),
             new(L("الحساب", "Account")), new(L("مدين", "Debit"), ReportValue.Money), new(L("دائن", "Credit"), ReportValue.Money), new(L("مركز الكلفة", "Cost centre")),
             new(L("الطرف", "Party")), new(L("ملاحظة", "Note")),
+            new(L("مرجع السطر", "Line reference")), new(L("رمز الضريبة", "Tax code")), new(L("الضريبة", "Tax"), ReportValue.Money), new(L("سطر ضريبة آلي", "Automatic tax line")),
         ];
         var rows = entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)
         [
             e.Number, e.EntryDate, e.Description, e.Reference, e.Source is null ? null : $"{e.Source.Type} {e.Source.Number}".Trim(), e.IsManual, e.Status,
             l.LineNo, l.Account.Code, en ? l.Account.NameEn ?? l.Account.NameAr : l.Account.NameAr, l.Debit, l.Credit, l.CostCentre?.Name,
             l.Party?.Name, l.Note,
+            l.Reference, l.TaxCode?.Code, l.TaxAmount, l.TaxForLineNo is int src ? L($"للسطر {src}", $"for line {src}") : null,
         ])).ToList();
         var filters = new List<(string, string)>();
         if (q.PeriodFrom is not null || q.PeriodTo is not null) filters.Add((L("الفترة", "Period"), $"{q.PeriodFrom ?? "…"} – {q.PeriodTo ?? "…"}"));
@@ -232,7 +241,9 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         if (TextNormalizer.CleanText(q.Search) is { } search)
         {
             var code = TextNormalizer.CleanCode(search) ?? search;
-            query = query.Where(e => e.Number.Contains(code) || e.Description.Contains(search) || (e.Reference != null && e.Reference.Contains(search)));
+            // DT-254: the entry's reference or any line reference.
+            query = query.Where(e => e.Number.Contains(code) || e.Description.Contains(search) || (e.Reference != null && e.Reference.Contains(search))
+                || e.Lines.Any(l => l.Reference != null && l.Reference.Contains(search)));
         }
         if (!string.IsNullOrWhiteSpace(q.SourceType)) query = query.Where(e => e.SourceType == q.SourceType);
         if (!string.IsNullOrEmpty(q.AccountId))
@@ -280,9 +291,12 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         var lines = await db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.JournalEntryId))
             .Select(l => new
             {
-                l.JournalEntryId, l.LineNo, l.Debit, l.Credit, l.PartyModule, l.PartyType, l.PartyId, l.Note,
+                l.JournalEntryId, l.LineNo, l.Debit, l.Credit, l.PartyModule, l.PartyType, l.PartyId, l.Note, l.Reference, l.TaxRate, l.TaxAmount,
                 Account = new { l.Account.PublicId, l.Account.Code, l.Account.NameAr, l.Account.NameEn },
                 Centre = l.CostCentre == null ? null : new { l.CostCentre.PublicId, l.CostCentre.Code, l.CostCentre.Name },
+                TaxCode = l.TaxCode == null ? null : new { l.TaxCode.PublicId, l.TaxCode.Code, l.TaxCode.Rate, l.TaxCode.NameAr, l.TaxCode.NameEn },
+                TaxAccount = l.TaxAccount == null ? null : new { l.TaxAccount.PublicId, l.TaxAccount.Code, l.TaxAccount.NameAr, l.TaxAccount.NameEn },
+                TaxForLineNo = l.TaxForLine == null ? (int?)null : l.TaxForLine.LineNo,
             })
             .ToListAsync(ct).ConfigureAwait(false);
         var creatorIds = entries.Where(e => e.Entry.CreatedBy is not null).Select(e => e.Entry.CreatedBy!.Value).Distinct().ToList();
@@ -298,7 +312,11 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
                 l.Centre is null ? null : new Ref(tokens.Encode<CostCentre>(l.Centre.PublicId), $"{l.Centre.Code} – {l.Centre.Name}"),
                 l.PartyType is null || l.PartyId is null ? null
                     : partyNames.GetValueOrDefault((l.PartyType, l.PartyId.Value)) ?? new PartyResponse(l.PartyModule ?? string.Empty, l.PartyType, null, null),
-                l.Note)).ToList());
+                l.Note, l.Reference,
+                l.TaxCode is null ? null : new TaxCodeRef(tokens.Encode<TaxCode>(l.TaxCode.PublicId), l.TaxCode.Code, l.TaxCode.Rate, l.TaxCode.NameAr, l.TaxCode.NameEn),
+                l.TaxRate, l.TaxAmount,
+                l.TaxAccount is null ? null : new AccountRef(tokens.Encode<Account>(l.TaxAccount.PublicId), l.TaxAccount.Code, l.TaxAccount.NameAr, l.TaxAccount.NameEn),
+                l.TaxForLineNo)).ToList());
 
         var entryById = entries.ToDictionary(x => x.Entry.Id);
         return ids.Select(id => entryById[id]).Select(x =>

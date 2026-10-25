@@ -73,6 +73,15 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
   const billReturn = await api<{ return: { id: string } }>(page, "POST", c(company, "apar/returns"), { documentId: bill.document.id, returnDate: today(), amount: 300, reason: "Visual return / مرتجع" });
   const draft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-drafts"),
     { entryDate: today(), description: "Visual draft / مسودة", reference: "REF-1001", lines: [] });
+  // Owner request 25 Oct 2026 (DT-254, DT-255): a draft with line references and VAT 16 % on the expense line (tax account: input VAT 1105),
+  // so the journal form shows taxed lines, their totals and the automatic tax line it will post.
+  const taxCodes = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/tax-codes/options"));
+  const vat16 = taxCodes.find((x) => x.code === "VAT_JO_16")!.id;
+  const taxDraft = await api<{ id: string }>(page, "POST", c(company, "accounting/journal-drafts"), {
+    entryDate: today(), description: "Office supplies / قرطاسية", reference: "INV-2210", lines: [
+      { accountId: code("5299"), debit: 100, credit: 0, costCentreId: null, party: null, note: null, reference: "INV-2210", taxCodeId: vat16, taxAccountId: code("1105") },
+      { accountId: code("110101"), debit: 0, credit: 116, costCentreId: null, party: null, note: null, reference: "PAY-77", taxCodeId: null, taxAccountId: null },
+    ] });
   // Revision 6 part B: an approved budget of this year (revenue, a parent expense account and a posting account) for the budget page,
   // Budget vs Actual and the dashboard's budget usage; a journal template for the templates list.
   const year = Number(today().slice(0, 4));
@@ -94,6 +103,7 @@ async function documents(page: Page, company: string): Promise<{ w: World; ids: 
       receipt: await first("receipts", (j) => j.page.items),
       journal: await first("accounting/journal-entries?status=Posted", (j) => j.items),
       draft: draft.id,
+      taxDraft: taxDraft.id,
       statement: statementAccounts,
       bill: bill.document.id,
       billReturn: billReturn.return.id,
@@ -124,7 +134,7 @@ function companyRoutes(company: string, w: World, ids: Record<string, string | n
     "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, `masters/drivers/${w.driver}/edit`, "masters/customers", "masters/partners",
     "masters/materials", "masters/loading-sites", "masters/unloading-sites", "masters/ownership-types", "masters/tariffs", "masters/monthly-rates",
     "masters/import/customers",
-    "settings/company", "settings/mapping", "settings/numbering", "settings/e-invoicing", "settings/invoice-layout", "settings/fields", "settings/users",
+    "settings/company", "settings/mapping", "settings/numbering", "settings/tax-codes", "settings/e-invoicing", "settings/invoice-layout", "settings/fields", "settings/users",
     "settings/audit-log",
     "help", ...HelpTopics.All.map((t) => `help/${t}`),
   ].filter((x): x is string => x !== null).map((x) => `/c/${company}${x ? `/${x}` : ""}`)
@@ -213,7 +223,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
   test(`Visual — every company and tenant screen (${lang})`, async ({ page }) => {
     const states = (company: string, w: World, ids: Record<string, string | null>) => companyStates(ids, w).filter((x) => wanted(x.name, x.route));
     {
-      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", statement: "s", bill: "b", billReturn: "br" };
+      const ids = { trip: "t", invoice: "i", receipt: "r", journal: "j", advance: "a", draft: "d", taxDraft: "td", statement: "s", bill: "b", billReturn: "br" };
       const w = { driver: "d" } as World;
       const any = companyRoutes("x", w, ids).some((r) => wanted(r.replace("/c/x", "") || "dashboard")) || companyStates(ids, w).some((x) => wanted(x.name, x.route));
       test.skip(!any, "not among VISUAL_ONLY");
@@ -368,6 +378,8 @@ function companyPopups(ids: Record<string, string | null>, w: World, roleName: s
     { name: "tariffs#new", route: "masters/tariffs", open: header("tar.new") },
     { name: "fields#new", route: "settings/fields", open: header("fld.newCustom") },
     { name: "numbering#edit", route: "settings/numbering", open: firstRow },
+    // Owner request 25 Oct 2026 (DT-257): Settings → Tax codes and its edit dialog.
+    { name: "tax-codes#edit", route: "settings/tax-codes", open: firstRow },
     { name: "company#migration", route: "settings/company", optional: true, open: async (p, t) => {
       await p.getByRole("tab", { name: t("set.operations") }).click(); await button(p.locator("main"), t("set.migrationComplete")).click(); } },
     { name: "trips-list#columns", route: "trips/list", open: header("cols.title") },
@@ -419,6 +431,17 @@ function companyStates(ids: Record<string, string | null>, w: World): State[] {
     { name: "journal-new#account-list", route: "accounting/journal/new", act: async (p) => {
       const combo = p.locator("main table [role=combobox]").first(); await combo.click(); await combo.press("ArrowDown");
       await expect(p.locator("[role=listbox]").first()).toBeVisible(); } },
+    // Owner request 25 Oct 2026 (DT-254, DT-255): a journal entry with taxed lines, with the tax code list and the tax account list open.
+    ...(ids.taxDraft ? [
+      { name: "journal-tax#lines", route: `accounting/journal/drafts/${ids.taxDraft}`, act: async (p: Page) => {
+        await expect(p.locator("main table tr.auto").first()).toBeVisible(); } },
+      { name: "journal-tax#tax-code-list", route: `accounting/journal/drafts/${ids.taxDraft}`, act: async (p: Page, t: Text) => {
+        const combo = p.getByLabel(t("je.lineTaxCode", 1), { exact: true }); await combo.click(); await combo.press("ArrowDown");
+        await expect(p.locator("[role=listbox]").first()).toBeVisible(); } },
+      { name: "journal-tax#tax-account-list", route: `accounting/journal/drafts/${ids.taxDraft}`, act: async (p: Page, t: Text) => {
+        const combo = p.getByLabel(t("je.lineTaxAccount", 1), { exact: true }); await combo.click(); await combo.press("ArrowDown");
+        await expect(p.locator("[role=listbox]").first()).toBeVisible(); } },
+    ] : []),
     // Field configuration (SCR-75): the Drivers tab (long form preview) and the Customers tab.
     { name: "fields#drivers", route: "settings/fields", act: async (p, t) => { await p.getByRole("tab", { name: t("nav.drivers") }).click(); await expect(p.locator(".sk")).toHaveCount(0); } },
     { name: "fields#customers", route: "settings/fields", act: async (p, t) => { await p.getByRole("tab", { name: t("nav.customers") }).click(); await expect(p.locator(".sk")).toHaveCount(0); } },

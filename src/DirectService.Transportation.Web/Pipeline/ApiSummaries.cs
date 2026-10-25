@@ -162,6 +162,16 @@ internal static class ApiSummaries
         ["GET /api/v1/companies/{company}/accounting/journal-templates/{template}/history"] = "History of a journal entry template",
         ["PUT /api/v1/companies/{company}/accounting/journal-templates/{template}"] = "Edit or rename a journal entry template",
         ["POST /api/v1/companies/{company}/accounting/journal-templates/{template}/delete"] = "Delete a journal entry template",
+        // Tax codes (owner request 25 Oct 2026, DT-257)
+        ["GET /api/v1/companies/{company}/accounting/tax-codes/options"] = "Active tax codes for journal lines (code, rate, descriptions)",
+        ["GET /api/v1/companies/{company}/accounting/tax-codes/"] = "List the tax codes of Settings → Tax codes, with whether each is used on posted entries",
+        ["GET /api/v1/companies/{company}/accounting/tax-codes/{taxCode}/history"] = "History of a tax code",
+        ["POST /api/v1/companies/{company}/accounting/tax-codes/"] = "Add a tax code: code, rate %, Arabic and English description, order",
+        ["PUT /api/v1/companies/{company}/accounting/tax-codes/{taxCode}"] = "Edit a tax code (the code and rate cannot change once it is used on posted entries)",
+        ["POST /api/v1/companies/{company}/accounting/tax-codes/{taxCode}/deactivate"] = "Deactivate a tax code (no longer offered; posted lines keep it)",
+        ["POST /api/v1/companies/{company}/accounting/tax-codes/{taxCode}/activate"] = "Activate a tax code again",
+        ["POST /api/v1/companies/{company}/accounting/tax-codes/{taxCode}/delete"] = "Delete a tax code that no posted entry uses",
+        ["POST /api/v1/companies/{company}/accounting/accounts/default-tax-accounts"] = "Add the default tax accounts (VAT on sales, VAT on purchases, VAT expenses) or mark the template ones",
         // Budgets (revision 6 part B)
         ["GET /api/v1/companies/{company}/accounting/budgets/"] = "List the company's budgets (optionally of one year) with status and revenue / expense totals",
         ["POST /api/v1/companies/{company}/accounting/budgets/"] = "Create a draft budget of a year: empty, or copied from the previous year's actuals with an optional percentage",

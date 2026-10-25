@@ -36,7 +36,10 @@ public sealed class AccountingUnitTests
     {
         var codes = ChartTemplate.Accounts.Select(a => a.Code).ToList();
         Assert.Equal(codes.Count, codes.Distinct().Count());
-        Assert.Equal(48, codes.Count);   // revision 6: + 4105 Supplier deductions income
+        Assert.Equal(49, codes.Count);   // revision 6: + 4105 Supplier deductions income; DT-256: + 5207 VAT expenses
+        // DT-256: input VAT, output VAT and VAT expenses are the template's tax accounts, none of them a control account.
+        Assert.Equal(["1105", "2104", "5207"], ChartTemplate.Accounts.Where(a => a.IsTax).Select(a => a.Code).Order(StringComparer.Ordinal));
+        Assert.All(ChartTemplate.Accounts.Where(a => a.IsTax), a => Assert.Null(a.ControlPartyType));
         var seen = new Dictionary<string, ChartTemplate.TemplateAccount>();
         foreach (var a in ChartTemplate.Accounts)
         {

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Configuration;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
@@ -12,7 +14,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// rule: per-company data is created by the application, not by a migration):
 /// built-in ownership type "Company" (own fleet, FR-161), the TRN.* operation settings with their
 /// defaults (7.9.1) and the market formats, the 12 number sequences (D-16), the e-invoicing settings
-/// row (disabled, FR-059) and the two invoice layouts (FR-054). The chart of accounts is created
+/// row (disabled, FR-059), the two invoice layouts (FR-054) and the default tax codes of journal lines (DT-257). The chart of accounts is created
 /// only when chosen in onboarding (template awaiting approval, D-10).
 /// </summary>
 public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scope)
@@ -50,6 +52,9 @@ public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scop
             });
 
         db.Set<EInvoiceSettings>().Add(new EInvoiceSettings { TenantId = t, CompanyId = c, IsEnabled = false });
+
+        foreach (var d in JournalTax.Defaults)
+            db.Set<TaxCode>().Add(new TaxCode { TenantId = t, CompanyId = c, Code = d.Code, Rate = d.Rate, NameAr = d.NameAr, NameEn = d.NameEn, SortOrder = d.SortOrder });
 
         var columns = JsonSerializer.Serialize(DefaultAnnexColumns);
         var signatures = JsonSerializer.Serialize(DefaultSignatures);

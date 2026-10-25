@@ -93,7 +93,7 @@ for (const lang of ["ar", "en"] as Lang[]) {
       "reports/operational", "reports/financial", "reports/builder", "reports/saved",
       "masters/drivers", "masters/drivers/new", `masters/drivers/${w.driver}`, "masters/customers", "masters/partners", "masters/materials",
       "masters/loading-sites", "masters/unloading-sites", "masters/ownership-types", "masters/tariffs", "masters/monthly-rates", "masters/import/customers",
-      "settings/company", "settings/mapping", "settings/numbering", "settings/e-invoicing", "settings/invoice-layout", "settings/fields", "settings/users",
+      "settings/company", "settings/mapping", "settings/numbering", "settings/tax-codes", "settings/e-invoicing", "settings/invoice-layout", "settings/fields", "settings/users",
       "settings/audit-log", "help", "help/setup", "help/invoicing",
     ].filter((r): r is string => r !== null).map((r) => `/c/${company}${r ? `/${r}` : ""}`);
     routes.push("/tenant/subscription", "/tenant/companies", "/tenant/export", "/tenant/support-access");

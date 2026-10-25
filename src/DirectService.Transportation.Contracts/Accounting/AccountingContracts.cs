@@ -13,14 +13,15 @@ public sealed record AccountRef(string Id, string Code, string NameAr, string? N
 public sealed record AccountResponse(
     string Id, string Code, string NameAr, string? NameEn, string AccountType, string? ParentId, string? ParentCode, int Level,
     bool IsPostable, bool HasChildren, decimal OpeningDebit, decimal OpeningCredit, bool IsControlAccount, string? ControlPartyType,
-    string Status, string RowVersion);
+    string Status, string RowVersion, bool IsTaxAccount = false);
 
-/// <summary>An active postable account for pick lists, with its type and whether lines on it need a party (control account).</summary>
-public sealed record AccountOption(AccountRef Account, string AccountType, bool IsControlAccount, string? ControlPartyType);
+/// <summary>An active postable account for pick lists, with its type, whether lines on it need a party (control account) and whether it is a
+/// tax account (offered as the tax account of journal lines, DT-256).</summary>
+public sealed record AccountOption(AccountRef Account, string AccountType, bool IsControlAccount, string? ControlPartyType, bool IsTaxAccount = false);
 
 public sealed record AccountRequest(
     string? Code, string? NameAr, string? NameEn, string? AccountType, string? ParentId, bool IsPostable,
-    bool IsControlAccount, string? ControlPartyType, string? RowVersion);
+    bool IsControlAccount, string? ControlPartyType, string? RowVersion, bool IsTaxAccount = false);
 
 public sealed record MoveAccountRequest(string? ParentId, string? RowVersion);
 
@@ -31,6 +32,23 @@ public sealed record StatusChangeRequest(string? RowVersion);
 
 /// <summary>Accounts, cash box and posting keys created from the built-in transport template (FR-107, D-10).</summary>
 public sealed record ChartTemplateResult(int Accounts, int CashBoxes, int PostingKeys);
+
+/// <summary>
+/// "Add the default tax accounts" (DT-256): VAT on sales (liability), VAT on purchases (asset) and VAT expenses (expense). For each kind without a
+/// tax account, the template account with its code is marked when it is there, otherwise a new account is added with the next free code
+/// under the right group. <paramref name="Accounts"/> are the tax accounts added or marked.
+/// </summary>
+public sealed record DefaultTaxAccountsResult(int Added, int Marked, IReadOnlyList<AccountRef> Accounts);
+
+// ---------------------------------------------------------------- tax codes (owner request 25 Oct 2026, DT-257)
+
+/// <summary>A tax code of Settings → Tax codes; <paramref name="InUse"/> = on posted journal lines (no delete, no rate change).</summary>
+public sealed record TaxCodeResponse(string Id, string Code, decimal Rate, string NameAr, string? NameEn, string Status, int SortOrder, bool InUse, string RowVersion);
+
+public sealed record TaxCodeRequest(string? Code, decimal? Rate, string? NameAr, string? NameEn, int? SortOrder, string? RowVersion);
+
+/// <summary>A tax code on a line or in a pick list.</summary>
+public sealed record TaxCodeRef(string Id, string Code, decimal Rate, string NameAr, string? NameEn);
 
 // ---------------------------------------------------------------- imports (FR-109, FR-114; ADR-13)
 
@@ -114,7 +132,13 @@ public sealed record PartyRequest(string? Type, string? Id);
 
 public sealed record PartyResponse(string Module, string Type, string? Id, string? Name);
 
-public sealed record JournalLineRequest(string? AccountId, decimal Debit, decimal Credit, string? CostCentreId, PartyRequest? Party, string? Note);
+/// <summary>
+/// A manual journal line. Debit or credit is the amount <b>before</b> tax (DT-255). <paramref name="Reference"/> is the line reference (DT-254;
+/// empty = the entry's Reference); <paramref name="TaxCodeId"/> a tax code; <paramref name="TaxAccountId"/> the tax account, required for a rate above 0 %
+/// — posting adds the tax on the same side to that account as an automatic line.
+/// </summary>
+public sealed record JournalLineRequest(string? AccountId, decimal Debit, decimal Credit, string? CostCentreId, PartyRequest? Party, string? Note,
+    string? Reference = null, string? TaxCodeId = null, string? TaxAccountId = null);
 
 /// <summary>A manual entry; <paramref name="Reference"/> is the free-text reference (المرجع, up to 100 characters, revision 6).</summary>
 public sealed record ManualEntryRequest(DateOnly? EntryDate, string? Description, IReadOnlyList<JournalLineRequest>? Lines, string? RowVersion,
@@ -126,7 +150,8 @@ public sealed record JournalDraftResponse(
     decimal TotalDebit, decimal TotalCredit, DateTime CreatedAt, string? CreatedBy, string RowVersion);
 
 /// <summary>A draft line as entered (account, cost centre and party may still be missing).</summary>
-public sealed record JournalDraftLineResponse(AccountRef? Account, decimal Debit, decimal Credit, Ref? CostCentre, PartyResponse? Party, string? Note);
+public sealed record JournalDraftLineResponse(AccountRef? Account, decimal Debit, decimal Credit, Ref? CostCentre, PartyResponse? Party, string? Note,
+    string? Reference = null, TaxCodeRef? TaxCode = null, AccountRef? TaxAccount = null);
 
 public sealed record VoidRequest(string? Reason, string? RowVersion);
 
@@ -135,7 +160,7 @@ public sealed record RowVersionRequest(string? RowVersion);
 
 /// <summary>
 /// Journal list filters (FR-102, FR-115). Months are YYYY-MM; status: Posted, Reversed, Void, or Draft (revision 6: drafts only; with no
-/// status, drafts are listed first). <paramref name="Search"/> matches the number, the description or the reference.
+/// status, drafts are listed first). <paramref name="Search"/> matches the number, the description, the entry's reference or a line reference (DT-254).
 /// </summary>
 public sealed record JournalQuery(
     string? PeriodFrom, string? PeriodTo, string? Number, string? AccountId, string? CostCentreId, string? PartyType, string? PartyId,
@@ -159,8 +184,14 @@ public sealed record EntryLinkRef(string Id, string Number);
 /// <summary>The document that posted an automatic entry (FR-097): its type, number and URL token for the link.</summary>
 public sealed record SourceDocumentRef(string Module, string Type, string? Id, string? Number);
 
+/// <summary>
+/// An entry line. A taxed line (DT-255) has its <paramref name="TaxCode"/>, rate, tax amount and tax account (the amount is before tax; gross =
+/// amount + tax); an automatic tax line has <paramref name="TaxForLineNo"/> = the line whose tax it carries, and the code and rate it used.
+/// </summary>
 public sealed record JournalLineResponse(
-    int LineNo, AccountRef Account, decimal Debit, decimal Credit, Ref? CostCentre, PartyResponse? Party, string? Note);
+    int LineNo, AccountRef Account, decimal Debit, decimal Credit, Ref? CostCentre, PartyResponse? Party, string? Note,
+    string? Reference = null, TaxCodeRef? TaxCode = null, decimal? TaxRate = null, decimal? TaxAmount = null, AccountRef? TaxAccount = null,
+    int? TaxForLineNo = null);
 
 /// <summary>Printable journal voucher data (FR-103): lines, totals, amount in words (BR-024) and signature captions.</summary>
 public sealed record JournalVoucherResponse(

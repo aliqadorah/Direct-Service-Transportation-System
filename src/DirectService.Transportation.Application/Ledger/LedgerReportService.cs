@@ -135,6 +135,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var lines = db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
         if (costCentreId is long cc) lines = lines.Where(l => l.CostCentreId == cc);
         if (party is not null) lines = lines.Where(l => l.PartyModule == party.Module && l.PartyType == party.Type && l.PartyId == party.Id);
+        lines = ByReference(lines, q.Reference);
         var opening = await lines.Where(l => l.JournalEntry.EntryDate < from).SumAsync(l => l.Debit - l.Credit, ct).ConfigureAwait(false);
         var period = lines.Where(l => l.JournalEntry.EntryDate >= from);
         var totals = await period.GroupBy(_ => 1).Select(g => new { D = g.Sum(l => l.Debit), C = g.Sum(l => l.Credit), N = g.Count() }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
@@ -161,7 +162,13 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     private static IQueryable<LineRow> Project(IQueryable<EntryLine> q) => q.Select(l => new LineRow(l.Id, l.JournalEntry.EntryDate, l.JournalEntry.PublicId, l.JournalEntry.Number,
         l.JournalEntry.Description, l.JournalEntry.SourceModule, l.JournalEntry.SourceType, l.JournalEntry.SourceId, l.AccountId, l.PartyType, l.PartyId,
         l.CostCentre != null ? l.CostCentre.PublicId : null, l.CostCentre != null ? l.CostCentre.Code : null, l.CostCentre != null ? l.CostCentre.Name : null, l.Note,
-        l.Debit, l.Credit, l.JournalEntry.Reference));
+        l.Debit, l.Credit, l.Reference ?? l.JournalEntry.Reference));
+
+    /// <summary>DT-254: only the lines whose line reference or entry reference contains the text (like the cost-centre filter, also for the opening).</summary>
+    private static IQueryable<EntryLine> ByReference(IQueryable<EntryLine> lines, string? reference) =>
+        Common.TextNormalizer.CleanText(reference) is { } r
+            ? lines.Where(l => (l.Reference != null && l.Reference.Contains(r)) || (l.JournalEntry.Reference != null && l.JournalEntry.Reference.Contains(r)))
+            : lines;
 
     /// <summary>Entry, source document, account, party and cost-centre references for a page of lines.</summary>
     private async Task<Func<LineRow, decimal, LedgerLine>> DescribeAsync(IReadOnlyList<LineRow> rows, Dictionary<long, Node> tree, CancellationToken ct)
@@ -244,6 +251,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var lines = db.Set<EntryLine>().AsNoTracking().Where(l => all.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
         if (costCentreId is long cc) lines = lines.Where(l => l.CostCentreId == cc);
         if (party is not null) lines = lines.Where(l => l.PartyModule == party.Module && l.PartyType == party.Type && l.PartyId == party.Id);
+        lines = ByReference(lines, q.Reference);
         var openings = await lines.Where(l => l.JournalEntry.EntryDate < from).GroupBy(l => l.AccountId).Select(g => new { g.Key, B = g.Sum(l => l.Debit - l.Credit) })
             .ToDictionaryAsync(x => x.Key, x => x.B, ct).ConfigureAwait(false);
         var rows = await Project(lines.Where(l => l.JournalEntry.EntryDate >= from)

@@ -42,6 +42,13 @@
         </EmptyState>
     </Empty>
     <ChildContent>
+        @* DT-256: existing companies get no tax account automatically; the button adds (or marks) the three defaults. *@
+        @if (!_all.Any(a => a.IsTaxAccount && a.Status == "Active"))
+        {
+            <Banner Tone="Tone.Info" Icon="info" Text="@L["acc.noTaxAccounts"]">
+                <Actions>@if (CanSetup) {<Btn Small="true" Icon="plus" Text="@L["acc.addTaxAccounts"]" OnClick="() => _addingTax = true" />}</Actions>
+            </Banner>
+        }
         <div class="cols fill" style="grid-template-columns:1fr @(_editing ? "360px" : "0px");min-height:0">
             <ListFrame Label="@L["nav.chart"]">
                 <DataGrid TItem="AccountResponse" Items="Visible" Key="a => a.Id" Caption="@L["nav.chart"]" OnRowClick="Open" RowClass="@(a => a.Status == "Active" ? (a.Id == _model.Id ? "sel" : null) : "void")">
@@ -65,6 +72,7 @@
                         <GridColumn TItem="AccountResponse" Title="@L["acc.type"]" Value="@(a => L["acc.t." + a.AccountType])" />
                         <GridColumn TItem="AccountResponse" Title="@L["acc.kind"]" Value="@(a => L[a.IsPostable ? "acc.postable" : "acc.group"])" />
                         <GridColumn TItem="AccountResponse" Title="@L["acc.control"]" Value="@(a => a.IsControlAccount ? L["party." + a.ControlPartyType] : null)" />
+                        <GridColumn TItem="AccountResponse" Title="@L["acc.tax"]"><Template>@if (context.IsTaxAccount) {<Badge Tone="Tone.Info" Icon="percent" Text="@L["acc.tax"]" />}</Template></GridColumn>
                         <GridColumn TItem="AccountResponse" Title="@L["acc.openDebit"]" Value="@(a => a.OpeningDebit == 0 ? null : Fmt.Money(a.OpeningDebit))" Numeric="true" />
                         <GridColumn TItem="AccountResponse" Title="@L["acc.openCredit"]" Value="@(a => a.OpeningCredit == 0 ? null : Fmt.Money(a.OpeningCredit))" Numeric="true" />
                         <GridColumn TItem="AccountResponse" Title="@L["ml.status"]"><Template><StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" /></Template></GridColumn>
@@ -89,6 +97,7 @@
                         {
                             <SelectField TValue="string?" @bind-Value="_model.ControlPartyType" Options="PartyTypes" Label="@L["acc.partyType"]" Required="true" Disabled="!CanSetup" />
                         }
+                        <CheckField @bind-Value="_model.IsTaxAccount" Label="@L["acc.isTax"]" Disabled="@(!CanSetup || _model.IsControlAccount)" Help="@L["acc.isTaxHelp"]" />
                         @if (_model.Id is not null) {<p class="help" style="margin:0">@L.F("acc.openingsHere", Fmt.Money(_model.OpeningDebit), Fmt.Money(_model.OpeningCredit))</p>}
                         <div class="row" style="gap:6px;flex-wrap:wrap">
                             @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" Disabled="@(_lockedBy is not null)" />}
@@ -108,6 +117,8 @@
     </ChildContent>
 </StateView>
 
+<ConfirmDialog @bind-Open="_addingTax" Title="@L["acc.addTaxAccounts"]" ConfirmText="@L["acc.addTaxAccounts"]" Message="@L["acc.addTaxAccountsText"]"
+               Busy="_busy" Error="@_taxError" OnConfirm="_ => AddTaxAccounts()" />
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _model.Code ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
                Message="@L["acc.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="Delete" />
 
@@ -117,7 +128,8 @@
     private LoadState _state = LoadState.Loading;
     private string? _reference, _q, _deleteError;
     private string? _lockedBy;
-    private bool _showArchived, _editing, _busy, _deleting;
+    private bool _showArchived, _editing, _busy, _deleting, _addingTax;
+    private string? _taxError;
     private AccountModel _model = new();
     private EditContext _ctx = new(new AccountModel());
     private ProblemValidator? _problems;
@@ -217,6 +229,23 @@
         catch (ApiException) { }
     }
 
+    /// <summary>"Add the default tax accounts" (DT-256): VAT on sales, VAT on purchases, VAT expenses — added, or the template ones marked.</summary>
+    private async Task AddTaxAccounts()
+    {
+        _busy = true;
+        _taxError = null;
+        try
+        {
+            var r = await Api.PostAsync<DefaultTaxAccountsResult>(Api.C("accounting/accounts/default-tax-accounts"), new { });
+            _addingTax = false;
+            Toasts.Success(L.F("acc.taxAccountsAdded", r.Added, r.Marked));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { _taxError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
     private async Task Template()
     {
         _busy = true;
@@ -238,7 +267,8 @@
         try
         {
             var req = new AccountRequest(_model.Code?.Trim(), _model.NameAr?.Trim(), string.IsNullOrWhiteSpace(_model.NameEn) ? null : _model.NameEn.Trim(), _model.AccountType,
-                _model.ParentId, _model.IsPostable, _model.IsControlAccount, _model.IsControlAccount ? _model.ControlPartyType : null, _model.RowVersion);
+                _model.ParentId, _model.IsPostable, _model.IsControlAccount, _model.IsControlAccount ? _model.ControlPartyType : null, _model.RowVersion,
+                _model.IsTaxAccount && !_model.IsControlAccount);
             AccountResponse saved;
             if (_model.Id is null) saved = await Api.PostAsync<AccountResponse>(Api.C("accounting/accounts"), req);
             else
@@ -304,6 +334,7 @@
         public bool IsPostable { get; set; }
         public bool IsControlAccount { get; set; }
         public string? ControlPartyType { get; set; }
+        public bool IsTaxAccount { get; set; }
         public decimal OpeningDebit { get; set; }
         public decimal OpeningCredit { get; set; }
         public string Status { get; set; } = "Active";
@@ -313,7 +344,7 @@
         {
             Id = a.Id, Code = a.Code, NameAr = a.NameAr, NameEn = a.NameEn, AccountType = a.AccountType, ParentId = a.ParentId, IsPostable = a.IsPostable,
             IsControlAccount = a.IsControlAccount, ControlPartyType = a.ControlPartyType, OpeningDebit = a.OpeningDebit, OpeningCredit = a.OpeningCredit,
-            Status = a.Status, RowVersion = a.RowVersion,
+            Status = a.Status, RowVersion = a.RowVersion, IsTaxAccount = a.IsTaxAccount,
         };
     }
 }

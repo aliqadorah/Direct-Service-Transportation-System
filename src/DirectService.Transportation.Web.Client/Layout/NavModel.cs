@@ -112,6 +112,7 @@ public static class NavModel
             .. Part("nav.part.company",
               new("nav.companySettings", "building", "settings/company", PermissionKeys.SettingsManage),
               new("nav.numbering", "hash", "settings/numbering", PermissionKeys.SettingsManage),
+              new("nav.taxCodes", "percent", "settings/tax-codes", PermissionKeys.SettingsManage),   // DT-257
               new("nav.mapping", "link", "settings/mapping", PermissionKeys.SettingsManage),
               new("nav.einvoiceSettings", "qr", "settings/e-invoicing", PermissionKeys.SettingsManage),
               new("nav.layoutDesigner", "layout", "settings/invoice-layout", PermissionKeys.InvIssue),   // FR-055: the layout designer belongs to inv.issue

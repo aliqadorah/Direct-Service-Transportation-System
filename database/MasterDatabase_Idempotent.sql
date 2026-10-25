@@ -6855,3 +6855,679 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Settlements] DROP CONSTRAINT [CK_TRN_Settlements_NetPayable];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Advances] DROP CONSTRAINT [CK_TRN_Advances_CashBoxId_BankAccountId];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Advances] DROP CONSTRAINT [CK_TRN_Advances_PaymentMethod];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Settlements] ADD [CarriedForward] decimal(18,3) NOT NULL CONSTRAINT [DF_TRN_Settlements_CarriedForward] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Settlements] ADD [RepaidAmount] decimal(18,3) NOT NULL CONSTRAINT [DF_TRN_Settlements_RepaidAmount] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_PartnerPayments] ADD [Kind] varchar(10) NOT NULL CONSTRAINT [DF_TRN_PartnerPayments_Kind] DEFAULT ('Payment');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Advances] ADD [CarriedFromSettlementId] bigint NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Settlements] ADD CONSTRAINT [CK_TRN_Settlements_NetPayable] CHECK ([NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [RepaidAmount] + [CarriedForward])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Settlements] ADD CONSTRAINT [CK_TRN_Settlements_RepaidAmount_CarriedForward] CHECK ([RepaidAmount] >= 0 AND [CarriedForward] >= 0 AND ([NetPayable] = 0 OR ([RepaidAmount] = 0 AND [CarriedForward] = 0)))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_PartnerPayments] ADD CONSTRAINT [CK_TRN_PartnerPayments_Kind] CHECK ([Kind] IN (''Payment'',''Repayment''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_Advances_CarriedFromSettlementId] ON [trn].[TRN_Advances] ([CarriedFromSettlementId]) WHERE [CarriedFromSettlementId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Advances] ADD CONSTRAINT [CK_TRN_Advances_CarriedFromSettlementId] CHECK (([PaymentMethod] = ''Carried'' AND [CarriedFromSettlementId] IS NOT NULL) OR ([PaymentMethod] <> ''Carried'' AND [CarriedFromSettlementId] IS NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Advances] ADD CONSTRAINT [CK_TRN_Advances_CashBoxId_BankAccountId] CHECK (([PaymentMethod] = ''Cash'' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN (''Bank'',''CliQ'') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL) OR ([PaymentMethod] = ''Carried'' AND [CashBoxId] IS NULL AND [BankAccountId] IS NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Advances] ADD CONSTRAINT [CK_TRN_Advances_PaymentMethod] CHECK ([PaymentMethod] IN (''Cash'',''Bank'',''CliQ'',''Carried''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Advances] ADD CONSTRAINT [FK_TRN_Advances_TRN_Settlements_CarriedFromSettlementId] FOREIGN KEY ([CarriedFromSettlementId]) REFERENCES [trn].[TRN_Settlements] ([Id]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021071856_Rev6_SettlementRepayment'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261021071856_Rev6_SettlementRepayment', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021074616_Rev6_PendingEmail'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [PendingEmail] nvarchar(150) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021074616_Rev6_PendingEmail'
+)
+BEGIN
+    ALTER TABLE [core].[Users] ADD [PendingEmailAt] datetime2 NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021074616_Rev6_PendingEmail'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [core].[Users] ADD CONSTRAINT [CK_Users_PendingEmail_PendingEmailAt] CHECK (([PendingEmail] IS NULL AND [PendingEmailAt] IS NULL) OR ([PendingEmail] IS NOT NULL AND [PendingEmailAt] IS NOT NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021074616_Rev6_PendingEmail'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261021074616_Rev6_PendingEmail', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_PartnerPayments] ADD [DeductedAmount] decimal(18,3) NOT NULL CONSTRAINT [DF_TRN_PartnerPayments_DeductedAmount] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    CREATE TABLE [trn].[TRN_PartnerOverpayments] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_TRN_PartnerOverpayments_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [PartnerId] bigint NOT NULL,
+        [TripId] bigint NOT NULL,
+        [PartnerPaymentId] bigint NULL,
+        [Amount] decimal(18,3) NOT NULL,
+        [Handling] varchar(10) NOT NULL,
+        [Reason] nvarchar(500) NOT NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_TRN_PartnerOverpayments_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_TRN_PartnerOverpayments_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_TRN_PartnerOverpayments] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_TRN_PartnerOverpayments_Amount] CHECK ([Amount] > 0),
+        CONSTRAINT [CK_TRN_PartnerOverpayments_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_TRN_PartnerOverpayments_Handling] CHECK ([Handling] IN ('Return','Deduct','NotPaid')),
+        CONSTRAINT [CK_TRN_PartnerOverpayments_PartnerPaymentId] CHECK (([Handling] = 'NotPaid' AND [PartnerPaymentId] IS NOT NULL) OR ([Handling] <> 'NotPaid' AND [PartnerPaymentId] IS NULL)),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_TRN_PartnerPayments_PartnerPaymentId] FOREIGN KEY ([PartnerPaymentId]) REFERENCES [trn].[TRN_PartnerPayments] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_TRN_Partners_PartnerId] FOREIGN KEY ([PartnerId]) REFERENCES [trn].[TRN_Partners] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_TRN_Trips_TripId] FOREIGN KEY ([TripId]) REFERENCES [trn].[TRN_Trips] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_PartnerOverpayments_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_PartnerPayments] ADD CONSTRAINT [CK_TRN_PartnerPayments_DeductedAmount] CHECK ([DeductedAmount] >= 0 AND ([Kind] = ''Payment'' OR [DeductedAmount] = 0))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_PartnerOverpayments_CompanyId] ON [trn].[TRN_PartnerOverpayments] ([CompanyId]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    CREATE INDEX [IX_TRN_PartnerOverpayments_PartnerId] ON [trn].[TRN_PartnerOverpayments] ([PartnerId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_PartnerOverpayments_PartnerPaymentId] ON [trn].[TRN_PartnerOverpayments] ([PartnerPaymentId]) WHERE [PartnerPaymentId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    CREATE INDEX [IX_TRN_PartnerOverpayments_TripId] ON [trn].[TRN_PartnerOverpayments] ([TripId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_TRN_PartnerOverpayments_PublicId] ON [trn].[TRN_PartnerOverpayments] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261021092930_Rev6_PartnerOverpayments'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261021092930_Rev6_PartnerOverpayments', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE TABLE [core].[EmailOutbox] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_EmailOutbox_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NULL,
+        [Template] varchar(40) NOT NULL,
+        [LanguageCode] varchar(5) NOT NULL,
+        [Recipient] nvarchar(254) NOT NULL,
+        [Status] varchar(10) NOT NULL,
+        [Attempts] int NOT NULL CONSTRAINT [DF_EmailOutbox_Attempts] DEFAULT (0),
+        [NextAttemptAt] datetime2(3) NOT NULL,
+        [ClaimedUntil] datetime2(3) NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_EmailOutbox_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [LastAttemptAt] datetime2(3) NULL,
+        [SentAt] datetime2(3) NULL,
+        [FailedAt] datetime2(3) NULL,
+        [ErrorKind] varchar(40) NULL,
+        [LastError] nvarchar(400) NULL,
+        [Mode] varchar(20) NULL,
+        [HasSecretLink] bit NOT NULL CONSTRAINT [DF_EmailOutbox_HasSecretLink] DEFAULT (0),
+        [PayloadEncrypted] varbinary(max) NULL,
+        [ResentFromId] bigint NULL,
+        [ResentAt] datetime2(3) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_EmailOutbox] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_EmailOutbox_Attempts] CHECK ([Attempts] >= 0),
+        CONSTRAINT [CK_EmailOutbox_FailedAt] CHECK ([Status] <> 'Failed' OR [FailedAt] IS NOT NULL),
+        CONSTRAINT [CK_EmailOutbox_LanguageCode] CHECK ([LanguageCode] IN ('ar','en')),
+        CONSTRAINT [CK_EmailOutbox_PayloadEncrypted] CHECK ([PayloadEncrypted] IS NULL OR [Status] IN ('Pending','Sending') OR ([Status] = 'Failed' AND [HasSecretLink] = 0)),
+        CONSTRAINT [CK_EmailOutbox_SentAt] CHECK ([Status] <> 'Sent' OR [SentAt] IS NOT NULL),
+        CONSTRAINT [CK_EmailOutbox_Status] CHECK ([Status] IN ('Pending','Sending','Sent','Failed','Suppressed')),
+        CONSTRAINT [FK_EmailOutbox_EmailOutbox_ResentFromId] FOREIGN KEY ([ResentFromId]) REFERENCES [core].[EmailOutbox] ([Id]),
+        CONSTRAINT [FK_EmailOutbox_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE TABLE [core].[SystemEmailSettings] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_SystemEmailSettings_PublicId] DEFAULT (NEWID()),
+        [State] varchar(10) NOT NULL,
+        [Mode] varchar(20) NOT NULL,
+        [EntraTenantId] nvarchar(100) NULL,
+        [EntraClientId] nvarchar(100) NULL,
+        [ClientSecretEncrypted] varbinary(max) NULL,
+        [SecretSavedAt] datetime2(3) NULL,
+        [SecretExpiresOn] date NULL,
+        [SenderMailbox] nvarchar(254) NULL,
+        [DisplayName] nvarchar(100) NOT NULL,
+        [ReplyTo] nvarchar(254) NULL,
+        [ActivatedAt] datetime2(3) NULL,
+        [LastTestAt] datetime2(3) NULL,
+        [LastTestOk] bit NULL,
+        [LastTestError] nvarchar(400) NULL,
+        [ExpiryWarnedDays] int NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_SystemEmailSettings_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_SystemEmailSettings_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_SystemEmailSettings] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_SystemEmailSettings_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_SystemEmailSettings_ExpiryWarnedDays] CHECK ([ExpiryWarnedDays] IS NULL OR [ExpiryWarnedDays] > 0),
+        CONSTRAINT [CK_SystemEmailSettings_Microsoft365] CHECK ([Mode] <> 'Microsoft365' OR ([EntraTenantId] IS NOT NULL AND [EntraClientId] IS NOT NULL AND [ClientSecretEncrypted] IS NOT NULL AND [SenderMailbox] IS NOT NULL)),
+        CONSTRAINT [CK_SystemEmailSettings_Mode] CHECK ([Mode] IN ('Development','Microsoft365')),
+        CONSTRAINT [CK_SystemEmailSettings_State] CHECK ([State] IN ('Active','Pending','Retired')),
+        CONSTRAINT [FK_SystemEmailSettings_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_SystemEmailSettings_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_SystemEmailSettings_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE INDEX [IX_EmailOutbox_CreatedAt] ON [core].[EmailOutbox] ([CreatedAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE INDEX [IX_EmailOutbox_Recipient_Template_CreatedAt] ON [core].[EmailOutbox] ([Recipient], [Template], [CreatedAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_EmailOutbox_SentAt] ON [core].[EmailOutbox] ([SentAt]) WHERE [SentAt] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE INDEX [IX_EmailOutbox_Status_NextAttemptAt] ON [core].[EmailOutbox] ([Status], [NextAttemptAt]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_EmailOutbox_PublicId] ON [core].[EmailOutbox] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_SystemEmailSettings_Active] ON [core].[SystemEmailSettings] ([State]) WHERE [State] = ''Active'' AND [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_SystemEmailSettings_Pending] ON [core].[SystemEmailSettings] ([State]) WHERE [State] = ''Pending'' AND [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_SystemEmailSettings_PublicId] ON [core].[SystemEmailSettings] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261022114807_Rev6_SystemEmail'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261022114807_Rev6_SystemEmail', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [Reference] nvarchar(100) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [TaxAccountId] bigint NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [TaxAmount] decimal(18,3) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [TaxCodeId] bigint NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [TaxForLineId] bigint NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD [TaxRate] decimal(5,2) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[Accounts] ADD [IsTaxAccount] bit NOT NULL CONSTRAINT [DF_Accounts_IsTaxAccount] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    CREATE TABLE [acc].[TaxCodes] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_TaxCodes_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [Code] varchar(30) NOT NULL,
+        [Rate] decimal(5,2) NOT NULL,
+        [NameAr] nvarchar(100) NOT NULL,
+        [NameEn] nvarchar(100) NULL,
+        [Status] varchar(10) NOT NULL CONSTRAINT [DF_TaxCodes_Status] DEFAULT ('Active'),
+        [SortOrder] int NOT NULL CONSTRAINT [DF_TaxCodes_SortOrder] DEFAULT (0),
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_TaxCodes_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_TaxCodes_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_TaxCodes] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_TaxCodes_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_TaxCodes_Rate] CHECK ([Rate] >= 0 AND [Rate] <= 100),
+        CONSTRAINT [CK_TaxCodes_SortOrder] CHECK ([SortOrder] >= 0),
+        CONSTRAINT [CK_TaxCodes_Status] CHECK ([Status] IN ('Active','Archived')),
+        CONSTRAINT [FK_TaxCodes_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_TaxCodes_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_TaxCodes_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TaxCodes_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TaxCodes_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_EntryLines_CompanyId_Reference] ON [acc].[EntryLines] ([CompanyId], [Reference]) WHERE [Reference] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_EntryLines_TaxAccountId] ON [acc].[EntryLines] ([TaxAccountId]) WHERE [TaxAccountId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_EntryLines_TaxCodeId] ON [acc].[EntryLines] ([TaxCodeId]) WHERE [TaxCodeId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_EntryLines_TaxForLineId] ON [acc].[EntryLines] ([TaxForLineId]) WHERE [TaxForLineId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [CK_EntryLines_TaxAmount] CHECK ([TaxAmount] IS NULL OR [TaxAmount] >= 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [CK_EntryLines_TaxCodeId_TaxRate] CHECK (([TaxCodeId] IS NULL AND [TaxRate] IS NULL AND [TaxAmount] IS NULL AND [TaxAccountId] IS NULL AND [TaxForLineId] IS NULL) OR ([TaxCodeId] IS NOT NULL AND [TaxRate] IS NOT NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [CK_EntryLines_TaxForLineId] CHECK ([TaxForLineId] IS NULL OR ([TaxAmount] IS NULL AND [TaxAccountId] IS NULL))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [CK_EntryLines_TaxRate] CHECK ([TaxRate] IS NULL OR ([TaxRate] >= 0 AND [TaxRate] <= 100))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[Accounts] ADD CONSTRAINT [CK_Accounts_IsTaxAccount] CHECK ([IsTaxAccount] = 0 OR [IsControlAccount] = 0)');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [UX_TaxCodes_CompanyId_Code] ON [acc].[TaxCodes] ([CompanyId], [Code]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_TaxCodes_PublicId] ON [acc].[TaxCodes] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [FK_EntryLines_Accounts_TaxAccountId] FOREIGN KEY ([TaxAccountId]) REFERENCES [acc].[Accounts] ([Id]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [FK_EntryLines_EntryLines_TaxForLineId] FOREIGN KEY ([TaxForLineId]) REFERENCES [acc].[EntryLines] ([Id]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    ALTER TABLE [acc].[EntryLines] ADD CONSTRAINT [FK_EntryLines_TaxCodes_TaxCodeId] FOREIGN KEY ([TaxCodeId]) REFERENCES [acc].[TaxCodes] ([Id]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    UPDATE l SET l.[Reference] = e.[Reference] FROM [acc].[EntryLines] l INNER JOIN [acc].[JournalEntries] e ON e.[Id] = l.[JournalEntryId] WHERE e.[Reference] IS NOT NULL AND l.[Reference] IS NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    INSERT INTO [acc].[TaxCodes] ([TenantId], [CompanyId], [Code], [Rate], [NameAr], [NameEn], [Status], [SortOrder]) SELECT c.[TenantId], c.[Id], d.[Code], d.[Rate], d.[NameAr], d.[NameEn], 'Active', d.[SortOrder] FROM [core].[Companies] c CROSS JOIN (VALUES ('VAT_JO_0', 0, N'ضريبة المبيعات 0%', N'VAT 0%', 10), ('VAT_JO_1', 1, N'ضريبة المبيعات 1%', N'VAT 1%', 20), ('VAT_JO_2', 2, N'ضريبة المبيعات 2%', N'VAT 2%', 30), ('VAT_JO_4', 4, N'ضريبة المبيعات 4%', N'VAT 4%', 40), ('VAT_JO_5', 5, N'ضريبة المبيعات 5%', N'VAT 5%', 50), ('VAT_JO_7', 7, N'ضريبة المبيعات 7%', N'VAT 7%', 60), ('VAT_JO_8', 8, N'ضريبة المبيعات 8%', N'VAT 8%', 70), ('VAT_JO_10', 10, N'ضريبة المبيعات 10%', N'VAT 10%', 80), ('VAT_JO_16', 16, N'ضريبة المبيعات 16%', N'VAT 16%', 90)) AS d([Code], [Rate], [NameAr], [NameEn], [SortOrder]) WHERE c.[IsDeleted] = 0 AND NOT EXISTS (SELECT 1 FROM [acc].[TaxCodes] x WHERE x.[CompanyId] = c.[Id] AND x.[Code] = d.[Code] AND x.[IsDeleted] = 0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261025120358_Rev6_JournalLineTax'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261025120358_Rev6_JournalLineTax', N'10.0.13');
+END;
+
+COMMIT;
+GO
+

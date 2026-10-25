@@ -26,8 +26,9 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>A stored line: internal ids, so a template survives a change of the URL-token key.</summary>
-    private sealed record TemplateLine(long AccountId, long? CostCentreId, string? Note, decimal Debit, decimal Credit);
+    /// <summary>A stored line: internal ids, so a template survives a change of the URL-token key; line reference and tax since DT-254 / DT-255.</summary>
+    private sealed record TemplateLine(long AccountId, long? CostCentreId, string? Note, decimal Debit, decimal Credit,
+        string? Reference = null, long? TaxCodeId = null, long? TaxAccountId = null);
 
     public async Task<IReadOnlyList<JournalTemplateSummary>> ListAsync(CancellationToken ct)
     {
@@ -48,15 +49,19 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
     {
         var t = await support.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
         var lines = Read(t.Lines);
-        var accountIds = lines.Select(l => l.AccountId).Distinct().ToList();
+        var accountIds = lines.Select(l => l.AccountId).Concat(lines.Where(l => l.TaxAccountId is not null).Select(l => l.TaxAccountId!.Value)).Distinct().ToList();
         var accounts = await db.Set<Account>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(a => accountIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => new AccountRef(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn), ct).ConfigureAwait(false);
         var centreIds = lines.Where(l => l.CostCentreId is not null).Select(l => l.CostCentreId!.Value).Distinct().ToList();
         var centres = await db.Set<CostCentre>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(c => centreIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => new Ref(tokens.Encode<CostCentre>(c.PublicId), $"{c.Code} – {c.Name}"), ct).ConfigureAwait(false);
+        var codeIds = lines.Where(l => l.TaxCodeId is not null).Select(l => l.TaxCodeId!.Value).Distinct().ToList();
+        var codes = await db.Set<TaxCode>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(x => codeIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => new TaxCodeRef(tokens.Encode<TaxCode>(x.PublicId), x.Code, x.Rate, x.NameAr, x.NameEn), ct).ConfigureAwait(false);
         return new JournalTemplateResponse(token, t.Name, t.Description, t.Reference,
             lines.Select(l => new JournalTemplateLineResponse(accounts.GetValueOrDefault(l.AccountId), l.Debit, l.Credit,
-                l.CostCentreId is long c ? centres.GetValueOrDefault(c) : null, l.Note)).ToList(),
+                l.CostCentreId is long c ? centres.GetValueOrDefault(c) : null, l.Note, l.Reference,
+                l.TaxCodeId is long tc ? codes.GetValueOrDefault(tc) : null, l.TaxAccountId is long ta ? accounts.GetValueOrDefault(ta) : null)).ToList(),
             DateTime.SpecifyKind(t.UpdatedAt ?? t.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(t.RowVersion));
     }
 
@@ -134,6 +139,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
         var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var accounts = await db.Set<Account>().AsNoTracking().Select(a => new { a.Id, a.PublicId }).ToDictionaryAsync(a => a.PublicId, a => a.Id, ct).ConfigureAwait(false);
         var centres = await db.Set<CostCentre>().AsNoTracking().Select(c => new { c.Id, c.PublicId }).ToDictionaryAsync(c => c.PublicId, c => c.Id, ct).ConfigureAwait(false);
+        var taxCodes = await db.Set<TaxCode>().AsNoTracking().Select(c => new { c.Id, c.PublicId }).ToDictionaryAsync(c => c.PublicId, c => c.Id, ct).ConfigureAwait(false);
         var lines = new List<TemplateLine>(input.Count);
         for (var i = 0; i < input.Count; i++)
         {
@@ -149,7 +155,16 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
                     : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             var note = TextNormalizer.CleanText(l.Note);
             if (note is { Length: > 500 }) throw Fail.Field(field + ".note", ErrorCodes.ValidationRange, new FieldRef(field + ".note"));
-            lines.Add(new TemplateLine(accountId, centreId, note, l.Debit, l.Credit));
+            var lineReference = TextNormalizer.CleanText(l.Reference);
+            if (lineReference is { Length: > PostingEngine.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            long? taxCodeId = null, taxAccountId = null;
+            if (!string.IsNullOrEmpty(l.TaxCodeId))
+                taxCodeId = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && taxCodes.TryGetValue(tg, out var tc) ? tc
+                    : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+            if (taxCodeId is not null && !string.IsNullOrEmpty(l.TaxAccountId))
+                taxAccountId = tokens.Decode<Account>(l.TaxAccountId) is Guid tag && accounts.TryGetValue(tag, out var ta) ? ta
+                    : throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+            lines.Add(new TemplateLine(accountId, centreId, note, l.Debit, l.Credit, lineReference, taxCodeId, taxAccountId));
         }
         t.Name = name!;
         t.Description = description;

@@ -67,7 +67,7 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         "account" => typeof(Acc.Account), "bankAccount" => typeof(Acc.BankAccount), "budget" => typeof(Acc.Budget), "cashBox" => typeof(Acc.CashBox),
         "costCentre" => typeof(Acc.CostCentre), "draft" => typeof(Acc.JournalDraft), "entry" => typeof(Acc.JournalEntry), "template" => typeof(Acc.JournalTemplate),
         "document" => typeof(Acc.ApArDocument), "party" or "supplier" => typeof(Acc.ApArParty), "return" => typeof(Acc.ApArReturn),
-        "pending" => typeof(Acc.PendingPosting),
+        "pending" => typeof(Acc.PendingPosting), "taxCode" => typeof(Acc.TaxCode),
         "submission" => route.Contains("/apar/", StringComparison.Ordinal) ? typeof(Acc.ApArEInvoiceSubmission) : typeof(Trn.EInvoiceSubmission),
         "payment" => route.Contains("/apar/", StringComparison.Ordinal) ? typeof(Acc.ApArPayment) : typeof(Trn.PartnerPayment),
         "advance" => typeof(Trn.Advance), "creditNote" => typeof(Trn.CreditNote), "customer" => typeof(Trn.Customer), "driver" => typeof(Trn.Driver),

@@ -31,7 +31,22 @@ public class EntryLine : AuditableEntity, ITenantScoped, ICompanyScoped
     public long? PartyId { get; set; }
     /// <summary>Free-text note for this line.</summary>
     public string? Note { get; set; }
+    /// <summary>Line reference (مرجع السطر, DT-254); a new line starts with the entry's Reference.</summary>
+    public string? Reference { get; set; }
+    /// <summary>Tax code of the line (DT-255); on an automatic tax line, the code it was calculated with.</summary>
+    public long? TaxCodeId { get; set; }
+    /// <summary>The code's rate (percent) when the line was posted.</summary>
+    public decimal? TaxRate { get; set; }
+    /// <summary>Tax on the line's amount (the amount is before tax); NULL on an automatic tax line.</summary>
+    public decimal? TaxAmount { get; set; }
+    /// <summary>Tax account the tax was posted to (rates above 0 %); NULL on an automatic tax line.</summary>
+    public long? TaxAccountId { get; set; }
+    /// <summary>Automatic tax line: the line whose tax it carries (cannot be edited on its own).</summary>
+    public long? TaxForLineId { get; set; }
     public JournalEntry JournalEntry { get; set; } = null!;
     public Account Account { get; set; } = null!;
     public CostCentre? CostCentre { get; set; }
+    public TaxCode? TaxCode { get; set; }
+    public Account? TaxAccount { get; set; }
+    public EntryLine? TaxForLine { get; set; }
 }

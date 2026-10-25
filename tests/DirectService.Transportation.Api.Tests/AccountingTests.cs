@@ -66,10 +66,12 @@ public sealed class AccountingTests(ApiFactory f)
         var r = await owner.Client.PostAsJsonAsync(U(owner, "/accounting/accounts/template"), new { });
         await r.EnsureOkAsync();
         // Revision 6: + account 4105 "Supplier deductions income" mapped to the optional key ACC.SupplierDeductions.
-        Assert.Equal(new ChartTemplateResult(48, 1, 14), await r.Content.ReadFromJsonAsync<ChartTemplateResult>());
+        // DT-256: + 5207 "VAT expenses (non-recoverable)"; 1105, 2104 and 5207 are tax accounts.
+        Assert.Equal(new ChartTemplateResult(49, 1, 14), await r.Content.ReadFromJsonAsync<ChartTemplateResult>());
 
         var accounts = await AccountsAsync(owner);
-        Assert.Equal(48, accounts.Count);
+        Assert.Equal(49, accounts.Count);
+        Assert.Equal(["1105", "2104", "5207"], accounts.Values.Where(a => a.IsTaxAccount).Select(a => a.Code).Order(StringComparer.Ordinal));
         Assert.False(accounts["1"].IsPostable);
         Assert.True(accounts["110301"].IsPostable);
         Assert.Equal(("Customer", true), (accounts["110301"].ControlPartyType, accounts["110301"].IsControlAccount));

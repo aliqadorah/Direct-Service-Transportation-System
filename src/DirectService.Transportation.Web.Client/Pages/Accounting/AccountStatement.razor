@@ -35,6 +35,7 @@
         <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
         <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
         @if (Lookups.CostCentres.Count > 0) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="Lookups.CostCentres" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
+        <TextField @bind-Value="_lineReference" Label="@L["je.reference"]" MaxLength="100" FieldClass="w160" />
         @if (PartyType is { } pt)
         {
             @if (pt == "Driver") {<ComboField TValue="string?" @bind-Value="_party" SearchAsync="SearchDrivers" Label="@L["je.party"]" Placeholder="@L["tar.all"]" FieldClass="w220" />}
@@ -122,7 +123,7 @@ else
     private readonly Dictionary<string, IReadOnlyList<Option<string?>>> _parties = new(StringComparer.Ordinal);
     private LoadState _state = LoadState.Loading;
     private string _mode = "accounts";
-    private string? _reference, _costCentre, _party, _adding, _codeFrom, _codeTo;
+    private string? _reference, _costCentre, _party, _adding, _codeFrom, _codeTo, _lineReference;
     private DateOnly? _from, _to;
 
     [Parameter] public string Company { get; set; } = "";
@@ -216,6 +217,7 @@ else
         Put("from", _from?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         Put("to", _to?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         Put("costCentre", _costCentre);
+        Put("reference", _lineReference?.Trim());   // DT-254: line or entry reference
         if (PartyType is not null && _party?.Split('|') is [var type, var id]) { Put("partyType", type); Put("party", id); }
         return "?" + string.Join('&', p);
     }

@@ -51,6 +51,7 @@ public static class AuditVocabulary
         ["ACC.CashBox"] = E("صندوق", "Cash box", "الصندوق", "cash box"),
         ["ACC.BankAccount"] = E("حساب بنكي", "Bank account", "الحساب البنكي", "bank account"),
         ["ACC.CostCentre"] = E("مركز تكلفة", "Cost centre", "مركز التكلفة", "cost centre"),
+        ["ACC.TaxCode"] = E("رمز ضريبة", "Tax code", "رمز الضريبة", "tax code"),
         ["ACC.JournalTemplate"] = E("نموذج قيد", "Journal template", "نموذج القيد", "journal template"),
         ["ACC.Budget"] = E("موازنة", "Budget", "الموازنة", "budget"),
         ["ACC.BudgetLine"] = E("سطر موازنة", "Budget line", "سطر الموازنة", "the budget line"),
@@ -272,6 +273,7 @@ public static class AuditVocabulary
         "ResponsePayload", "QrCode", "IncomeSourceSequence", "TruckPlateAtSave", "RateMonth", "InvoiceLineId", "DocumentId", "CreditNoteId",
         "AttachmentsCount", "AcquiredAt", "Definition", "Columns", "Labels", "Signatures", "AnnexColumns", "Options", "Lines", "EmailConfirmedAt",
         "TwoFactorEnabledAt", "OccurredAt", "Grouping", "IsPlatformStaff", "UserId", "OwnerUserId", "Specificity", "ResolvedAt",
+        "TaxForLineId",
     };
 
     /// <summary>Field labels by column name (the labels of the screens); <see cref="EntityFields"/> refines some per record type.</summary>
@@ -444,6 +446,12 @@ public static class AuditVocabulary
         ["AccountType"] = F("نوع الحساب", "Account type", Kind.Code),
         ["IsPostable"] = F("يقبل الترحيل", "Postable"),
         ["IsControlAccount"] = F("حساب مراقبة", "Control account"),
+        // Journal line tax and tax codes (owner request 25 Oct 2026, DT-254…DT-257).
+        ["IsTaxAccount"] = F("حساب ضريبة", "Tax account"),
+        ["TaxCodeId"] = R("رمز الضريبة", "Tax code", "ACC.TaxCode"),
+        ["TaxAccountId"] = R("حساب الضريبة", "Tax account", "ACC.Account"),
+        ["TaxAmount"] = F("مبلغ الضريبة", "Tax amount", Kind.Money),
+        ["Rate"] = F("النسبة", "Rate", Kind.Percent),
         ["ControlPartyType"] = F("نوع أطراف المراقبة", "Control party type", Kind.Code),
         ["PostingKey"] = F("مفتاح الترحيل", "Posting key", Kind.Code),
         ["BatchNo"] = F("رقم الدفعة", "Batch number"),
@@ -545,6 +553,9 @@ public static class AuditVocabulary
         ["TRN.ReceiptAllocation.ReceiptId"] = R("سند القبض", "Receipt", "TRN.Receipt"),
         ["ACC.ApArDocument.PartyId"] = R("الطرف", "Party", "ACC.ApArParty"),
         ["ACC.Account.Code"] = F("رقم الحساب", "Account code"),
+        ["ACC.EntryLine.Reference"] = F("مرجع السطر", "Line reference"),
+        ["ACC.TaxCode.NameAr"] = F("الوصف بالعربية", "Arabic description"),
+        ["ACC.TaxCode.NameEn"] = F("الوصف بالإنجليزية", "English description"),
         ["ACC.Period.PeriodMonth"] = F("الفترة", "Period"),
         ["ACC.JournalEntry.Description"] = F("البيان", "Description"),
         ["ACC.JournalEntry.Status"] = F("الحالة", "Status", Kind.Code),

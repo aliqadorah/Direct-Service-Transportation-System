@@ -354,6 +354,12 @@ public sealed class TripListMigrationFactory : ApiFactory
     protected override string DatabaseName => "DirectServiceMaster_MigrationTests";
 }
 
+/// <summary>DT-259: the journal line tax upgrade / rollback test on its own database.</summary>
+public sealed class JournalTaxUpgradeFactory : ApiFactory
+{
+    protected override string DatabaseName => "DirectServiceMaster_TaxUpgradeTests";
+}
+
 /// <summary>DT-231: the settlement upgrade / rollback test on its own database.</summary>
 public sealed class SettlementUpgradeFactory : ApiFactory
 {

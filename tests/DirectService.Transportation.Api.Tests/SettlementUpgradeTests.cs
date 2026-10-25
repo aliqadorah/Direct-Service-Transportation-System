@@ -114,7 +114,8 @@ public sealed class SettlementUpgradeTests(SettlementUpgradeFactory f) : IClassF
         var current = (await ReadAsync<TripDetails>(await o.Client.GetAsync(U(o, $"/trips/{partnerTrip.Id}")))).Trip;
         await (await o.Client.PostAsJsonAsync(U(o, $"/trips/{partnerTrip.Id}/void"), new TripVoidRequest("Cancelled", current.RowVersion, CashCodes.Deduct))).EnsureOkAsync();
         Assert.Contains("Rev6_PartnerOverpayments cannot be rolled back", await MigrateAsync(BeforeRepayment), StringComparison.Ordinal);
-        // Only later migrations without data (Rev6_SystemEmail, 22 Oct 2026, nothing saved here) were taken back: applied again, nothing lost.
+        // Only later migrations without data (Rev6_SystemEmail, 22 Oct 2026, and Rev6_JournalLineTax, 25 Oct 2026: no taxed line here) were
+        // taken back: applied again, nothing lost.
         Assert.Null(await MigrateAsync(null));
         Assert.Empty(await f.DbAsync(db => db.Database.GetPendingMigrationsAsync()));
         Assert.Equal(1, await f.DbAsync(db => db.Set<PartnerOverpayment>().IgnoreQueryFilters().CountAsync()));

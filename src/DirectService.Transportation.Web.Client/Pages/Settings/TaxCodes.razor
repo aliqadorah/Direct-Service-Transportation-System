@@ -1,0 +1,166 @@
+@page "/c/{Company}/settings/tax-codes"
+@*
+  Settings → Tax codes (owner request 25 Oct 2026, DT-257; settings.manage): code, rate %, Arabic and English description, status and order of
+  the tax codes chosen on journal lines; seeded with the Jordanian VAT rates. A code used on posted entries cannot be deleted and its code and
+  rate cannot change (the fields are read-only, with the reason) — deactivate it and create a new one.
+*@
+@inject Api Api
+@inject Loc L
+@inject ToastService Toasts
+@inject AccountingLookups Lookups
+
+<PageHeader Title="@L["nav.taxCodes"]" Crumbs="@([new Crumb(L["nav.settings"]), new Crumb(L["nav.taxCodes"])])">
+    <Actions><Btn Primary="true" Icon="plus" Text="@L["tax.new"]" OnClick="() => Edit(null)" /></Actions>
+</PageHeader>
+<StateView State="_state" ErrorReference="@_reference" OnRetry="Load">
+    <Empty>
+        <EmptyState Icon="percent" Title="@L["tax.none"]" Text="@L["tax.noneText"]"><Actions><Btn Primary="true" Text="@L["tax.new"]" OnClick="() => Edit(null)" /></Actions></EmptyState>
+    </Empty>
+    <ChildContent>
+        <p class="muted" style="margin:0">@L["tax.help"]</p>
+        <ListFrame Label="@L["nav.taxCodes"]">
+            <DataGrid TItem="TaxCodeResponse" Items="_items" Key="t => t.Id" Caption="@L["nav.taxCodes"]" OnRowClick="Edit" RowClass="@(t => t.Status == "Active" ? null : "void")">
+                <Columns>
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["tax.code"]" Value="t => t.Code" Ltr="true" />
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["tax.rate"]" Value="t => Fmt.Percent(t.Rate)" Numeric="true" />
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["tax.nameAr"]" Value="t => t.NameAr" />
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["tax.nameEn"]" Value="t => t.NameEn" />
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["tax.order"]" Value="t => Fmt.Count(t.SortOrder)" Numeric="true" />
+                    <GridColumn TItem="TaxCodeResponse" Title="@L["ml.status"]">
+                        <Template>
+                            <StatusTag Status="@(context.Status == "Active" ? "active" : "archived")" />
+                            @if (context.InUse) {<Badge Tone="Tone.Info" Text="@L["tax.inUse"]" />}
+                        </Template>
+                    </GridColumn>
+                </Columns>
+            </DataGrid>
+        </ListFrame>
+    </ChildContent>
+</StateView>
+
+<Modal @bind-Open="_editing" Title="@(_m.Id is null ? L["tax.new"] : L.F("ml.editTitle", _m.Code ?? ""))" Busy="_busy">
+    <ChildContent>
+        @if (_m.InUse) {<Banner Tone="Tone.Info" Icon="info" Text="@L["tax.inUseHelp"]" />}
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" id="tax-form" class="stack">
+            <ProblemValidator @ref="_problems" />
+            <ErrorSummary Extra="_extra" />
+            <div class="fg" style="grid-template-columns:minmax(0,1fr) 140px">
+                <TextField @bind-Value="_m.Code" Label="@L["tax.code"]" Required="true" MaxLength="30" Ltr="true" ReadOnly="_m.InUse" />
+                <NumberField @bind-Value="_m.Rate" Label="@L["tax.rate"]" Required="true" Min="0m" Max="100m" Decimals="2" Unit="%" ReadOnly="_m.InUse" />
+            </div>
+            <TextField @bind-Value="_m.NameAr" Label="@L["tax.nameAr"]" Required="true" MaxLength="100" dir="rtl" />
+            <TextField @bind-Value="_m.NameEn" Label="@L["tax.nameEn"]" MaxLength="100" Ltr="true" />
+            <IntField @bind-Value="_m.SortOrder" Label="@L["tax.order"]" Min="0" Max="9999" />
+        </EditForm>
+        @if (_m.Id is not null)
+        {
+            <div class="row" style="gap:6px;margin-top:10px">
+                <Btn Icon="@(_m.Status == "Active" ? "archive" : "refresh")" Text="@L[_m.Status == "Active" ? "acc.deactivate" : "acc.activate"]" Busy="_busy" OnClick="ToggleStatus" />
+                @if (!_m.InUse) {<Btn Danger="true" Icon="trash" Text="@L["ml.delete"]" OnClick="() => { _editing = false; _deleting = true; }" />}
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Btn Text="@L["ui.cancel"]" OnClick="() => _editing = false" />
+        <Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" form="tax-form" />
+    </Footer>
+</Modal>
+<ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _m.Code ?? "")" Danger="true" AskReason="true" ConfirmText="@L["ml.delete"]"
+               Message="@L["tax.deleteText"]" Busy="_busy" Error="@_deleteError" OnConfirm="Delete" />
+
+@code {
+    private IReadOnlyList<TaxCodeResponse> _items = [];
+    private LoadState _state = LoadState.Loading;
+    private string? _reference, _deleteError;
+    private bool _editing, _busy, _deleting;
+    private Model _m = new();
+    private EditContext _ctx = new(new Model());
+    private ProblemValidator? _problems;
+    private IReadOnlyList<string>? _extra;
+
+    [Parameter] public string Company { get; set; } = "";
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            _items = await Api.GetAsync<IReadOnlyList<TaxCodeResponse>>(Api.C("accounting/tax-codes"));
+            _state = _items.Count == 0 ? LoadState.Empty : LoadState.Ready;
+        }
+        catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
+    }
+
+    private void Edit(TaxCodeResponse? t)
+    {
+        _m = t is null ? new Model()
+            : new Model { Id = t.Id, Code = t.Code, Rate = t.Rate, NameAr = t.NameAr, NameEn = t.NameEn, SortOrder = t.SortOrder, Status = t.Status, InUse = t.InUse, RowVersion = t.RowVersion };
+        _ctx = new EditContext(_m);
+        _extra = null;
+        _editing = true;
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        _extra = null;
+        try
+        {
+            var req = new TaxCodeRequest(_m.Code?.Trim(), _m.Rate, _m.NameAr?.Trim(), string.IsNullOrWhiteSpace(_m.NameEn) ? null : _m.NameEn.Trim(), _m.SortOrder, _m.RowVersion);
+            if (_m.Id is null) await Api.PostAsync(Api.C("accounting/tax-codes"), req);
+            else await Api.PutAsync(Api.C($"accounting/tax-codes/{Uri.EscapeDataString(_m.Id)}"), req);
+            _editing = false;
+            Toasts.Success(L.F("tax.saved", _m.Code ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { if (_problems?.Show(e.Problem) is { } other) _extra = [other]; }
+        finally { _busy = false; }
+    }
+
+    private async Task ToggleStatus()
+    {
+        _busy = true;
+        try
+        {
+            var active = _m.Status == "Active";
+            await Api.PostAsync(Api.C($"accounting/tax-codes/{Uri.EscapeDataString(_m.Id!)}/{(active ? "deactivate" : "activate")}"), new StatusChangeRequest(_m.RowVersion));
+            _editing = false;
+            Toasts.Success(L.F(active ? "tax.deactivated" : "tax.activated", _m.Code ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _busy = false; }
+    }
+
+    private async Task Delete(string reason)
+    {
+        _busy = true;
+        _deleteError = null;
+        try
+        {
+            await Api.PostAsync(Api.C($"accounting/tax-codes/{Uri.EscapeDataString(_m.Id!)}/delete"), new DeleteRequest(reason));
+            _deleting = false;
+            Toasts.Success(L.F("tax.deleted", _m.Code ?? ""));
+            Lookups.Invalidate();
+            await Load();
+        }
+        catch (ApiException e) { _deleteError = e.Problem.Detail; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Model
+    {
+        public string? Id { get; set; }
+        public string? Code { get; set; }
+        public decimal? Rate { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public int? SortOrder { get; set; }
+        public string Status { get; set; } = "Active";
+        public bool InUse { get; set; }
+        public string? RowVersion { get; set; }
+    }
+}

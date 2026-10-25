@@ -10,10 +10,12 @@ namespace DirectService.Transportation.Contracts.Ledger;
 /// General ledger / account statement filters: an account (a parent account covers its descendants), the period (default: this month up to
 /// today), an optional cost centre and an optional party (type Customer / Driver / Partner / ApArParty + its id).
 /// </summary>
-public sealed record LedgerQuery(string? Account, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party, int Page = 1, int PageSize = 200);
+/// <summary>Ledger / statement filters; <paramref name="Reference"/> (DT-254) keeps the lines whose line reference or entry reference contains it.</summary>
+public sealed record LedgerQuery(string? Account, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party, int Page = 1, int PageSize = 200,
+    string? Reference = null);
 
 /// <summary>One movement with its running balance (debit − credit); drill-down to the entry and to its source document.</summary>
-/// <summary>A ledger / statement line; <paramref name="Reference"/> is the entry's reference (المرجع, revision 6).</summary>
+/// <summary>A ledger / statement line; <paramref name="Reference"/> is the line reference (مرجع السطر, DT-254; the entry's reference when the line has none).</summary>
 public sealed record LedgerLine(
     DateOnly Date, EntryLinkRef Entry, string Description, SourceDocumentRef? Source, AccountRef Account, PartyResponse? Party, Ref? CostCentre, string? Note,
     decimal Debit, decimal Credit, decimal Balance, string? Reference = null);
@@ -33,7 +35,7 @@ public sealed record LedgerReport(
 /// </summary>
 public sealed record AccountStatementsQuery(
     string? Accounts, string? CodeFrom, string? CodeTo, bool? AllAccounts, DateOnly? From, DateOnly? To, string? CostCentre, string? PartyType, string? Party,
-    bool? HideEmpty = null);
+    bool? HideEmpty = null, string? Reference = null);
 
 /// <summary>One account of the statement: opening, every movement with its running balance, the subtotal (totals and closing).</summary>
 public sealed record AccountStatementSection(

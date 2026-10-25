@@ -18,6 +18,12 @@ internal sealed class EntryLineConfiguration : IEntityTypeConfiguration<EntryLin
             t.HasCheckConstraint("CK_EntryLines_PartyModule", "[PartyModule] IN ('TRN','ACC')");
             t.HasCheckConstraint("CK_EntryLines_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
             t.HasCheckConstraint("CK_EntryLines_Debit_Credit", "([Debit] > 0 AND [Credit] = 0) OR ([Credit] > 0 AND [Debit] = 0)");
+            // DT-255: a taxed line has its code and rate; tax amount, tax account and source line only with a code; an automatic tax line
+            // carries its code and rate but no tax amount or tax account of its own (its account is the tax account).
+            t.HasCheckConstraint("CK_EntryLines_TaxRate", "[TaxRate] IS NULL OR ([TaxRate] >= 0 AND [TaxRate] <= 100)");
+            t.HasCheckConstraint("CK_EntryLines_TaxAmount", "[TaxAmount] IS NULL OR [TaxAmount] >= 0");
+            t.HasCheckConstraint("CK_EntryLines_TaxCodeId_TaxRate", "([TaxCodeId] IS NULL AND [TaxRate] IS NULL AND [TaxAmount] IS NULL AND [TaxAccountId] IS NULL AND [TaxForLineId] IS NULL) OR ([TaxCodeId] IS NOT NULL AND [TaxRate] IS NOT NULL)");
+            t.HasCheckConstraint("CK_EntryLines_TaxForLineId", "[TaxForLineId] IS NULL OR ([TaxAmount] IS NULL AND [TaxAccountId] IS NULL)");
         });
 
         builder.HasKey(e => e.Id).HasName("PK_EntryLines");
@@ -159,6 +165,13 @@ internal sealed class EntryLineConfiguration : IEntityTypeConfiguration<EntryLin
             .HasColumnOrder(22)
             .IsRequired(true)
             .IsRowVersion();
+        // DT-254 / DT-255 (owner request 25 Oct 2026): line reference and tax.
+        builder.Property(e => e.Reference).HasColumnName("Reference").HasColumnType("nvarchar(100)").HasColumnOrder(23).IsUnicode(true).HasMaxLength(100).IsRequired(false);
+        builder.Property(e => e.TaxCodeId).HasColumnName("TaxCodeId").HasColumnType("bigint").HasColumnOrder(24).IsRequired(false);
+        builder.Property(e => e.TaxRate).HasColumnName("TaxRate").HasColumnType("decimal(5,2)").HasColumnOrder(25).HasPrecision(5, 2).IsRequired(false);
+        builder.Property(e => e.TaxAmount).HasColumnName("TaxAmount").HasColumnType("decimal(18,3)").HasColumnOrder(26).HasPrecision(18, 3).IsRequired(false);
+        builder.Property(e => e.TaxAccountId).HasColumnName("TaxAccountId").HasColumnType("bigint").HasColumnOrder(27).IsRequired(false);
+        builder.Property(e => e.TaxForLineId).HasColumnName("TaxForLineId").HasColumnType("bigint").HasColumnOrder(28).IsRequired(false);
 
         builder.HasIndex(new[] { "PublicId" }, "UX_EntryLines_PublicId")
             .IsUnique()
@@ -168,6 +181,10 @@ internal sealed class EntryLineConfiguration : IEntityTypeConfiguration<EntryLin
         builder.HasIndex(new[] { "CompanyId", "PartyModule", "PartyType", "PartyId" }, "IX_EntryLines_Party");
         builder.HasIndex(new[] { "JournalEntryId" }, "IX_EntryLines_JournalEntryId");
         builder.HasIndex(new[] { "CostCentreId" }, "IX_EntryLines_CostCentreId");
+        builder.HasIndex(new[] { "TaxCodeId" }, "IX_EntryLines_TaxCodeId").HasFilter("[TaxCodeId] IS NOT NULL");
+        builder.HasIndex(new[] { "TaxAccountId" }, "IX_EntryLines_TaxAccountId").HasFilter("[TaxAccountId] IS NOT NULL");
+        builder.HasIndex(new[] { "TaxForLineId" }, "IX_EntryLines_TaxForLineId").HasFilter("[TaxForLineId] IS NOT NULL");
+        builder.HasIndex(new[] { "CompanyId", "Reference" }, "IX_EntryLines_CompanyId_Reference").HasFilter("[Reference] IS NOT NULL");
 
         builder.HasOne(e => e.JournalEntry)
             .WithMany(p => p.Lines)
@@ -190,6 +207,12 @@ internal sealed class EntryLineConfiguration : IEntityTypeConfiguration<EntryLin
             .IsRequired(false)
             .HasConstraintName("FK_EntryLines_CostCentres_CostCentreId")
             .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(e => e.TaxCode).WithMany().HasForeignKey(e => e.TaxCodeId).HasPrincipalKey(p => p.Id).IsRequired(false)
+            .HasConstraintName("FK_EntryLines_TaxCodes_TaxCodeId").OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(e => e.TaxAccount).WithMany().HasForeignKey(e => e.TaxAccountId).HasPrincipalKey(p => p.Id).IsRequired(false)
+            .HasConstraintName("FK_EntryLines_Accounts_TaxAccountId").OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(e => e.TaxForLine).WithMany().HasForeignKey(e => e.TaxForLineId).HasPrincipalKey(p => p.Id).IsRequired(false)
+            .HasConstraintName("FK_EntryLines_EntryLines_TaxForLineId").OnDelete(DeleteBehavior.NoAction);
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(e => e.TenantId)

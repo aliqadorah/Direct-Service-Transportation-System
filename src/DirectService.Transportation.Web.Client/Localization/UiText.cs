@@ -739,6 +739,7 @@ public static partial class UiText
         ["nav.companySettings"] = ("إعدادات الشركة", "Company settings"),
         ["nav.mapping"] = ("ربط الحسابات", "Account mapping"),
         ["nav.numbering"] = ("الترقيم", "Numbering"),
+        ["nav.taxCodes"] = ("رموز الضريبة", "Tax codes"),
         ["nav.einvoiceSettings"] = ("الفوترة الإلكترونية", "E-invoicing"),
         ["nav.layoutDesigner"] = ("مصمم نموذج الفاتورة", "Invoice layout designer"),
         ["nav.fields"] = ("تهيئة الحقول", "Field configuration"),

@@ -25,8 +25,12 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>A stored draft line: internal ids, so a draft survives a change of the URL-token key.</summary>
-    private sealed record DraftLine(long? AccountId, decimal Debit, decimal Credit, long? CostCentreId, string? PartyType, long? PartyId, string? Note);
+    /// <summary>
+    /// A stored draft line: internal ids, so a draft survives a change of the URL-token key. Line reference, tax code and tax account (DT-254,
+    /// DT-255) are absent from drafts saved before them (read as none).
+    /// </summary>
+    private sealed record DraftLine(long? AccountId, decimal Debit, decimal Credit, long? CostCentreId, string? PartyType, long? PartyId, string? Note,
+        string? Reference = null, long? TaxCodeId = null, long? TaxAccountId = null);
 
     public async Task<JournalDraftResponse> CreateAsync(ManualEntryRequest r, CancellationToken ct)
     {
@@ -77,7 +81,7 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
             var l = lines[i];
             if (l.AccountId is null) throw Fail.Field($"lines[{i}].accountId", ErrorCodes.ValidationRequired, new FieldRef($"lines[{i}].accountId"));
             var party = l.PartyType is not null && l.PartyId is long pid ? new PostingParty(PartyResolver.ModuleOf(l.PartyType), l.PartyType, pid) : null;
-            posting.Add(new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, party, l.Note));
+            posting.Add(new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, party, l.Note, l.Reference, l.TaxCodeId, l.TaxCodeId is null ? null : l.TaxAccountId));
         }
         var request = new PostingRequest(draft.EntryDate!.Value, draft.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true,
             posting, draft.Reference);
@@ -98,12 +102,16 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         var publicId = tokens.Decode<JournalDraft>(token) ?? throw Fail.NotFound();
         var d = await db.Set<JournalDraft>().AsNoTracking().SingleOrDefaultAsync(x => x.PublicId == publicId, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
         var lines = Read(d.Lines);
-        var accountIds = lines.Where(l => l.AccountId is not null).Select(l => l.AccountId!.Value).Distinct().ToList();
+        var accountIds = lines.Where(l => l.AccountId is not null).Select(l => l.AccountId!.Value)
+            .Concat(lines.Where(l => l.TaxAccountId is not null).Select(l => l.TaxAccountId!.Value)).Distinct().ToList();
         var accounts = await db.Set<Account>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(a => accountIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, a => new AccountRef(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn), ct).ConfigureAwait(false);
         var centreIds = lines.Where(l => l.CostCentreId is not null).Select(l => l.CostCentreId!.Value).Distinct().ToList();
         var centres = await db.Set<CostCentre>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(c => centreIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => new Ref(tokens.Encode<CostCentre>(c.PublicId), $"{c.Code} – {c.Name}"), ct).ConfigureAwait(false);
+        var codeIds = lines.Where(l => l.TaxCodeId is not null).Select(l => l.TaxCodeId!.Value).Distinct().ToList();
+        var codes = await db.Set<TaxCode>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(t => codeIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, t => new TaxCodeRef(tokens.Encode<TaxCode>(t.PublicId), t.Code, t.Rate, t.NameAr, t.NameEn), ct).ConfigureAwait(false);
         var partyNames = await parties.DescribeAsync(lines.Select(l => (l.PartyType, l.PartyId)), ct).ConfigureAwait(false);
         var creator = d.CreatedBy is long cb
             ? await db.Set<User>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(u => u.Id == cb).Select(u => u.FullName).SingleOrDefaultAsync(ct).ConfigureAwait(false)
@@ -113,7 +121,8 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
                 l.AccountId is long a ? accounts.GetValueOrDefault(a) : null, l.Debit, l.Credit,
                 l.CostCentreId is long c ? centres.GetValueOrDefault(c) : null,
                 l.PartyType is not null && l.PartyId is long p ? partyNames.GetValueOrDefault((l.PartyType, p)) : null,
-                l.Note)).ToList(),
+                l.Note, l.Reference, l.TaxCodeId is long tc ? codes.GetValueOrDefault(tc) : null,
+                l.TaxAccountId is long ta ? accounts.GetValueOrDefault(ta) : null)).ToList(),
             d.TotalDebit, d.TotalCredit, d.CreatedAt, creator, Convert.ToBase64String(d.RowVersion));
     }
 
@@ -131,10 +140,10 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
             var month = AccountingCodes.Month(date);
             if (q.PeriodFrom is not null && string.CompareOrdinal(month, q.PeriodFrom) < 0) continue;
             if (q.PeriodTo is not null && string.CompareOrdinal(month, q.PeriodTo) > 0) continue;
-            if (search is not null && !(Contains(d.Description, search) || Contains(d.Reference, search))) continue;
+            var lines = Read(d.Lines);
+            if (search is not null && !(Contains(d.Description, search) || Contains(d.Reference, search) || lines.Any(l => Contains(l.Reference, search)))) continue;
             if (accountId is not null || costCentreId is not null || party is not null)
             {
-                var lines = Read(d.Lines);
                 if (accountId is not null && !lines.Any(l => l.AccountId == accountId)) continue;
                 if (costCentreId is not null && !lines.Any(l => l.CostCentreId == costCentreId)) continue;
                 if (party is { } pt && !lines.Any(l => l.PartyType == pt.Type && l.PartyId == pt.Id)) continue;
@@ -167,6 +176,9 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
             .Check(description is not null || input.Count > 0, "description", ErrorCodes.ValidationRequired)
             .ThrowIfInvalid();
         var lines = new List<DraftLine>(input.Count);
+        var rates = await db.Set<TaxCode>().AsNoTracking().ToDictionaryAsync(t => t.PublicId, t => (t.Id, t.Rate), ct).ConfigureAwait(false);
+        var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
+        decimal totalDebit = 0, totalCredit = 0;
         for (var i = 0; i < input.Count; i++)
         {
             var l = input[i];
@@ -187,14 +199,31 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
             }
             var party = l.Party is { Type: not null } && !string.IsNullOrEmpty(l.Party.Id)
                 ? await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false) : null;
-            lines.Add(new DraftLine(accountId, l.Debit, l.Credit, centreId, party?.Type, party?.Id, TextNormalizer.CleanText(l.Note)));
+            var lineReference = TextNormalizer.CleanText(l.Reference);
+            if (lineReference is { Length: > PostingEngine.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            (long Id, decimal Rate)? code = null;
+            if (!string.IsNullOrEmpty(l.TaxCodeId))
+                code = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && rates.TryGetValue(tg, out var c) ? c
+                    : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+            long? taxAccountId = null;
+            if (code is not null && !string.IsNullOrEmpty(l.TaxAccountId))
+            {
+                var pid = tokens.Decode<Account>(l.TaxAccountId) ?? throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+                taxAccountId = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == pid).Select(a => (long?)a.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
+                    ?? throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+            }
+            lines.Add(new DraftLine(accountId, l.Debit, l.Credit, centreId, party?.Type, party?.Id, TextNormalizer.CleanText(l.Note), lineReference, code?.Id, taxAccountId));
+            // Totals as they would post: with the tax of each line on its side (DT-255).
+            var tax = code is { } k ? JournalTax.Amount(l.Debit + l.Credit, k.Rate, decimals) : 0;
+            totalDebit += l.Debit + (l.Debit > 0 ? tax : 0);
+            totalCredit += l.Credit + (l.Debit > 0 ? 0 : tax);
         }
         draft.EntryDate = r.EntryDate;
         draft.Description = description;
         draft.Reference = reference;
         draft.Lines = JsonSerializer.Serialize(lines, Json);
-        draft.TotalDebit = lines.Sum(l => l.Debit);
-        draft.TotalCredit = lines.Sum(l => l.Credit);
+        draft.TotalDebit = totalDebit;
+        draft.TotalCredit = totalCredit;
     }
 
     private static List<DraftLine> Read(string json) => JsonSerializer.Deserialize<List<DraftLine>>(json, Json) ?? [];

@@ -214,3 +214,41 @@ Two new **platform-wide** tables (schema `core`, no `TenantId` filter: only plat
 | `RowVersion` | ROWVERSION | |
 
 Indexes: `IX_EmailOutbox_Status_NextAttemptAt` (the worker's queue), `IX_EmailOutbox_SentAt` filtered `SentAt IS NOT NULL` (the 30-a-minute throttle, last success), `IX_EmailOutbox_CreatedAt` (log, retention), `IX_EmailOutbox_Recipient_Template_CreatedAt` (5 of a kind per address an hour). The worker claims due rows with `UPDLOCK, READPAST, ROWLOCK` (raw SQL, listed in BUILD_STATUS.md). The application user `dst_app` needs no new right (insert / update only; `DENY DELETE` on `core` stays).
+
+## B11. Journal line reference and tax (owner request 25 Oct 2026, DT-254…DT-259) — migration `Rev6_JournalLineTax`
+Manual journal entries get a reference on every line and a tax code per line; the amount on a line is **before tax** and posting adds the tax as an automatic line. Sales invoices, credit notes, supplier bills and e-invoicing (JoFotara) keep their own tax calculation (no change).
+
+**New table `acc.TaxCodes`** (company-scoped, standard audit / soft-delete / row-version columns, audited as `ACC.TaxCode`): the tax codes of Settings → Tax codes.
+
+| Column | Type | Rule |
+|---|---|---|
+| `Code` | VARCHAR(30) NOT NULL | `UX_TaxCodes_CompanyId_Code` unique per company (filter `[IsDeleted] = 0`); letters, digits, `.` `_` `-` (application rule, as account codes) |
+| `Rate` | DECIMAL(5,2) NOT NULL | `CK_TaxCodes_Rate` 0–100 (percent) |
+| `NameAr` / `NameEn` | NVARCHAR(100) NOT NULL / NULL | Arabic and English description |
+| `Status` | VARCHAR(10) NOT NULL DEFAULT 'Active' | `CK_TaxCodes_Status` Active / Archived (deactivated: not offered, not posted; posted lines keep it) |
+| `SortOrder` | INT NOT NULL DEFAULT 0 | `CK_TaxCodes_SortOrder` ≥ 0; list order (then the code) |
+
+Index `UX_TaxCodes_PublicId`; FKs to `core.Tenants`, `core.Companies`, `core.Users` (Created/Updated/DeletedBy). Application rules: a code used on a journal line (any status of the entry) cannot be deleted and its code and rate cannot change — deactivate it and create a new code. Seed (editable): `VAT_JO_0`, `_1`, `_2`, `_4`, `_5`, `_7`, `_8`, `_10`, `_16` with "ضريبة المبيعات n%" / "VAT n%", order 10…90 — for every existing company by the migration, for new companies by `CompanyProvisioningService`.
+
+**`acc.EntryLines`** — six new columns (all NULL):
+
+| Column | Type | Rule |
+|---|---|---|
+| `Reference` | NVARCHAR(100) | line reference (مرجع السطر); a line without one takes the entry's `Reference` when posted; index `IX_EntryLines_CompanyId_Reference` (filter `IS NOT NULL`) |
+| `TaxCodeId` | BIGINT | FK `FK_EntryLines_TaxCodes_TaxCodeId`; the line's tax code (on an automatic tax line, the code it was calculated with); filtered index |
+| `TaxRate` | DECIMAL(5,2) | the code's rate when posted (`CK_EntryLines_TaxRate` 0–100) — later edits of the code never change posted lines |
+| `TaxAmount` | DECIMAL(18,3) | tax = amount × rate ÷ 100, half-up to the currency's decimals (`CK_EntryLines_TaxAmount` ≥ 0); gross = amount + tax (not stored) |
+| `TaxAccountId` | BIGINT | FK `FK_EntryLines_Accounts_TaxAccountId`; the tax account the user chose (required for a rate above 0 %, never defaulted); filtered index |
+| `TaxForLineId` | BIGINT | FK `FK_EntryLines_EntryLines_TaxForLineId` (self); set on the **automatic tax line** = the line whose tax it carries; filtered index |
+
+Checks: `CK_EntryLines_TaxCodeId_TaxRate` — without a tax code every tax column is NULL; with one the rate is set. `CK_EntryLines_TaxForLineId` — an automatic tax line has no tax amount and no tax account of its own (its `AccountId` is the tax account). Posting: for each taxed line with tax > 0 the engine adds a line to the tax account on the **same side** (debit line → tax debit, credit line → tax credit), same cost centre and reference, note "ضريبة المبيعات 16% على السطر 2 / VAT 16% on line 2", numbered after the entered lines; `TotalDebit` / `TotalCredit` include the tax lines and must be equal (BR-033). Reversal (edit, void) mirrors every column and keeps the link between the mirror lines.
+
+**`acc.Accounts.IsTaxAccount`** BIT NOT NULL DEFAULT 0 (`DF_Accounts_IsTaxAccount`) — offered as the tax account of journal lines; `CK_Accounts_IsTaxAccount`: never a control account. The chart template (new companies) marks 1105 (input VAT) and 2104 (output VAT) and adds 5207 "مصروف ضريبة المبيعات غير القابلة للاسترداد / VAT expenses (non-recoverable)" under 52, marked. Existing companies: nothing is added or marked by the migration; "Add the default tax accounts" (chart of accounts, acct.setup) marks the template's own 1105 / 2104 when they are there (same code, type and name) and adds the missing ones with the next free code under their group (11, 21, 52).
+
+**JSON lines** of `acc.JournalDrafts` and `acc.JournalTemplates` (no schema change): each line may also hold `reference`, `taxCodeId`, `taxAccountId` (internal ids); lines saved before have none. Draft totals are as they would post (with tax).
+
+**Existing data (upgrade).** Choice: the lines of existing entries **take the entry's Reference** (one `UPDATE … FROM acc.JournalEntries`), so statements, the entry view and the search show old and new entries alike — exactly what a new line starts with; entries without a Reference (all automatic ones) keep empty line references. No existing line gets a tax code; nothing else changes, so balances and reports are unchanged. Alternative not taken: leave line references empty and fall back to the entry's at reading time — two places to read one value. (The statement still falls back to the entry's Reference for a line without one.)
+
+**Rollback.** `Down` refuses first, in the same transaction, while any line has a tax code or is an automatic tax line (`THROW 50259`, same style as DT-231); otherwise it drops the tax codes, the tax-account flag and the line references (the entry Reference stays).
+
+Raw SQL in the migration: the reference copy, the seed of the tax codes and the rollback guard (listed in BUILD_STATUS.md).

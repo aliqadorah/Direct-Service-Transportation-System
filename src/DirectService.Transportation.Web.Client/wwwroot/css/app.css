@@ -220,6 +220,10 @@ table.grid tr.sel td { background: var(--tint); }
 table.grid tr.live td { background: var(--live-row); transition: background var(--dur-live) var(--ease); }
 table.grid tr.void td { color: var(--muted); }
 table.grid tr.grp td { background: var(--surface-group); font-weight: var(--fw-semibold); }
+/* Journal entry form and view (DT-255): the automatic tax lines, read-only, under the entered lines. */
+table.je-lines tr.auto td, table.grid tr.auto td { background: var(--surface-group); color: var(--muted); }
+table.je-lines tr.auto td .num, table.grid tr.auto td .num { color: var(--text); }
+table.je-lines td { vertical-align: middle; }
 /* Trial balance tree (revision 6): indented names with an expand / collapse button on parent rows. */
 .tb-name { display: inline-flex; align-items: center; gap: 4px; }
 .tb-toggle { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }

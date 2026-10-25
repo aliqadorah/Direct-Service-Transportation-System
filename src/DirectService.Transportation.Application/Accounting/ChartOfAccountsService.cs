@@ -36,7 +36,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
     /// </summary>
     public async Task<IReadOnlyList<AccountOption>> OptionsAsync(CancellationToken ct) =>
         (await db.Set<Account>().AsNoTracking().Where(a => a.IsPostable && a.Status == AccountingCodes.Active).OrderBy(a => a.Code).ToListAsync(ct).ConfigureAwait(false))
-            .Select(a => new AccountOption(Ref(a), a.AccountType, a.IsControlAccount, a.ControlPartyType)).ToList();
+            .Select(a => new AccountOption(Ref(a), a.AccountType, a.IsControlAccount, a.ControlPartyType, a.IsTaxAccount)).ToList();
 
     public async Task<AccountResponse> GetAsync(string token, CancellationToken ct)
     {
@@ -65,7 +65,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         var account = new Account
         {
             Code = code, NameAr = nameAr, NameEn = nameEn, AccountType = type!, ParentId = parent?.Id, IsPostable = r.IsPostable,
-            IsControlAccount = isControl, ControlPartyType = partyType, Status = AccountingCodes.Active,
+            IsControlAccount = isControl, ControlPartyType = partyType, Status = AccountingCodes.Active, IsTaxAccount = r.IsTaxAccount,
         };
         if (parent is not null && parent.IsPostable)
         {
@@ -115,6 +115,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         a.IsPostable = r.IsPostable;
         a.IsControlAccount = isControl;
         a.ControlPartyType = partyType;
+        a.IsTaxAccount = r.IsTaxAccount;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return await ResponseAsync(a, ct).ConfigureAwait(false);
     }
@@ -211,7 +212,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
                     Parent = t.ParentCode is null ? null : created[t.ParentCode],
                     IsPostable = ChartTemplate.IsLeaf(t.Code),
                     IsControlAccount = t.ControlPartyType is not null, ControlPartyType = t.ControlPartyType,
-                    Status = AccountingCodes.Active,
+                    Status = AccountingCodes.Active, IsTaxAccount = t.IsTax,
                 };
                 created[t.Code] = account;
                 db.Set<Account>().Add(account);
@@ -231,6 +232,78 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
             return new ChartTemplateResult(created.Count, cashBoxes, ChartTemplate.Mapping.Count);
         }, ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// "Add the default tax accounts" (DT-256, existing companies — nothing is added automatically): for each of VAT on sales, VAT on purchases
+    /// and VAT expenses whose type has no active tax account yet, the template account with its code is marked as a tax account when it is a
+    /// plain active leaf of that type; otherwise a new account is added under the template group (or the first top-level account of the type
+    /// that can take sub-accounts) with the next free code of that group.
+    /// </summary>
+    public async Task<DefaultTaxAccountsResult> AddDefaultTaxAccountsAsync(CancellationToken ct) =>
+        await db.InTransactionAsync(async c =>
+        {
+            var all = await db.Set<Account>().ToListAsync(c).ConfigureAwait(false);
+            var parents = all.Where(a => a.ParentId is not null).Select(a => a.ParentId!.Value).ToHashSet();
+            var codes = all.Select(a => a.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var touched = new List<Account>();
+            int added = 0, marked = 0;
+            foreach (var d in ChartTemplate.TaxAccounts)
+            {
+                if (all.Any(a => a.IsTaxAccount && a.AccountType == d.Type && a.Status == AccountingCodes.Active)) continue;
+                // Only the template's own account (same code and type, one of its names): an unrelated account that took the code stays as it is.
+                var names = ChartTemplate.Accounts.Where(t => t.Code == d.TemplateCode).SelectMany(t => new[] { t.NameAr, t.NameEn }).Append(d.NameAr).Append(d.NameEn).ToList();
+                var template = all.FirstOrDefault(a => a.Code == d.TemplateCode && a.AccountType == d.Type && !a.IsControlAccount
+                    && a.Status == AccountingCodes.Active && a.IsPostable && !parents.Contains(a.Id) && (names.Contains(a.NameAr) || (a.NameEn is not null && names.Contains(a.NameEn))));
+                if (template is not null)
+                {
+                    template.IsTaxAccount = true;
+                    touched.Add(template);
+                    marked++;
+                    continue;
+                }
+                Account? parent = null;
+                string? code = null;
+                foreach (var candidate in all.Where(a => a.AccountType == d.Type && a.Status == AccountingCodes.Active && (a.Code == d.GroupCode || a.ParentId is null))
+                             .OrderBy(a => a.Code == d.GroupCode ? 0 : 1).ThenBy(a => a.Code, StringComparer.Ordinal))
+                {
+                    if ((await UsesAsync(candidate, c).ConfigureAwait(false)).Count > 0) continue;
+                    code = Enumerable.Range(1, 99).Select(n => candidate.Code + n.ToString("00", System.Globalization.CultureInfo.InvariantCulture))
+                        .FirstOrDefault(x => !codes.Contains(x) && IsCode(x));
+                    if (code is null) continue;
+                    parent = candidate;
+                    break;
+                }
+                if (parent is null || code is null) throw Fail.Rule(ErrorCodes.TaxAccountNoGroup, TypeName(d.Type));
+                if (parent.IsPostable)
+                {
+                    parent.IsPostable = false; // FR-108: an account with children is not postable
+                    changes.SetAction(parent, "Update");
+                }
+                var account = new Account
+                {
+                    Code = code, NameAr = d.NameAr, NameEn = d.NameEn, AccountType = d.Type, Parent = parent, IsPostable = true,
+                    Status = AccountingCodes.Active, IsTaxAccount = true,
+                };
+                db.Set<Account>().Add(account);
+                all.Add(account);
+                codes.Add(code);
+                touched.Add(account);
+                added++;
+            }
+            await db.SaveChangesAsync(c).ConfigureAwait(false);
+            return new DefaultTaxAccountsResult(added, marked, touched.Select(Ref).ToList());
+        }, ct).ConfigureAwait(false);
+
+    private string TypeName(string type) => (ctx.Language == "en", type) switch
+    {
+        (true, "Liability") => "Liabilities",
+        (false, "Liability") => "الالتزامات",
+        (true, "Asset") => "Assets",
+        (false, "Asset") => "الأصول",
+        (true, "Expense") => "Expenses",
+        (false, "Expense") => "المصروفات",
+        _ => type,
+    };
 
     // ------------------------------------------------------------ shared rules
 
@@ -282,6 +355,8 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
 
     private static (bool IsControl, string? PartyType) ValidateControl(AccountRequest r)
     {
+        // DT-256: a tax account carries the automatic tax lines, which have no party.
+        if (r.IsTaxAccount && r.IsControlAccount) throw Fail.RuleOn("isTaxAccount", ErrorCodes.TaxAccountControl);
         if (!r.IsControlAccount) return (false, null);
         new Validator().Check(r.ControlPartyType is not null && AccountingCodes.ControlPartyTypes.Contains(r.ControlPartyType), "controlPartyType")
             .ThrowIfInvalid();
@@ -353,7 +428,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         return new AccountResponse(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn, a.AccountType,
             parentAccount is null ? null : tokens.Encode<Account>(parentAccount.PublicId), parentAccount?.Code, level,
             a.IsPostable, withChildren.Contains(a.Id), a.OpeningDebit, a.OpeningCredit, a.IsControlAccount, a.ControlPartyType, a.Status,
-            Convert.ToBase64String(a.RowVersion));
+            Convert.ToBase64String(a.RowVersion), a.IsTaxAccount);
     }
 
     internal AccountRef Ref(Account a) => new(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn);

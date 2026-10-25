@@ -9,6 +9,10 @@
   a JV number and without posting — a draft opens here again to be edited, deleted or posted (number and period lock apply at posting).
   Revision 6 part B: "Use template" fills the description, Reference and lines from a journal template (also ?template=… from the templates
   list); "Save as template" keeps them (amounts optional) under a name. The entry is then saved or posted as usual.
+  Owner request 25 Oct 2026: a Reference on every line (DT-254; a new line starts with the entry's Reference, and lines that still show the old
+  one follow a change of it) and a tax code per line (DT-255): debit / credit is the amount before tax; rate, tax and gross are shown; the tax
+  account is always chosen by the user among the tax accounts (rates above 0 %), and the automatic tax lines posting will add are previewed;
+  the entry must balance including them. "?copy=…" fills a new entry from a posted one (DT-258) without its automatic tax lines.
 *@
 @inject Api Api
 @inject Loc L
@@ -22,7 +26,7 @@
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        <PageHeader Title="@(_existing is not null ? L.F("je.edit", _existing.Number) : _draft is not null ? L["je.draftTitle"] : L["nav.newJournal"])" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
+        <PageHeader Title="@(_existing is not null ? L.F("je.edit", _existing.Number) : _draft is not null ? L["je.draftTitle"] : _copiedFrom is not null ? L.F("je.copyTitle", _copiedFrom) : L["nav.newJournal"])" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.journal"], NavModel.Href(Company, "accounting/journal"))])">
             <Actions>
                 @if (_existing is null)
                 {
@@ -36,6 +40,7 @@
         </PageHeader>
         @if (!MayPost && _existing is null) {<Banner Tone="Tone.Info" Icon="info" Text="@L["je.prepareOnly"]" />}
         @if (_draft is not null) {<Banner Tone="Tone.Info" Icon="info" Text="@L["je.draftHelp"]" />}
+        @if (_copiedFrom is not null) {<Banner Tone="Tone.Info" Icon="copy" Text="@L.F("je.copyHelp", _copiedFrom)" />}
         @if (_existing is not null) {<Banner Tone="Tone.Info" Text="@L.F("je.editHelp", _existing.Number)" />}
         @if (_existing is not null) {<RecordLockGuard EntityType="ACC.JournalEntry" Id="@_existing.Id" OnState="h => _lockedBy = h" />}
         <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
@@ -45,17 +50,20 @@
                 <div class="fg" style="grid-template-columns:200px minmax(0,2fr) minmax(0,1fr)">
                     <DateField @bind-Value="_m.EntryDate" Label="@L["trip.date"]" Required="true" />
                     <TextField @bind-Value="_m.Description" Label="@L["je.description"]" Required="true" MaxLength="500" />
-                    <TextField @bind-Value="_m.Reference" Label="@L["je.reference"]" MaxLength="100" />
+                    <TextField @bind-Value="_m.Reference" Label="@L["je.reference"]" MaxLength="100" @bind-Value:after="HeaderReferenceChanged" />
                 </div>
             </section>
             <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
-                <Actions><Btn Small="true" Icon="plus" Text="@L["je.addLine"]" OnClick="() => _m.Lines.Add(new LineModel())" /></Actions>
+                <Actions><Btn Small="true" Icon="plus" Text="@L["je.addLine"]" OnClick="AddLine" /></Actions>
                 <ChildContent>
+                    @if (_m.Lines.Any(l => l.TaxCodeId is not null)) {<p class="help pad" style="margin:0;padding-bottom:0">@L["je.taxHelp"]</p>}
                     <div class="tbl-wrap fill">
-                        <table class="tbl">
+                        <table class="tbl je-lines">
                             <caption class="sr-only">@L["je.lines"]</caption>
                             <thead><tr>
-                                <th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.account"]</th><th scope="col">@L["je.reference"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.taxCode"]</th><th scope="col" class="n">@L["je.taxRate"]</th><th scope="col" class="n">@L["je.taxAmount"]</th><th scope="col" class="n">@L["je.gross"]</th>
+                                <th scope="col">@L["je.taxAccount"]</th>
                                 <th scope="col">@L["je.costCentre"]</th><th scope="col">@L["je.party"]</th><th scope="col">@L["drv.note"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>
                             </tr></thead>
                             <tbody>
@@ -64,12 +72,33 @@
                                     var line = _m.Lines[i];
                                     var n = i + 1;
                                     var account = Lookups.Account(line.AccountId);
+                                    var code = Lookups.TaxCode(line.TaxCodeId);
                                     <tr @key="line">
-                                        <td style="min-width:260px"><ComboField TValue="string?" @bind-Value="line.AccountId" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" OnSelected="_ => line.Party = null" /></td>
-                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
-                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
-                                        <td style="width:180px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
-                                        <td style="min-width:200px">
+                                        <td style="min-width:230px"><ComboField TValue="string?" @bind-Value="line.AccountId" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" OnSelected="_ => line.Party = null" /></td>
+                                        <td style="min-width:120px"><TextField @bind-Value="line.Reference" MaxLength="100" aria-label="@L.F("je.lineReference", n)" /></td>
+                                        <td class="n" style="min-width:120px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
+                                        <td class="n" style="min-width:120px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
+                                        <td style="min-width:150px"><ComboField TValue="string?" @bind-Value="line.TaxCodeId" Options="_taxCodes" aria-label="@L.F("je.lineTaxCode", n)" OnSelected="_ => TaxCodeChosen(line)" /></td>
+                                        <td class="n" style="width:56px"><bdi class="num">@(code is null ? "—" : Fmt.Percent(code.Rate))</bdi></td>
+                                        <td class="n" style="min-width:84px"><bdi class="num">@(code is null ? "—" : Fmt.Money(Tax(line)))</bdi></td>
+                                        <td class="n" style="min-width:96px"><bdi class="num">@Fmt.Money(Amount(line) + Tax(line))</bdi></td>
+                                        <td style="min-width:190px">
+                                            @if (code is { Rate: > 0 })
+                                            {
+                                                @if (_taxAccounts.Count > 0)
+                                                {
+                                                    <ComboField TValue="string?" @bind-Value="line.TaxAccountId" Options="_taxAccounts" aria-label="@L.F("je.lineTaxAccount", n)" Placeholder="@L["je.chooseTaxAccount"]" />
+                                                }
+                                                else if (Shell.Can(PermissionKeys.AcctSetup))
+                                                {
+                                                    <Btn Small="true" Icon="plus" Text="@L["acc.addTaxAccounts"]" Busy="_addingTaxAccounts" OnClick="AddTaxAccounts" />
+                                                }
+                                                else {<span class="muted">@L["acc.noTaxAccounts"]</span>}
+                                            }
+                                            else {<span class="muted">—</span>}
+                                        </td>
+                                        <td style="min-width:160px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
+                                        <td style="min-width:180px">
                                             @if (account is { IsControlAccount: true } a)
                                             {
                                                 @if (a.ControlPartyType == "Driver")
@@ -82,19 +111,47 @@
                                                 }
                                             }
                                         </td>
-                                        <td style="min-width:160px"><TextField @bind-Value="line.Note" MaxLength="200" aria-label="@L.F("je.lineNote", n)" /></td>
+                                        <td style="min-width:150px"><TextField @bind-Value="line.Note" MaxLength="200" aria-label="@L.F("je.lineNote", n)" /></td>
                                         <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 2" OnClick="() => _m.Lines.Remove(line)" /></td>
+                                    </tr>
+                                }
+                                @* DT-255: the tax lines posting will add (same side, on the chosen tax account), read-only. *@
+                                @for (var i = 0; i < _m.Lines.Count; i++)
+                                {
+                                    var line = _m.Lines[i];
+                                    var tax = Tax(line);
+                                    if (tax <= 0 || line.TaxAccountId is null || Lookups.Account(line.TaxAccountId) is not { } taxAccount) continue;
+                                    var debitSide = line.Debit > 0;
+                                    <tr class="auto" @key="(line, true)">
+                                        <td><Badge Tone="Tone.Mute" Icon="zap" Text="@L["je.autoTax"]" /> <Tx Value="@Lookups.Name(taxAccount.Account)" /></td>
+                                        <td><Tx Value="@line.Reference" /></td>
+                                        <td class="n"><bdi class="num">@(debitSide ? Fmt.Money(tax) : null)</bdi></td>
+                                        <td class="n"><bdi class="num">@(debitSide ? null : Fmt.Money(tax))</bdi></td>
+                                        <td colspan="9" class="muted">@L.F("je.autoTaxFor", i + 1)</td>
                                     </tr>
                                 }
                             </tbody>
                             <tfoot>
+                                @if (TaxTotal > 0)
+                                {
+                                    <tr>
+                                        <td>@L["je.netTotal"]</td>
+                                        <td></td>
+                                        <td class="n"><bdi class="num">@Fmt.Money(Debit)</bdi></td>
+                                        <td class="n"><bdi class="num">@Fmt.Money(Credit)</bdi></td>
+                                        <td></td><td></td>
+                                        <td class="n"><bdi class="num">@Fmt.Money(TaxTotal)</bdi></td>
+                                        <td colspan="6"></td>
+                                    </tr>
+                                }
                                 <tr>
-                                    <td>@L["ui.total"]</td>
-                                    <td class="n"><bdi class="num">@Fmt.Money(Debit)</bdi></td>
-                                    <td class="n"><bdi class="num">@Fmt.Money(Credit)</bdi></td>
-                                    <td colspan="4" aria-live="polite">
-                                        @if (Debit == Credit && Debit > 0) {<Badge Tone="Tone.Ok" Icon="check" Text="@L["je.balanced"]" />}
-                                        else {<Badge Tone="Tone.Err" Icon="alert" Text="@L.F("je.difference", Fmt.Money(Debit - Credit))" />}
+                                    <td>@L[TaxTotal > 0 ? "je.grossTotal" : "ui.total"]</td>
+                                    <td></td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(GrossDebit)</bdi></td>
+                                    <td class="n"><bdi class="num">@Fmt.Money(GrossCredit)</bdi></td>
+                                    <td colspan="9" aria-live="polite">
+                                        @if (GrossDebit == GrossCredit && GrossDebit > 0) {<Badge Tone="Tone.Ok" Icon="check" Text="@L[TaxTotal > 0 ? "je.balancedWithTax" : "je.balanced"]" />}
+                                        else {<Badge Tone="Tone.Err" Icon="alert" Text="@L.F(TaxTotal > 0 ? "je.differenceWithTax" : "je.difference", Fmt.Money(GrossDebit - GrossCredit))" />}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -163,6 +220,15 @@
     [Parameter] public string? Id { get; set; }
     [Parameter] public string? DraftId { get; set; }
     [SupplyParameterFromQuery(Name = "template")] public string? TemplateId { get; set; }
+    [SupplyParameterFromQuery(Name = "copy")] public string? CopyId { get; set; }
+
+    private IReadOnlyList<Option<string?>> _taxCodes = [];
+    private IReadOnlyList<Option<string?>> _taxAccounts = [];
+    private bool _addingTaxAccounts;
+    private string? _copiedFrom, _headerReference;
+
+    /// <summary>The currency's decimals for the preview (the server rounds the posted tax the same way, half-up).</summary>
+    private const int Decimals = 3;
 
     private bool _picking, _naming, _savingTemplate;
     private IReadOnlyList<JournalTemplateSummary>? _templates;
@@ -174,6 +240,63 @@
 
     private decimal Debit => _m.Lines.Sum(l => l.Debit ?? 0);
     private decimal Credit => _m.Lines.Sum(l => l.Credit ?? 0);
+    private decimal TaxTotal => _m.Lines.Sum(Tax);
+    // DT-255: the tax goes on the same side as its line.
+    private decimal GrossDebit => Debit + _m.Lines.Where(l => l.Debit > 0).Sum(Tax);
+    private decimal GrossCredit => Credit + _m.Lines.Where(l => !(l.Debit > 0)).Sum(Tax);
+
+    private static decimal Amount(LineModel l) => (l.Debit ?? 0) + (l.Credit ?? 0);
+
+    /// <summary>Tax = amount × rate ÷ 100, half-up to the currency's decimals (as the server posts it).</summary>
+    private decimal Tax(LineModel l) => Lookups.TaxCode(l.TaxCodeId) is { } c ? Math.Round(Amount(l) * c.Rate / 100m, Decimals, MidpointRounding.AwayFromZero) : 0;
+
+    /// <summary>A new line starts with the entry's Reference (DT-254).</summary>
+    private void AddLine() => _m.Lines.Add(new LineModel { Reference = _m.Reference });
+
+    /// <summary>Lines that still carry the previous entry Reference (or none) follow a change of it; lines given their own keep it.</summary>
+    private void HeaderReferenceChanged()
+    {
+        foreach (var l in _m.Lines.Where(l => string.IsNullOrWhiteSpace(l.Reference) || l.Reference == _headerReference)) l.Reference = _m.Reference;
+        _headerReference = _m.Reference;
+    }
+
+    /// <summary>A 0 % code (or none) needs no tax account; a code above 0 % keeps the account already chosen — never a default.</summary>
+    private void TaxCodeChosen(LineModel line)
+    {
+        if (Lookups.TaxCode(line.TaxCodeId) is not { Rate: > 0 }) line.TaxAccountId = null;
+    }
+
+    private void LoadTaxLists()
+    {
+        _taxCodes = [new Option<string?>(null, L["je.noTax"]), .. Lookups.TaxCodes.Select(t => new Option<string?>(t.Id, Lookups.TaxName(t), t.Code))];
+        _taxAccounts = Lookups.TaxAccountOptions();
+    }
+
+    /// <summary>"Add the default tax accounts" from the line when the chart has none (DT-256, acct.setup).</summary>
+    private async Task AddTaxAccounts()
+    {
+        _addingTaxAccounts = true;
+        try
+        {
+            var r = await Api.PostAsync<DefaultTaxAccountsResult>(Api.C("accounting/accounts/default-tax-accounts"), new { });
+            Toasts.Success(L.F("acc.taxAccountsAdded", r.Added, r.Marked));
+            Lookups.Invalidate();
+            await Lookups.EnsureAsync();
+            _accounts = Lookups.AccountOptions();
+            LoadTaxLists();
+        }
+        catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
+        finally { _addingTaxAccounts = false; }
+    }
+
+    /// <summary>Lines of a posted entry for the form: the entered lines only — the automatic tax lines are made again on posting.</summary>
+    private static List<LineModel> FromEntry(JournalEntryResponse e) => e.Lines.Where(l => l.TaxForLineNo is null).Select(l => new LineModel
+    {
+        AccountId = l.Account.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+        Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
+        PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
+        Reference = l.Reference, TaxCodeId = l.TaxCode?.Id, TaxAccountId = l.TaxAccount?.Id,
+    }).ToList();
     private bool CanSave => !_saving && !_savingDraft && _lockedBy is null && Shell.Can(PermissionKeys.AcctPost);
     // DT-201: posting (new entry, draft, edit of a posted entry) needs "Post journal entries"; acct.post alone saves drafts and templates.
     private bool MayPost => Shell.Can(PermissionKeys.AcctPostEntry);
@@ -192,6 +315,7 @@
         {
             await Lookups.EnsureAsync();
             _accounts = Lookups.AccountOptions();
+            LoadTaxLists();
             await LoadParties();
             if (Id is not null)
             {
@@ -200,12 +324,7 @@
                 _m.Description = _existing.Description;
                 _m.Reference = _existing.Reference;
                 _m.RowVersion = _existing.RowVersion;
-                _m.Lines = _existing.Lines.Select(l => new LineModel
-                {
-                    AccountId = l.Account.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
-                    Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
-                    PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
-                }).ToList();
+                _m.Lines = FromEntry(_existing);
             }
             else if (DraftId is not null)
             {
@@ -218,7 +337,18 @@
                 _m.EntryDate = Money.Today ?? DateOnly.FromDateTime(DateTime.Today);
                 _m.Lines = [new LineModel(), new LineModel()];
                 if (TemplateId is not null) Fill(await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(TemplateId)}")));
+                else if (CopyId is not null)
+                {
+                    // DT-258: a copy is a new entry dated today with the description, references, lines and tax codes of the original.
+                    var source = await Api.GetAsync<JournalEntryResponse>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(CopyId)}"));
+                    _copiedFrom = source.Number;
+                    _m.Description = source.Description;
+                    _m.Reference = source.Reference;
+                    _m.Lines = FromEntry(source);
+                    while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel { Reference = _m.Reference });
+                }
             }
+            _headerReference = _m.Reference;
             _state = LoadState.Ready;
         }
         catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }
@@ -253,8 +383,9 @@
             AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
             Party = l.Party?.Id is { } pid ? $"{l.Party.Type}|{pid}" : null,
             PartyOption = l.Party?.Id is { } p2 ? new Option<string?>($"{l.Party.Type}|{p2}", l.Party.Name ?? "") : null,
+            Reference = l.Reference, TaxCodeId = l.TaxCode?.Id, TaxAccountId = l.TaxAccount?.Id,
         }).ToList();
-        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel());
+        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel { Reference = d.Reference });
     }
 
     private ManualEntryRequest Request()
@@ -263,7 +394,8 @@
         {
             PartyRequest? party = null;
             if (l.Party?.Split('|') is [var type, var id]) party = new PartyRequest(type, id);
-            return new JournalLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, party, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim());
+            return new JournalLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, party, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim(),
+                string.IsNullOrWhiteSpace(l.Reference) ? null : l.Reference.Trim(), l.TaxCodeId, l.TaxCodeId is null ? null : l.TaxAccountId);
         }).ToList();
         return new ManualEntryRequest(_m.EntryDate, _m.Description?.Trim(), lines, _m.RowVersion, string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim());
     }
@@ -379,8 +511,10 @@
         _m.Lines = t.Lines.Select(l => new LineModel
         {
             AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+            Reference = l.Reference ?? t.Reference, TaxCodeId = l.TaxCode?.Id, TaxAccountId = l.TaxAccount?.Id,
         }).ToList();
-        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel());
+        while (_m.Lines.Count < 2) _m.Lines.Add(new LineModel { Reference = t.Reference });
+        _headerReference = _m.Reference;
         _ctx = new EditContext(_m);
     }
 
@@ -400,7 +534,8 @@
         {
             var lines = _m.Lines.Where(l => l.AccountId is not null)
                 .Select(l => new JournalTemplateLineRequest(l.AccountId, _tpl.WithAmounts ? l.Debit ?? 0 : 0, _tpl.WithAmounts ? l.Credit ?? 0 : 0, l.CostCentreId,
-                    string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim())).ToList();
+                    string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim(), string.IsNullOrWhiteSpace(l.Reference) ? null : l.Reference.Trim(),
+                    l.TaxCodeId, l.TaxCodeId is null ? null : l.TaxAccountId)).ToList();
             var t = await Api.PostAsync<JournalTemplateResponse>(Api.C("accounting/journal-templates"),
                 new JournalTemplateRequest(_tpl.Name?.Trim(), string.IsNullOrWhiteSpace(_m.Description) ? null : _m.Description.Trim(),
                     string.IsNullOrWhiteSpace(_m.Reference) ? null : _m.Reference.Trim(), lines));
@@ -435,5 +570,8 @@
         public string? Party { get; set; }
         public Option<string?>? PartyOption { get; set; }
         public string? Note { get; set; }
+        public string? Reference { get; set; }
+        public string? TaxCodeId { get; set; }
+        public string? TaxAccountId { get; set; }
     }
 }

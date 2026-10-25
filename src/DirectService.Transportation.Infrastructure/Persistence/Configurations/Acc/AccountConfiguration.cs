@@ -178,6 +178,15 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasColumnOrder(23)
             .IsRequired(true)
             .IsRowVersion();
+        // DT-256 (owner request 25 Oct 2026): tax accounts offered on journal lines; never a control account.
+        builder.Property(e => e.IsTaxAccount)
+            .HasColumnName("IsTaxAccount")
+            .HasColumnType("bit")
+            .HasColumnOrder(24)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
+        builder.ToTable(t => t.HasCheckConstraint("CK_Accounts_IsTaxAccount", "[IsTaxAccount] = 0 OR [IsControlAccount] = 0"));
 
         builder.HasIndex(new[] { "PublicId" }, "UX_Accounts_PublicId")
             .IsUnique()

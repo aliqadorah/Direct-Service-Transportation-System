@@ -5,6 +5,25 @@ public static partial class UiText
 {
     private static Dictionary<string, (string Ar, string En)> Settings() => new(StringComparer.Ordinal)
     {
+        // ---- Settings → Tax codes (owner request 25 Oct 2026, DT-257)
+        ["tax.help"] = ("رموز الضريبة التي تُختار على أسطر القيود اليومية. المدين أو الدائن على السطر مبلغ قبل الضريبة، والضريبة = المبلغ × النسبة مقرّبة لخانات العملة.",
+            "The tax codes chosen on journal lines. The line's debit or credit is the amount before tax; tax = amount × rate, rounded to the currency's decimals."),
+        ["tax.new"] = ("رمز ضريبة جديد", "New tax code"),
+        ["tax.code"] = ("الرمز", "Code"),
+        ["tax.rate"] = ("النسبة %", "Rate %"),
+        ["tax.nameAr"] = ("الوصف بالعربية", "Arabic description"),
+        ["tax.nameEn"] = ("الوصف بالإنجليزية", "English description"),
+        ["tax.order"] = ("الترتيب", "Order"),
+        ["tax.inUse"] = ("مستخدم", "In use"),
+        ["tax.inUseHelp"] = ("مستخدم في قيود مرحّلة: لا يمكن حذفه ولا تغيير رمزه أو نسبته. أوقفه وأنشئ رمزاً جديداً بالنسبة الجديدة.",
+            "Used on posted entries: it cannot be deleted and its code or rate cannot change. Deactivate it and create a new code with the new rate."),
+        ["tax.none"] = ("لا رموز ضريبة", "No tax codes"),
+        ["tax.noneText"] = ("أضف رمزاً لكل نسبة ضريبة تستخدمها على القيود اليومية.", "Add a code for each tax rate you use on journal entries."),
+        ["tax.deleteText"] = ("يُحذف الرمز مع السبب. غير ممكن إذا استُخدم في قيد مرحّل؛ أوقفه بدلاً من ذلك.", "The code is deleted with the reason. Not possible once a posted entry uses it; deactivate it instead."),
+        ["tax.saved"] = ("تم حفظ رمز الضريبة {0}.", "Tax code {0} saved."),
+        ["tax.deactivated"] = ("تم إيقاف رمز الضريبة {0}.", "Tax code {0} deactivated."),
+        ["tax.activated"] = ("تم تفعيل رمز الضريبة {0}.", "Tax code {0} activated."),
+        ["tax.deleted"] = ("تم حذف رمز الضريبة {0}.", "Tax code {0} deleted."),
         // ---- company settings (SCR-70)
         ["set.profile"] = ("ملف الشركة", "Company profile"),
         ["set.market"] = ("السوق والضريبة", "Market and tax"),

@@ -268,12 +268,15 @@ export function floatList(wrap, id) {
     list.style.position = "fixed";
     list.style.minWidth = width + "px";
     list.style.maxWidth = (vw - 16) + "px";
+    // Kept inside the window in both directions with the list's real width (long names make it wider than the field; DT-260: in Arabic a
+    // list opened near the left edge — the journal lines' tax account — ran off the window).
+    const actual = Math.min(Math.max(list.getBoundingClientRect().width, width), vw - 16);
     if (getComputedStyle(wrap).direction === "rtl") {
       list.style.left = "auto";
-      list.style.right = Math.max(8, vw - r.right) + "px";
+      list.style.right = Math.max(8, Math.min(vw - r.right, vw - actual - 8)) + "px";
     } else {
       list.style.right = "auto";
-      list.style.left = Math.max(8, Math.min(r.left, vw - width - 8)) + "px";
+      list.style.left = Math.max(8, Math.min(r.left, vw - actual - 8)) + "px";
     }
     const below = vh - r.bottom - 8, above = r.top - 8;
     const wantHeight = Math.min(list.scrollHeight, 280);

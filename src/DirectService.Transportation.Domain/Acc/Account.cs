@@ -33,6 +33,8 @@ public class Account : AuditableEntity, ITenantScoped, ICompanyScoped
     public string? ControlPartyType { get; set; }
     /// <summary>Record status.</summary>
     public string Status { get; set; } = "Active";
+    /// <summary>1 = tax account: offered as the tax account of journal lines (DT-256).</summary>
+    public bool IsTaxAccount { get; set; }
     public Account? Parent { get; set; }
     public ICollection<Account> Children { get; set; } = new List<Account>();
 }

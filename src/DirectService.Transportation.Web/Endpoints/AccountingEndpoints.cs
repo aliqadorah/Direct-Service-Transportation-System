@@ -29,6 +29,7 @@ internal static class AccountingEndpoints
         MapJournal(acc.MapGroup("/journal-entries").WithTags("Journal"));
         MapJournalDrafts(acc.MapGroup("/journal-drafts").WithTags("Journal"));
         MapJournalTemplates(acc.MapGroup("/journal-templates").WithTags("Journal"));
+        MapTaxCodes(acc.MapGroup("/tax-codes").WithTags("Tax codes"));
         // Revision 6 part B: the accounting dashboard (each part by its own permission).
         acc.MapGet("/dashboard", async (int? year, int? month, AccountingDashboardService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.GetAsync(year, month, ct).ConfigureAwait(false))).WithTags("Accounting dashboard").RequireAnyPermission(AccountingDashboardService.Readers);
@@ -64,6 +65,9 @@ internal static class AccountingEndpoints
         { await svc.DeleteAsync(account, r.Reason, ct).ConfigureAwait(false); return TypedResults.NoContent(); }).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPost("/template", async (ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ApplyTemplateAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
+        // DT-256: VAT on sales / on purchases / VAT expenses for an existing chart (marked or added with the next free codes).
+        g.MapPost("/default-tax-accounts", async (ChartOfAccountsService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.AddDefaultTaxAccountsAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
         g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync("accounts", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPost("/import/preview", async (IFormFile file, ChartImportService svc, CancellationToken ct) =>
@@ -220,6 +224,30 @@ internal static class AccountingEndpoints
     }
 
     /// <summary>Revision 6 part B: journal entry templates — saved from and used on the new entry screen; list, edit (rename), delete. acct.post.</summary>
+    /// <summary>Tax codes (DT-257): the active ones for journal lines; the list and changes in Settings → Tax codes (settings.manage).</summary>
+    private static void MapTaxCodes(RouteGroupBuilder g)
+    {
+        g.MapGet("/options", async (TaxCodeService svc, CancellationToken ct) => TypedResults.Ok(await svc.OptionsAsync(ct).ConfigureAwait(false)))
+            .RequireAnyPermission(PermissionKeys.AcctPost, PermissionKeys.AcctPostEntry, PermissionKeys.AcctView, PermissionKeys.JeView, PermissionKeys.SettingsManage);
+        g.MapGet("/", async (TaxCodeService svc, CancellationToken ct) => TypedResults.Ok(await svc.ListAsync(ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.SettingsManage);
+        g.MapGet("/{taxCode}/history", async (string taxCode, TaxCodeService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.HistoryAsync(taxCode, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.SettingsManage);
+        g.MapPost("/", async (TaxCodeRequest r, TaxCodeService svc, CancellationToken ct) => TypedResults.Ok(await svc.CreateAsync(r, ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.SettingsManage);
+        g.MapPut("/{taxCode}", async (string taxCode, TaxCodeRequest r, TaxCodeService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.UpdateAsync(taxCode, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.SettingsManage);
+        g.MapPost("/{taxCode}/deactivate", async (string taxCode, StatusChangeRequest r, TaxCodeService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.SetStatusAsync(taxCode, false, r.RowVersion, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.SettingsManage);
+        g.MapPost("/{taxCode}/activate", async (string taxCode, StatusChangeRequest r, TaxCodeService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.SetStatusAsync(taxCode, true, r.RowVersion, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.SettingsManage);
+        g.MapPost("/{taxCode}/delete", async (string taxCode, DeleteRequest r, TaxCodeService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(taxCode, r.Reason, ct).ConfigureAwait(false);
+            return TypedResults.NoContent();
+        }).RequirePermission(PermissionKeys.SettingsManage);
+    }
+
     private static void MapJournalTemplates(RouteGroupBuilder g)
     {
         g.MapGet("/", async (JournalTemplateService svc, CancellationToken ct) => TypedResults.Ok(await svc.ListAsync(ct).ConfigureAwait(false)))

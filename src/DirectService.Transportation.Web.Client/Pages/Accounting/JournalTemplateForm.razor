@@ -2,7 +2,8 @@
 @*
   A journal entry template (revision 6 part B): name, entry description, Reference and lines — account, debit, credit (amounts optional), cost
   centre, line description. Save (also renames), Delete, "Use" (a new entry filled from the saved template), history. Record lock and
-  leave-page confirmation like the other accounting forms. acct.post.
+  leave-page confirmation like the other accounting forms. acct.post. Owner request 25 Oct 2026: each line also keeps its reference (DT-254),
+  tax code and tax account (DT-255), which a new entry made from the template takes over.
 *@
 @using Md = DirectService.Transportation.Contracts.MasterData
 @inject Api Api
@@ -43,7 +44,8 @@
                         <table class="tbl">
                             <caption class="sr-only">@L["je.lines"]</caption>
                             <thead><tr>
-                                <th scope="col">@L["je.account"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.account"]</th><th scope="col">@L["je.reference"]</th><th scope="col" class="n">@L["je.debit"]</th><th scope="col" class="n">@L["je.credit"]</th>
+                                <th scope="col">@L["je.taxCode"]</th><th scope="col">@L["je.taxAccount"]</th>
                                 <th scope="col">@L["je.costCentre"]</th><th scope="col">@L["tpl.lineDescription"]</th><th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>
                             </tr></thead>
                             <tbody>
@@ -52,10 +54,19 @@
                                     var line = _m.Lines[i];
                                     var n = i + 1;
                                     <tr @key="line">
-                                        <td style="min-width:260px"><ComboField TValue="string?" @bind-Value="line.AccountId" @bind-Value:after="() => _structure = true" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" /></td>
-                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
-                                        <td class="n" style="width:140px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
-                                        <td style="width:180px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" @bind-Value:after="() => _structure = true" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
+                                        <td style="min-width:240px"><ComboField TValue="string?" @bind-Value="line.AccountId" @bind-Value:after="() => _structure = true" Options="_accounts" aria-label="@L.F("je.lineAccount", n)" /></td>
+                                        <td style="min-width:120px"><TextField @bind-Value="line.Reference" MaxLength="100" aria-label="@L.F("je.lineReference", n)" /></td>
+                                        <td class="n" style="min-width:120px"><NumberField @bind-Value="line.Debit" Min="0m" aria-label="@L.F("je.lineDebit", n)" @bind-Value:after="() => { if (line.Debit > 0) line.Credit = null; }" /></td>
+                                        <td class="n" style="min-width:120px"><NumberField @bind-Value="line.Credit" Min="0m" aria-label="@L.F("je.lineCredit", n)" @bind-Value:after="() => { if (line.Credit > 0) line.Debit = null; }" /></td>
+                                        <td style="min-width:150px"><ComboField TValue="string?" @bind-Value="line.TaxCodeId" @bind-Value:after="() => TaxCodeChosen(line)" Options="_taxCodes" aria-label="@L.F("je.lineTaxCode", n)" /></td>
+                                        <td style="min-width:180px">
+                                            @if (Lookups.TaxCode(line.TaxCodeId) is { Rate: > 0 })
+                                            {
+                                                <ComboField TValue="string?" @bind-Value="line.TaxAccountId" @bind-Value:after="() => _structure = true" Options="_taxAccounts" aria-label="@L.F("je.lineTaxAccount", n)" Placeholder="@L["je.chooseTaxAccount"]" />
+                                            }
+                                            else {<span class="muted">—</span>}
+                                        </td>
+                                        <td style="min-width:160px"><SelectField TValue="string?" @bind-Value="line.CostCentreId" @bind-Value:after="() => _structure = true" Options="Lookups.CostCentres" Empty="—" aria-label="@L.F("je.lineCostCentre", n)" /></td>
                                         <td style="min-width:200px"><TextField @bind-Value="line.Note" MaxLength="500" aria-label="@L.F("je.lineNote", n)" /></td>
                                         <td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" Disabled="_m.Lines.Count <= 1" OnClick="() => { _m.Lines.Remove(line); _structure = true; }" /></td>
                                     </tr>
@@ -64,9 +75,10 @@
                             <tfoot>
                                 <tr>
                                     <td>@L["ui.total"]</td>
+                                    <td></td>
                                     <td class="n"><bdi class="num">@Fmt.Money(_m.Lines.Sum(l => l.Debit ?? 0))</bdi></td>
                                     <td class="n"><bdi class="num">@Fmt.Money(_m.Lines.Sum(l => l.Credit ?? 0))</bdi></td>
-                                    <td colspan="3" class="muted">@L["tpl.amountsOptional"]</td>
+                                    <td colspan="5" class="muted">@L["tpl.amountsOptional"]</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -90,6 +102,8 @@
     private EditContext _ctx = new(new Model());
     private bool _saving, _deleting, _historyOpen, _structure;
     private IReadOnlyList<Option<string?>> _accounts = [];
+    private IReadOnlyList<Option<string?>> _taxCodes = [];
+    private IReadOnlyList<Option<string?>> _taxAccounts = [];
     private IReadOnlyList<Md.HistoryEntry>? _history;
     private IReadOnlyList<string>? _extra;
     private ProblemValidator? _problems;
@@ -109,6 +123,8 @@
         {
             await Lookups.EnsureAsync();
             _accounts = Lookups.AccountOptions();
+            _taxCodes = [new Option<string?>(null, L["je.noTax"]), .. Lookups.TaxCodes.Select(t => new Option<string?>(t.Id, Lookups.TaxName(t), t.Code))];
+            _taxAccounts = Lookups.TaxAccountOptions();
             Show(await Api.GetAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(Id)}")));
             _state = LoadState.Ready;
         }
@@ -125,6 +141,7 @@
             Lines = t.Lines.Select(l => new LineModel
             {
                 AccountId = l.Account?.Id, Debit = l.Debit == 0 ? null : l.Debit, Credit = l.Credit == 0 ? null : l.Credit, CostCentreId = l.CostCentre?.Id, Note = l.Note,
+                Reference = l.Reference, TaxCodeId = l.TaxCode?.Id, TaxAccountId = l.TaxAccount?.Id,
             }).ToList(),
         };
         if (_m.Lines.Count == 0) _m.Lines.Add(new LineModel());
@@ -141,7 +158,8 @@
         try
         {
             var lines = _m.Lines.Where(l => l.AccountId is not null || l.Debit is not null || l.Credit is not null || !string.IsNullOrWhiteSpace(l.Note))
-                .Select(l => new JournalTemplateLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim())).ToList();
+                .Select(l => new JournalTemplateLineRequest(l.AccountId, l.Debit ?? 0, l.Credit ?? 0, l.CostCentreId, string.IsNullOrWhiteSpace(l.Note) ? null : l.Note.Trim(),
+                    string.IsNullOrWhiteSpace(l.Reference) ? null : l.Reference.Trim(), l.TaxCodeId, l.TaxCodeId is null ? null : l.TaxAccountId)).ToList();
             Show(await Api.PutAsync<JournalTemplateResponse>(Api.C($"accounting/journal-templates/{Uri.EscapeDataString(_t.Id)}"),
                 new JournalTemplateRequest(_m.Name?.Trim(), _m.Description?.Trim(), _m.Reference?.Trim(), lines, _t.RowVersion)));
             Toasts.Success(L["tpl.updatedOk"]);
@@ -152,6 +170,13 @@
             if (_summary is not null) await _summary.FocusAsync();
         }
         finally { _saving = false; }
+    }
+
+    /// <summary>A 0 % code (or none) needs no tax account (DT-255).</summary>
+    private void TaxCodeChosen(LineModel line)
+    {
+        _structure = true;
+        if (Lookups.TaxCode(line.TaxCodeId) is not { Rate: > 0 }) line.TaxAccountId = null;
     }
 
     private void Use()
@@ -200,5 +225,8 @@
         public decimal? Credit { get; set; }
         public string? CostCentreId { get; set; }
         public string? Note { get; set; }
+        public string? Reference { get; set; }
+        public string? TaxCodeId { get; set; }
+        public string? TaxAccountId { get; set; }
     }
 }

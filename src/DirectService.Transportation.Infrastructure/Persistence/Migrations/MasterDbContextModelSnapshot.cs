@@ -107,6 +107,12 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnOrder(9)
                         .HasDefaultValueSql("1", "DF_Accounts_IsPostable");
 
+                    b.Property<bool>("IsTaxAccount")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsTaxAccount")
+                        .HasColumnOrder(24)
+                        .HasDefaultValueSql("0", "DF_Accounts_IsTaxAccount");
+
                     b.Property<string>("NameAr")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -198,6 +204,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Accounts_ControlPartyType", "[ControlPartyType] IN ('Customer','Driver','Partner','Supplier')");
 
                             t.HasCheckConstraint("CK_Accounts_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Accounts_IsTaxAccount", "[IsTaxAccount] = 0 OR [IsControlAccount] = 0");
 
                             t.HasCheckConstraint("CK_Accounts_OpeningCredit", "[OpeningCredit] >= 0");
 
@@ -2177,6 +2185,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnOrder(1)
                         .HasDefaultValueSql("NEWID()", "DF_EntryLines_PublicId");
 
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Reference")
+                        .HasColumnOrder(23);
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -2184,6 +2199,33 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnType("rowversion")
                         .HasColumnName("RowVersion")
                         .HasColumnOrder(22);
+
+                    b.Property<long?>("TaxAccountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TaxAccountId")
+                        .HasColumnOrder(27);
+
+                    b.Property<decimal?>("TaxAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("TaxAmount")
+                        .HasColumnOrder(26);
+
+                    b.Property<long?>("TaxCodeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TaxCodeId")
+                        .HasColumnOrder(24);
+
+                    b.Property<long?>("TaxForLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TaxForLineId")
+                        .HasColumnOrder(28);
+
+                    b.Property<decimal?>("TaxRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("TaxRate")
+                        .HasColumnOrder(25);
 
                     b.Property<long>("TenantId")
                         .HasColumnType("bigint")
@@ -2207,11 +2249,23 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "AccountId" }, "IX_EntryLines_Account"), new[] { "Debit", "Credit" });
 
+                    b.HasIndex(new[] { "CompanyId", "Reference" }, "IX_EntryLines_CompanyId_Reference")
+                        .HasFilter("[Reference] IS NOT NULL");
+
                     b.HasIndex(new[] { "CostCentreId" }, "IX_EntryLines_CostCentreId");
 
                     b.HasIndex(new[] { "JournalEntryId" }, "IX_EntryLines_JournalEntryId");
 
                     b.HasIndex(new[] { "CompanyId", "PartyModule", "PartyType", "PartyId" }, "IX_EntryLines_Party");
+
+                    b.HasIndex(new[] { "TaxAccountId" }, "IX_EntryLines_TaxAccountId")
+                        .HasFilter("[TaxAccountId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "TaxCodeId" }, "IX_EntryLines_TaxCodeId")
+                        .HasFilter("[TaxCodeId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "TaxForLineId" }, "IX_EntryLines_TaxForLineId")
+                        .HasFilter("[TaxForLineId] IS NOT NULL");
 
                     b.HasIndex(new[] { "PublicId" }, "UX_EntryLines_PublicId")
                         .IsUnique();
@@ -2227,6 +2281,14 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_EntryLines_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_EntryLines_PartyModule", "[PartyModule] IN ('TRN','ACC')");
+
+                            t.HasCheckConstraint("CK_EntryLines_TaxAmount", "[TaxAmount] IS NULL OR [TaxAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_EntryLines_TaxCodeId_TaxRate", "([TaxCodeId] IS NULL AND [TaxRate] IS NULL AND [TaxAmount] IS NULL AND [TaxAccountId] IS NULL AND [TaxForLineId] IS NULL) OR ([TaxCodeId] IS NOT NULL AND [TaxRate] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_EntryLines_TaxForLineId", "[TaxForLineId] IS NULL OR ([TaxAmount] IS NULL AND [TaxAccountId] IS NULL)");
+
+                            t.HasCheckConstraint("CK_EntryLines_TaxRate", "[TaxRate] IS NULL OR ([TaxRate] >= 0 AND [TaxRate] <= 100)");
                         });
                 });
 
@@ -3266,6 +3328,150 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.ToTable("PostingKeyMappings", "acc", t =>
                         {
                             t.HasCheckConstraint("CK_PostingKeyMappings_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.TaxCode", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("Code")
+                        .HasColumnOrder(4);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(10)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_TaxCodes_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(11);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(17);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(15);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(16);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(14)
+                        .HasDefaultValueSql("0", "DF_TaxCodes_IsDeleted");
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("NameAr")
+                        .HasColumnOrder(6);
+
+                    b.Property<string>("NameEn")
+                        .HasMaxLength(100)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("NameEn")
+                        .HasColumnOrder(7);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_TaxCodes_PublicId");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("Rate")
+                        .HasColumnOrder(5);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(18);
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("SortOrder")
+                        .HasColumnOrder(9)
+                        .HasDefaultValueSql("0", "DF_TaxCodes_SortOrder");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnName("Status")
+                        .HasColumnOrder(8)
+                        .HasDefaultValueSql("'Active'", "DF_TaxCodes_Status");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(12);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(13);
+
+                    b.HasKey("Id")
+                        .HasName("PK_TaxCodes");
+
+                    b.HasIndex(new[] { "CompanyId", "Code" }, "UX_TaxCodes_CompanyId_Code")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_TaxCodes_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("TaxCodes", "acc", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaxCodes_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_TaxCodes_Rate", "[Rate] >= 0 AND [Rate] <= 100");
+
+                            t.HasCheckConstraint("CK_TaxCodes_SortOrder", "[SortOrder] >= 0");
+
+                            t.HasCheckConstraint("CK_TaxCodes_Status", "[Status] IN ('Active','Archived')");
                         });
                 });
 
@@ -12731,6 +12937,24 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_EntryLines_JournalEntries_JournalEntryId");
 
+                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "TaxAccount")
+                        .WithMany()
+                        .HasForeignKey("TaxAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_EntryLines_Accounts_TaxAccountId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Acc.TaxCode", "TaxCode")
+                        .WithMany()
+                        .HasForeignKey("TaxCodeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_EntryLines_TaxCodes_TaxCodeId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Acc.EntryLine", "TaxForLine")
+                        .WithMany()
+                        .HasForeignKey("TaxForLineId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_EntryLines_EntryLines_TaxForLineId");
+
                     b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -12749,6 +12973,12 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("CostCentre");
 
                     b.Navigation("JournalEntry");
+
+                    b.Navigation("TaxAccount");
+
+                    b.Navigation("TaxCode");
+
+                    b.Navigation("TaxForLine");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalDraft", b =>
@@ -13052,6 +13282,41 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_PostingKeyMappings_Users_UpdatedBy");
 
                     b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.TaxCode", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TaxCodes_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TaxCodes_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TaxCodes_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TaxCodes_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TaxCodes_Users_UpdatedBy");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.CompanySetting", b =>

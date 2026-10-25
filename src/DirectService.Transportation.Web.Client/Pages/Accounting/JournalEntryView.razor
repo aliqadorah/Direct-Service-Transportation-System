@@ -2,7 +2,8 @@
 @*
   Journal entry view (FR-097, FR-102, FR-103, FR-112, FR-113): lines with account, debit, credit, cost centre, party and note; totals; the
   source document and the reversal links; void details; export batch. Manual posted entries can be edited (reverse + re-post, D-05) or voided
-  with a reason (acct.post); every entry prints as a journal voucher.
+  with a reason (acct.post); every entry prints as a journal voucher. Owner request 25 Oct 2026: each line shows its reference (DT-254) and its tax
+  code, tax and tax account (DT-255); automatic tax lines are marked and name their line; "Copy" opens a new entry with the same lines (DT-258).
 *@
 @inject Api Api
 @inject Loc L
@@ -18,6 +19,10 @@
             <Badges><StatusTag Status="@JournalStatus.Tag(e.Status)" /><Badge Tone="Tone.Mute" Text="@(e.IsManual ? L["je.manual"] : L["je.src." + (e.SourceType ?? "Opening")])" /></Badges>
             <Actions>
                 <Btn Icon="print" Text="@L["je.voucher"]" Href="@NavModel.Href(Company, $"print/journal/{Id}")" />
+                @if (e.IsManual && e.ReversesEntry is null && Shell.Can(PermissionKeys.AcctPost) && Shell.Can(PermissionKeys.AcctView))
+                {
+                    <Btn Icon="copy" Text="@L["je.copy"]" Href="@NavModel.Href(Company, $"accounting/journal/new?copy={Uri.EscapeDataString(Id)}")" />
+                }
                 @if (editable)
                 {
                     <Btn Icon="edit" Text="@L["ml.edit"]" Href="@NavModel.Href(Company, $"accounting/journal/{Id}/edit")" />
@@ -32,12 +37,21 @@
             <KeyValues Columns="4" Items="Details(e)" />
         </Box>
         <ListFrame Label="@L["je.lines"]">
-            <DataGrid TItem="JournalLineResponse" Items="e.Lines" Key="l => l.LineNo" Caption="@L["je.lines"]" FooterLabel="@L["ui.total"]">
+            <DataGrid TItem="JournalLineResponse" Items="e.Lines" Key="l => l.LineNo" Caption="@L["je.lines"]" FooterLabel="@L["ui.total"]" RowClass="@(l => l.TaxForLineNo is null ? null : "auto")">
                 <Columns>
                     <GridColumn TItem="JournalLineResponse" Title="#" Value="l => Fmt.Count(l.LineNo)" Numeric="true" Width="40px" />
-                    <GridColumn TItem="JournalLineResponse" Title="@L["je.account"]" Value="l => Lookups.Name(l.Account)" />
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.account"]">
+                        <Template>@if (context.TaxForLineNo is not null) {<Badge Tone="Tone.Mute" Icon="zap" Text="@L["je.autoTax"]" />} <Tx Value="@Lookups.Name(context.Account)" /></Template>
+                    </GridColumn>
+                    <GridColumn TItem="JournalLineResponse" Title="@L["je.reference"]" Value="l => l.Reference" />
                     <GridColumn TItem="JournalLineResponse" Title="@L["je.debit"]" Value="@(l => l.Debit == 0 ? null : Fmt.Money(l.Debit))" Numeric="true" Footer="@Fmt.Money(e.TotalDebit)" />
                     <GridColumn TItem="JournalLineResponse" Title="@L["je.credit"]" Value="@(l => l.Credit == 0 ? null : Fmt.Money(l.Credit))" Numeric="true" Footer="@Fmt.Money(e.TotalCredit)" />
+                    @if (e.Lines.Any(l => l.TaxCode is not null))
+                    {
+                        <GridColumn TItem="JournalLineResponse" Title="@L["je.taxCode"]" Value="@(l => l.TaxCode is { } t ? $"{Lookups.TaxName(t)}" : null)" />
+                        <GridColumn TItem="JournalLineResponse" Title="@L["je.taxAmount"]" Value="@(l => l.TaxAmount is decimal t ? Fmt.Money(t) : null)" Numeric="true" Footer="@Fmt.Money(e.Lines.Sum(l => l.TaxAmount ?? 0))" />
+                        <GridColumn TItem="JournalLineResponse" Title="@L["je.taxAccount"]" Value="@(l => l.TaxForLineNo is int src ? L.F("je.autoTaxFor", src) : l.TaxAccount is { } a ? Lookups.Name(a) : null)" />
+                    }
                     <GridColumn TItem="JournalLineResponse" Title="@L["je.costCentre"]" Value="l => l.CostCentre?.Name" />
                     <GridColumn TItem="JournalLineResponse" Title="@L["je.party"]" Value="@(l => l.Party is { } p ? $"{p.Name} ({L["party." + p.Type]})" : null)" />
                     <GridColumn TItem="JournalLineResponse" Title="@L["drv.note"]" Value="l => l.Note" Wrap="true" />

@@ -8,7 +8,7 @@ namespace DirectService.Transportation.Web.Client.Services;
 
 /// <summary>
 /// Pick lists of the accounting screens, loaded once per company: active postable accounts (with type and control-party type, FR-106),
-/// active cost centres (FR-131) and accounting parties by role (FR-122).
+/// active cost centres (FR-131), accounting parties by role (FR-122) and the active tax codes of journal lines (DT-257).
 /// </summary>
 public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
 {
@@ -18,6 +18,7 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
 
     public IReadOnlyList<AccountOption> Accounts { get; private set; } = [];
     public IReadOnlyList<Option<string?>> CostCentres { get; private set; } = [];
+    public IReadOnlyList<TaxCodeRef> TaxCodes { get; private set; } = [];
 
     public Task EnsureAsync()
     {
@@ -26,7 +27,7 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
             _company = shell.Company?.Id;
             _loading = null;
             _parties.Clear();
-            (Accounts, CostCentres) = ([], []);   // never the previous company's lists (DT-187)
+            (Accounts, CostCentres, TaxCodes) = ([], [], []);   // never the previous company's lists (DT-187)
         }
         return _loading ??= LoadAsync();
     }
@@ -55,9 +56,13 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
             centres = cc.Select(c => new Option<string?>(c.Id, c.Name)).ToList();
         }
         catch (ApiException) { centres = []; }
+        IReadOnlyList<TaxCodeRef> taxCodes;
+        try { taxCodes = await api.GetAsync<IReadOnlyList<TaxCodeRef>>(api.C("accounting/tax-codes/options")).ConfigureAwait(false); }
+        catch (ApiException) { taxCodes = []; }
         if (company != _company) return;   // the company changed meanwhile
         Accounts = accounts;
         CostCentres = centres;
+        TaxCodes = taxCodes;
     }
 
     /// <summary>"code · name" in the reader's language.</summary>
@@ -69,6 +74,17 @@ public sealed class AccountingLookups(Api api, ShellState shell, Loc loc)
             .Select(a => new Option<string?>(a.Account.Id, Name(a.Account), a.IsControlAccount ? loc["acc.controlOf"] + " " + loc["party." + a.ControlPartyType] : null)).ToList();
 
     public AccountOption? Account(string? id) => id is null ? null : Accounts.FirstOrDefault(a => a.Account.Id == id);
+
+    /// <summary>The accounts marked as tax accounts (DT-256): the only choices for a journal line's tax account.</summary>
+    public IReadOnlyList<Option<string?>> TaxAccountOptions() =>
+        Accounts.Where(a => a.IsTaxAccount).Select(a => new Option<string?>(a.Account.Id, Name(a.Account))).ToList();
+
+    /// <summary>Tax codes as options: "code · description (rate %)".</summary>
+    public IReadOnlyList<Option<string?>> TaxCodeOptions() => TaxCodes.Select(t => new Option<string?>(t.Id, TaxName(t))).ToList();
+
+    public string TaxName(TaxCodeRef t) => loc.Pick(t.NameAr, t.NameEn);
+
+    public TaxCodeRef? TaxCode(string? id) => id is null ? null : TaxCodes.FirstOrDefault(t => t.Id == id);
 
     /// <summary>Accounting parties of a role (Supplier / Customer), transport customers included for receivables (DT-101).</summary>
     public async Task<IReadOnlyList<ApArPartyOption>> PartiesAsync(string role)

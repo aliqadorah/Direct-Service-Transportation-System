@@ -247,6 +247,11 @@ public sealed class ImportTemplateService(IAppDbContext db, IRequestContext ctx,
         new(T("نوع الطرف", "Party type"), false, Text(20), T("عميل، سائق، شريك، مورد، طرف محاسبي (Customer, Driver, Partner, Supplier, ApArParty)؛ مطلوب لحسابات الرقابة", "Customer, Driver, Partner, Supplier, ApArParty (عميل، سائق، شريك، مورد، طرف محاسبي); required on control accounts"), null),
         new(T("الطرف", "Party"), false, Text(200), T("اسم العميل أو الشريك أو الطرف المحاسبي، أو الرقم الوطني للسائق", "Customer, partner or accounting-party name, or the driver's national ID"), null),
         new(T("ملاحظة السطر", "Line note"), false, Text(500), "", null),
+        // Owner request 25 Oct 2026 (DT-254, DT-255): line reference and tax; the debit / credit is the amount before tax.
+        new(T("مرجع السطر", "Line reference"), false, Text(100), T("فارغ = مرجع القيد", "Empty = the entry's reference"), null),
+        new(T("رمز الضريبة", "Tax code"), false, T("رمز ضريبة نشط (الإعدادات ← رموز الضريبة)", "Code of an active tax code (Settings → Tax codes)"),
+            T("المدين أو الدائن مبلغ قبل الضريبة؛ تُضاف الضريبة آلياً في الجهة نفسها ويجب أن يتوازن القيد معها", "Debit or credit is the amount before tax; the tax is added on the same side and the entry must balance with it"), null),
+        new(T("حساب الضريبة", "Tax account"), false, T("رمز حساب ضريبة", "Code of a tax account"), T("مطلوب لرمز بنسبة أكبر من 0%", "Required for a code with a rate above 0%"), null),
     ];
 
     // ------------------------------------------------------------ custom fields (FR-180)

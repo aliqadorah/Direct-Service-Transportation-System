@@ -80,8 +80,16 @@ public sealed class GlobalSearchService(IAppDbContext db, IRequestContext ctx, M
         }
         if (Any(PermissionKeys.AcctView, PermissionKeys.JeView))
         {
-            hits.AddRange((await db.Set<JournalEntry>().AsNoTracking().Where(e => e.Number.Contains(text) || (e.Reference != null && e.Reference.Contains(text))).OrderByDescending(e => e.EntryDate).Take(PerType)
-                    .Select(e => new { e.PublicId, e.Number, e.EntryDate, e.Description, e.Reference }).ToListAsync(ct).ConfigureAwait(false))
+            // DT-254: the entry's reference or a line reference; a matching line reference is shown when the entry's does not match.
+            hits.AddRange((await db.Set<JournalEntry>().AsNoTracking()
+                    .Where(e => e.Number.Contains(text) || (e.Reference != null && e.Reference.Contains(text)) || e.Lines.Any(l => l.Reference != null && l.Reference.Contains(text)))
+                    .OrderByDescending(e => e.EntryDate).Take(PerType)
+                    .Select(e => new
+                    {
+                        e.PublicId, e.Number, e.EntryDate, e.Description,
+                        Reference = e.Reference != null && e.Reference.Contains(text) ? e.Reference
+                            : e.Lines.Where(l => l.Reference != null && l.Reference.Contains(text)).Select(l => l.Reference).FirstOrDefault() ?? e.Reference,
+                    }).ToListAsync(ct).ConfigureAwait(false))
                 .Select(e => new SearchHit("journal-entry", support.Token<JournalEntry>(e.PublicId), e.Number,
                     e.Reference is null ? $"{e.EntryDate:yyyy-MM-dd} · {e.Description}" : $"{e.EntryDate:yyyy-MM-dd} · {e.Reference} · {e.Description}")));
         }

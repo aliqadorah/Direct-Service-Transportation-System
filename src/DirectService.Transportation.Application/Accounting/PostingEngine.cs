@@ -15,9 +15,11 @@ public sealed record PostingParty(string Module, string Type, long Id);
 /// <summary>
 /// One line to post: either a posting key (resolved through acc.PostingKeyMappings, 7.5.1) or an explicit account
 /// (cash box / bank account / manual entries). Exactly one of <see cref="Debit"/> and <see cref="Credit"/> is &gt; 0.
+/// Manual lines (owner request 25 Oct 2026) may carry a line <see cref="Reference"/> (DT-254; none = the entry's Reference) and a tax code with
+/// its tax account (DT-255): the amount is before tax and the engine adds the tax as an automatic line on the same side.
 /// </summary>
 public sealed record PostingLine(string? PostingKey, long? AccountId, decimal Debit, decimal Credit, long? CostCentreId = null,
-    PostingParty? Party = null, string? Note = null)
+    PostingParty? Party = null, string? Note = null, string? Reference = null, long? TaxCodeId = null, long? TaxAccountId = null)
 {
     public static PostingLine DebitKey(string key, decimal amount, PostingParty? party = null) => new(key, null, amount, 0, null, party);
 
@@ -37,6 +39,8 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 /// <item><see cref="PostOrPendAsync"/>: a technical failure rolls back to a savepoint, the document is kept and the
 /// entry waits in acc.PendingPostings with the reason (FR-101).</item>
 /// <item>Reversal: a mirror entry linked both ways; the original is never changed apart from its status (FR-099, BR-035).</item>
+/// <item>Tax (DT-255): a line with a tax code of rate &gt; 0 gets an automatic tax line to its tax account, on the same side, with its cost
+/// centre and reference, linked to it (TaxForLineId); the entry must balance with the tax lines.</item>
 /// </list>
 /// </summary>
 public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IRequestContext ctx,
@@ -117,11 +121,20 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         var costCentres = await db.Set<CostCentre>().AsNoTracking().Where(c => costCentreIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => (c.Code, c.Status), ct).ConfigureAwait(false);
 
+        var taxCodeIds = resolved.Where(l => l.TaxCodeId is not null).Select(l => l.TaxCodeId!.Value).Distinct().ToList();
+        var taxCodes = taxCodeIds.Count == 0 ? [] : await db.Set<TaxCode>().AsNoTracking().Where(t => taxCodeIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, ct).ConfigureAwait(false);
+        var taxAccountIds = resolved.Where(l => l.TaxAccountId is not null).Select(l => l.TaxAccountId!.Value).Distinct().ToList();
+        var taxAccounts = await db.Set<Account>().AsNoTracking().Where(a => taxAccountIds.Contains(a.Id))
+            .Select(a => new TaxAccountRow(a.Id, a.Code, a.Status, a.IsPostable, a.IsTaxAccount, a.IsControlAccount, a.Children.Any()))
+            .ToDictionaryAsync(a => a.Id, ct).ConfigureAwait(false);
+
         var apArIds = resolved.Where(l => l.Party is { Type: AccountingCodes.PartyApAr }).Select(l => l.Party!.Id).Distinct().ToList();
         var apArRoles = await db.Set<ApArParty>().AsNoTracking().Where(p => apArIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.PartyRole, ct).ConfigureAwait(false);
 
-        decimal totalDebit = 0, totalCredit = 0;
+        decimal totalDebit = 0, totalCredit = 0, taxDebit = 0, taxCredit = 0;
+        var taxes = new (TaxCode Code, decimal Amount, long? AccountId)?[resolved.Count];
         for (var i = 0; i < resolved.Count; i++)
         {
             var l = resolved[i];
@@ -144,10 +157,25 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                     throw Fail.Rule(ErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
             }
             if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", ErrorCodes.ValidationRange, new FieldRef("note"));
+            if (Common.TextNormalizer.CleanText(l.Reference) is { Length: > ReferenceMax })
+                throw Fail.Field($"lines[{i}].reference", ErrorCodes.ValidationRange, new FieldRef($"lines[{i}].reference"));
             totalDebit += l.Debit;
             totalCredit += l.Credit;
+            if (l.TaxCodeId is long taxCodeId)
+            {
+                var tax = TaxOf(l, i, taxCodeId, taxCodes, taxAccounts, decimals);
+                taxes[i] = tax;
+                if (l.Debit > 0) { totalDebit += tax.Amount; taxDebit += tax.Amount; }
+                else { totalCredit += tax.Amount; taxCredit += tax.Amount; }
+            }
         }
-        if (totalDebit != totalCredit) throw Fail.Rule(ErrorCodes.JournalUnbalanced, Money.Format(totalDebit), Money.Format(totalCredit));
+        if (totalDebit != totalCredit)
+        {
+            // With tax the message names the tax on each side: it is added on the same side as its line (DT-255).
+            if (taxDebit + taxCredit > 0)
+                throw Fail.Rule(ErrorCodes.JournalUnbalancedWithTax, Money.Format(totalDebit), Money.Format(taxDebit), Money.Format(totalCredit), Money.Format(taxCredit));
+            throw Fail.Rule(ErrorCodes.JournalUnbalanced, Money.Format(totalDebit), Money.Format(totalCredit));
+        }
         if (totalDebit > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines")); // entry totals are DECIMAL(18,3)
 
         // The number lock serialises posting per company; the period is checked again after it, so a period closed
@@ -171,10 +199,13 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             TotalDebit = totalDebit,
             TotalCredit = totalCredit,
         };
+        var lastLineNo = resolved.Count;
+        var taxLines = new List<EntryLine>();
         for (var i = 0; i < resolved.Count; i++)
         {
             var l = resolved[i];
-            entry.Lines.Add(new EntryLine
+            var tax = taxes[i];
+            var line = new EntryLine
             {
                 LineNo = i + 1,
                 AccountId = l.AccountId!.Value,
@@ -185,8 +216,32 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 PartyType = l.Party?.Type,
                 PartyId = l.Party?.Id,
                 Note = Common.TextNormalizer.CleanText(l.Note),
-            });
+                Reference = Common.TextNormalizer.CleanText(l.Reference) ?? reference,
+                TaxCodeId = tax?.Code.Id,
+                TaxRate = tax?.Code.Rate,
+                TaxAmount = tax?.Amount,
+                TaxAccountId = tax?.AccountId,
+            };
+            entry.Lines.Add(line);
+            // The automatic tax line: same side, cost centre and reference, linked to its line; numbered after the entered lines.
+            if (tax is { AccountId: long taxAccount, Amount: > 0 } t)
+            {
+                taxLines.Add(new EntryLine
+                {
+                    LineNo = ++lastLineNo,
+                    AccountId = taxAccount,
+                    Debit = l.Debit > 0 ? t.Amount : 0,
+                    Credit = l.Debit > 0 ? 0 : t.Amount,
+                    CostCentreId = l.CostCentreId,
+                    Note = Truncate(JournalTax.Note(t.Code.NameAr, t.Code.NameEn, t.Code.Code, i + 1), NoteMax),
+                    Reference = line.Reference,
+                    TaxCodeId = t.Code.Id,
+                    TaxRate = t.Code.Rate,
+                    TaxForLine = line,
+                });
+            }
         }
+        foreach (var t in taxLines) entry.Lines.Add(t);
         db.Set<JournalEntry>().Add(entry);
         changes.SetAction(entry, auditAction, auditReason);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -295,9 +350,11 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             TotalDebit = original.TotalCredit,
             TotalCredit = original.TotalDebit,
         };
+        // Line references and tax (DT-254, DT-255) are mirrored too; an automatic tax line stays linked to the mirror of its line.
+        var mirrors = new Dictionary<long, EntryLine>();
         foreach (var l in lines)
         {
-            reversal.Lines.Add(new EntryLine
+            var mirror = new EntryLine
             {
                 LineNo = l.LineNo,
                 AccountId = l.AccountId,
@@ -308,7 +365,15 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 PartyType = l.PartyType,
                 PartyId = l.PartyId,
                 Note = l.Note,
-            });
+                Reference = l.Reference,
+                TaxCodeId = l.TaxCodeId,
+                TaxRate = l.TaxRate,
+                TaxAmount = l.TaxAmount,
+                TaxAccountId = l.TaxAccountId,
+                TaxForLine = l.TaxForLineId is long source ? mirrors.GetValueOrDefault(source) : null,
+            };
+            mirrors[l.Id] = mirror;
+            reversal.Lines.Add(mirror);
         }
         db.Set<JournalEntry>().Add(reversal);
         changes.SetAction(reversal, "Reversal");
@@ -333,6 +398,27 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     }
 
     // ------------------------------------------------------------ helpers
+
+    private sealed record TaxAccountRow(long Id, string Code, string Status, bool IsPostable, bool IsTaxAccount, bool IsControlAccount, bool HasChildren);
+
+    /// <summary>
+    /// The tax of line <paramref name="i"/> (DT-255): an active code; amount × rate rounded to the currency; for a rate above 0 % the tax account
+    /// the user chose (never a default), which must be an active postable tax account. A 0 % code needs no tax account and makes no tax line.
+    /// </summary>
+    private static (TaxCode Code, decimal Amount, long? AccountId) TaxOf(PostingLine l, int i, long taxCodeId, Dictionary<long, TaxCode> codes,
+        Dictionary<long, TaxAccountRow> accounts, int decimals)
+    {
+        var field = $"lines[{i}]";
+        var lineNo = i + 1;
+        if (!codes.TryGetValue(taxCodeId, out var code)) throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+        if (code.Status != AccountingCodes.Active) throw Fail.Field(field + ".taxCodeId", ErrorCodes.TaxCodeInactive, lineNo, code.Code);
+        var amount = JournalTax.Amount(l.Debit + l.Credit, code.Rate, decimals);
+        if (code.Rate == 0) return (code, amount, null);
+        if (l.TaxAccountId is not long id) throw Fail.Field(field + ".taxAccountId", ErrorCodes.TaxAccountRequired, lineNo, code.Code);
+        if (!accounts.TryGetValue(id, out var a) || !a.IsTaxAccount || a.IsControlAccount || a.Status != AccountingCodes.Active || !a.IsPostable || a.HasChildren)
+            throw Fail.Field(field + ".taxAccountId", ErrorCodes.TaxAccountInvalid, lineNo, a?.Code ?? "#" + lineNo);
+        return (code, amount, id);
+    }
 
     /// <summary>G-17: Customer = TRN customer or ACC party with role Customer; Supplier = ACC party with role Supplier; Driver/Partner = TRN.</summary>
     public static bool PartyMatches(string? controlType, PostingParty party, IReadOnlyDictionary<long, string> apArRoles) => controlType switch

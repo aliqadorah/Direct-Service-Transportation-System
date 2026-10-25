@@ -51,6 +51,18 @@ public static class ErrorCatalog
         [ErrorCodes.EmailInUse] = ("هذا البريد الإلكتروني مستخدم لحساب آخر.", "This email address is already used by another account."),
         [ErrorCodes.ApArDeductionNotAllowed] = ("الخصم متاح على أسطر فواتير الموردين فقط.", "A deduction is available on supplier-bill lines only."),
         [ErrorCodes.ApArDeductionKeyMissing] = ("اربط «خصومات الموردين» بحساب في ربط الحسابات قبل حفظ فاتورة فيها خصم.", "Map “Supplier deductions” to an account in the account mapping before saving a bill with a deduction."),
+        // Journal line tax (owner request 25 Oct 2026, DT-255…DT-257).
+        [ErrorCodes.JournalUnbalancedWithTax] = ("القيد غير متوازن بعد احتساب الضريبة: المدين {0} (منه ضريبة {1}) والدائن {2} (منه ضريبة {3}). تُضاف الضريبة آلياً في نفس جهة سطرها، لذا يجب أن يشمل الطرف الآخر مبلغ الضريبة أيضاً.",
+            "The entry does not balance including tax: debit {0} (tax {1}), credit {2} (tax {3}). Tax is added automatically on the same side as its line, so the other side must include the tax too."),
+        [ErrorCodes.TaxAccountRequired] = ("السطر {0}: اختر حساب الضريبة لرمز الضريبة {1}.", "Line {0}: choose the tax account for tax code {1}."),
+        [ErrorCodes.TaxAccountInvalid] = ("السطر {0}: الحساب {1} ليس حساب ضريبة نشطاً يقبل الترحيل. علِّمه كحساب ضريبة في دليل الحسابات أو اختر حساباً آخر.",
+            "Line {0}: account {1} is not an active postable tax account. Mark it as a tax account in the chart of accounts or choose another one."),
+        [ErrorCodes.TaxCodeInactive] = ("السطر {0}: رمز الضريبة {1} غير نشط.", "Line {0}: tax code {1} is not active."),
+        [ErrorCodes.TaxCodeInUse] = ("رمز الضريبة {0} مستخدم في قيود مرحّلة: لا يمكن حذفه ولا تغيير نسبته. أوقفه وأنشئ رمزاً جديداً بالنسبة الجديدة.",
+            "Tax code {0} is used on posted journal entries: it cannot be deleted and its rate cannot be changed. Deactivate it and create a new code with the new rate."),
+        [ErrorCodes.TaxAccountControl] = ("لا يمكن أن يكون حساب المراقبة حساب ضريبة.", "A control account cannot be a tax account."),
+        [ErrorCodes.TaxAccountNoGroup] = ("لا توجد مجموعة من نوع «{0}» لإضافة حساب الضريبة تحتها. أضف الحساب بنفسك وعلِّمه كحساب ضريبة.",
+            "There is no «{0}» group to add the tax account under. Add the account yourself and mark it as a tax account."),
         [ErrorCodes.TemplateNameTaken] = ("يوجد نموذج قيد باسم «{0}».", "A journal template named “{0}” already exists."),
         [ErrorCodes.BudgetDuplicateLine] = ("الحساب {0} مكرر في الموازنة لمركز التكلفة نفسه؛ اجمع المبلغين في سطر واحد.", "Account {0} appears twice in the budget for the same cost centre; put both amounts on one line."),
         [ErrorCodes.BudgetOverlap] = ("الحساب {0} جزء من الحساب {1} الموجود في الموازنة لمركز التكلفة نفسه؛ ضع المبلغ على أحدهما فقط.", "Account {0} is part of account {1}, which is also in the budget for the same cost centre; budget only one of them."),
@@ -363,6 +375,13 @@ public static class ErrorCodes
     public const string ApArDeductionNotAllowed = "apar.deductionNotAllowed";
     public const string ApArDeductionKeyMissing = "apar.deductionKeyMissing";
     public const string TemplateNameTaken = "template.nameTaken";
+    public const string JournalUnbalancedWithTax = "journal.unbalancedWithTax";
+    public const string TaxAccountRequired = "journal.taxAccountRequired";
+    public const string TaxAccountInvalid = "journal.taxAccountInvalid";
+    public const string TaxCodeInactive = "journal.taxCodeInactive";
+    public const string TaxCodeInUse = "taxCode.inUse";
+    public const string TaxAccountControl = "account.taxControl";
+    public const string TaxAccountNoGroup = "account.taxNoGroup";
     public const string BudgetDuplicateLine = "budget.duplicateLine";
     public const string BudgetOverlap = "budget.overlap";
     public const string BudgetAccountType = "budget.accountType";
