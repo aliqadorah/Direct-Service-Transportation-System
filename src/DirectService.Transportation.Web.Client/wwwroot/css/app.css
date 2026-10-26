@@ -228,6 +228,48 @@ table.je-lines td { vertical-align: middle; }
 .rec-help { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-5); margin: 0; font-size: var(--fs-sm); }
 .rec-help dt { font-weight: var(--fw-semibold); }
 .rec-help dd { margin: 0; color: var(--muted); }
+/* Budget grid (DT-265): every account at once; header, first column and totals stay in view; it scrolls inside its card. */
+.bud-tools { flex: none; flex-wrap: wrap; gap: var(--sp-3) var(--sp-4); align-items: flex-end; }
+.bud-count { margin-inline-start: auto; font-size: var(--fs-sm); align-self: center; }
+.bud-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--sp-1); }
+/* The grid (and the P&L) is as tall as its rows up to most of the window, also below filters and banners (the page scrolls to it); it
+   scrolls inside with its header, first column and totals in view. */
+.bud-box, .pl-box { display: flex; flex-direction: column; flex: 0 0 auto; max-height: max(360px, calc(100vh - 210px)); overflow: hidden; }
+.bud-scroll, .pl-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; }
+table.bud-grid, table.pl-grid { width: max-content; min-width: 100%; }
+table.bud-grid tbody th, table.bud-grid tfoot th, table.pl-grid tbody th, table.pl-grid tfoot th {
+  top: auto; color: var(--text); font-size: var(--fs-md); font-weight: var(--fw-regular); background: var(--surface);
+}
+table.bud-grid .bud-first, table.pl-grid .pl-first { position: sticky; inset-inline-start: 0; z-index: 2; border-inline-end: 1px solid var(--border); text-align: start; }
+table.bud-grid .bud-first { min-width: 280px; max-width: 340px; }
+table.bud-grid thead th.bud-first, table.pl-grid thead th.pl-first { z-index: 3; background: var(--surface-head); color: var(--muted); font-size: var(--fs-sm); }
+table.bud-grid tr.grp th, table.pl-grid tr.grp th { background: var(--surface-group); font-weight: var(--fw-semibold); }
+table.bud-grid tr.sel th { background: var(--tint); }
+/* Three sticky total rows of exactly 34px (no borders of their own, so nothing scrolls through between them). */
+table.bud-grid tfoot tr.bud-foot > * { position: sticky; bottom: 0; height: 34px; border-top: 0; border-bottom: 0; background: var(--surface-foot); font-weight: var(--fw-semibold); }
+table.bud-grid tfoot tr.bud-foot.f2 > * { box-shadow: inset 0 1px 0 var(--line-strong); }
+table.bud-grid tfoot tr.bud-foot.f1 > * { bottom: 34px; }
+table.bud-grid tfoot tr.bud-foot.f2 > * { bottom: 68px; }
+table.bud-grid tfoot tr.bud-foot > th { z-index: 3; }
+.bud-acc { display: inline-flex; align-items: center; gap: 6px; max-width: 330px; }
+.bud-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.bud-grid td.bud-c { padding: 2px 3px; min-width: 104px; }
+.bud-in { height: 30px; text-align: end; }
+.bud-in[aria-invalid="true"] { border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
+table.bud-grid td.bud-tot { min-width: 120px; font-weight: var(--fw-semibold); }
+/* Profit and loss (DT-266): sections, group totals, gross and net profit; amounts open the account statement. */
+table.pl-grid .pl-first { min-width: 300px; }
+table.pl-grid td.n { min-width: 112px; }
+table.pl-grid tr.pl-sec th { background: var(--surface-head); color: var(--primary); font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+table.pl-grid tr.pl-gtot > *, table.pl-grid tr.pl-stot > * { font-weight: var(--fw-semibold); border-top: 1px solid var(--line-strong); }
+table.pl-grid tr.pl-stot > * { background: var(--surface-foot); }
+table.pl-grid tr.pl-key > * { font-weight: var(--fw-bold); background: var(--tint); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+table.pl-grid tfoot tr.pl-key > * { position: sticky; bottom: 0; }
+table.pl-grid tfoot tr.pl-key > th { z-index: 3; }
+table.pl-grid td.pl-tot { font-weight: var(--fw-semibold); }
+.pl-amt { all: unset; cursor: pointer; border-radius: var(--r); padding: 2px 4px; margin-inline-end: -4px; color: var(--primary); }
+.pl-amt:hover { text-decoration: underline; background: var(--surface-filter); }
+.pl-amt:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 /* Trial balance tree (revision 6): indented names with an expand / collapse button on parent rows. */
 .tb-name { display: inline-flex; align-items: center; gap: 4px; }
 .tb-toggle { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }
@@ -542,6 +584,10 @@ details.refunded ul.refunds { margin: 4px 0 0; padding-inline-start: 18px; font-
   /* The unlogged on-screen preview is never what the browser prints (FR-058): printing goes through the Print button. */
   .print-preview { visibility: hidden; }
   .shell { display: block; height: auto; }
+  /* Wide grids print whole (no inner scroll, no sticky cells); the filters and tools are not printed. */
+  .bud-scroll, .pl-scroll, .bud-box, .pl-box { overflow: visible; max-height: none; }
+  table.bud-grid .bud-first, table.pl-grid .pl-first, table.grid th, table.grid tfoot td, table.bud-grid tfoot tr.bud-foot > *, table.pl-grid tfoot tr.pl-key > * { position: static; }
+  .bud-tools, .pl-filters { display: none; }
 }
 .w100 { width: 100%; }
 .w120 { width: 120px; } .w160 { width: 160px; } .w200 { width: 200px; } .w220 { width: 220px; }

@@ -9,8 +9,24 @@ public static class BudgetMath
     public const string Unfavourable = "unfavourable";
     public const string OnBudget = "onBudget";
 
-    /// <summary>The amount of an account in its natural direction: revenue = credit − debit, expense (and anything else) = debit − credit.</summary>
-    public static decimal Natural(string accountType, decimal debit, decimal credit) => accountType == BudgetService.Revenue ? credit - debit : debit - credit;
+    /// <summary>
+    /// The amount of an account in its natural direction: revenue, liabilities and equity = credit − debit; expenses and assets = debit −
+    /// credit (balance-sheet accounts may be budgeted since DT-265).
+    /// </summary>
+    public static decimal Natural(string accountType, decimal debit, decimal credit) =>
+        accountType is BudgetService.Revenue or "Liability" or "Equity" ? credit - debit : debit - credit;
+
+    /// <summary>
+    /// A yearly amount spread evenly over the twelve months (DT-265): each month the amount ÷ 12 rounded half away from zero to the currency
+    /// decimals; December takes the rounding difference, so the months add up to the amount exactly.
+    /// </summary>
+    public static decimal[] Distribute(decimal yearly, int decimals)
+    {
+        var month = Math.Round(yearly / 12m, decimals, MidpointRounding.AwayFromZero);
+        var months = Enumerable.Repeat(month, 12).ToArray();
+        months[11] = yearly - month * 11;
+        return months;
+    }
 
     /// <summary>A budget amount: the currency's decimals, any sign, at most <see cref="Money.MaxAmount"/> either way.</summary>
     public static bool IsValidAmount(decimal value, int decimals) => Money.IsValidAmount(Math.Abs(value), decimals);

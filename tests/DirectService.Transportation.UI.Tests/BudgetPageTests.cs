@@ -14,6 +14,10 @@ public sealed class BudgetPageTests : PageTestBase
     internal static readonly AccountRef Revenue = new("r1", "4102", "إيرادات أخرى", "Other revenue");
     internal static readonly AccountRef Rent = new("e1", "5202", "الإيجارات", "Rent");
     internal static readonly AccountRef Admin = new("e0", "52", "المصاريف الإدارية", "Administrative expenses");
+    internal static readonly AccountRef RevenueGroup = new("g4", "4", "الإيرادات", "Revenue");
+    internal static readonly AccountRef ExpenseGroup = new("g5", "5", "المصروفات", "Expenses");
+    internal static readonly AccountRef Telecom = new("e2", "5203", "الاتصالات", "Communications");
+    internal static readonly AccountRef Prepaid = new("b1", "1106", "مصاريف مدفوعة مقدماً", "Prepaid expenses");
 
     internal static decimal[] Months(decimal first, decimal second = 0)
     {
@@ -30,9 +34,13 @@ public sealed class BudgetPageTests : PageTestBase
     internal static void Options(PageTestBase t, Action<string, object?> respond)
     {
         _ = t;
-        respond("accounting/budgets/account-options", new[]
+        // DT-265: every account of the chart for the grid.
+        respond("accounting/budgets/grid-accounts", new[]
         {
-            new BudgetAccountOption(Revenue, "Revenue", false, 2), new BudgetAccountOption(Admin, "Expense", true, 2), new BudgetAccountOption(Rent, "Expense", false, 3),
+            new BudgetGridAccount(Prepaid, "Asset", null, 1, false, true),
+            new BudgetGridAccount(RevenueGroup, "Revenue", null, 1, true, true), new BudgetGridAccount(Revenue, "Revenue", "g4", 2, false, true),
+            new BudgetGridAccount(ExpenseGroup, "Expense", null, 1, true, true), new BudgetGridAccount(Admin, "Expense", "g5", 2, true, true),
+            new BudgetGridAccount(Rent, "Expense", "e0", 3, false, true), new BudgetGridAccount(Telecom, "Expense", "e0", 3, false, true),
         });
         respond("accounting/cost-centres/options", Array.Empty<object>());
     }
@@ -61,35 +69,13 @@ public sealed class BudgetPageTests : PageTestBase
     }
 
     [Fact]
-    public void Budget_page_totals_months_and_saves_every_line()
-    {
-        Respond("accounting/budgets/b1", Budget());
-        var cut = Render<BudgetEditor>(p => p.Add(x => x.Company, Company).Add(x => x.Id, "b1"));
-        cut.WaitForAssertion(() => Assert.Contains(L["bud.lines"], cut.Markup));
-        Assert.Contains(L["bud.draftHelp"], cut.Markup);
-        Assert.Contains(Fmt.Money(2000), Text(cut));                       // revenue year total
-        AngleSharp.Dom.IElement feb() => cut.Find($"[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}'] input, input[aria-label='{L.F("bud.lineMonth", 2, L["bud.m2"])}']");
-        Act(() => feb().Change("50"));
-        cut.WaitForAssertion(() => Assert.Contains(Fmt.Money(350), Text(cut)));   // rent 300 + 50
-        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["bud.addLine"], StringComparison.Ordinal)).Click());
-        Assert.Equal(3, cut.FindAll("tbody tr").Count);
-        Act(() => cut.FindAll("button").First(b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal)).Click());
-        cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "accounting/budgets/b1"));
-        var body = Requests.Single(r => r.Method == "PUT").Body!;
-        Assert.Contains("\"accountId\":\"e1\"", body, StringComparison.Ordinal);
-        Assert.Contains("[300,50,0,0,0,0,0,0,0,0,0,0]", body, StringComparison.Ordinal);
-        Assert.Contains("\"rowVersion\":\"RV1\"", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"accountId\":null", body, StringComparison.Ordinal);   // the empty new line is not sent
-    }
-
-    [Fact]
     public void Approved_budget_is_read_only_and_can_be_returned_to_draft()
     {
         Respond("accounting/budgets/b1", Budget(BudgetStatus.Approved));
         var cut = Render<BudgetEditor>(p => p.Add(x => x.Company, Company).Add(x => x.Id, "b1"));
         cut.WaitForAssertion(() => Assert.Contains(L["bud.returnToDraft"], cut.Markup));
         Assert.Empty(cut.FindAll("tbody input"));
-        Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) || b.TextContent.Contains(L["bud.addLine"], StringComparison.Ordinal));
+        Assert.DoesNotContain(cut.FindAll("button"), b => b.TextContent.Contains(L["ui.save"], StringComparison.Ordinal) || b.TextContent.Contains(L["bud.distribute"], StringComparison.Ordinal));
         Assert.Contains(L["nav.budgetVsActual"], cut.Markup);
     }
 

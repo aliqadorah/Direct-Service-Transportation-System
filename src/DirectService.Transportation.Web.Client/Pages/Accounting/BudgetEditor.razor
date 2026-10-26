@@ -1,9 +1,12 @@
 @page "/c/{Company}/accounting/budgets/{Id}"
 @*
-  A budget (revision 6 part B): name, status, lines — revenue or expense account (posting or parent account), optional cost centre, twelve
-  months and the yearly total — with totals per month for revenue and for expenses. A draft is edited here (acc.budget.manage): add / remove
-  lines, type the amounts, import the lines from Excel (template, strict preview; the import replaces every line), save. Approve / return to
-  draft (acc.budget.approve); only one approved budget per year. An approved budget is read-only. Record lock, leave-page confirmation, history.
+  A budget (revision 6 part B; owner request 26 Oct 2026, DT-265): name, status and every posting account of the chart at once — group
+  accounts as headings with subtotals, the twelve months as columns and the row total. Filters (account type, cost centre — accounts posted
+  with it in the budget year or the year before —, search) only choose the rows shown; hidden rows keep their amounts and are saved. Tick
+  rows to Distribute a yearly amount, Fill the following months or Clear them. Totals per month for the rows shown and for the whole budget.
+  Only accounts with amounts are saved; lines made per cost centre or on a group account earlier (copy, import) are kept as they are.
+  A draft is edited here (acc.budget.manage), Excel import (the import replaces every line), approve / return to draft (acc.budget.approve);
+  an approved budget is read-only. Record lock, leave-page confirmation, history, Ctrl+S.
 *@
 @using Md = DirectService.Transportation.Contracts.MasterData
 @inject Api Api
@@ -11,11 +14,12 @@
 @inject ShellState Shell
 @inject ToastService Toasts
 @inject NavigationManager Nav
+@inject UiJs Js
 
 <StateView State="_state" Kind="SkeletonKind.Form" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
-        @{ var b = _b!; }
+        @{ var b = _b!; var view = View(); }
         <PageHeader Title="@b.Name" Help="budget" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.budgets"], NavModel.Href(Company, "accounting/budgets")), new Crumb(b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture))])">
             <Badges><StatusTag Status="@(Approved ? "approved" : "draft")" /></Badges>
             <Actions>
@@ -45,73 +49,106 @@
             <ProblemValidator @ref="_problems" />
             <ErrorSummary @ref="_summary" Extra="_extra" />
             <section class="box pad" style="flex:none">
-                <div class="fg" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);align-items:end">
+                <div class="fg" style="grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);align-items:end">
                     <TextField @bind-Value="_m.Name" Label="@L["md.name"]" Required="true" MaxLength="200" ReadOnly="!Editable" />
-                    <Figures Columns="3" Items="@([new Figure(L["bud.year"], b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture)), new Figure(L["bud.revenueTotal"], Fmt.Money(Total("Revenue"))), new Figure(L["bud.expenseTotal"], Fmt.Money(Total("Expense")))])" />
+                    <Figures Columns="4" Items="@([new Figure(L["bud.year"], b.FiscalYear.ToString(System.Globalization.CultureInfo.InvariantCulture)), new Figure(L["bud.revenueTotal"], Fmt.Money(Total("Revenue"))),
+                        new Figure(L["bud.expenseTotal"], Fmt.Money(Total("Expense"))), new Figure(L["bud.netResult"], Fmt.Money(Total("Revenue") - Total("Expense")))])" />
                 </div>
             </section>
-            <Box NoPad="true" Style="display:flex;flex-direction:column;min-height:0">
-                <Actions>@if (Editable) {<Btn Small="true" Icon="plus" Text="@L["bud.addLine"]" OnClick="AddLine" />}</Actions>
-                <ChildContent>
-                    @if (_m.Lines.Count == 0)
-                    {
-                        <EmptyState Icon="chart" Title="@L["bud.noLines"]" Text="@L[Editable ? "bud.noLinesText" : "bud.noLinesReadOnly"]" />
-                    }
-                    else
-                    {
-                        <div class="tbl-wrap fill">
-                            <table class="tbl bud-tbl">
-                                <caption class="sr-only">@L["bud.lines"]</caption>
-                                <thead><tr>
-                                    <th scope="col">@L["je.account"]</th><th scope="col">@L["je.costCentre"]</th>
-                                    @for (var m = 0; m < 12; m++) {<th scope="col" class="n">@L["bud.m" + (m + 1)]</th>}
-                                    <th scope="col" class="n">@L["bud.yearTotal"]</th>
-                                    @if (Editable) {<th scope="col"><span class="sr-only">@L["ml.delete"]</span></th>}
-                                </tr></thead>
-                                <tbody>
-                                    @for (var i = 0; i < _m.Lines.Count; i++)
-                                    {
-                                        var line = _m.Lines[i];
-                                        var n = i + 1;
-                                        <tr @key="line">
-                                            <td style="min-width:240px">
-                                                @if (Editable) {<ComboField TValue="string?" @bind-Value="line.AccountId" @bind-Value:after="Changed" Options="_accounts" aria-label="@L.F("bud.lineAccount", n)" />}
-                                                else {<bdi>@AccountName(line.AccountId)</bdi>}
-                                            </td>
-                                            <td style="min-width:150px">
-                                                @if (Editable) {<SelectField TValue="string?" @bind-Value="line.CostCentreId" @bind-Value:after="Changed" Options="_centres" Empty="—" aria-label="@L.F("bud.lineCostCentre", n)" />}
-                                                else {@(_centres.FirstOrDefault(c => c.Value == line.CostCentreId)?.Text ?? line.CostCentreName ?? "—")}
-                                            </td>
-                                            @for (var m = 0; m < 12; m++)
-                                            {
-                                                var mi = m;
-                                                <td class="n" style="min-width:104px">
-                                                    @if (Editable) {<NumberField @bind-Value="line.Months[mi]" aria-label="@L.F("bud.lineMonth", n, L["bud.m" + (mi + 1)])" />}
-                                                    else {<bdi class="num">@M(line.Months[mi])</bdi>}
-                                                </td>
-                                            }
-                                            <td class="n" style="min-width:120px"><bdi class="num">@Fmt.Money(line.Total)</bdi></td>
-                                            @if (Editable) {<td style="width:40px"><Btn Small="true" Ghost="true" Icon="trash" AriaLabel="@L.F("inv.removeLine", n)" OnClick="() => Remove(line)" /></td>}
-                                        </tr>
-                                    }
-                                </tbody>
-                                <tfoot>
-                                    @foreach (var type in new[] { "Revenue", "Expense" })
-                                    {
-                                        <tr>
-                                            <td colspan="2">@L[type == "Revenue" ? "bud.revenueTotal" : "bud.expenseTotal"]</td>
-                                            @for (var m = 0; m < 12; m++) {<td class="n"><bdi class="num">@Fmt.Money(MonthTotal(type, m))</bdi></td>}
-                                            <td class="n"><bdi class="num">@Fmt.Money(Total(type))</bdi></td>
-                                            @if (Editable) {<td></td>}
-                                        </tr>
-                                    }
-                                </tfoot>
-                            </table>
-                        </div>
-                    }
-                </ChildContent>
-            </Box>
         </EditForm>
+        <div class="row bud-tools" role="group" aria-label="@L["ui.filter"]">
+            <SelectField TValue="string" Value="_type" ValueChanged="SetType" ValueExpression="() => _type" Options="TypeOptions" Label="@L["bud.typeFilter"]" FieldClass="w200" />
+            @if (_centres.Count > 0)
+            {
+                <SelectField TValue="string?" Value="_centre" ValueChanged="SetCentre" ValueExpression="() => _centre" Options="_centres" Empty="@L["bud.allCentres"]" Label="@L["je.costCentre"]" FieldClass="w200"
+                             Help="@(_centre is null ? null : L.F("bud.centreHelp", b.FiscalYear - 1, b.FiscalYear))" />
+            }
+            <div class="field w220">
+                <label for="bud-search">@L["bud.search"]</label>
+                <input id="bud-search" class="input" type="search" autocomplete="off" placeholder="@L["bud.searchHint"]" value="@_search" @oninput="e => _search = e.Value?.ToString()" />
+            </div>
+            <span class="muted bud-count" role="status">@L.F("bud.shown", view.Count(i => i.Row is not null), _rows.Count)</span>
+        </div>
+        @if (Editable)
+        {
+            var chosen = Chosen(view).Count;
+            <div class="row bud-tools" role="group" aria-label="@L["bud.helpers"]">
+                <Btn Small="true" Icon="check" Text="@L["bud.selectAll"]" OnClick="() => SelectAll(view)" />
+                <Btn Small="true" Ghost="true" Text="@L["bud.clearSelection"]" Disabled="chosen == 0" OnClick="ClearSelection" />
+                <span class="muted" role="status">@L.F("bud.selected", chosen)</span>
+                <span class="bud-sep" aria-hidden="true"></span>
+                <div class="field w160">
+                    <label for="bud-yearly">@L["bud.yearlyAmount"]</label>
+                    <input id="bud-yearly" class="input num" inputmode="decimal" autocomplete="off" value="@_yearlyText" @onchange="e => _yearlyText = e.Value?.ToString()" />
+                </div>
+                <Btn Small="true" Icon="grid" Text="@L["bud.distribute"]" Disabled="chosen == 0" OnClick="() => Distribute(view)" />
+                <span class="bud-sep" aria-hidden="true"></span>
+                <SelectField TValue="int" @bind-Value="_fillFrom" Options="MonthOptions" Label="@L["bud.fillFrom"]" FieldClass="w160" />
+                <Btn Small="true" Icon="right" Text="@L["bud.fill"]" Disabled="chosen == 0" OnClick="() => Fill(view)" />
+                <span class="bud-sep" aria-hidden="true"></span>
+                <Btn Small="true" Ghost="true" Danger="true" Icon="x" Text="@L["bud.clearRows"]" Disabled="chosen == 0" OnClick="() => ClearRows(view)" />
+            </div>
+        }
+        @if (_kept.Count > 0)
+        {
+            <Banner Tone="Tone.Info" Icon="info" Text="@L.F("bud.keptHelp", _kept.Count, Fmt.Money(_kept.Sum(k => k.Total)))">
+                <Actions>@if (Editable) {<Btn Small="true" Ghost="true" Danger="true" Text="@L["bud.removeKept"]" OnClick="RemoveKept" />}</Actions>
+            </Banner>
+        }
+        <section class="box bud-box" aria-label="@L["bud.lines"]">
+            @if (view.Count == 0)
+            {
+                <EmptyState Icon="chart" Title="@L["bud.noRows"]" Text="@L["bud.noRowsText"]" />
+            }
+            else
+            {
+                <div class="bud-scroll" @ref="_grid">
+                    <table class="grid bud-grid">
+                        <caption class="sr-only">@L["bud.lines"]</caption>
+                        <thead><tr>
+                            <th scope="col" class="bud-first">@L["je.account"]</th>
+                            @for (var m = 0; m < 12; m++) {<th scope="col" class="n">@L["bud.m" + (m + 1)]</th>}
+                            <th scope="col" class="n">@L["bud.yearTotal"]</th>
+                        </tr></thead>
+                        <tbody>
+                            @foreach (var item in view)
+                            {
+                                if (item.Row is { } row)
+                                {
+                                    <BudgetGridRow @key="row" Row="row" Version="row.Version" Editable="Editable" OnChange="CellChanged" OnSelect="ToggleRow" />
+                                }
+                                else
+                                {
+                                    var s = item.Subtotals!;
+                                    <tr @key="item.Account.Account.Id" class="grp">
+                                        <th scope="row" class="bud-first"><span class="bud-acc" style="padding-inline-start:@((item.Account.Level - 1) * 14)px">
+                                            <bdi class="num">@item.Account.Account.Code</bdi> <bdi class="bud-name">@L.Pick(item.Account.Account.NameAr, item.Account.Account.NameEn)</bdi></span></th>
+                                        @for (var m = 0; m < 12; m++) {<td class="n"><bdi class="num">@M(s[m])</bdi></td>}
+                                        <td class="n bud-tot"><bdi class="num">@Fmt.Money(s.Sum())</bdi></td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        <tfoot>
+                            @{ var shown = view.Where(i => i.Row is not null).Select(i => i.Row!).ToList(); }
+                            <tr class="bud-foot f2">
+                                <th scope="row" class="bud-first">@L["bud.shownTotal"]</th>
+                                @for (var m = 0; m < 12; m++) {var mi = m; <td class="n"><bdi class="num">@Fmt.Money(shown.Sum(r => r.Months[mi] ?? 0))</bdi></td>}
+                                <td class="n"><bdi class="num">@Fmt.Money(shown.Sum(r => r.Total))</bdi></td>
+                            </tr>
+                            @foreach (var (type, label, n) in new[] { ("Revenue", L["bud.wholeRevenue"], 1), ("Expense", L["bud.wholeExpense"], 0) })
+                            {
+                                <tr class="bud-foot f@(n)">
+                                    <th scope="row" class="bud-first">@label</th>
+                                    @for (var m = 0; m < 12; m++) {var mi = m; <td class="n"><bdi class="num">@Fmt.Money(MonthTotal(type, mi))</bdi></td>}
+                                    <td class="n"><bdi class="num">@Fmt.Money(Total(type))</bdi></td>
+                                </tr>
+                            }
+                        </tfoot>
+                    </table>
+                </div>
+            }
+        </section>
     </ChildContent>
 </StateView>
 <SidePanel @bind-Open="_historyOpen" Title="@L["ui.history"]">
@@ -125,19 +162,27 @@
                Busy="_saving" Error="@_actionError" OnConfirm="_ => ReturnToDraft()" />
 
 @code {
+    private const int Decimals = 3;
     private BudgetResponse? _b;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _lockedBy, _actionError;
     private Model _m = new();
     private EditContext _ctx = new(new Model());
-    private bool _saving, _deleting, _approving, _reopening, _importing, _historyOpen, _structure;
-    private IReadOnlyList<Option<string?>> _accounts = [];
+    private bool _saving, _deleting, _approving, _reopening, _importing, _historyOpen, _changed;
+    private IReadOnlyList<BudgetGridAccount> _ordered = [];
+    private Dictionary<string, BudgetGridAccount> _accountById = new(StringComparer.Ordinal);
+    private Dictionary<string, BudgetGridRowModel> _rows = new(StringComparer.Ordinal);
+    private List<BudgetLineResponse> _kept = [];
     private IReadOnlyList<Option<string?>> _centres = [];
-    private Dictionary<string, BudgetAccountOption> _accountById = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlySet<string>> _centreAccounts = new(StringComparer.Ordinal);
+    private string _type = BudgetGrid.TypePl;
+    private string? _centre, _search, _yearlyText;
+    private int _fillFrom;
     private IReadOnlyList<Md.HistoryEntry>? _history;
     private IReadOnlyList<string>? _extra;
     private ProblemValidator? _problems;
     private ErrorSummary? _summary;
+    private ElementReference _grid;
 
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string Id { get; set; } = "";
@@ -147,14 +192,23 @@
     private bool Busy => _saving || _lockedBy is not null;
     private bool CanApprove => Shell.Can(PermissionKeys.BudgetApprove);
     private bool Editable => !Approved && _lockedBy is null && Shell.Can(PermissionKeys.BudgetManage);
-    private bool Dirty => Editable && (_structure || _ctx.IsModified());
+    private bool Dirty => Editable && (_changed || _ctx.IsModified());
 
-    private static string? M(decimal? v) => v is null or 0 ? null : Fmt.Money(v);
+    private IReadOnlyList<Option<string>> TypeOptions => BudgetGrid.Types.Select(t => new Option<string>(t, L["bud.type." + t])).ToList();
+
+    private IReadOnlyList<Option<int>> MonthOptions => Enumerable.Range(0, 12).Select(m => new Option<int>(m, L["bud.m" + (m + 1)])).ToList();
+
+    private static string? M(decimal v) => v == 0 ? null : Fmt.Money(v);
 
     protected override Task OnParametersSetAsync()
     {
         _importing = ImportQuery == "1";
         return Load();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_state == LoadState.Ready && _grid.Context is not null) await Js.AmountGrid(_grid);
     }
 
     private async Task Load()
@@ -163,10 +217,9 @@
         {
             if (_accountById.Count == 0)
             {
-                var options = await Api.GetAsync<IReadOnlyList<BudgetAccountOption>>(Api.C("accounting/budgets/account-options"));
-                _accountById = options.ToDictionary(o => o.Account.Id, StringComparer.Ordinal);
-                _accounts = options.Select(o => new Option<string?>(o.Account.Id, new string(' ', (o.Level - 1) * 2) + $"{o.Account.Code} · {L.Pick(o.Account.NameAr, o.Account.NameEn)}",
-                    L["acc.t." + o.AccountType] + (o.IsParent ? " · " + L["bud.parentAccount"] : ""))).ToList();
+                var accounts = await Api.GetAsync<IReadOnlyList<BudgetGridAccount>>(Api.C("accounting/budgets/grid-accounts"));
+                _ordered = BudgetGrid.TreeOrder(accounts);
+                _accountById = accounts.ToDictionary(a => a.Account.Id, StringComparer.Ordinal);
                 try { _centres = (await Api.GetAsync<IReadOnlyList<Md.MasterOption>>(Api.C("accounting/cost-centres/options"))).Select(c => new Option<string?>(c.Id, c.Name)).ToList(); }
                 catch (ApiException) { _centres = []; }
             }
@@ -177,53 +230,168 @@
         catch (ApiException e) { _reference = e.Problem.Reference; _state = LoadState.Error; }
     }
 
+    /// <summary>
+    /// The budget on the grid: a posting account's company-wide line fills its row; lines per cost centre or on a group account (from a copy by
+    /// cost centre or an import) are kept as they are, and the sub-accounts of a group with its own company-wide line take no amount.
+    /// </summary>
     private void Show(BudgetResponse b)
     {
         _b = b;
-        _m = new Model
-        {
-            Name = b.Name,
-            Lines = b.Lines.Select(l => new LineModel
-            {
-                AccountId = l.Account.Id, AccountType = l.AccountType, AccountLabel = $"{l.Account.Code} · {L.Pick(l.Account.NameAr, l.Account.NameEn)}",
-                CostCentreId = l.CostCentre?.Id, CostCentreName = l.CostCentre?.Name, Months = l.Months.Select(v => (decimal?)v).ToArray(),
-            }).ToList(),
-        };
+        _m = new Model { Name = b.Name };
         _ctx = new EditContext(_m);
-        _structure = false;
+        _changed = false;
         _history = null;
+        _rows = _ordered.Where(a => !a.IsGroup).ToDictionary(a => a.Account.Id, a => new BudgetGridRowModel(a), StringComparer.Ordinal);
+        _kept = [];
+        foreach (var l in b.Lines)
+        {
+            if (l.CostCentre is null && _rows.TryGetValue(l.Account.Id, out var row))
+            {
+                for (var m = 0; m < 12; m++) row.Months[m] = l.Months[m] == 0 ? null : l.Months[m];
+                row.Saved = true;
+            }
+            else _kept.Add(l);
+        }
+        var lockedBy = _kept.Where(k => k.CostCentre is null).Select(k => k.Account.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var row in _rows.Values)
+        {
+            var guard = 0;
+            for (var p = row.Account.ParentId; p is not null && guard++ < 64; p = _accountById.GetValueOrDefault(p)?.ParentId)
+            {
+                if (lockedBy.Contains(p)) { row.Locked = true; break; }
+            }
+            row.Changed();
+        }
     }
 
-    private string AccountName(string? id) => id is null ? "" : _m.Lines.FirstOrDefault(l => l.AccountId == id)?.AccountLabel ?? id;
-
-    private string? TypeOf(LineModel l) => l.AccountId is { } id && _accountById.TryGetValue(id, out var o) ? o.AccountType : l.AccountType;
-
-    private decimal MonthTotal(string type, int m) => _m.Lines.Where(l => TypeOf(l) == type).Sum(l => l.Months[m] ?? 0);
-
-    private decimal Total(string type) => _m.Lines.Where(l => TypeOf(l) == type).Sum(l => l.Total);
-
-    private void Changed() => _structure = true;
-
-    private void AddLine()
+    private List<BudgetGridItem> View()
     {
-        _m.Lines.Add(new LineModel());
-        _structure = true;
+        var centre = _centre is not null ? _centreAccounts.GetValueOrDefault(_centre) : null;
+        return BudgetGrid.View(_ordered, _rows, r => BudgetGrid.Shows(r, _type, centre, _search));
     }
 
-    private void Remove(LineModel line)
+    private Task SetType(string type)
     {
-        _m.Lines.Remove(line);
-        _structure = true;
+        _type = type;
+        return Task.CompletedTask;
     }
 
+    private async Task SetCentre(string? centre)
+    {
+        _centre = centre;
+        if (centre is null || _centreAccounts.ContainsKey(centre) || _b is null) return;
+        try
+        {
+            var ids = await Api.GetAsync<IReadOnlyList<string>>(Api.C($"accounting/budgets/cost-centre-accounts?costCentre={Uri.EscapeDataString(centre)}&year={_b.FiscalYear}"));
+            _centreAccounts[centre] = ids.ToHashSet(StringComparer.Ordinal);
+        }
+        catch (ApiException e)
+        {
+            _centre = null;
+            Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]);
+        }
+    }
+
+    private decimal MonthTotal(string type, int m) =>
+        _rows.Values.Where(r => r.Account.AccountType == type).Sum(r => r.Months[m] ?? 0) + _kept.Where(k => k.AccountType == type).Sum(k => k.Months[m]);
+
+    private decimal Total(string type) =>
+        _rows.Values.Where(r => r.Account.AccountType == type).Sum(r => r.Total) + _kept.Where(k => k.AccountType == type).Sum(k => k.Total);
+
+    /// <summary>A cell typed in: an amount with at most the currency's decimals, or empty; anything else stays as typed and is marked.</summary>
+    private void CellChanged(BudgetCellChange c)
+    {
+        var text = c.Text?.Trim();
+        if (string.IsNullOrEmpty(text)) { c.Row.Months[c.Month] = null; c.Row.Invalid[c.Month] = null; }
+        else if (Fmt.TryParseDecimal(text, out var v) && decimal.Round(v, Decimals) == v)
+        {
+            c.Row.Months[c.Month] = v == 0 ? null : v;
+            c.Row.Invalid[c.Month] = null;
+        }
+        else c.Row.Invalid[c.Month] = c.Text;
+        c.Row.Changed();
+        _changed = true;
+    }
+
+    private void ToggleRow(BudgetGridRowModel row)
+    {
+        row.Selected = !row.Selected;
+        row.Changed();
+    }
+
+    /// <summary>The ticked rows that are shown (helpers never touch rows the filters hide).</summary>
+    private static List<BudgetGridRowModel> Chosen(List<BudgetGridItem> view) =>
+        view.Where(i => i.Row is { Selected: true, Locked: false }).Select(i => i.Row!).ToList();
+
+    private void SelectAll(List<BudgetGridItem> view)
+    {
+        foreach (var row in view.Where(i => i.Row is { Locked: false }).Select(i => i.Row!).Where(r => !r.Selected))
+        {
+            row.Selected = true;
+            row.Changed();
+        }
+    }
+
+    private void ClearSelection()
+    {
+        foreach (var row in _rows.Values.Where(r => r.Selected))
+        {
+            row.Selected = false;
+            row.Changed();
+        }
+    }
+
+    private void Apply(List<BudgetGridItem> view, Action<BudgetGridRowModel> change)
+    {
+        foreach (var row in Chosen(view))
+        {
+            change(row);
+            Array.Clear(row.Invalid);
+            row.Changed();
+        }
+        _changed = true;
+    }
+
+    private void Distribute(List<BudgetGridItem> view)
+    {
+        if (!Fmt.TryParseDecimal(_yearlyText, out var yearly) || decimal.Round(yearly, Decimals) != yearly)
+        {
+            Toasts.Error(L.F("ui.notANumber", L["bud.yearlyAmount"]));
+            return;
+        }
+        var months = BudgetGrid.Distribute(yearly, Decimals);
+        Apply(view, r => { for (var m = 0; m < 12; m++) r.Months[m] = months[m] == 0 ? null : months[m]; });
+    }
+
+    private void Fill(List<BudgetGridItem> view) => Apply(view, r => BudgetGrid.Fill(r.Months, _fillFrom));
+
+    private void ClearRows(List<BudgetGridItem> view) => Apply(view, r => Array.Clear(r.Months));
+
+    private void RemoveKept()
+    {
+        _kept = [];
+        foreach (var row in _rows.Values.Where(r => r.Locked))
+        {
+            row.Locked = false;
+            row.Changed();
+        }
+        _changed = true;
+    }
+
+    /// <summary>Every account with an amount (also rows the filters hide) and the kept lines; empty rows are not sent.</summary>
     private BudgetRequest Request() => new(_m.Name?.Trim(),
-        _m.Lines.Where(l => l.AccountId is not null || l.Months.Any(v => v is not null and not 0))
-            .Select(l => new BudgetLineRequest(l.AccountId, l.CostCentreId, l.Months.Select(v => v ?? 0).ToList())).ToList(),
+        _rows.Values.Where(r => r.HasAmounts).Select(r => new BudgetLineRequest(r.Account.Account.Id, null, r.Months.Select(v => v ?? 0).ToList()))
+            .Concat(_kept.Select(k => new BudgetLineRequest(k.Account.Id, k.CostCentre?.Id, k.Months.ToList()))).ToList(),
         _b?.RowVersion);
 
     private async Task Save()
     {
         if (_b is null || !Editable || _saving) return;
+        if (_rows.Values.FirstOrDefault(r => r.Invalid.Any(t => t is not null)) is { } bad)
+        {
+            Toasts.Error(L.F("bud.cellInvalid", bad.Account.Account.Code));
+            return;
+        }
         _saving = true;
         _extra = null;
         try
@@ -273,7 +441,7 @@
         {
             await Api.PostAsync(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/delete"), new RowVersionRequest(_b.RowVersion));
             _deleting = false;
-            _structure = false;
+            _changed = false;
             _ctx.MarkAsUnmodified();
             Toasts.Success(L["bud.deleted"]);
             Nav.NavigateTo(NavModel.Href(Company, "accounting/budgets"));
@@ -293,17 +461,5 @@
     private sealed class Model
     {
         public string? Name { get; set; }
-        public List<LineModel> Lines { get; set; } = [];
-    }
-
-    private sealed class LineModel
-    {
-        public string? AccountId { get; set; }
-        public string? AccountType { get; set; }
-        public string? AccountLabel { get; set; }
-        public string? CostCentreId { get; set; }
-        public string? CostCentreName { get; set; }
-        public decimal?[] Months { get; set; } = new decimal?[12];
-        public decimal Total => Months.Sum(v => v ?? 0);
     }
 }

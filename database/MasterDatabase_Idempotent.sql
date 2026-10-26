@@ -7531,3 +7531,56 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    ALTER TABLE [acc].[Accounts] ADD [ProfitLossGroup] nvarchar(20) NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [acc].[Accounts] ADD CONSTRAINT [CK_Accounts_ProfitLossGroup] CHECK ([ProfitLossGroup] IS NULL OR ([AccountType] = N''Revenue'' AND [ProfitLossGroup] IN (N''Sales'', N''OtherIncome'')) OR ([AccountType] = N''Expense'' AND [ProfitLossGroup] IN (N''CostOfSales'', N''Operating'', N''OtherExpense'')))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    UPDATE [acc].[Accounts] SET [ProfitLossGroup] = N'CostOfSales' WHERE [Code] = N'51' AND [AccountType] = N'Expense' AND [ProfitLossGroup] IS NULL AND [IsDeleted] = 0 AND ([NameAr] = N'تكاليف النقل المباشرة' OR [NameEn] = N'Direct transport costs');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    UPDATE t SET t.[NameAr] = d.[NewName] FROM [acc].[TaxCodes] t INNER JOIN (VALUES (N'ضريبة المبيعات 0%', N'ضريبة المبيعات العامة 0%'), (N'ضريبة المبيعات 1%', N'ضريبة المبيعات العامة 1%'), (N'ضريبة المبيعات 2%', N'ضريبة المبيعات العامة 2%'), (N'ضريبة المبيعات 4%', N'ضريبة المبيعات العامة 4%'), (N'ضريبة المبيعات 5%', N'ضريبة المبيعات العامة 5%'), (N'ضريبة المبيعات 7%', N'ضريبة المبيعات العامة 7%'), (N'ضريبة المبيعات 8%', N'ضريبة المبيعات العامة 8%'), (N'ضريبة المبيعات 10%', N'ضريبة المبيعات العامة 10%'), (N'ضريبة المبيعات 16%', N'ضريبة المبيعات العامة 16%')) AS d([OldName], [NewName]) ON t.[NameAr] = d.[OldName] WHERE t.[IsDeleted] = 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    UPDATE [acc].[Accounts] SET [NameAr] = N'ضريبة مبيعات غير قابلة للخصم' WHERE [NameAr] = N'مصروف ضريبة المبيعات غير القابلة للاسترداد' AND [AccountType] = N'Expense' AND [IsDeleted] = 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261026070033_Rev6_BudgetProfitLoss'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261026070033_Rev6_BudgetProfitLoss', N'10.0.13');
+END;
+
+COMMIT;
+GO
+

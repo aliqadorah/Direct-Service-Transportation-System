@@ -43,7 +43,7 @@ public sealed class JournalTaxUnitTests
     {
         Assert.Equal([0m, 1m, 2m, 4m, 5m, 7m, 8m, 10m, 16m], JournalTax.Defaults.Select(d => d.Rate));
         Assert.Equal("VAT_JO_16", JournalTax.Defaults[^1].Code);
-        Assert.Equal(("ضريبة المبيعات 16%", "VAT 16%"), (JournalTax.Defaults[^1].NameAr, JournalTax.Defaults[^1].NameEn));
+        Assert.Equal(("ضريبة المبيعات العامة 16%", "VAT 16%"), (JournalTax.Defaults[^1].NameAr, JournalTax.Defaults[^1].NameEn));   // DT-263
         Assert.Equal(JournalTax.Defaults.Select(d => d.SortOrder).Order(), JournalTax.Defaults.Select(d => d.SortOrder));
         Assert.All(JournalTax.Defaults, d => Assert.True(ChartOfAccountsService.IsCode(d.Code), d.Code));
     }

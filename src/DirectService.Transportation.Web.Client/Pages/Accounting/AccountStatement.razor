@@ -34,7 +34,7 @@
         }
         <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
         <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
-        @if (Lookups.CostCentres.Count > 0) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="Lookups.CostCentres" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
+        @if (Lookups.CostCentres.Count > 0 || _costCentre is not null) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="CentreOptions" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
         <TextField @bind-Value="_lineReference" Label="@L["je.reference"]" MaxLength="100" FieldClass="w160" />
         @if (PartyType is { } pt)
         {
@@ -134,7 +134,12 @@ else
     [SupplyParameterFromQuery(Name = "account")] public string? QueryAccount { get; set; }
     [SupplyParameterFromQuery(Name = "from")] public string? QueryFrom { get; set; }
     [SupplyParameterFromQuery(Name = "to")] public string? QueryTo { get; set; }
+    /// <summary>A cost centre's token or <c>none</c> (lines without a cost centre) — from a profit and loss amount (DT-267).</summary>
+    [SupplyParameterFromQuery(Name = "costCentre")] public string? QueryCostCentre { get; set; }
     private string? _appliedQuery;
+
+    /// <summary>The cost centres, and "No cost centre" (DT-267).</summary>
+    private IReadOnlyList<Option<string?>> CentreOptions => [new("none", L["pl.noCostCentre"]), .. Lookups.CostCentres];
 
     private IReadOnlyList<TabItem> Modes => [new("accounts", L["stmt.modeAccounts"]), new("range", L["stmt.modeRange"]), new("all", L["stmt.modeAll"])];
 
@@ -175,7 +180,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        var key = $"{QueryAccounts}|{QueryAccount}|{QueryFrom}|{QueryTo}";
+        var key = $"{QueryAccounts}|{QueryAccount}|{QueryFrom}|{QueryTo}|{QueryCostCentre}";
         if (key == _appliedQuery) return;
         _appliedQuery = key;
         static DateOnly? Day(string? s) => DateOnly.TryParseExact(s, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d : null;
@@ -186,6 +191,7 @@ else
         _chosen.AddRange(ids.Distinct(StringComparer.Ordinal));
         _from = Day(QueryFrom);
         _to = Day(QueryTo);
+        _costCentre = string.IsNullOrWhiteSpace(QueryCostCentre) ? null : QueryCostCentre;
         _party = null;
         await Run();
     }

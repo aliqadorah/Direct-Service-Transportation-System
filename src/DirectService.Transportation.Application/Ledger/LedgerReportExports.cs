@@ -80,23 +80,78 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
         ? (IReadOnlyList<object?>)[new string(' ', (x.Level - 1) * 2) + Name(x.Account), x.Amount, x.CompareAmount]
         : [new string(' ', (x.Level - 1) * 2) + Name(x.Account), x.Amount]);
 
+    /// <summary>Title of a profit and loss section (DT-264).</summary>
+    public string SectionTitle(string group) => group switch
+    {
+        ProfitLossGroups.Sales => L("المبيعات والإيرادات", "Sales and revenue"),
+        ProfitLossGroups.CostOfSales => L("تكلفة المبيعات", "Cost of sales"),
+        ProfitLossGroups.Operating => L("المصاريف التشغيلية", "Operating expenses"),
+        ProfitLossGroups.OtherIncome => L("إيرادات أخرى", "Other income"),
+        _ => L("مصروفات أخرى", "Other expenses"),
+    };
+
+    /// <summary>
+    /// The profit and loss as on the screen (DT-266): the sections with their accounts indented by level (a group with the total of its
+    /// sub-accounts, followed by its sub-accounts), each section's total, gross profit after the cost of sales and net profit last; the same
+    /// columns as the screen ("Columns by" and the total; the comparison period with one amount). A PDF with more than six amount columns is
+    /// printed landscape.
+    /// </summary>
     public async Task<GeneratedFile> ProfitLossAsync(ProfitLossQuery q, string? format, CancellationToken ct)
     {
         var r = await reports.ProfitLossAsync(q, ct).ConfigureAwait(false);
         var compare = r.CompareFrom is not null;
+        var single = r.ColumnsBy == "none";
         var filters = new List<(string, string)> { Period(r.From, r.To) };
         if (r.CostCentre is not null) filters.Add((L("مركز التكلفة", "Cost centre"), r.CostCentre.Name));
         if (compare) filters.Add((L("مقارنة", "Compared with"), Date(r.CompareFrom!.Value) + " – " + Date(r.CompareTo!.Value)));
-        var rows = new List<IReadOnlyList<object?>> { ReportExporter.Group(L("الإيرادات", "Revenue")) };
-        rows.AddRange(Lines(r.Revenue, compare));
-        rows.Add(compare ? [L("مجموع الإيرادات", "Total revenue"), r.TotalRevenue, r.CompareTotalRevenue] : [L("مجموع الإيرادات", "Total revenue"), r.TotalRevenue]);
-        rows.Add(ReportExporter.Group(L("المصروفات", "Expenses")));
-        rows.AddRange(Lines(r.Expenses, compare));
-        rows.Add(compare ? [L("مجموع المصروفات", "Total expenses"), r.TotalExpenses, r.CompareTotalExpenses] : [L("مجموع المصروفات", "Total expenses"), r.TotalExpenses]);
-        List<ReportColumn> columns = [new(L("البند", "Item")), new(L("المبلغ", "Amount"), ReportValue.Money)];
+        if (!single)
+        {
+            filters.Add((L("الأعمدة حسب", "Columns by"), r.ColumnsBy switch
+            {
+                "costCentre" => L("مركز التكلفة", "Cost centre"),
+                "month" => L("الشهر", "Month"),
+                "quarter" => L("الربع", "Quarter"),
+                _ => L("السنة", "Year"),
+            }));
+        }
+        IReadOnlyList<object?> Values(string label, IReadOnlyList<decimal> amounts, decimal total, decimal? cmp)
+        {
+            var v = new List<object?> { label };
+            if (single) v.Add(total);
+            else
+            {
+                v.AddRange(amounts.Cast<object?>());
+                v.Add(total);
+            }
+            if (compare) v.Add(cmp);
+            return v;
+        }
+        var rows = new List<IReadOnlyList<object?>>();
+        foreach (var s in r.Sections ?? [])
+        {
+            var optional = s.Group is ProfitLossGroups.OtherIncome or ProfitLossGroups.OtherExpense;
+            if (s.Rows.Count > 0 || !optional)
+            {
+                rows.Add(ReportExporter.Group(SectionTitle(s.Group)));
+                rows.AddRange(s.Rows.Select(x => Values(new string(' ', (x.Level - 1) * 2) + Name(x.Account), x.Amounts, x.Total, x.CompareAmount)));
+                rows.Add(Values(L("مجموع ", "Total ") + SectionTitle(s.Group), s.Total.Amounts, s.Total.Total, s.Total.Compare));
+            }
+            if (s.Group == ProfitLossGroups.CostOfSales && r.GrossProfit is { } g) rows.Add(Values(L("مجمل الربح", "Gross profit"), g.Amounts, g.Total, g.Compare));
+        }
+        List<ReportColumn> columns = [new(L("البند", "Item"))];
+        if (single) columns.Add(new(L("المبلغ", "Amount"), ReportValue.Money));
+        else
+        {
+            columns.AddRange((r.Columns ?? []).Select(c => new ReportColumn(c.Name ?? c.Key, ReportValue.Money)));
+            columns.Add(new(L("الإجمالي", "Total"), ReportValue.Money));
+        }
         if (compare) columns.Add(new(L("فترة المقارنة", "Comparison"), ReportValue.Money));
+        var net = r.Net ?? new ProfitLossFigure([r.NetProfit], r.NetProfit, r.CompareNetProfit);
         var table = new ReportTable(L("قائمة الأرباح والخسائر", "Profit and loss"), filters, columns, rows,
-            compare ? [L("صافي الربح", "Net profit"), r.NetProfit, r.CompareNetProfit] : [L("صافي الربح", "Net profit"), r.NetProfit]);
+            Values(net.Total >= 0 ? L("صافي الربح", "Net profit") : L("صافي الخسارة", "Net loss"), net.Amounts, net.Total, net.Compare))
+        {
+            Landscape = columns.Count > 7,
+        };
         return await exporter.ExportAsync(table, format, "profit-and-loss", ct).ConfigureAwait(false);
     }
 

@@ -62,7 +62,7 @@ public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, I
         var notes = new List<IReadOnlyList<string>>
         {
             new[] { headers[0], T("نعم", "Yes"), T("رمز حساب في الدليل", "Code of an account in the chart"),
-                T("حساب إيرادات أو مصروفات؛ حساب فرعي أو حساب أب (لا تضع الأب وفروعه معاً لمركز التكلفة نفسه)", "A revenue or expense account; a posting account or a parent (not a parent and its sub-accounts for the same cost centre)") },
+                T("أي حساب في الدليل؛ حساب فرعي أو حساب أب (لا تضع الأب وفروعه معاً لمركز التكلفة نفسه). الصفوف التي كل مبالغها صفر لا تُحفظ", "Any account of the chart; a posting account or a parent (not a parent and its sub-accounts for the same cost centre). Rows whose amounts are all zero are not kept") },
             new[] { headers[1], T("لا", "No"), T("رمز مركز تكلفة", "Code of a cost centre"), T("فارغ = بلا مركز تكلفة؛ الحساب مرة واحدة لكل مركز", "Empty = no cost centre; an account once per cost centre") },
         };
         notes.AddRange(monthHeaders.Select(h => (IReadOnlyList<string>)[h, T("لا", "No"), T("رقم، حتى 3 خانات عشرية؛ يمكن أن يكون سالباً", "Number, up to 3 decimals; may be negative"),
@@ -95,7 +95,7 @@ public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, I
         if (preview.RejectedRows > 0) throw Fail.Rule(ErrorCodes.ImportHasErrors, preview.RejectedRows);
         var batch = await db.InTransactionAsync(async c =>
         {
-            var changed = await budgets.ReplaceLinesAsync(budget, rows.Select(r => (r.AccountId, r.CostCentreId, r.Months)).ToList(), "Replaced by an import", c).ConfigureAwait(false);
+            var changed = await budgets.ReplaceLinesAsync(budget, rows.Where(r => r.Months.Any(m => m != 0)).Select(r => (r.AccountId, r.CostCentreId, r.Months)).ToList(), "Replaced by an import", c).ConfigureAwait(false);
             if (changed) db.Set<Budget>().Entry(budget).Property(b => b.UpdatedAt).IsModified = true;
             var b = ImportParse.Batch(BudgetService.EntityType, fileName, rows.Count, rows.Count, ctx.UserId!.Value);
             db.Set<ImportBatch>().Add(b);

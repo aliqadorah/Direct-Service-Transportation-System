@@ -26,6 +26,12 @@ public sealed record BudgetLineResponse(AccountRef Account, string AccountType, 
 public sealed record BudgetAccountOption(AccountRef Account, string AccountType, bool IsParent, int Level);
 
 /// <summary>
+/// An account of the budget screen (DT-265): every account in chart order with its parent and tree level (1 = top); a group (sub-accounts, or
+/// not postable) is a heading with subtotals, the others take amounts.
+/// </summary>
+public sealed record BudgetGridAccount(AccountRef Account, string AccountType, string? ParentId, int Level, bool IsGroup, bool IsActive);
+
+/// <summary>
 /// Creates a budget: year and name; empty, or copied from the previous year's actuals (<paramref name="CopyActuals"/>) with an optional
 /// percentage increase (may be negative) and optionally one line per cost centre.
 /// </summary>

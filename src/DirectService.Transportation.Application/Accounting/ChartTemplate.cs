@@ -7,10 +7,13 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Codes by level: 1 digit class · 2 group · 4 account · 6 sub-account. Only leaf accounts are postable.
 /// Owner request 25 Oct 2026 (DT-256): the template's sales-tax accounts 1105 (input VAT) and 2104 (output VAT) are marked as tax accounts and
 /// 5207 "VAT expenses (non-recoverable)" is added and marked; existing companies get them only through "Add the default tax accounts".
+/// Owner request 26 Oct 2026: 5207 is named "ضريبة مبيعات غير قابلة للخصم" in Arabic (DT-263), and the direct transport costs (51) are the
+/// cost of sales of the profit and loss statement (DT-264).
 /// </summary>
 public static class ChartTemplate
 {
-    public sealed record TemplateAccount(string Code, string NameAr, string NameEn, string Type, string? ParentCode, string? ControlPartyType, bool IsTax = false);
+    public sealed record TemplateAccount(string Code, string NameAr, string NameEn, string Type, string? ParentCode, string? ControlPartyType, bool IsTax = false,
+        string? ProfitLossGroup = null);
 
     /// <summary>A default tax account (DT-256): its type, the template code (marked when it exists), its group and names.</summary>
     public sealed record DefaultTaxAccount(string Type, string TemplateCode, string GroupCode, string NameAr, string NameEn);
@@ -20,8 +23,14 @@ public static class ChartTemplate
     [
         new("Liability", "2104", "21", "ضريبة المبيعات على المبيعات (مخرجات)", "VAT on sales (output VAT)"),
         new("Asset", "1105", "11", "ضريبة المبيعات على المشتريات (مدخلات)", "VAT on purchases (input VAT)"),
-        new("Expense", "5207", "52", "مصروف ضريبة المبيعات غير القابلة للاسترداد", "VAT expenses (non-recoverable)"),
+        new("Expense", "5207", "52", VatExpensesNameAr, "VAT expenses (non-recoverable)"),
     ];
+
+    /// <summary>Arabic name of the VAT expenses account (owner decision 26 Oct 2026, DT-263).</summary>
+    public const string VatExpensesNameAr = "ضريبة مبيعات غير قابلة للخصم";
+
+    /// <summary>Earlier default Arabic names of the tax accounts (still recognised as the template's own account; renamed by Rev6_BudgetProfitLoss).</summary>
+    public static readonly IReadOnlyList<string> FormerNamesAr = ["مصروف ضريبة المبيعات غير القابلة للاسترداد"];
 
     public const string MainCashBoxNameAr = "الصندوق الرئيسي";
     public const string MainCashBoxAccountCode = "110101";
@@ -62,7 +71,7 @@ public static class ChartTemplate
         new("4104", "الخصم المسموح به", "Discount allowed", "Revenue", "4", null),
         new("4105", "إيرادات خصومات الموردين", "Supplier deductions income", "Revenue", "4", null),
         new("5", "المصروفات", "Expenses", "Expense", null, null),
-        new("51", "تكاليف النقل المباشرة", "Direct transport costs", "Expense", "5", null),
+        new("51", "تكاليف النقل المباشرة", "Direct transport costs", "Expense", "5", null, ProfitLossGroup: "CostOfSales"),
         new("5101", "أجور السائقين", "Driver wage expense", "Expense", "51", null),
         new("5102", "تكلفة النقل لدى الشركاء", "Partner (subcontracted haulage) cost", "Expense", "51", null),
         new("5103", "الوقود", "Fuel", "Expense", "51", null),
@@ -75,7 +84,7 @@ public static class ChartTemplate
         new("5204", "الرسوم والاشتراكات", "Fees and subscriptions", "Expense", "52", null),
         new("5205", "مصروف الإهلاك", "Depreciation expense", "Expense", "52", null),
         new("5206", "العمولات والمصاريف البنكية", "Bank charges", "Expense", "52", null),
-        new("5207", "مصروف ضريبة المبيعات غير القابلة للاسترداد", "VAT expenses (non-recoverable)", "Expense", "52", null, IsTax: true),
+        new("5207", VatExpensesNameAr, "VAT expenses (non-recoverable)", "Expense", "52", null, IsTax: true),
         new("5299", "مصاريف أخرى", "Other expenses", "Expense", "52", null),
     ];
 

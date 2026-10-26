@@ -98,6 +98,11 @@
                             <SelectField TValue="string?" @bind-Value="_model.ControlPartyType" Options="PartyTypes" Label="@L["acc.partyType"]" Required="true" Disabled="!CanSetup" />
                         }
                         <CheckField @bind-Value="_model.IsTaxAccount" Label="@L["acc.isTax"]" Disabled="@(!CanSetup || _model.IsControlAccount)" Help="@L["acc.isTaxHelp"]" />
+                        @if (ProfitLossGroups.For(_model.AccountType).Count > 0)
+                        {
+                            <SelectField TValue="string?" @bind-Value="_model.ProfitLossGroup" Options="PlGroups" Empty="@L.F("acc.plGroupInherit", L["acc.pl." + InheritedGroup])"
+                                         Label="@L["acc.plGroup"]" Help="@L["acc.plGroupHelp"]" Disabled="!CanSetup" />
+                        }
                         @if (_model.Id is not null) {<p class="help" style="margin:0">@L.F("acc.openingsHere", Fmt.Money(_model.OpeningDebit), Fmt.Money(_model.OpeningCredit))</p>}
                         <div class="row" style="gap:6px;flex-wrap:wrap">
                             @if (CanSetup) {<Btn Type="submit" Primary="true" Text="@L["ui.save"]" Busy="_busy" Disabled="@(_lockedBy is not null)" />}
@@ -140,6 +145,24 @@
     private bool CanSetup => Shell.Can(PermissionKeys.AcctSetup);
 
     private IReadOnlyList<Option<string?>> Types => new[] { "Asset", "Liability", "Equity", "Revenue", "Expense" }.Select(t => new Option<string?>(t, L["acc.t." + t])).ToList();
+    /// <summary>The profit and loss sections of the account's type (DT-264).</summary>
+    private IReadOnlyList<Option<string?>> PlGroups => ProfitLossGroups.For(_model.AccountType).Select(g => new Option<string?>(g, L["acc.pl." + g])).ToList();
+
+    /// <summary>The section the account takes without one of its own: the nearest parent's, else the default of its type.</summary>
+    private string InheritedGroup
+    {
+        get
+        {
+            var byId = _all.ToDictionary(a => a.Id, StringComparer.Ordinal);
+            var guard = 0;
+            for (var p = _model.ParentId; p is not null && byId.TryGetValue(p, out var parent) && guard++ < 64; p = parent.ParentId)
+            {
+                if (parent.ProfitLossGroup is { } g && ProfitLossGroups.For(_model.AccountType).Contains(g)) return g;
+            }
+            return ProfitLossGroups.Default(_model.AccountType) ?? ProfitLossGroups.Sales;
+        }
+    }
+
     private IReadOnlyList<Option<string?>> PartyTypes => new[] { "Customer", "Supplier", "Driver", "Partner" }.Select(t => new Option<string?>(t, L["party." + t])).ToList();
 
     /// <summary>Parents: any account except the edited one and its descendants (a group must not be posted to, FR-108).</summary>
@@ -268,7 +291,7 @@
         {
             var req = new AccountRequest(_model.Code?.Trim(), _model.NameAr?.Trim(), string.IsNullOrWhiteSpace(_model.NameEn) ? null : _model.NameEn.Trim(), _model.AccountType,
                 _model.ParentId, _model.IsPostable, _model.IsControlAccount, _model.IsControlAccount ? _model.ControlPartyType : null, _model.RowVersion,
-                _model.IsTaxAccount && !_model.IsControlAccount);
+                _model.IsTaxAccount && !_model.IsControlAccount, ProfitLossGroups.For(_model.AccountType).Contains(_model.ProfitLossGroup ?? "") ? _model.ProfitLossGroup : null);
             AccountResponse saved;
             if (_model.Id is null) saved = await Api.PostAsync<AccountResponse>(Api.C("accounting/accounts"), req);
             else
@@ -335,6 +358,7 @@
         public bool IsControlAccount { get; set; }
         public string? ControlPartyType { get; set; }
         public bool IsTaxAccount { get; set; }
+        public string? ProfitLossGroup { get; set; }
         public decimal OpeningDebit { get; set; }
         public decimal OpeningCredit { get; set; }
         public string Status { get; set; } = "Active";
@@ -344,7 +368,7 @@
         {
             Id = a.Id, Code = a.Code, NameAr = a.NameAr, NameEn = a.NameEn, AccountType = a.AccountType, ParentId = a.ParentId, IsPostable = a.IsPostable,
             IsControlAccount = a.IsControlAccount, ControlPartyType = a.ControlPartyType, OpeningDebit = a.OpeningDebit, OpeningCredit = a.OpeningCredit,
-            Status = a.Status, RowVersion = a.RowVersion, IsTaxAccount = a.IsTaxAccount,
+            Status = a.Status, RowVersion = a.RowVersion, IsTaxAccount = a.IsTaxAccount, ProfitLossGroup = a.ProfitLossGroup,
         };
     }
 }

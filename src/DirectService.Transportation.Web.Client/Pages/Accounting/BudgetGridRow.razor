@@ -1,0 +1,61 @@
+@*
+  One posting account of the budget grid (DT-265): tick box, account, twelve amount cells and the row total. It renders again only when its
+  row's version or the editing state changes, so typing stays fast with several hundred accounts. Cells are plain inputs (data-c = month)
+  for the grid's keyboard moves (ui.js budgetGrid: Enter / Shift+Enter down / up, Tab across).
+*@
+@inject Loc L
+<tr class="@(Row.Selected ? "sel" : null)">
+    <th scope="row" class="bud-first">
+        <span class="bud-acc" style="padding-inline-start:@((Row.Account.Level - 1) * 14)px">
+            @if (Editable && !Row.Locked)
+            {
+                <input type="checkbox" checked="@Row.Selected" aria-label="@L.F("bud.selectRow", Row.Account.Account.Code)" @onchange="() => OnSelect.InvokeAsync(Row)" />
+            }
+            <bdi class="num">@Row.Account.Account.Code</bdi>
+            <bdi class="bud-name">@L.Pick(Row.Account.Account.NameAr, Row.Account.Account.NameEn)</bdi>
+            @if (Row.Locked) {<span class="muted" title="@L["bud.lockedHelp"]"><Icon Name="lock" /><span class="sr-only">@L["bud.lockedHelp"]</span></span>}
+        </span>
+    </th>
+    @for (var m = 0; m < 12; m++)
+    {
+        var mi = m;
+        <td class="n bud-c">
+            @if (Editable && !Row.Locked)
+            {
+                <input type="text" inputmode="decimal" autocomplete="off" class="input num bud-in" data-c="@mi" value="@(Row.Invalid[mi] ?? Format(Row.Months[mi]))"
+                       aria-invalid="@(Row.Invalid[mi] is null ? null : "true")"
+                       aria-label="@L.F("bud.cell", Row.Account.Account.Code, L["bud.m" + (mi + 1)])" @onchange="e => OnChange.InvokeAsync(new BudgetCellChange(Row, mi, e.Value?.ToString()))" />
+            }
+            else {<bdi class="num">@Format(Row.Months[mi])</bdi>}
+        </td>
+    }
+    <td class="n bud-tot"><bdi class="num">@Fmt.Money(Row.Total)</bdi></td>
+</tr>
+
+@code {
+    private int _version = -1;
+    private bool _editable;
+
+    [Parameter, EditorRequired] public BudgetGridRowModel Row { get; set; } = default!;
+    /// <summary>The row's version (passed so a change is seen even though the row object stays the same).</summary>
+    [Parameter] public int Version { get; set; }
+    [Parameter] public bool Editable { get; set; }
+    [Parameter] public EventCallback<BudgetCellChange> OnChange { get; set; }
+    [Parameter] public EventCallback<BudgetGridRowModel> OnSelect { get; set; }
+
+    private static string? Format(decimal? v) => v is null ? null : Fmt.Money(v);
+
+    protected override void OnInitialized()
+    {
+        _version = Version;
+        _editable = Editable;
+    }
+
+    protected override bool ShouldRender()
+    {
+        if (_version == Version && _editable == Editable) return false;
+        _version = Version;
+        _editable = Editable;
+        return true;
+    }
+}

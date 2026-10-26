@@ -72,12 +72,41 @@ public sealed record TrialBalanceReport(
 /// <summary>A line of a statement in tree order: group accounts carry the total of their descendants.</summary>
 public sealed record StatementRow(AccountRef Account, string AccountType, int Level, bool IsLeaf, decimal Amount, decimal? CompareAmount);
 
-/// <summary>Profit and loss for a period, optionally for one cost centre and compared with a second period.</summary>
-public sealed record ProfitLossQuery(DateOnly? From, DateOnly? To, string? CostCentre, DateOnly? CompareFrom, DateOnly? CompareTo);
+/// <summary>
+/// Profit and loss for a period, optionally for one cost centre (a token, or <c>none</c> = lines without a cost centre) and compared with a
+/// second period. <paramref name="ColumnsBy"/> (DT-266): <c>none</c> (one amount), <c>costCentre</c>, <c>month</c>, <c>quarter</c> or
+/// <c>year</c>, always with a total; <paramref name="HideZero"/> (default true) leaves out accounts without amounts.
+/// </summary>
+public sealed record ProfitLossQuery(DateOnly? From, DateOnly? To, string? CostCentre, DateOnly? CompareFrom, DateOnly? CompareTo, string? ColumnsBy = null,
+    bool? HideZero = null);
 
+/// <summary>
+/// Profit and loss. <see cref="Revenue"/> / <see cref="Expenses"/> and the totals are the statement by account type (as before DT-266);
+/// <see cref="Sections"/> is the statement by section — sales, cost of sales, gross profit, operating expenses, other income, other
+/// expenses, net profit — with one amount per column of <see cref="Columns"/> and a total.
+/// </summary>
 public sealed record ProfitLossReport(
     DateOnly From, DateOnly To, Ref? CostCentre, DateOnly? CompareFrom, DateOnly? CompareTo, IReadOnlyList<StatementRow> Revenue, IReadOnlyList<StatementRow> Expenses,
-    decimal TotalRevenue, decimal TotalExpenses, decimal NetProfit, decimal? CompareTotalRevenue, decimal? CompareTotalExpenses, decimal? CompareNetProfit);
+    decimal TotalRevenue, decimal TotalExpenses, decimal NetProfit, decimal? CompareTotalRevenue, decimal? CompareTotalExpenses, decimal? CompareNetProfit,
+    string ColumnsBy = "none", IReadOnlyList<ProfitLossColumn>? Columns = null, IReadOnlyList<ProfitLossSection>? Sections = null,
+    ProfitLossFigure? GrossProfit = null, ProfitLossFigure? Net = null);
+
+/// <summary>
+/// A column of the profit and loss (DT-266): <paramref name="Key"/> is the period (<c>2026-01</c>, <c>2026-Q1</c>, <c>2026</c>), the cost
+/// centre's token or <c>none</c> (no cost centre), or <c>total</c>; <paramref name="From"/> / <paramref name="To"/> the dates it covers and
+/// <paramref name="CostCentre"/> the cost centre it is for (token or <c>none</c>) — what an amount's account statement is filtered by.
+/// </summary>
+public sealed record ProfitLossColumn(string Key, string? Name, DateOnly From, DateOnly To, string? CostCentre);
+
+/// <summary>An account of a section: one amount per column, the total, and the comparison period's amount (columns "none" only).</summary>
+public sealed record ProfitLossRow(AccountRef Account, string AccountType, int Level, bool IsLeaf, string? ParentId, IReadOnlyList<decimal> Amounts, decimal Total,
+    decimal? CompareAmount = null);
+
+/// <summary>A section (<see cref="ProfitLossGroups"/>): its accounts in tree order (groups total their sub-accounts of the section) and its total.</summary>
+public sealed record ProfitLossSection(string Group, IReadOnlyList<ProfitLossRow> Rows, ProfitLossFigure Total);
+
+/// <summary>A total line: one amount per column, the total, and the comparison period's amount.</summary>
+public sealed record ProfitLossFigure(IReadOnlyList<decimal> Amounts, decimal Total, decimal? Compare = null);
 
 public sealed record BalanceSheetQuery(DateOnly? AsOf);
 

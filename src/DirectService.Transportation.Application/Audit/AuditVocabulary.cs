@@ -448,6 +448,8 @@ public static class AuditVocabulary
         ["IsControlAccount"] = F("حساب مراقبة", "Control account"),
         // Journal line tax and tax codes (owner request 25 Oct 2026, DT-254…DT-257).
         ["IsTaxAccount"] = F("حساب ضريبة", "Tax account"),
+        // Profit and loss section of an account (owner request 26 Oct 2026, DT-264).
+        ["ProfitLossGroup"] = F("قسم قائمة الدخل", "Profit and loss section", Kind.Code),
         ["TaxCodeId"] = R("رمز الضريبة", "Tax code", "ACC.TaxCode"),
         ["TaxAccountId"] = R("حساب الضريبة", "Tax account", "ACC.Account"),
         ["TaxAmount"] = F("مبلغ الضريبة", "Tax amount", Kind.Money),
@@ -685,6 +687,10 @@ public static class AuditVocabulary
         ["Equity"] = new("حقوق ملكية", "Equity"),
         ["Revenue"] = new("إيرادات", "Revenue"),
         ["Expense"] = new("مصروفات", "Expense"),
+        ["CostOfSales"] = new("تكلفة المبيعات", "Cost of sales"),
+        ["Operating"] = new("مصاريف تشغيلية", "Operating expenses"),
+        ["OtherIncome"] = new("إيرادات أخرى", "Other income"),
+        ["OtherExpense"] = new("مصروفات أخرى", "Other expenses"),
         ["CashBox"] = new("صندوق", "Cash box"),
         ["BankAccount"] = new("حساب بنكي", "Bank account"),
         // Custom fields

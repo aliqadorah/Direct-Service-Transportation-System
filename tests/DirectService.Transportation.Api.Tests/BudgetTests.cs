@@ -109,7 +109,6 @@ public sealed class BudgetTests(ApiFactory f)
 
         Assert.Equal("budget.overlap", await (await SaveAsync(o, b, Line(a["52"], twelve), Line(a["5202"], twelve))).ErrorCodeAsync());
         Assert.Equal("budget.duplicateLine", await (await SaveAsync(o, b, Line(a["5202"], twelve), Line(a["5202"], twelve))).ErrorCodeAsync());
-        Assert.Equal("budget.accountType", await (await SaveAsync(o, b, Line(a["110101"], twelve))).ErrorCodeAsync());
         Assert.Equal("validation.range", await (await SaveAsync(o, b, new BudgetLineRequest(a["5202"].Id, null, [1, 2]))).ErrorCodeAsync());
         Assert.Equal("validation.range", await (await SaveAsync(o, b, Line(a["5202"], Month(2, 1.2345m)))).ErrorCodeAsync());
         Assert.Equal("budget.nameTaken", await (await o.Client.PostAsJsonAsync(U(o, "/accounting/budgets"), new CreateBudgetRequest(Today.Year, "Main"))).ErrorCodeAsync());
@@ -205,10 +204,10 @@ public sealed class BudgetTests(ApiFactory f)
             5201,,1,,
             """;
         preview = await Upload<ImportPreview>("import/preview", Encoding.UTF8.GetBytes(csv), "b.csv");
-        Assert.Equal(2, preview.ValidRows);   // 4102 and 52; 5201 overlaps 52 and is the row rejected
+        Assert.Equal(3, preview.ValidRows);   // 4102, 110101 (balance-sheet accounts may be budgeted since DT-265) and 52; 5201 overlaps 52
         var problems = preview.Rows.Where(r => r.Problems.Count > 0).ToDictionary(r => r.Row, r => r.Details!.Select(d => d.Code).ToList());
         Assert.Equal("import.unknown", problems[3][0]);
-        Assert.Equal("budget.accountType", problems[4][0]);
+        Assert.False(problems.ContainsKey(4));
         Assert.Equal("import.unknown", problems[5][0]);
         Assert.Equal("import.invalid", problems[6][0]);
         Assert.Equal("import.duplicate", problems[8][0]);

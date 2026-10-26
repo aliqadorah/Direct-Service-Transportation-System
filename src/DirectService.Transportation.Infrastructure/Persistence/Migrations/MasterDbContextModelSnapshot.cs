@@ -147,6 +147,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("ParentId")
                         .HasColumnOrder(8);
 
+                    b.Property<string>("ProfitLossGroup")
+                        .HasMaxLength(20)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("ProfitLossGroup")
+                        .HasColumnOrder(25);
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("PublicId")
@@ -212,6 +219,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Accounts_OpeningDebit", "[OpeningDebit] >= 0");
 
                             t.HasCheckConstraint("CK_Accounts_OpeningDebit_OpeningCredit", "NOT ([OpeningDebit] > 0 AND [OpeningCredit] > 0)");
+
+                            t.HasCheckConstraint("CK_Accounts_ProfitLossGroup", "[ProfitLossGroup] IS NULL OR ([AccountType] = N'Revenue' AND [ProfitLossGroup] IN (N'Sales', N'OtherIncome')) OR ([AccountType] = N'Expense' AND [ProfitLossGroup] IN (N'CostOfSales', N'Operating', N'OtherExpense'))");
 
                             t.HasCheckConstraint("CK_Accounts_Status", "[Status] IN ('Active','Archived')");
                         });

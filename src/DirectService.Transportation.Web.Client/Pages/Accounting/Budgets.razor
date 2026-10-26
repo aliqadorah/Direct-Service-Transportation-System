@@ -63,9 +63,9 @@
             </fieldset>
             @if (_m.Start == "actuals")
             {
-                <div class="fg" style="grid-template-columns:160px minmax(0,1fr);align-items:end">
+                @* DT-265 (owner decision 26 Oct 2026): the budget is company-wide — no copy per cost centre (the cost centre filters the budget screen). *@
+                <div class="fg" style="grid-template-columns:160px;align-items:end">
                     <NumberField @bind-Value="_m.IncreasePercent" Label="@L["bud.increase"]" Decimals="2" Min="-100m" Max="1000m" Unit="%" />
-                    <CheckField @bind-Value="_m.ByCostCentre" Label="@L["bud.byCostCentre"]" />
                 </div>
                 <p class="help">@L.F("bud.copyHelp", (_m.FiscalYear ?? DateTime.Today.Year) - 1)</p>
             }
@@ -133,7 +133,7 @@
         try
         {
             var r = await Api.PostAsync<BudgetResponse>(Api.C("accounting/budgets"),
-                new CreateBudgetRequest(_m.FiscalYear ?? 0, _m.Name?.Trim(), _m.Start == "actuals", _m.Start == "actuals" ? _m.IncreasePercent : null, _m.Start == "actuals" && _m.ByCostCentre));
+                new CreateBudgetRequest(_m.FiscalYear ?? 0, _m.Name?.Trim(), _m.Start == "actuals", _m.Start == "actuals" ? _m.IncreasePercent : null));
             _creating = false;
             Toasts.Success(L.F("bud.created", r.Name));
             Nav.NavigateTo(NavModel.Href(Company, $"accounting/budgets/{r.Id}" + (_m.Start == "import" ? "?import=1" : "")));
@@ -150,6 +150,5 @@
         public string? Name { get; set; }
         public string Start { get; set; } = "empty";
         public decimal? IncreasePercent { get; set; }
-        public bool ByCostCentre { get; set; }
     }
 }

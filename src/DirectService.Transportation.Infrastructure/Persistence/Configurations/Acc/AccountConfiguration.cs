@@ -187,6 +187,17 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasDefaultValueSql("0")
             .ValueGeneratedNever();
         builder.ToTable(t => t.HasCheckConstraint("CK_Accounts_IsTaxAccount", "[IsTaxAccount] = 0 OR [IsControlAccount] = 0"));
+        // DT-264 (owner request 26 Oct 2026): section of the profit and loss statement; NULL = inherited from the parent / default of the type.
+        builder.Property(e => e.ProfitLossGroup)
+            .HasColumnName("ProfitLossGroup")
+            .HasColumnType("nvarchar(20)")
+            .HasColumnOrder(25)
+            .IsUnicode(true)
+            .HasMaxLength(20)
+            .IsRequired(false);
+        builder.ToTable(t => t.HasCheckConstraint("CK_Accounts_ProfitLossGroup",
+            "[ProfitLossGroup] IS NULL OR ([AccountType] = N'Revenue' AND [ProfitLossGroup] IN (N'Sales', N'OtherIncome'))" +
+            " OR ([AccountType] = N'Expense' AND [ProfitLossGroup] IN (N'CostOfSales', N'Operating', N'OtherExpense'))"));
 
         builder.HasIndex(new[] { "PublicId" }, "UX_Accounts_PublicId")
             .IsUnique()

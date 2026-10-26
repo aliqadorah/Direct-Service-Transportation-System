@@ -13,7 +13,7 @@ public sealed record AccountRef(string Id, string Code, string NameAr, string? N
 public sealed record AccountResponse(
     string Id, string Code, string NameAr, string? NameEn, string AccountType, string? ParentId, string? ParentCode, int Level,
     bool IsPostable, bool HasChildren, decimal OpeningDebit, decimal OpeningCredit, bool IsControlAccount, string? ControlPartyType,
-    string Status, string RowVersion, bool IsTaxAccount = false);
+    string Status, string RowVersion, bool IsTaxAccount = false, string? ProfitLossGroup = null);
 
 /// <summary>An active postable account for pick lists, with its type, whether lines on it need a party (control account) and whether it is a
 /// tax account (offered as the tax account of journal lines, DT-256).</summary>
@@ -21,7 +21,35 @@ public sealed record AccountOption(AccountRef Account, string AccountType, bool 
 
 public sealed record AccountRequest(
     string? Code, string? NameAr, string? NameEn, string? AccountType, string? ParentId, bool IsPostable,
-    bool IsControlAccount, string? ControlPartyType, string? RowVersion, bool IsTaxAccount = false);
+    bool IsControlAccount, string? ControlPartyType, string? RowVersion, bool IsTaxAccount = false, string? ProfitLossGroup = null);
+
+/// <summary>
+/// Sections of the profit and loss statement (DT-264): revenue is Sales or OtherIncome, expenses CostOfSales, Operating or OtherExpense. An
+/// account without its own section takes the nearest ancestor's, else the default of its type (Sales, Operating).
+/// </summary>
+public static class ProfitLossGroups
+{
+    public const string Sales = "Sales";
+    public const string CostOfSales = "CostOfSales";
+    public const string Operating = "Operating";
+    public const string OtherIncome = "OtherIncome";
+    public const string OtherExpense = "OtherExpense";
+
+    /// <summary>The statement order: sales, cost of sales, (gross profit), operating expenses, other income, other expenses, (net profit).</summary>
+    public static readonly IReadOnlyList<string> Order = [Sales, CostOfSales, Operating, OtherIncome, OtherExpense];
+
+    public static IReadOnlyList<string> For(string? accountType) => accountType switch
+    {
+        "Revenue" => [Sales, OtherIncome],
+        "Expense" => [CostOfSales, Operating, OtherExpense],
+        _ => [],
+    };
+
+    public static string? Default(string? accountType) => accountType switch { "Revenue" => Sales, "Expense" => Operating, _ => null };
+
+    /// <summary>Revenue sections add to the profit, the others subtract.</summary>
+    public static bool IsRevenue(string group) => group is Sales or OtherIncome;
+}
 
 public sealed record MoveAccountRequest(string? ParentId, string? RowVersion);
 

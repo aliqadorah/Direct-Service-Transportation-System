@@ -21,6 +21,11 @@ internal static class BudgetEndpoints
             .RequirePermission(PermissionKeys.BudgetManage);
         g.MapGet("/account-options", async (BudgetService svc, CancellationToken ct) => TypedResults.Ok(await svc.AccountOptionsAsync(ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.BudgetView);
+        // DT-265: the budget screen's accounts and its cost-centre filter (accounts with postings for the centre in the year or the year before).
+        g.MapGet("/grid-accounts", async (BudgetService svc, CancellationToken ct) => TypedResults.Ok(await svc.GridAccountsAsync(ct).ConfigureAwait(false)))
+            .RequirePermission(PermissionKeys.BudgetView);
+        g.MapGet("/cost-centre-accounts", async (string? costCentre, int? year, BudgetService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.CostCentreAccountsAsync(costCentre, year, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.BudgetView);
         g.MapGet("/{budget}/import/template", async (string budget, BudgetImportService svc, CancellationToken ct) => File(await svc.TemplateAsync(budget, ct).ConfigureAwait(false)))
             .RequirePermission(PermissionKeys.BudgetManage);
         g.MapGet("/{budget}", async (string budget, BudgetService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetAsync(budget, ct).ConfigureAwait(false)))

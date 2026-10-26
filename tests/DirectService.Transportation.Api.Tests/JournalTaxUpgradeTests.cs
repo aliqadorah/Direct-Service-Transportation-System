@@ -94,6 +94,10 @@ public sealed class JournalTaxUpgradeTests(JournalTaxUpgradeFactory f) : IClassF
         Assert.Equal(3, taxed.Lines.Count);
         var refused = await MigrateAsync(BeforeTax);
         Assert.Contains("Rev6_JournalLineTax cannot be rolled back", refused, StringComparison.Ordinal);
+        // Later migrations are rolled back one by one first (each in its own transaction, e.g. Rev6_BudgetProfitLoss); Rev6_JournalLineTax stays.
+        var pending = await f.DbAsync(db => db.Database.GetPendingMigrationsAsync());
+        Assert.DoesNotContain(pending, m => m.EndsWith("_Rev6_JournalLineTax", StringComparison.Ordinal));
+        Assert.Null(await MigrateAsync(null));
         Assert.Empty(await f.DbAsync(db => db.Database.GetPendingMigrationsAsync()));
         Assert.Equal(16m, (await ReadAsync<JournalEntryResponse>(await o.Client.GetAsync(U(o, $"/accounting/journal-entries/{taxed.Id}")))).Lines[0].TaxAmount);
     }

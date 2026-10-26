@@ -47,6 +47,8 @@ public sealed class UiJs(IJSRuntime js) : IAsyncDisposable
     public ValueTask SaveFile(string name, string contentType, byte[] bytes) => Call("saveFile", name, contentType, bytes);
     public ValueTask PrintHtml(Microsoft.AspNetCore.Components.ElementReference el, string html) => Call("printHtml", el, html);
     public ValueTask ScrollIntoView(Microsoft.AspNetCore.Components.ElementReference el) => Call("scrollIntoView", el);
+    /// <summary>Keyboard moves of an amount grid (DT-265): Enter / Shift+Enter to the same column below / above; a cell's text is selected on focus.</summary>
+    public ValueTask AmountGrid(Microsoft.AspNetCore.Components.ElementReference el) => Call("amountGrid", el);
 
     /// <summary>Brings a panel into view when it is stacked under the lists (DT-246); nothing when it stands beside them.</summary>
     public ValueTask RevealStacked(string selector) => Call("revealStacked", selector);

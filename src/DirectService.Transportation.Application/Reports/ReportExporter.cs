@@ -23,10 +23,13 @@ public enum ReportValue
 
 /// <summary>
 /// A report ready for export: title, the filters applied (label → value), columns, rows, an optional totals row and an optional note
-/// (e.g. a warning). Rows marked as groups print in bold across the table.
+/// (e.g. a warning). Rows marked as groups print in bold across the table. <see cref="Landscape"/>: the printout is A4 landscape (many columns).
 /// </summary>
 public sealed record ReportTable(string Title, IReadOnlyList<(string Label, string Value)> Filters, IReadOnlyList<ReportColumn> Columns,
-    IReadOnlyList<IReadOnlyList<object?>> Rows, IReadOnlyList<object?>? Totals = null, string? Note = null);
+    IReadOnlyList<IReadOnlyList<object?>> Rows, IReadOnlyList<object?>? Totals = null, string? Note = null)
+{
+    public bool Landscape { get; init; }
+}
 
 /// <summary>
 /// Export of any report or screen (FR-121, FR-150): Excel (default) or CSV with the same columns, or a printout (PDF, or its HTML) with
@@ -124,6 +127,7 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
         var tz = TimeZoneInfo.FindSystemTimeZoneById(company.TimeZone);
         var local = TimeZoneInfo.ConvertTimeFromUtc(printed, tz).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
         var sb = new StringBuilder();
+        if (t.Landscape) sb.Append("<style>@page { size: A4 landscape; }</style>");
         sb.Append(printer.Header(company, band: L("طُبع في", "Printed") + " " + local + " · " + (ctx.UserName ?? string.Empty)));
         sb.Append("<h1>").Append(E(t.Title)).Append("</h1>");
         if (t.Filters.Count > 0)

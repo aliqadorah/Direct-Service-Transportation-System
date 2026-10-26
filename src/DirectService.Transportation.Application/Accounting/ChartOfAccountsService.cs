@@ -60,12 +60,14 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         new Validator().Check(type is not null && AccountingCodes.AccountTypes.Contains(type), "accountType").ThrowIfInvalid();
         if (parent is not null && parent.AccountType != type) throw Fail.RuleOn("accountType", ErrorCodes.AccountTypeMismatch, parent.AccountType);
         var (isControl, partyType) = ValidateControl(r);
+        var plGroup = ValidateProfitLossGroup(r, type!);
         await EnsureUniqueCodeAsync(code, null, ct).ConfigureAwait(false);
 
         var account = new Account
         {
             Code = code, NameAr = nameAr, NameEn = nameEn, AccountType = type!, ParentId = parent?.Id, IsPostable = r.IsPostable,
             IsControlAccount = isControl, ControlPartyType = partyType, Status = AccountingCodes.Active, IsTaxAccount = r.IsTaxAccount,
+            ProfitLossGroup = plGroup,
         };
         if (parent is not null && parent.IsPostable)
         {
@@ -85,6 +87,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         var type = r.AccountType ?? a.AccountType;
         new Validator().Check(AccountingCodes.AccountTypes.Contains(type), "accountType").ThrowIfInvalid();
         var (isControl, partyType) = ValidateControl(r);
+        var plGroup = ValidateProfitLossGroup(r, type);
         var hasChildren = await db.Set<Account>().AnyAsync(x => x.ParentId == a.Id, ct).ConfigureAwait(false);
 
         if (type != a.AccountType)
@@ -116,6 +119,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         a.IsControlAccount = isControl;
         a.ControlPartyType = partyType;
         a.IsTaxAccount = r.IsTaxAccount;
+        a.ProfitLossGroup = plGroup;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return await ResponseAsync(a, ct).ConfigureAwait(false);
     }
@@ -212,7 +216,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
                     Parent = t.ParentCode is null ? null : created[t.ParentCode],
                     IsPostable = ChartTemplate.IsLeaf(t.Code),
                     IsControlAccount = t.ControlPartyType is not null, ControlPartyType = t.ControlPartyType,
-                    Status = AccountingCodes.Active, IsTaxAccount = t.IsTax,
+                    Status = AccountingCodes.Active, IsTaxAccount = t.IsTax, ProfitLossGroup = t.ProfitLossGroup,
                 };
                 created[t.Code] = account;
                 db.Set<Account>().Add(account);
@@ -251,7 +255,8 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
             {
                 if (all.Any(a => a.IsTaxAccount && a.AccountType == d.Type && a.Status == AccountingCodes.Active)) continue;
                 // Only the template's own account (same code and type, one of its names): an unrelated account that took the code stays as it is.
-                var names = ChartTemplate.Accounts.Where(t => t.Code == d.TemplateCode).SelectMany(t => new[] { t.NameAr, t.NameEn }).Append(d.NameAr).Append(d.NameEn).ToList();
+                var names = ChartTemplate.Accounts.Where(t => t.Code == d.TemplateCode).SelectMany(t => new[] { t.NameAr, t.NameEn }).Append(d.NameAr).Append(d.NameEn)
+                    .Concat(ChartTemplate.FormerNamesAr).ToList();
                 var template = all.FirstOrDefault(a => a.Code == d.TemplateCode && a.AccountType == d.Type && !a.IsControlAccount
                     && a.Status == AccountingCodes.Active && a.IsPostable && !parents.Contains(a.Id) && (names.Contains(a.NameAr) || (a.NameEn is not null && names.Contains(a.NameEn))));
                 if (template is not null)
@@ -353,6 +358,14 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         return (code!, nameAr!, nameEn);
     }
 
+    /// <summary>The profit and loss section (DT-264): empty = inherited; otherwise one of the sections of the account type (revenue / expense only).</summary>
+    private static string? ValidateProfitLossGroup(AccountRequest r, string type)
+    {
+        var group = string.IsNullOrWhiteSpace(r.ProfitLossGroup) ? null : r.ProfitLossGroup.Trim();
+        if (group is not null && !ProfitLossGroups.For(type).Contains(group)) throw Fail.Field("profitLossGroup", ErrorCodes.ValidationFormat, new FieldRef("profitLossGroup"));
+        return group;
+    }
+
     private static (bool IsControl, string? PartyType) ValidateControl(AccountRequest r)
     {
         // DT-256: a tax account carries the automatic tax lines, which have no party.
@@ -428,7 +441,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         return new AccountResponse(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn, a.AccountType,
             parentAccount is null ? null : tokens.Encode<Account>(parentAccount.PublicId), parentAccount?.Code, level,
             a.IsPostable, withChildren.Contains(a.Id), a.OpeningDebit, a.OpeningCredit, a.IsControlAccount, a.ControlPartyType, a.Status,
-            Convert.ToBase64String(a.RowVersion), a.IsTaxAccount);
+            Convert.ToBase64String(a.RowVersion), a.IsTaxAccount, a.ProfitLossGroup);
     }
 
     internal AccountRef Ref(Account a) => new(tokens.Encode<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn);

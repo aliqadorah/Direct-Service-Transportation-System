@@ -1,5 +1,7 @@
+using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
+using DirectService.Transportation.Application.Budgets;
 using DirectService.Transportation.Application.Cash;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;
@@ -18,12 +20,17 @@ namespace DirectService.Transportation.Application.Ledger;
 /// report (FR-131), cash/bank statements and balances (FR-130, FR-139), sub-ledger reconciliation (FR-105, RPT-23). Every entry that is
 /// not soft-deleted counts — posted, reversed and void entries with their reversals — so voids and edits net to zero; dates are entry
 /// dates; balances are debit − credit unless a statement shows them the natural way for the account type. Lines carry links to their
-/// entry and source document (FR-121).
+/// entry and source document (FR-121). A cost-centre filter may be <c>none</c>: lines without a cost centre (DT-267).
 /// </summary>
 public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport support, ChartOfAccountsService chart, PartyResolver parties, PostingSources sources,
-    CashSupport cash)
+    CashSupport cash, IRequestContext ctx)
 {
     public const int MaxPageSize = 1000;
+
+    /// <summary>The cost-centre filter value for lines without a cost centre (DT-267: the "No cost centre" column of the profit and loss).</summary>
+    public const string NoCostCentre = "none";
+
+    private const long NoCentreId = 0;
 
     // ============================================================ shared
 
@@ -75,7 +82,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
     private async Task<Dictionary<long, Sums>> SumsAsync(DateOnly? from, DateOnly to, long? costCentreId, CancellationToken ct)
     {
         var q = db.Set<EntryLine>().AsNoTracking().Where(l => l.JournalEntry.EntryDate <= to);
-        if (costCentreId is long cc) q = q.Where(l => l.CostCentreId == cc);
+        q = ByCentre(q, costCentreId);
         var f = from ?? DateOnly.MinValue;
         return await q.GroupBy(l => l.AccountId).Select(g => new Sums(g.Key,
                 g.Sum(l => l.JournalEntry.EntryDate < f ? l.Debit : 0), g.Sum(l => l.JournalEntry.EntryDate < f ? l.Credit : 0),
@@ -83,15 +90,25 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             .ToDictionaryAsync(s => s.AccountId, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Lines of one cost centre, or without one (<see cref="NoCentreId"/>); all lines when null.</summary>
+    private static IQueryable<EntryLine> ByCentre(IQueryable<EntryLine> q, long? centre) => centre switch
+    {
+        null => q,
+        NoCentreId => q.Where(l => l.CostCentreId == null),
+        long cc => q.Where(l => l.CostCentreId == cc),
+    };
+
     private async Task<long?> CostCentreAsync(string? token, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
+        if (token.Trim() == NoCostCentre) return NoCentreId;
         var g = support.Decode<CostCentre>(token) ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, new FieldRef("costCentre"));
         return await db.Set<CostCentre>().AsNoTracking().Where(c => c.PublicId == g).Select(c => (long?)c.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
             ?? throw Fail.Field("costCentre", ErrorCodes.ValidationFormat, new FieldRef("costCentre"));
     }
 
-    private async Task<Ref?> CostCentreRefAsync(long? id, CancellationToken ct) => id is long cc
+    private async Task<Ref?> CostCentreRefAsync(long? id, CancellationToken ct) => id == NoCentreId ? new Ref(NoCostCentre, NoCentreName)
+        : id is long cc
         ? await db.Set<CostCentre>().AsNoTracking().Where(c => c.Id == cc).Select(c => new { c.PublicId, c.Code, c.Name }).SingleAsync(ct).ConfigureAwait(false) is var c
             ? new Ref(support.Token<CostCentre>(c.PublicId), c.Code + " " + c.Name) : null
         : null;
@@ -133,7 +150,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         }
 
         var lines = db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
-        if (costCentreId is long cc) lines = lines.Where(l => l.CostCentreId == cc);
+        lines = ByCentre(lines, costCentreId);
         if (party is not null) lines = lines.Where(l => l.PartyModule == party.Module && l.PartyType == party.Type && l.PartyId == party.Id);
         lines = ByReference(lines, q.Reference);
         var opening = await lines.Where(l => l.JournalEntry.EntryDate < from).SumAsync(l => l.Debit - l.Credit, ct).ConfigureAwait(false);
@@ -249,7 +266,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var sections = chosen.OrderBy(id => tree[id].Account.Code, StringComparer.Ordinal).Select(id => (Id: id, Ids: Subtree(tree, id).ToHashSet())).ToList();
         var all = sections.SelectMany(s => s.Ids).Distinct().ToList();
         var lines = db.Set<EntryLine>().AsNoTracking().Where(l => all.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
-        if (costCentreId is long cc) lines = lines.Where(l => l.CostCentreId == cc);
+        lines = ByCentre(lines, costCentreId);
         if (party is not null) lines = lines.Where(l => l.PartyModule == party.Module && l.PartyType == party.Type && l.PartyId == party.Id);
         lines = ByReference(lines, q.Reference);
         var openings = await lines.Where(l => l.JournalEntry.EntryDate < from).GroupBy(l => l.AccountId).Select(g => new { g.Key, B = g.Sum(l => l.Debit - l.Credit) })
@@ -425,8 +442,180 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var te = TopTotal(expenses, r => r.Amount);
         decimal? ctr = compare is null ? null : TopTotal(revenue, r => r.CompareAmount ?? 0);
         decimal? cte = compare is null ? null : TopTotal(expenses, r => r.CompareAmount ?? 0);
+        var mode = string.IsNullOrWhiteSpace(q.ColumnsBy) ? "none" : q.ColumnsBy.Trim();
+        if (!ColumnModes.Contains(mode)) throw Fail.Field("columnsBy", ErrorCodes.ValidationFormat, new FieldRef("columnsBy"));
+        var (columns, sections, gross, net) = await SectionsAsync(tree, from, to, cc, mode, q.HideZero ?? true, compare is null ? null : id => Rev(compare, id),
+            compare is null ? null : id => Exp(compare, id), ct).ConfigureAwait(false);
         return new ProfitLossReport(from, to, await CostCentreRefAsync(cc, ct).ConfigureAwait(false), cmp?.From, cmp?.To, revenue, expenses, tr, te, tr - te, ctr, cte,
-            compare is null ? null : ctr - cte);
+            compare is null ? null : ctr - cte, mode, columns, sections, gross, net);
+    }
+
+    /// <summary>The "Columns by" choices of the profit and loss (DT-266).</summary>
+    public static readonly IReadOnlyList<string> ColumnModes = ["none", "costCentre", "month", "quarter", "year"];
+
+    /// <summary>Most columns one profit and loss shows (e.g. ten years of months).</summary>
+    public const int MaxProfitLossColumns = 120;
+
+    private string NoCentreName => ctx.Language == "en" ? "No cost centre" : "بلا مركز تكلفة";
+
+    private sealed record PlMove(long AccountId, long? CostCentreId, int Year, int Month, decimal Debit, decimal Credit);
+
+    /// <summary>
+    /// The section of an account (DT-264): its own, else the nearest ancestor's, else the default of its type (revenue = sales, expense =
+    /// operating expenses).
+    /// </summary>
+    internal static string? SectionOf(Dictionary<long, Node> tree, long id)
+    {
+        var type = tree[id].Account.AccountType;
+        var guard = 0;
+        for (long? x = id; x is long cur && tree.TryGetValue(cur, out var n) && guard++ < 64; x = n.Account.ParentId)
+        {
+            if (n.Account.ProfitLossGroup is { } g && ProfitLossGroups.For(type).Contains(g)) return g;
+        }
+        return ProfitLossGroups.Default(type);
+    }
+
+    /// <summary>
+    /// The profit and loss by section (DT-264, DT-266): the columns (one; the cost centres with amounts and "no cost centre"; or the months,
+    /// quarters or years of the period, the first and last cut to the period), every section's accounts in tree order — a group totals its
+    /// sub-accounts of that section; with <paramref name="hideZero"/> accounts without amounts are left out — the section totals, gross profit
+    /// (sales − cost of sales) and net profit (gross − operating + other income − other expenses). The total of a row is the sum of its columns.
+    /// </summary>
+    private async Task<(List<ProfitLossColumn>, List<ProfitLossSection>, ProfitLossFigure, ProfitLossFigure)> SectionsAsync(Dictionary<long, Node> tree, DateOnly from,
+        DateOnly to, long? centre, string mode, bool hideZero, Func<long, decimal>? compareRevenue, Func<long, decimal>? compareExpense, CancellationToken ct)
+    {
+        var byCentre = mode == "costCentre";
+        var q = ByCentre(db.Set<EntryLine>().AsNoTracking().Where(l => l.JournalEntry.EntryDate >= from && l.JournalEntry.EntryDate <= to
+            && (l.Account.AccountType == "Revenue" || l.Account.AccountType == "Expense")), centre);
+        var moves = await q.GroupBy(l => new { l.AccountId, CostCentreId = byCentre ? l.CostCentreId : null, l.JournalEntry.EntryDate.Year, l.JournalEntry.EntryDate.Month })
+            .Select(g => new PlMove(g.Key.AccountId, g.Key.CostCentreId, g.Key.Year, g.Key.Month, g.Sum(l => l.Debit), g.Sum(l => l.Credit)))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var columns = new List<ProfitLossColumn>();
+        Func<PlMove, int> columnOf;
+        var en = ctx.Language == "en";
+        if (byCentre)
+        {
+            var ids = moves.Where(m => m.CostCentreId is not null).Select(m => m.CostCentreId!.Value).Distinct().ToList();
+            if (centre is long only && only != NoCentreId && !ids.Contains(only)) ids.Add(only);
+            var centres = await db.Set<CostCentre>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(c => ids.Contains(c.Id))
+                .Select(c => new { c.Id, c.PublicId, c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(false);
+            var index = new Dictionary<long, int>();
+            foreach (var c in centres.OrderBy(c => c.Code, StringComparer.Ordinal))
+            {
+                index[c.Id] = columns.Count;
+                var token = support.Token<CostCentre>(c.PublicId);
+                columns.Add(new ProfitLossColumn(token, c.Code + " " + c.Name, from, to, token));
+            }
+            // Lines without a cost centre have their own column, unless the report is for one cost centre.
+            var none = columns.Count;
+            if (centre is not long one || one == NoCentreId) columns.Add(new ProfitLossColumn(NoCostCentre, NoCentreName, from, to, NoCostCentre));
+            columnOf = m => m.CostCentreId is long c ? index[c] : none;
+        }
+        else if (mode == "none")
+        {
+            columns.Add(new ProfitLossColumn("total", en ? "Amount" : "المبلغ", from, to, null));
+            columnOf = _ => 0;
+        }
+        else
+        {
+            var months = mode switch { "quarter" => 3, "year" => 12, _ => 1 };
+            var start = new DateOnly(from.Year, (from.Month - 1) / months * months + 1, 1);
+            var index = new Dictionary<(int, int), int>();
+            for (var s = start; s <= to; s = s.AddMonths(months))
+            {
+                if (columns.Count == MaxProfitLossColumns) throw Fail.Field("to", ErrorCodes.ValidationRange, new FieldRef("to"));
+                var e = s.AddMonths(months).AddDays(-1);
+                for (var m = 0; m < months; m++) index[(s.AddMonths(m).Year, s.AddMonths(m).Month)] = columns.Count;
+                var year = s.Year.ToString(CultureInfo.InvariantCulture);
+                var quarter = (s.Month - 1) / 3 + 1;
+                var name = mode switch
+                {
+                    "year" => year,
+                    "quarter" => (en ? $"Q{quarter} " : $"الربع {quarter} ") + year,
+                    _ => (en ? BudgetImportService.MonthNames[s.Month - 1].En[..3] : BudgetImportService.MonthNames[s.Month - 1].Ar) + " " + year,
+                };
+                var key = mode switch { "year" => year, "quarter" => $"{year}-Q{quarter}", _ => year + "-" + s.Month.ToString("00", CultureInfo.InvariantCulture) };
+                columns.Add(new ProfitLossColumn(key, name, s < from ? from : s, e > to ? to : e, null));
+            }
+            columnOf = m => index[(m.Year, m.Month)];
+        }
+
+        var k = columns.Count;
+        var amounts = new Dictionary<long, decimal[]>();
+        foreach (var m in moves)
+        {
+            if (!tree.TryGetValue(m.AccountId, out var n)) continue;
+            if (!amounts.TryGetValue(m.AccountId, out var a)) amounts[m.AccountId] = a = new decimal[k];
+            a[columnOf(m)] += n.Account.AccountType == "Revenue" ? m.Credit - m.Debit : m.Debit - m.Credit;
+        }
+        var section = tree.Keys.ToDictionary(id => id, id => SectionOf(tree, id));
+        var withCompare = compareRevenue is not null;
+        decimal Compare(long id) => tree[id].Account.AccountType switch
+        {
+            "Revenue" => compareRevenue?.Invoke(id) ?? 0,
+            "Expense" => compareExpense?.Invoke(id) ?? 0,
+            _ => 0,
+        };
+        var roots = tree.Values.Where(n => n.Account.AccountType is "Revenue" or "Expense"
+                && (n.Account.ParentId is not long p || !tree.TryGetValue(p, out var parent) || parent.Account.AccountType != n.Account.AccountType))
+            .OrderBy(n => n.Account.AccountType == "Revenue" ? 0 : 1).ThenBy(n => n.Account.Code, StringComparer.Ordinal).Select(n => n.Account.Id).ToList();
+
+        var result = new List<ProfitLossSection>();
+        var totals = new Dictionary<string, ProfitLossFigure>();
+        foreach (var group in ProfitLossGroups.Order)
+        {
+            var rows = new List<ProfitLossRow>();
+            (decimal[] A, decimal C, bool Member) Walk(long id, string? parentToken, List<ProfitLossRow> into)
+            {
+                var n = tree[id];
+                var mine = section[id] == group;
+                var a = mine && amounts.TryGetValue(id, out var x) ? (decimal[])x.Clone() : new decimal[k];
+                var c = mine && withCompare ? Compare(id) : 0;
+                var member = mine;
+                var own = new List<ProfitLossRow>();
+                var token = chart.Ref(n.Account).Id;
+                foreach (var child in n.Children.OrderBy(ch => tree[ch].Account.Code, StringComparer.Ordinal))
+                {
+                    var (ca, cc, cm) = Walk(child, token, own);
+                    for (var i = 0; i < k; i++) a[i] += ca[i];
+                    c += cc;
+                    member |= cm;
+                }
+                // Kept when it has an amount or rows below it (amounts of sub-accounts may cancel out), or when zero rows are shown.
+                if (a.Any(v => v != 0) || c != 0 || own.Count > 0 || (!hideZero && member))
+                {
+                    into.Add(new ProfitLossRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, parentToken, a, a.Sum(), withCompare ? c : null));
+                    into.AddRange(own);
+                }
+                return (a, c, member);
+            }
+            foreach (var root in roots) Walk(root, null, rows);
+            var sum = new decimal[k];
+            foreach (var (_, a) in amounts.Where(x => section[x.Key] == group))
+            {
+                for (var i = 0; i < k; i++) sum[i] += a[i];
+            }
+            decimal? compareSum = withCompare ? tree.Keys.Where(id => section[id] == group).Sum(Compare) : null;
+            var figure = new ProfitLossFigure(sum, sum.Sum(), compareSum);
+            totals[group] = figure;
+            result.Add(new ProfitLossSection(group, rows, figure));
+        }
+        ProfitLossFigure Combine(params (string Group, int Sign)[] parts)
+        {
+            var a = new decimal[k];
+            decimal c = 0;
+            foreach (var (g, sign) in parts)
+            {
+                for (var i = 0; i < k; i++) a[i] += sign * totals[g].Amounts[i];
+                c += sign * (totals[g].Compare ?? 0);
+            }
+            return new ProfitLossFigure(a, a.Sum(), withCompare ? c : null);
+        }
+        var gross = Combine((ProfitLossGroups.Sales, 1), (ProfitLossGroups.CostOfSales, -1));
+        var net = Combine((ProfitLossGroups.Sales, 1), (ProfitLossGroups.CostOfSales, -1), (ProfitLossGroups.Operating, -1), (ProfitLossGroups.OtherIncome, 1),
+            (ProfitLossGroups.OtherExpense, -1));
+        return (columns, result, gross, net);
     }
 
     /// <summary>Sum of the top rows of a statement (rows whose level is the smallest in their branch: the roots).</summary>

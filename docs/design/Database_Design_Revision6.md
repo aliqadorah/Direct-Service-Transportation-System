@@ -252,3 +252,18 @@ Checks: `CK_EntryLines_TaxCodeId_TaxRate` — without a tax code every tax colum
 **Rollback.** `Down` refuses first, in the same transaction, while any line has a tax code or is an automatic tax line (`THROW 50259`, same style as DT-231); otherwise it drops the tax codes, the tax-account flag and the line references (the entry Reference stays).
 
 Raw SQL in the migration: the reference copy, the seed of the tax codes and the rollback guard (listed in BUILD_STATUS.md).
+
+## B12. Profit and loss sections, budget lines, Arabic tax names (owner request 26 Oct 2026, DT-263…DT-266) — migration `Rev6_BudgetProfitLoss`
+**`acc.Accounts.ProfitLossGroup`** NVARCHAR(20) NULL — the section of the profit and loss statement the account belongs to: revenue `Sales` or `OtherIncome`, expenses `CostOfSales`, `Operating` or `OtherExpense`. `CK_Accounts_ProfitLossGroup`: NULL, or a section of the account's own type (revenue / expense only). NULL = the nearest ancestor's section, else the default of the type (revenue → `Sales`, expense → `Operating`); so marking a group (e.g. 51) covers its sub-accounts. Set in the chart form ("Profit and loss section"), audited with the account (`ProfitLossGroup`, words in `AuditVocabulary`).
+
+**Chart template (new companies):** 51 "تكاليف النقل المباشرة / Direct transport costs" is `CostOfSales` (its sub-accounts 5101…5105 follow); everything else keeps the default. 5207 is named "ضريبة مبيعات غير قابلة للخصم" in Arabic (also the "Add the default tax accounts" button). Default tax codes: Arabic description "ضريبة المبيعات العامة n%".
+
+**Existing data (upgrade), only where the old default is still in place:**
+- 51 gets `CostOfSales` when it is still the template's own account (code 51, type Expense, its Arabic or English template name) and has no section — a renamed or reused 51 stays as it is.
+- Tax codes whose Arabic description is exactly one of the nine old defaults "ضريبة المبيعات n%" (0, 1, 2, 4, 5, 7, 8, 10, 16) become "ضريبة المبيعات العامة n%"; any other text stays.
+- Expense accounts named exactly "مصروف ضريبة المبيعات غير القابلة للاسترداد" (the template's 5207 or one added by the button) become "ضريبة مبيعات غير قابلة للخصم".
+- Down restores the old default texts where the new defaults are still in place and drops the column. Automatic tax lines posted before keep their stored (bilingual) note.
+
+**Budgets (no schema change, application rules):** a budget line may now be on any account type (balance-sheet accounts too; Budget vs Actual still compares revenue and expenses only); a line whose twelve amounts are all zero is not stored (save and import). The budget stays company-wide (owner decision): the screen edits company-wide lines on posting accounts; lines per cost centre or on a parent account made earlier (copy by cost centre, import) are kept and still counted (the overlap rule is unchanged).
+
+Raw SQL in the migration: the three data steps above (`CostOfSalesSql`, `TaxCodeNamesSql`, `VatExpensesNameSql`, public so the API tests run them on purpose-made rows) and their reverse in Down (listed in BUILD_STATUS.md).

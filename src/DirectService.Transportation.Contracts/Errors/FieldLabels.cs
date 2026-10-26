@@ -219,6 +219,8 @@ public static partial class FieldLabels
         ["taxAccount"] = ("حساب الضريبة", "Tax account"),
         ["taxAccountId"] = ("حساب الضريبة", "Tax account"),
         ["isTaxAccount"] = ("حساب ضريبة", "Tax account"),
+        ["profitLossGroup"] = ("قسم قائمة الدخل", "Profit and loss section"),
+        ["columnsBy"] = ("الأعمدة حسب", "Columns by"),
         ["rate"] = ("النسبة", "Rate"),
         ["sortOrder"] = ("الترتيب", "Order"),
         ["tenantId"] = ("المشترك", "Tenant"),

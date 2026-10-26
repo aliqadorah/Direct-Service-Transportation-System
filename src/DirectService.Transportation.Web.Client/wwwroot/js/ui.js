@@ -304,3 +304,26 @@ export function unfloatList(id) {
   window.removeEventListener("resize", h);
   floating.delete(id);
 }
+
+/**
+ * Amount grid (budget screen, DT-265): in a cell (input[data-c]) Enter moves to the same column of the next row and Shift+Enter to the row
+ * above, after committing the typed value (change); Tab keeps its normal order across the row. A cell's text is selected when it gets the
+ * focus, so typing replaces it. Listeners are added once per grid.
+ */
+export function amountGrid(el) {
+  if (!el || el.dataset.grid) return;
+  el.dataset.grid = "1";
+  el.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (e.key !== "Enter" || !(t instanceof HTMLInputElement) || !t.dataset.c || e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+    t.dispatchEvent(new Event("change", { bubbles: true }));
+    const cells = [...el.querySelectorAll('input[data-c="' + t.dataset.c + '"]')];
+    const next = cells[cells.indexOf(t) + (e.shiftKey ? -1 : 1)];
+    if (next) { next.focus(); next.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  });
+  el.addEventListener("focusin", (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.dataset.c) setTimeout(() => { if (document.activeElement === t) t.select(); }, 0);
+  });
+}

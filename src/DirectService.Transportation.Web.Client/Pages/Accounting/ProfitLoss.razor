@@ -1,48 +1,174 @@
 @page "/c/{Company}/accounting/profit-loss"
 @*
-  SCR-37 profit and loss (FR-118, DT-111): revenue and expenses grouped by the account tree for a period, optionally one cost centre and a
-  comparison period; net profit. A leaf opens its ledger. Excel / PDF.
+  SCR-37 profit and loss (FR-118, DT-111; owner request 26 Oct 2026, DT-264 / DT-266 / DT-267): sales and revenue → cost of sales → gross
+  profit → operating expenses → other income and other expenses → net profit, by the account tree (each group expands and collapses and has
+  a total row; expand all / collapse all). Period From / To with quick picks, optional cost centre (or "no cost centre"), "Columns by" none /
+  cost centre (with "No cost centre") / month / quarter / year — always with a Total column —, the comparison period with one amount, hide
+  zero rows (default on). An amount of an account opens its account statement for that column's period and cost centre. Excel / PDF with the
+  same columns and grouping (PDF landscape with many columns). Header and first column stay in view; many columns scroll inside the card.
 *@
 @inject Api Api
 @inject Loc L
 @inject ToastService Toasts
 @inject AccountingLookups Lookups
 @inject Downloads Files
+@inject NavigationManager Nav
+@inject ShellState Shell
 
 <PageHeader Title="@L["nav.profitLoss"]" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.profitLoss"])])" />
-<div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end;flex:none">
-    <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
-    <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
-    @if (Lookups.CostCentres.Count > 0) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="Lookups.CostCentres" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
-    <DateField @bind-Value="_compareFrom" Label="@L["rep.compareFrom"]" FieldClass="w160" />
-    <DateField @bind-Value="_compareTo" Label="@L["rep.compareTo"]" FieldClass="w160" />
-    <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
-    <span style="margin-inline-start:auto;display:flex;gap:6px">
-        <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
-        <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
-    </span>
+<div class="stack pl-filters" style="flex:none;gap:8px">
+    <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <DateField @bind-Value="_from" Label="@L["trip.from"]" FieldClass="w160" />
+        <DateField @bind-Value="_to" Label="@L["trip.to"]" FieldClass="w160" />
+        <span class="row" style="gap:4px;flex-wrap:wrap" role="group" aria-label="@L["pl.quick"]">
+            @foreach (var q in Quick)
+            {
+                var key = q;
+                <Btn Small="true" Ghost="true" Text="@L["pl.q." + key]" Pressed="@(IsQuick(key) ? "true" : "false")" OnClick="() => Pick(key)" />
+            }
+        </span>
+        @if (Lookups.CostCentres.Count > 0) {<SelectField TValue="string?" @bind-Value="_costCentre" Options="CentreOptions" Empty="@L["tar.all"]" Label="@L["je.costCentre"]" FieldClass="w200" />}
+        <SelectField TValue="string" @bind-Value="_columnsBy" Options="ColumnOptions" Label="@L["pl.columnsBy"]" FieldClass="w160" />
+        <CheckField @bind-Value="_hideZero" Label="@L["pl.hideZero"]" />
+        @if (_columnsBy == "none")
+        {
+            <DateField @bind-Value="_compareFrom" Label="@L["rep.compareFrom"]" FieldClass="w160" />
+            <DateField @bind-Value="_compareTo" Label="@L["rep.compareTo"]" FieldClass="w160" />
+        }
+        <Btn Primary="true" Icon="filter" Text="@L["rep.run"]" OnClick="Load" />
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+        <span class="row" style="gap:6px" role="group" aria-label="@L["rep.treeTools"]">
+            <Btn Small="true" Text="@L["rep.expandAll"]" OnClick="() => _collapsed.Clear()" Disabled="_r is null" />
+            <Btn Small="true" Icon="up" Text="@L["rep.collapseAll"]" OnClick="CollapseAll" Disabled="_r is null" />
+        </span>
+        <span style="margin-inline-start:auto;display:flex;gap:6px">
+            <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
+            <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />
+        </span>
+    </div>
 </div>
 <StateView State="_state" Kind="SkeletonKind.Report" ErrorReference="@_reference" OnRetry="Load">
     <Empty><EmptyState Icon="chart" Title="@L["rep.noMovement"]" /></Empty>
     <ChildContent>
-        @{ var r = _r!; var cmp = r.CompareFrom is not null; }
-        <Figures Items="@([new Figure(L["rep.totalRevenue"], Fmt.Money(r.TotalRevenue)), new Figure(L["rep.totalExpenses"], Fmt.Money(r.TotalExpenses)),
+        @{ var r = _r!; var cmp = r.CompareFrom is not null; var single = r.ColumnsBy == "none"; var cols = r.Columns ?? []; }
+        <Figures Items="@([new Figure(L["rep.totalRevenue"], Fmt.Money(r.TotalRevenue)), new Figure(L["pl.gross"], Fmt.Money(r.GrossProfit?.Total ?? 0)),
             new Figure(L[r.NetProfit >= 0 ? "rep.netProfit" : "rep.netLoss"], Fmt.Money(r.NetProfit), cmp ? L.F("rep.vs", Fmt.Money(r.CompareNetProfit)) : null)])" />
-        <div class="stack" style="overflow:auto;min-height:0">
-            <Box NoPad="true"><StatementTable Title="@L["rep.revenue"]" Rows="r.Revenue" TotalLabel="@L["rep.totalRevenue"]" Total="r.TotalRevenue" CompareTotal="r.CompareTotalRevenue" Compare="cmp" From="r.From" To="r.To" /></Box>
-            <Box NoPad="true"><StatementTable Title="@L["rep.expenses"]" Rows="r.Expenses" TotalLabel="@L["rep.totalExpenses"]" Total="r.TotalExpenses" CompareTotal="r.CompareTotalExpenses" Compare="cmp" From="r.From" To="r.To" /></Box>
-            <div class="box pad"><div class="ln tot big"><span>@L[r.NetProfit >= 0 ? "rep.netProfit" : "rep.netLoss"]</span><Money Value="r.NetProfit" /></div></div>
-        </div>
+        <section class="box pl-box" aria-label="@L["nav.profitLoss"]">
+            <div class="pl-scroll">
+                <table class="grid pl-grid">
+                    <caption class="sr-only">@L["nav.profitLoss"] @Fmt.Date(r.From, Shell.DateFormat) – @Fmt.Date(r.To, Shell.DateFormat)</caption>
+                    <thead><tr>
+                        <th scope="col" class="pl-first">@L["pl.item"]</th>
+                        @if (!single) { foreach (var c in cols) {<th scope="col" class="n">@c.Name</th>} }
+                        <th scope="col" class="n">@L[single ? "inv.amount" : "pl.total"]</th>
+                        @if (cmp) {<th scope="col" class="n">@L["rep.compare"]</th>}
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var s in r.Sections ?? [])
+                        {
+                            var sec = s;
+                            if (sec.Rows.Count > 0 || sec.Group is ProfitLossGroups.Sales or ProfitLossGroups.CostOfSales)
+                            {
+                                <tr class="pl-sec"><th scope="rowgroup" colspan="@Span(r)" class="pl-first">@L["pl.sec." + sec.Group]</th></tr>
+                                @foreach (var line in Lines(sec))
+                                {
+                                    var x = line.Row;
+                                    var open = !_collapsed.Contains(x.Account.Id);
+                                    var group = !x.IsLeaf;
+                                    <tr @key="sec.Group + x.Account.Id + line.Closing" class="@(line.Closing ? "pl-gtot" : group ? "grp" : null)">
+                                        <th scope="row" class="pl-first">
+                                            <span class="tb-name" style="padding-inline-start:@((x.Level - 1) * 18)px">
+                                                @if (group && !line.Closing)
+                                                {
+                                                    <button type="button" class="tb-toggle" aria-expanded="@(open ? "true" : "false")" aria-label="@L.F(open ? "acc.collapse" : "acc.expand", x.Account.Code)"
+                                                            @onclick="() => Toggle(x)"><Icon Name="@(open ? "down" : "left")" Flip="@(!open && L.En)" /></button>
+                                                }
+                                                else {<span class="tb-toggle" aria-hidden="true"></span>}
+                                                @if (line.Closing) {<span>@L["pl.groupTotal"]</span>}
+                                                <bdi class="num">@x.Account.Code</bdi> <bdi>@L.Pick(x.Account.NameAr, x.Account.NameEn)</bdi>
+                                            </span>
+                                        </th>
+                                        @if (group && open && !line.Closing)
+                                        {
+                                            <td colspan="@(Span(r) - 1)"></td>
+                                        }
+                                        else
+                                        {
+                                            @if (!single)
+                                            {
+                                                for (var i = 0; i < cols.Count; i++)
+                                                {
+                                                    var ci = i;
+                                                    <td class="n">@Amount(x, x.Amounts[ci], cols[ci])</td>
+                                                }
+                                            }
+                                            <td class="n pl-tot">@Amount(x, x.Total, null)</td>
+                                            @if (cmp) {<td class="n"><bdi class="num">@Fmt.Money(x.CompareAmount)</bdi></td>}
+                                        }
+                                    </tr>
+                                }
+                                <tr class="pl-stot">@Figure(L.F("pl.secTotal", L["pl.sec." + sec.Group]), sec.Total, single, cmp)</tr>
+                            }
+                            if (sec.Group == ProfitLossGroups.CostOfSales && r.GrossProfit is { } g)
+                            {
+                                <tr class="pl-key">@Figure(L["pl.gross"], g, single, cmp)</tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        @{ var net = r.Net ?? new ProfitLossFigure([r.NetProfit], r.NetProfit, r.CompareNetProfit); }
+                        <tr class="pl-key">@Figure(L[net.Total >= 0 ? "rep.netProfit" : "rep.netLoss"], net, single, cmp)</tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
     </ChildContent>
 </StateView>
 
 @code {
+    private static readonly string[] Quick = ["thisMonth", "thisQuarter", "thisYear", "lastYear"];
+    private static readonly string[] Modes = ["none", "costCentre", "month", "quarter", "year"];
     private ProfitLossReport? _r;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _costCentre;
+    private string _columnsBy = "none";
+    private bool _hideZero = true;
     private DateOnly? _from, _to, _compareFrom, _compareTo;
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
 
     [Parameter] public string Company { get; set; } = "";
+
+    private IReadOnlyList<Option<string>> ColumnOptions => Modes.Select(m => new Option<string>(m, L["pl.by." + m])).ToList();
+
+    private IReadOnlyList<Option<string?>> CentreOptions => [new(LedgerNoCostCentre, L["pl.noCostCentre"]), .. Lookups.CostCentres];
+
+    /// <summary>The statements' filter value for lines without a cost centre (LedgerReportService.NoCostCentre).</summary>
+    private const string LedgerNoCostCentre = "none";
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+
+    private static (DateOnly From, DateOnly To) Range(string key)
+    {
+        var t = Today;
+        return key switch
+        {
+            "thisQuarter" => (new DateOnly(t.Year, (t.Month - 1) / 3 * 3 + 1, 1), new DateOnly(t.Year, (t.Month - 1) / 3 * 3 + 1, 1).AddMonths(3).AddDays(-1)),
+            "thisYear" => (new DateOnly(t.Year, 1, 1), new DateOnly(t.Year, 12, 31)),
+            "lastYear" => (new DateOnly(t.Year - 1, 1, 1), new DateOnly(t.Year - 1, 12, 31)),
+            _ => (new DateOnly(t.Year, t.Month, 1), new DateOnly(t.Year, t.Month, 1).AddMonths(1).AddDays(-1)),
+        };
+    }
+
+    private bool IsQuick(string key) => Range(key) is var (f, t) && _from == f && _to == t;
+
+    private async Task Pick(string key)
+    {
+        (_from, _to) = Range(key);
+        await Load();
+    }
+
+    private int Span(ProfitLossReport r) => 1 + (r.ColumnsBy == "none" ? 0 : (r.Columns?.Count ?? 0)) + 1 + (r.CompareFrom is null ? 0 : 1);
 
     protected override async Task OnInitializedAsync()
     {
@@ -56,9 +182,14 @@
         void Add(string k, DateOnly? d) { if (d is { } v) p.Add(k + "=" + v.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)); }
         Add("from", _from);
         Add("to", _to);
-        Add("compareFrom", _compareFrom);
-        Add("compareTo", _compareTo);
+        if (_columnsBy == "none")
+        {
+            Add("compareFrom", _compareFrom);
+            Add("compareTo", _compareTo);
+        }
         if (_costCentre is not null) p.Add("costCentre=" + Uri.EscapeDataString(_costCentre));
+        if (_columnsBy != "none") p.Add("columnsBy=" + _columnsBy);
+        if (!_hideZero) p.Add("hideZero=false");
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
     }
 
@@ -71,7 +202,7 @@
             _r = await Api.GetAsync<ProfitLossReport>(Api.C("accounting/reports/profit-loss" + Query()));
             _from ??= _r.From;
             _to ??= _r.To;
-            _state = _r.Revenue.Count == 0 && _r.Expenses.Count == 0 ? LoadState.Empty : LoadState.Ready;
+            _state = (_r.Sections ?? []).All(s => s.Rows.Count == 0) && _r.Revenue.Count == 0 && _r.Expenses.Count == 0 ? LoadState.Empty : LoadState.Ready;
         }
         // A refused filter (e.g. a period of more than the allowed years) is one message, not "could not load" (owner feedback 13 Oct 2026, RPT-12).
         catch (ApiException e) when (e.Problem.Status == 400)
@@ -83,4 +214,67 @@
     }
 
     private Task Export(string format) => Files.SaveAsync(Api.C("accounting/reports/profit-loss/export" + Query()), format);
+
+    private sealed record Line(ProfitLossRow Row, bool Closing);
+
+    /// <summary>
+    /// The rows of a section as shown: a collapsed group is one row with its totals; an expanded group is its heading, its sub-accounts and a
+    /// closing total row.
+    /// </summary>
+    private IEnumerable<Line> Lines(ProfitLossSection s)
+    {
+        var rows = s.Rows;
+        var hidden = new HashSet<string>(StringComparer.Ordinal);
+        var open = new Stack<ProfitLossRow>();
+        foreach (var x in rows)
+        {
+            while (open.Count > 0 && open.Peek().Level >= x.Level) yield return new Line(open.Pop(), true);
+            if (x.ParentId is { } p && (hidden.Contains(p) || _collapsed.Contains(p))) { hidden.Add(x.Account.Id); continue; }
+            yield return new Line(x, false);
+            if (!x.IsLeaf && !_collapsed.Contains(x.Account.Id)) open.Push(x);
+        }
+        while (open.Count > 0) yield return new Line(open.Pop(), true);
+    }
+
+    private void Toggle(ProfitLossRow x) { if (!_collapsed.Remove(x.Account.Id)) _collapsed.Add(x.Account.Id); }
+
+    private void CollapseAll()
+    {
+        _collapsed.Clear();
+        foreach (var s in _r?.Sections ?? []) foreach (var x in s.Rows) if (!x.IsLeaf) _collapsed.Add(x.Account.Id);
+    }
+
+    /// <summary>An amount; for an account without sub-accounts it opens the account statement of that column's period and cost centre.</summary>
+    private RenderFragment Amount(ProfitLossRow x, decimal value, ProfitLossColumn? column) => __builder =>
+    {
+        if (x.IsLeaf && value != 0 && Shell.Can(PermissionKeys.AcctView))
+        {
+            var label = L.F("pl.openStatement", x.Account.Code, column?.Name ?? L["pl.total"]);
+            <button type="button" class="pl-amt" title="@label" aria-label="@label" @onclick="() => Open(x, column)"><bdi class="num">@Fmt.Money(value)</bdi></button>
+        }
+        else
+        {
+            <bdi class="num">@(value == 0 ? null : Fmt.Money(value))</bdi>
+        }
+    };
+
+    private RenderFragment Figure(string label, ProfitLossFigure f, bool single, bool cmp) => __builder =>
+    {
+        <th scope="row" class="pl-first">@label</th>
+        @if (!single) { foreach (var v in f.Amounts) {<td class="n"><bdi class="num">@Fmt.Money(v)</bdi></td>} }
+        <td class="n pl-tot"><bdi class="num">@Fmt.Money(f.Total)</bdi></td>
+        @if (cmp) {<td class="n"><bdi class="num">@Fmt.Money(f.Compare)</bdi></td>}
+    };
+
+    /// <summary>The account statement of the account, filtered by the column's period (or the whole period) and cost centre (or the report's).</summary>
+    private void Open(ProfitLossRow x, ProfitLossColumn? column)
+    {
+        if (_r is null) return;
+        string D(DateOnly d) => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var from = column?.From ?? _r.From;
+        var to = column?.To ?? _r.To;
+        var centre = column?.CostCentre ?? _r.CostCentre?.Id;
+        var url = $"accounting/statement?accounts={Uri.EscapeDataString(x.Account.Id)}&from={D(from)}&to={D(to)}" + (centre is null ? "" : "&costCentre=" + Uri.EscapeDataString(centre));
+        Nav.NavigateTo(NavModel.Href(Company, url));
+    }
 }

@@ -35,6 +35,11 @@ public class Account : AuditableEntity, ITenantScoped, ICompanyScoped
     public string Status { get; set; } = "Active";
     /// <summary>1 = tax account: offered as the tax account of journal lines (DT-256).</summary>
     public bool IsTaxAccount { get; set; }
+    /// <summary>
+    /// Section of the profit and loss statement (DT-264): Sales, CostOfSales, Operating, OtherIncome or OtherExpense; NULL = the nearest
+    /// ancestor's section, else Sales for revenue and Operating for expense accounts.
+    /// </summary>
+    public string? ProfitLossGroup { get; set; }
     public Account? Parent { get; set; }
     public ICollection<Account> Children { get; set; } = new List<Account>();
 }

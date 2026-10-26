@@ -20,6 +20,9 @@ namespace DirectService.Transportation.Application.Budgets;
 /// (<see cref="BudgetImportService"/>). Draft → Approved (acc.budget.approve) → back to Draft; only one Approved budget per company and year,
 /// and only it is compared with the actuals. Approved budgets cannot be changed or deleted. Audited; the history shows the budget's and its
 /// lines' changes.
+/// Owner request 26 Oct 2026 (DT-265): the budget screen shows every posting account at once (all types, balance-sheet accounts too); a
+/// save keeps only lines with an amount. The cost centre is only a filter of that screen — the budget stays company-wide; lines per cost
+/// centre or on a parent account made earlier (copy by cost centre, import) are kept and still counted.
 /// </summary>
 public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PostingEngine engine, IChangeContext changes,
     AuditDescriber describer)
@@ -33,7 +36,8 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
     public const string Revenue = "Revenue";
     public const string Expense = "Expense";
 
-    public static bool IsBudgetType(string accountType) => accountType is Revenue or Expense;
+    /// <summary>Every account type may be budgeted (DT-265); Budget vs Actual compares revenue and expenses only.</summary>
+    public static bool IsBudgetType(string accountType) => AccountingCodes.AccountTypes.Contains(accountType);
 
     // ------------------------------------------------------------ read
 
@@ -72,6 +76,46 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
         return all.Where(a => a.Status == AccountingCodes.Active && IsBudgetType(a.AccountType)).OrderBy(a => a.Code, StringComparer.Ordinal)
             .Select(a => new BudgetAccountOption(new AccountRef(support.Token<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn), a.AccountType, parents.Contains(a.Id), Level(a.Id)))
             .ToList();
+    }
+
+    /// <summary>
+    /// The chart for the budget screen (DT-265): every account in chart order with its parent and level; groups (an account with sub-accounts
+    /// or not postable) are headings, the others take amounts.
+    /// </summary>
+    public async Task<IReadOnlyList<BudgetGridAccount>> GridAccountsAsync(CancellationToken ct)
+    {
+        var all = await db.Set<Account>().AsNoTracking().Select(a => new { a.Id, a.PublicId, a.Code, a.NameAr, a.NameEn, a.AccountType, a.ParentId, a.Status, a.IsPostable })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var byId = all.ToDictionary(a => a.Id);
+        var parents = all.Where(a => a.ParentId is not null).Select(a => a.ParentId!.Value).ToHashSet();
+        int Level(long id)
+        {
+            var level = 1;
+            for (var p = byId[id].ParentId; p is long pid && byId.ContainsKey(pid) && level < 64; p = byId[pid].ParentId) level++;
+            return level;
+        }
+        return all.OrderBy(a => a.Code, StringComparer.Ordinal)
+            .Select(a => new BudgetGridAccount(new AccountRef(support.Token<Account>(a.PublicId), a.Code, a.NameAr, a.NameEn), a.AccountType,
+                a.ParentId is long p && byId.TryGetValue(p, out var parent) ? support.Token<Account>(parent.PublicId) : null, Level(a.Id),
+                parents.Contains(a.Id) || !a.IsPostable, a.Status == AccountingCodes.Active))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The cost-centre filter of the budget screen (DT-265): the accounts with posted lines for that cost centre in the budget year or the
+    /// year before.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> CostCentreAccountsAsync(string? costCentre, int? year, CancellationToken ct)
+    {
+        new Validator().Check(year is >= MinYear and <= MaxYear, "year", ErrorCodes.ValidationRange).ThrowIfInvalid();
+        if (string.IsNullOrWhiteSpace(costCentre)) throw Fail.Field("costCentre", ErrorCodes.ValidationRequired, new FieldRef("costCentre"));
+        var centre = await support.FindAsync<CostCentre>(costCentre, ct).ConfigureAwait(false);
+        var from = new DateOnly(year!.Value - 1, 1, 1);
+        var to = new DateOnly(year.Value, 12, 31);
+        var ids = await db.Set<EntryLine>().AsNoTracking()
+            .Where(l => l.CostCentreId == centre.Id && l.JournalEntry.EntryDate >= from && l.JournalEntry.EntryDate <= to)
+            .Select(l => l.Account.PublicId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        return ids.Select(support.Token<Account>).ToList();
     }
 
     public async Task<BudgetResponse> GetAsync(string token, CancellationToken ct)
@@ -290,8 +334,9 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
         await db.Set<Account>().AsNoTracking().ToDictionaryAsync(a => a.Id, a => (a.PublicId, a.Code, a.AccountType, a.ParentId), ct).ConfigureAwait(false);
 
     /// <summary>
-    /// Validates the lines of a save: account (revenue or expense, posting or parent), cost centre, twelve amounts (currency decimals, may be
-    /// negative), no account twice for the same cost centre, no line on an account whose parent also has a line for that cost centre.
+    /// Validates the lines of a save: account (posting or parent), cost centre, twelve amounts (currency decimals, may be negative), no account
+    /// twice for the same cost centre, no line on an account whose parent also has a line for that cost centre. Lines whose twelve amounts are
+    /// all zero are not kept (DT-265: only lines with amounts are stored).
     /// </summary>
     private async Task<List<(long AccountId, long? CostCentreId, decimal[] Months)>> ResolveLinesAsync(IReadOnlyList<BudgetLineRequest> input, CancellationToken ct)
     {
@@ -301,6 +346,7 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
         var byPublic = accounts.ToDictionary(a => a.Value.PublicId, a => a.Key);
         var centres = await db.Set<CostCentre>().AsNoTracking().ToDictionaryAsync(c => c.PublicId, c => c.Id, ct).ConfigureAwait(false);
         var result = new List<(long, long?, decimal[])>(input.Count);
+        var origin = new List<int>(input.Count);   // the request index of each kept line (all-zero lines are left out)
         for (var i = 0; i < input.Count; i++)
         {
             var l = input[i];
@@ -314,11 +360,13 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
                     : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             var months = l.Months?.ToArray() ?? [];
             if (months.Length != 12 || months.Any(m => !BudgetMath.IsValidAmount(m, decimals))) throw Fail.Field(field + ".months", ErrorCodes.ValidationRange, new FieldRef(field + ".months"));
+            if (months.All(m => m == 0)) continue;
             result.Add((accountId, centreId, months));
+            origin.Add(i);
         }
         if (BudgetMath.FindConflict(result.Select(r => (r.Item1, r.Item2)).ToList(), id => accounts.TryGetValue(id, out var x) ? x.ParentId : null) is { } conflict)
         {
-            var field = $"lines[{conflict.Index}].accountId";
+            var field = $"lines[{origin[conflict.Index]}].accountId";
             throw conflict.AncestorId is long anc
                 ? Fail.Field(field, ErrorCodes.BudgetOverlap, accounts[result[conflict.Index].Item1].Code, accounts[anc].Code)
                 : Fail.Field(field, ErrorCodes.BudgetDuplicateLine, accounts[result[conflict.Index].Item1].Code);

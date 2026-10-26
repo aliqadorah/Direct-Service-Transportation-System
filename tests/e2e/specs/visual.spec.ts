@@ -886,6 +886,60 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await run.check(page, "rpt23#entries", { full: true });
     run.assertClean();
   });
+
+  /**
+   * Budget and profit and loss of 26 Oct (DT-265, DT-266): a draft budget with every account at once (headings with subtotals, sticky header,
+   * first column and totals; two rows ticked), and the profit and loss of this year with columns by cost centre (with "No cost centre") and
+   * by month (twelve columns scroll inside the card).
+   */
+  test(`Visual — budget grid and profit and loss (${lang})`, async ({ page }) => {
+    test.skip(!wanted("bpl26#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const t = texts(lang);
+    const run = new VisualRun(lang, "bpl26");
+    await enrol(page, lang, new VisualRun(lang, "bpl26-enrol", false));
+    const company = companyOf(page);
+    await documents(page, company);
+    const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    const code = (x: string) => chart.find((a) => a.code === x)!.id;
+    const centre = await api<{ id: string }>(page, "POST", c(company, "accounting/cost-centres"), { code: "BR-N", name: lang === "ar" ? "فرع الشمال" : "North branch", rowVersion: null });
+    const year = Number(today().slice(0, 4));
+    const entry = async (date: string, debit: string, credit: string, amount: number, costCentreId: string | null) =>
+      api(page, "POST", c(company, "accounting/journal-entries"), { entryDate: date, description: lang === "ar" ? "حركة" : "Movement", lines: [
+        { accountId: code(debit), debit: amount, credit: 0, costCentreId, party: null, note: null },
+        { accountId: code(credit), debit: 0, credit: amount, costCentreId, party: null, note: null }] });
+    await entry(`${year}-01-15`, "110101", "4101", 2500, centre.id);
+    await entry(`${year}-01-20`, "5101", "110101", 900, centre.id);
+    await entry(`${year}-02-10`, "110101", "4102", 400, null);
+    await entry(`${year}-02-12`, "5202", "110101", 300, null);
+    const every = (v: number) => Array.from({ length: 12 }, () => v);
+    let budget = await api<{ id: string; rowVersion: string; name: string }>(page, "POST", c(company, "accounting/budgets"), { fiscalYear: year, name: `Draft ${year} / مسودة` });
+    budget = await api<{ id: string; rowVersion: string; name: string }>(page, "PUT", c(company, `accounting/budgets/${budget.id}`), { name: budget.name, rowVersion: budget.rowVersion, lines: [
+      { accountId: code("4101"), costCentreId: null, months: every(2500) },
+      { accountId: code("5101"), costCentreId: null, months: every(900) },
+      { accountId: code("5202"), costCentreId: null, months: every(300) },
+    ] });
+
+    expect(await open(page, `/c/${company}/accounting/budgets/${budget.id}`)).toBe(true);
+    await expect(page.locator("table.bud-grid input[data-c]").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "bpl26#budget", { full: true });
+    await page.getByLabel(t("bud.selectRow", "5202")).check();
+    await page.getByLabel(t("bud.selectRow", "5203")).check();
+    await expect(page.locator("table.bud-grid tr.sel")).toHaveCount(2);
+    await run.check(page, "bpl26#budget-selected");
+
+    expect(await open(page, `/c/${company}/accounting/profit-loss`)).toBe(true);
+    await page.getByRole("button", { name: t("pl.q.thisYear") }).click();
+    await page.getByLabel(t("pl.columnsBy")).selectOption({ label: t("pl.by.costCentre") });
+    await page.getByRole("button", { name: t("rep.run"), exact: true }).click();
+    await expect(page.locator("table.pl-grid thead")).toContainText(t("pl.noCostCentre"), { timeout: 15_000 });
+    await run.check(page, "bpl26#pl-centre", { full: true });
+    await page.getByLabel(t("pl.columnsBy")).selectOption({ label: t("pl.by.month") });
+    await page.getByRole("button", { name: t("rep.run"), exact: true }).click();
+    await expect(page.locator("table.pl-grid thead th")).toHaveCount(14, { timeout: 15_000 });   // item, 12 months, total
+    await run.check(page, "bpl26#pl-month", { full: true });
+    run.assertClean();
+  });
 }
 
 /**

@@ -212,7 +212,7 @@ public sealed class AccountingDashboardTests(ApiFactory f)
         await OkAsync<JournalDraftResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/journal-drafts"),
             new ManualEntryRequest(Today, "Draft", [new JournalLineRequest(a["5202"].Id, 10, 0, null, null, null)], null)));
         var b = await OkAsync<BudgetResponse>(await o.Client.PostAsJsonAsync(U(o, "/accounting/budgets"), new CreateBudgetRequest(Today.Year, "Plan")));
-        b = await OkAsync<BudgetResponse>(await o.Client.PutAsJsonAsync(U(o, $"/accounting/budgets/{b.Id}"), new BudgetRequest("Plan", [new BudgetLineRequest(a["5202"].Id, null, new decimal[12])], b.RowVersion)));
+        b = await OkAsync<BudgetResponse>(await o.Client.PutAsJsonAsync(U(o, $"/accounting/budgets/{b.Id}"), new BudgetRequest("Plan", [new BudgetLineRequest(a["5202"].Id, null, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])], b.RowVersion)));   // an all-zero line is not kept (DT-265)
         await (await o.Client.PostAsJsonAsync(U(o, $"/accounting/budgets/{b.Id}/approve"), new RowVersionRequest(b.RowVersion))).EnsureOkAsync();
 
         // Budget viewer only: budget usage, no ledger figures, no journal reminders.
