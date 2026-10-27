@@ -3,7 +3,10 @@
   SCR-31 journal list (FR-111…115, FR-102): views All / Manual / Automatic / Reversed or void, period (months), number, account, cost centre and
   status filters, party and source-document filters (FR-102), links to the entry, its source document and its reversal; Excel / CSV / PDF export (FR-115). Users with acct.je.view but not acct.acct.view see the
   automatic entries only (DT-32). Revision 6: Reference column; search by number, description or reference; drafts (no number) under the
-  "Drafts" view and first in "All" — a draft opens in the entry form.
+  "Drafts" view and first in "All" — a draft opens in the entry form. Owner findings 27 Oct 2026 (DT-279): one "Cancelled" view for every
+  cancelled entry (Reversed — its document voided or changed, or edited — and Void — a voided manual entry) with "Cancelled by JV-…" and the
+  reason; the cancelling entries are "Reversal of JV-…" under All / Manual / Automatic (the old "Reversed" and "Void" views in an address open
+  "Cancelled").
 *@
 @inject Api Api
 @inject Loc L
@@ -31,6 +34,7 @@
            EmptyIcon="book" EmptyTitle="@L["je.none"]" EmptyText="@L["je.noneText"]" Filtered="Filtered" OnClear="ClearAll"
            Page="_page" PageSize="_size" Total="_result?.TotalCount" OnPage="Go" OnPageSize="Size">
     <Filters>
+        @if (_view == JournalStatus.Cancelled) {<p class="help je-cancelled-help" style="margin:0;flex-basis:100%">@L["je.cancelledHelp"]</p>}
         <TextField @bind-Value="_from" Label="@L["je.periodFrom"]" Placeholder="YYYY-MM" Ltr="true" MaxLength="7" FieldClass="w160" />
         <TextField @bind-Value="_to" Label="@L["je.periodTo"]" Placeholder="YYYY-MM" Ltr="true" MaxLength="7" FieldClass="w160" />
         @if (FullList)
@@ -54,6 +58,7 @@
                 <GridColumn TItem="JournalEntrySummary" Title="@L["je.reference"]" Value="e => e.Reference" Clip="true" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["je.reversal"]"
                             Value="@(e => e.ReversedByEntryNumber is { } r ? L.F("je.reversedBy", r) : e.ReversesEntryNumber is { } o ? L.F("je.reverses", o) : null)" />
+                <GridColumn TItem="JournalEntrySummary" Title="@L["je.cancelReason"]" Value="e => e.CancelReason" Clip="true" Visible="@(_view == JournalStatus.Cancelled)" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["inv.amount"]" Value="e => Fmt.Money(e.TotalDebit)" Numeric="true" />
                 <GridColumn TItem="JournalEntrySummary" Title="@L["ml.status"]"><Template><StatusTag Status="@JournalStatus.Tag(context.Status)" /></Template></GridColumn>
             </Columns>
@@ -84,7 +89,7 @@
     private bool FullList => Shell.Can(PermissionKeys.AcctView);
 
     private IReadOnlyList<TabItem> Views => FullList
-        ? [new("all", L["ml.all"]), new("manual", L["je.manualView"]), new("auto", L["je.autoView"]), new(JournalStatus.Draft, L["je.draftsView"]), new("Reversed", L["st.reversed"]), new("Void", L["st.void"])]
+        ? [new("all", L["ml.all"]), new("manual", L["je.manualView"]), new("auto", L["je.autoView"]), new(JournalStatus.Draft, L["je.draftsView"]), new(JournalStatus.Cancelled, L["je.cancelledView"])]
         : [new("all", L["nav.automatic"])];
 
     private bool Filtered => _number is not null || _from is not null || _to is not null || _account is not null || _costCentre is not null || _party is not null || _source is not null;
@@ -92,7 +97,11 @@
     protected override async Task OnInitializedAsync()
     {
         // A view in the address (?view=Draft from the accounting dashboard reminders, revision 6 part B).
-        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["view"] is { Length: > 0 } v && Views.Any(x => x.Key == v)) _view = v;
+        if (System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["view"] is { Length: > 0 } v)
+        {
+            if (v is "Reversed" or "Void") v = JournalStatus.Cancelled;   // DT-279: the two older views are one
+            if (Views.Any(x => x.Key == v)) _view = v;
+        }
         if (FullList)
         {
             try { await Lookups.EnsureAsync(); } catch (ApiException) { }
@@ -136,7 +145,7 @@
         if (_party?.Split('|') is [var partyType, var partyId]) { Add("partyType", partyType); Add("partyId", partyId); }
         Add("sourceType", _source);
         Add("manual", AutomaticOnly && FullList ? "false" : _view switch { "manual" => "true", "auto" => "false", _ => null });
-        Add("status", _view is "Reversed" or "Void" or JournalStatus.Draft ? _view : null);
+        Add("status", _view is JournalStatus.Cancelled or JournalStatus.Draft ? _view : null);
         if (paged) { Add("page", _page.ToString(System.Globalization.CultureInfo.InvariantCulture)); Add("pageSize", _size.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
         return p.Count == 0 ? "" : "?" + string.Join('&', p);
     }

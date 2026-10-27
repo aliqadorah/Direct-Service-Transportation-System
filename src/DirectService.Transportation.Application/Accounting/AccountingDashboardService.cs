@@ -27,7 +27,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// opens it; everything is of the company in the address (company switch).
 /// </summary>
 public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, AgeingService ageing,
-    BudgetReportService budgets, Reports.StandardReportService reports, TimeProvider clock)
+    BudgetReportService budgets, Cash.AccountStatementService statements, TimeProvider clock)
 {
     /// <summary>Bills due within this many days are reminded.</summary>
     public const int DueSoonDays = 7;
@@ -65,7 +65,7 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
         var partyReader = Any(PermissionKeys.DrvView);
         if (ledgerReader || ageingReader || partyReader)
         {
-            decimal? cash = null, receivables = null, unapplied = null, suppliers = null, drivers = null, partners = null;
+            decimal? cash = null, receivables = null, unapplied = null, suppliers = null, drivers = null, partners = null, suppliersOwe = null, driversOwe = null, partnersOwe = null;
             PeriodResult? monthResult = null, ytd = null;
             if (ledgerReader)
             {
@@ -79,18 +79,27 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
                 receivables = r.Totals.Total;
                 unapplied = r.Totals.Unapplied;
                 receivablesAgeing = r.Totals;
-                suppliers = (await ageing.AgeingAsync("payables", monthTo, ct).ConfigureAwait(false)).Totals.Total;
+                // DT-278: a supplier with more paid than billed owes the company — never a negative "what we owe".
+                var payables = (await ageing.AgeingAsync("payables", monthTo, ct).ConfigureAwait(false)).Rows;
+                suppliers = payables.Sum(x => Math.Max(x.Amounts.Total, 0));
+                suppliersOwe = payables.Sum(x => Math.Max(-x.Amounts.Total, 0));
             }
             if (partyReader)
             {
-                // The totals of the driver and partner balance reports (RPT-19 net due, RPT-20 balance due): what the account pages show.
-                var asOf = new Contracts.Reports.StandardReportQuery(null, null, monthTo, null, null, null, null, null, null, null, null);
-                drivers = Last((await reports.RunAsync("driver-balances", asOf, ct).ConfigureAwait(false)).Totals);
-                partners = Last((await reports.RunAsync("partner-balances", asOf, ct).ConfigureAwait(false)).Totals);
+                // The driver and partner balances of RPT-19 / RPT-20 (what the account pages show), split by side (DT-278): owed to the driver /
+                // partner, or owed by it to the company — before, one net figure (e.g. Drivers −100 for an opening advance).
+                var driverBalances = await statements.DriverBalancesAsync(monthTo, ct).ConfigureAwait(false);
+                var partnerBalances = await statements.PartnerBalancesAsync(monthTo, ct).ConfigureAwait(false);
+                drivers = driverBalances.Sum(b => Math.Max(b.Balance, 0));
+                driversOwe = driverBalances.Sum(b => Math.Max(-b.Balance, 0));
+                partners = partnerBalances.Sum(b => Math.Max(b.Balance, 0));
+                partnersOwe = partnerBalances.Sum(b => Math.Max(-b.Balance, 0));
             }
-            var payables = suppliers is null && drivers is null && partners is null
+            var owed = suppliers is null && drivers is null && partners is null
                 ? null : new Payables(suppliers, drivers, partners, (suppliers ?? 0) + (drivers ?? 0) + (partners ?? 0));
-            figures = new AccountingFigures(cash, receivables, unapplied, payables, monthResult, ytd);
+            var owedToUs = suppliersOwe is null && driversOwe is null && partnersOwe is null
+                ? null : new OwedToUs(suppliersOwe, driversOwe, partnersOwe, (suppliersOwe ?? 0) + (driversOwe ?? 0) + (partnersOwe ?? 0));
+            figures = new AccountingFigures(cash, receivables, unapplied, owed, monthResult, ytd, owedToUs);
         }
         var trend = ledgerReader ? await TrendAsync(monthFrom, ct).ConfigureAwait(false) : null;
         var budget = Any(PermissionKeys.BudgetView) ? await BudgetUsageAsync(y, yearFrom, monthTo, ct).ConfigureAwait(false) : null;
@@ -99,8 +108,6 @@ public sealed class AccountingDashboardService(IAppDbContext db, IRequestContext
     }
 
     // ------------------------------------------------------------ figures
-
-    private static decimal Last(IReadOnlyList<object?>? totals) => totals is { Count: > 0 } t && t[^1] is decimal d ? d : 0;
 
     private async Task<PeriodResult> ResultAsync(DateOnly from, DateOnly to, CancellationToken ct)
     {

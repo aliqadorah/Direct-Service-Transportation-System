@@ -7584,3 +7584,256 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    ALTER TABLE [cfg].[DashboardPins] ADD [WarnWhen] varchar(10) NOT NULL CONSTRAINT [DF_DashboardPins_WarnWhen] DEFAULT ('Above');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_Trips_PartnerOrder] ON [trn].[TRN_Trips] ([TenantId], [CompanyId], [PartnerId], [TripDate], [ReceiptNoKey], [Id]) INCLUDE ([PartnerCost]) WHERE [PartnerId] IS NOT NULL AND [Status] = ''Active'' AND [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [cfg].[DashboardPins] ADD CONSTRAINT [CK_DashboardPins_WarnWhen] CHECK ([WarnWhen] IN (''Above'',''Below''))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    CREATE VIEW trn.TRN_PartnerPaymentBoundary AS
+    WITH pay AS (
+        SELECT PartnerId, SUM(CASE WHEN Kind = 'Repayment' THEN -Amount ELSE Amount END) AS Paid
+        FROM trn.TRN_PartnerPayments WHERE Status = 'Active' AND IsDeleted = 0 GROUP BY PartnerId),
+    day AS (
+        SELECT TenantId, CompanyId, PartnerId, TripDate, SUM(PartnerCost) AS DayCost
+        FROM trn.TRN_Trips WHERE PartnerId IS NOT NULL AND Status = 'Active' AND IsDeleted = 0
+        GROUP BY TenantId, CompanyId, PartnerId, TripDate),
+    run AS (
+        SELECT d.TenantId, d.CompanyId, d.PartnerId, d.TripDate, ISNULL(p.Paid, 0) AS Paid,
+            SUM(d.DayCost) OVER (PARTITION BY d.TenantId, d.CompanyId, d.PartnerId ORDER BY d.TripDate ROWS UNBOUNDED PRECEDING) AS CostToDay
+        FROM day d LEFT JOIN pay p ON p.PartnerId = d.PartnerId)
+    SELECT TenantId, CompanyId, PartnerId, CAST(MAX(Paid) AS decimal(18,3)) AS Paid,
+        MIN(CASE WHEN CostToDay > Paid THEN TripDate END) AS BoundaryDate,
+        CAST(ISNULL(MAX(CASE WHEN CostToDay <= Paid THEN CostToDay END), 0) AS decimal(18,3)) AS CostBefore
+    FROM run GROUP BY TenantId, CompanyId, PartnerId;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    CREATE VIEW trn.TRN_TripPartnerCoverage AS
+    SELECT t.Id AS TripId, t.TenantId, t.CompanyId, t.PartnerId, t.PartnerCost, b.Paid,
+        CAST(CASE WHEN b.BoundaryDate IS NULL OR t.TripDate < b.BoundaryDate THEN 0
+                  WHEN t.TripDate > b.BoundaryDate THEN t.PartnerCost
+                  WHEN b.CostBefore + s.InDay <= b.Paid THEN 0
+                  WHEN b.CostBefore + s.InDay - t.PartnerCost >= b.Paid THEN t.PartnerCost
+                  ELSE b.CostBefore + s.InDay - b.Paid END AS decimal(18,3)) AS OpenAmount
+    FROM trn.TRN_Trips t
+    JOIN trn.TRN_PartnerPaymentBoundary b ON b.TenantId = t.TenantId AND b.CompanyId = t.CompanyId AND b.PartnerId = t.PartnerId
+    OUTER APPLY (SELECT SUM(x.PartnerCost) AS InDay FROM trn.TRN_Trips x
+                 WHERE t.TripDate = b.BoundaryDate AND x.TenantId = t.TenantId AND x.CompanyId = t.CompanyId AND x.PartnerId = t.PartnerId
+                   AND x.TripDate = t.TripDate AND x.Status = 'Active' AND x.IsDeleted = 0
+                   AND (x.ReceiptNoKey < t.ReceiptNoKey OR (x.ReceiptNoKey = t.ReceiptNoKey AND x.Id <= t.Id))) s
+    WHERE t.PartnerId IS NOT NULL AND t.Status = 'Active' AND t.IsDeleted = 0;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027103252_Rev6_PartnerTripCoverage'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261027103252_Rev6_PartnerTripCoverage', N'10.0.13');
+END;
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Settlements] DROP CONSTRAINT [CK_TRN_Settlements_NetPayable];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_PartnerPayments] DROP CONSTRAINT [CK_TRN_PartnerPayments_Amount];
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_Settlements] ADD [PreviousBalance] decimal(18,3) NOT NULL CONSTRAINT [DF_TRN_Settlements_PreviousBalance] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    ALTER TABLE [trn].[TRN_PartnerPayments] ADD [PreviousBalance] decimal(18,3) NOT NULL CONSTRAINT [DF_TRN_PartnerPayments_PreviousBalance] DEFAULT (0);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    CREATE TABLE [trn].[TRN_PreviousBalanceItems] (
+        [Id] bigint NOT NULL IDENTITY,
+        [PublicId] uniqueidentifier NOT NULL CONSTRAINT [DF_TRN_PreviousBalanceItems_PublicId] DEFAULT (NEWID()),
+        [TenantId] bigint NOT NULL,
+        [CompanyId] bigint NOT NULL,
+        [SettlementId] bigint NULL,
+        [PartnerPaymentId] bigint NULL,
+        [JournalEntryId] bigint NOT NULL,
+        [AccountId] bigint NOT NULL,
+        [Amount] decimal(18,3) NOT NULL,
+        [CreatedAt] datetime2(3) NOT NULL CONSTRAINT [DF_TRN_PreviousBalanceItems_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        [CreatedBy] bigint NULL,
+        [UpdatedAt] datetime2(3) NULL,
+        [UpdatedBy] bigint NULL,
+        [IsDeleted] bit NOT NULL CONSTRAINT [DF_TRN_PreviousBalanceItems_IsDeleted] DEFAULT (0),
+        [DeletedAt] datetime2(3) NULL,
+        [DeletedBy] bigint NULL,
+        [DeleteReason] nvarchar(500) NULL,
+        [RowVersion] rowversion NOT NULL,
+        CONSTRAINT [PK_TRN_PreviousBalanceItems] PRIMARY KEY ([Id]),
+        CONSTRAINT [CK_TRN_PreviousBalanceItems_Amount] CHECK ([Amount] <> 0),
+        CONSTRAINT [CK_TRN_PreviousBalanceItems_DeletedAt_DeletedBy_DeleteReason] CHECK ([IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)),
+        CONSTRAINT [CK_TRN_PreviousBalanceItems_Document] CHECK (([SettlementId] IS NOT NULL AND [PartnerPaymentId] IS NULL) OR ([SettlementId] IS NULL AND [PartnerPaymentId] IS NOT NULL)),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Accounts_AccountId] FOREIGN KEY ([AccountId]) REFERENCES [acc].[Accounts] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Companies_CompanyId] FOREIGN KEY ([CompanyId]) REFERENCES [core].[Companies] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_JournalEntries_JournalEntryId] FOREIGN KEY ([JournalEntryId]) REFERENCES [acc].[JournalEntries] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_TRN_PartnerPayments_PartnerPaymentId] FOREIGN KEY ([PartnerPaymentId]) REFERENCES [trn].[TRN_PartnerPayments] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_TRN_Settlements_SettlementId] FOREIGN KEY ([SettlementId]) REFERENCES [trn].[TRN_Settlements] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Tenants_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [core].[Tenants] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Users_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Users_DeletedBy] FOREIGN KEY ([DeletedBy]) REFERENCES [core].[Users] ([Id]),
+        CONSTRAINT [FK_TRN_PreviousBalanceItems_Users_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [core].[Users] ([Id])
+    );
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_Settlements] ADD CONSTRAINT [CK_TRN_Settlements_NetPayable] CHECK ([NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [PreviousBalance] + [RepaidAmount] + [CarriedForward])');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    EXEC(N'ALTER TABLE [trn].[TRN_PartnerPayments] ADD CONSTRAINT [CK_TRN_PartnerPayments_Amount] CHECK ([Amount] > 0 OR ([Amount] = 0 AND [Kind] = ''Payment'' AND [PreviousBalance] < 0))');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    CREATE INDEX [IX_TRN_PreviousBalanceItems_AccountId] ON [trn].[TRN_PreviousBalanceItems] ([AccountId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_PreviousBalanceItems_CompanyId] ON [trn].[TRN_PreviousBalanceItems] ([CompanyId]) WHERE [IsDeleted] = 0');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    CREATE INDEX [IX_TRN_PreviousBalanceItems_JournalEntryId_AccountId] ON [trn].[TRN_PreviousBalanceItems] ([JournalEntryId], [AccountId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_PreviousBalanceItems_PartnerPaymentId] ON [trn].[TRN_PreviousBalanceItems] ([PartnerPaymentId]) WHERE [PartnerPaymentId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    EXEC(N'CREATE INDEX [IX_TRN_PreviousBalanceItems_SettlementId] ON [trn].[TRN_PreviousBalanceItems] ([SettlementId]) WHERE [SettlementId] IS NOT NULL');
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_TRN_PreviousBalanceItems_PublicId] ON [trn].[TRN_PreviousBalanceItems] ([PublicId]);
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    ALTER VIEW trn.TRN_PartnerPaymentBoundary AS
+    WITH pay AS (
+        SELECT PartnerId, SUM(CASE WHEN Kind = 'Repayment' THEN -(Amount + PreviousBalance) ELSE Amount - PreviousBalance END) AS Paid
+        FROM trn.TRN_PartnerPayments WHERE Status = 'Active' AND IsDeleted = 0 GROUP BY PartnerId),
+    day AS (
+        SELECT TenantId, CompanyId, PartnerId, TripDate, SUM(PartnerCost) AS DayCost
+        FROM trn.TRN_Trips WHERE PartnerId IS NOT NULL AND Status = 'Active' AND IsDeleted = 0
+        GROUP BY TenantId, CompanyId, PartnerId, TripDate),
+    run AS (
+        SELECT d.TenantId, d.CompanyId, d.PartnerId, d.TripDate, ISNULL(p.Paid, 0) AS Paid,
+            SUM(d.DayCost) OVER (PARTITION BY d.TenantId, d.CompanyId, d.PartnerId ORDER BY d.TripDate ROWS UNBOUNDED PRECEDING) AS CostToDay
+        FROM day d LEFT JOIN pay p ON p.PartnerId = d.PartnerId)
+    SELECT TenantId, CompanyId, PartnerId, CAST(MAX(Paid) AS decimal(18,3)) AS Paid,
+        MIN(CASE WHEN CostToDay > Paid THEN TripDate END) AS BoundaryDate,
+        CAST(ISNULL(MAX(CASE WHEN CostToDay <= Paid THEN CostToDay END), 0) AS decimal(18,3)) AS CostBefore
+    FROM run GROUP BY TenantId, CompanyId, PartnerId;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261027113420_Rev6_PreviousBalances'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261027113420_Rev6_PreviousBalances', N'10.0.13');
+END;
+
+COMMIT;
+GO
+

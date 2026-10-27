@@ -129,6 +129,7 @@ public static class DependencyInjection
 
         // Cash, drivers and partners (B8)
         services.AddScoped<CashSupport>();
+        services.AddScoped<PreviousBalances>();
         services.AddScoped<ReceiptService>();
         services.AddScoped<AdvanceService>();
         services.AddScoped<SettlementService>();

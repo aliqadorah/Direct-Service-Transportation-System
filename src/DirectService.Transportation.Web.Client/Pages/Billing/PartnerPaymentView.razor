@@ -17,6 +17,13 @@
             @* DT-230 (c): from a paid partner trip — the payment was not actually made; voided for that trip (recorded with it). *@
             <Above>@if (ForTrip is not null && p.Status != "Void") {<Banner Tone="Tone.Warn" Icon="alert" Text="@L["prt.voidNotPaidBanner"]" />}
                 else if (ForTrip is not null) {<Banner Tone="Tone.Ok"><span>@L["prt.voidNotPaidDone"] <a href="@NavModel.Href(Company, $"trips/{Uri.EscapeDataString(ForTrip)}")">@L["prt.backToTrip"]</a></span></Banner>}</Above>
+            <ChildContent>
+                @* DT-277: the previous balance from manual / opening entries settled with this payment. *@
+                @if (p.PreviousBalance != 0)
+                {
+                    <PreviousBalancePanel Company="@Company" Name="@p.Partner.Name" Amount="p.PreviousBalance" Entries="@(_d.PreviousBalanceEntries ?? [])" Partner="true" Settled="true" />
+                }
+            </ChildContent>
         </CashDocView>
     </ChildContent>
 </StateView>
@@ -50,6 +57,12 @@
         new(L["trip.date"], Fmt.Date(p.PaymentDate, Shell.DateFormat)),
         new(L["prt.kind"], L["prt.kind." + p.Kind]),   // DT-228: payment to the partner or repayment from it
         .. (p.DeductedAmount > 0 ? new KeyValue[] { new(L["prt.deducted"], Fmt.Money(p.DeductedAmount)), new(L["prt.dueBeforeDeduction"], Fmt.Money(p.Amount + p.DeductedAmount)) } : []),
+        // DT-277: the previous balance settled with it and what it paid (or brought back) for the partner's trips.
+        .. (p.PreviousBalance != 0 ? new KeyValue[]
+        {
+            new(L["pb.tab"], Fmt.Money(Math.Abs(p.PreviousBalance)) + " · " + L[p.PreviousBalance > 0 ? "pb.owedToPartner" : "pb.owesCompany"]),
+            new(L["prt.forTrips"], Fmt.Money(p.Kind == CashCodes.Repayment ? p.Amount + p.PreviousBalance : p.Amount - p.PreviousBalance)),
+        } : []),
         new(L["cash.method"], L["pay." + p.PaymentMethod]),
         new(L["cash.account"], p.Account.Name),
         new(L["cash.reference"], p.Reference),

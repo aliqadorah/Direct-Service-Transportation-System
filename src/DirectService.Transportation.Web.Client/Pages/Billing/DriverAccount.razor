@@ -2,7 +2,8 @@
 @*
   SCR-27 driver account (FR-076, FR-083): unsettled wages, open advances, net due and the last settlement; tabs for the open trips, open
   advances, settlements and the statement of a period with its running balance (export Excel / PDF). Actions: new advance (drv.advance),
-  new settlement (drv.settle), statement.
+  new settlement (drv.settle), statement. DT-276: the previous balance from manual / opening entries has its own figure and tab (with the
+  entries) and can be settled like open items; "Nothing open to settle" only when trips, advances and that balance are all zero.
 *@
 @inject Api Api
 @inject Loc L
@@ -10,7 +11,7 @@
 @inject Downloads Files
 @inject NavigationManager Nav
 
-<LiveRefresh EntityTypes="@(["TRN.Trip", "TRN.Advance", "TRN.Settlement"])" OnChange="Load" />
+<LiveRefresh EntityTypes="@(["TRN.Trip", "TRN.Advance", "TRN.Settlement", "ACC.JournalEntry"])" OnChange="Load" />
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
     <Empty><NotFoundView /></Empty>
     <ChildContent>
@@ -20,13 +21,15 @@
             <Actions>
                 <Btn Icon="print" Text="@L["md.statement"]" OnClick="@(() => _tab = "statement")" />
                 @if (Shell.Can(PermissionKeys.DrvAdvance)) {<Btn Icon="cash" Text="@L["drv.advance"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}/advance")" />}
-                @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Text="@L["drv.settle"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}/settle")" Disabled="@(a.OpenTrips.Count == 0 && a.OpenAdvances.Count == 0)" />}
+                @if (Shell.Can(PermissionKeys.DrvSettle)) {<Btn Primary="true" Text="@L["drv.settle"]" Href="@NavModel.Href(Company, $"driver-accounts/{Id}/settle")" Disabled="@NothingOpen" />}
             </Actions>
         </PageHeader>
         <Figures Items="@([
             new Figure(L["md.unsettledWages"], Fmt.Money(a.Gross), L.F("drv.tripsCount", Fmt.Count(a.OpenTrips.Count))),
             new Figure(L["md.openAdvances"], Fmt.Money(a.AdvancesTotal), L.F("drv.advancesCount", Fmt.Count(a.OpenAdvances.Count))),
-            new Figure(L["md.netDue"], Fmt.Money(a.NetDue)),
+            .. (a.PreviousBalance != 0 ? new[] { new Figure(L["pb.tab"], Fmt.Money(Math.Abs(a.PreviousBalance)), L[a.PreviousBalance > 0 ? "pb.figureOwedTo" : "pb.figureOwes"]) } : []),
+            // DT-278: never a negative net — what the driver owes the company has its own label.
+            a.NetDue < 0 ? new Figure(L["drv.owesCompanyFigure"], Fmt.Money(-a.NetDue)) : new Figure(L["md.netDue"], Fmt.Money(a.NetDue)),
             new Figure(L["drv.lastSettlement"], last?.Number ?? "—", last is null ? null : Fmt.Date(last.SettlementDate, Shell.DateFormat)),
         ])" />
         <TabStrip Items="Tabs" @bind-Selected="_tab" Label="@a.Driver.Name" />
@@ -68,8 +71,12 @@
                 case "statement":
                     <StatementPanel Path="@($"drivers/{Uri.EscapeDataString(Id)}/statement")" />
                     break;
+                case "previous":
+                    <PreviousBalancePanel Company="@Company" Name="@a.Driver.Name" Amount="a.PreviousBalance" Entries="@(a.PreviousBalanceEntries ?? [])" />
+                    break;
                 default:
-                    @if (a.OpenTrips.Count == 0) {<EmptyState Icon="check" Title="@L["drv.noOpenTrips"]" Text="@L.F("drv.noOpenTripsText", a.Driver.Name)" />}
+                    @if (NothingOpen) {<EmptyState Icon="check" Title="@L["drv.noOpenTrips"]" Text="@L.F("drv.noOpenTripsText", a.Driver.Name)" />}
+                    else if (a.OpenTrips.Count == 0) {<EmptyState Icon="check" Title="@L["drv.noOpenTripsOnly"]" />}
                     else {<SettlementTripsGrid Trips="a.OpenTrips" Company="@Company" />}
                     break;
             }
@@ -89,8 +96,12 @@
     private IReadOnlyList<TabItem> Tabs =>
     [
         new("trips", L["md.openTrips"], _a?.OpenTrips.Count), new("advances", L["md.openAdvances"], _a?.OpenAdvances.Count),
+        .. (_a is { PreviousBalance: not 0 } ? new TabItem[] { new("previous", L["pb.tab"], _a.PreviousBalanceEntries?.Count) } : []),
         new("settlements", L["drv.settlements"], _a?.Settlements.Count), new("statement", L["md.statement"]),
     ];
+
+    /// <summary>DT-276: nothing to settle only when there are no open trips or advances and no previous balance.</summary>
+    private bool NothingOpen => _a is { OpenTrips.Count: 0, OpenAdvances.Count: 0, PreviousBalance: 0 };
 
     protected override Task OnParametersSetAsync() => Load();
 
@@ -98,7 +109,10 @@
     {
         try
         {
+            var first = _a is null;
             _a = await Api.GetAsync<DriverAccountResponse>(Api.C($"drivers/{Uri.EscapeDataString(Id)}/account"));
+            // Only a previous balance is open: show it first.
+            if (first && _tab == "trips" && _a is { OpenTrips.Count: 0, OpenAdvances.Count: 0, PreviousBalance: not 0 }) _tab = "previous";
             _state = LoadState.Ready;
         }
         catch (ApiException e) when (e.Problem.Status == 404) { _state = LoadState.Empty; }

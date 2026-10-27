@@ -187,25 +187,28 @@ public sealed record VoidRequest(string? Reason, string? RowVersion);
 public sealed record RowVersionRequest(string? RowVersion);
 
 /// <summary>
-/// Journal list filters (FR-102, FR-115). Months are YYYY-MM; status: Posted, Reversed, Void, or Draft (revision 6: drafts only; with no
-/// status, drafts are listed first). <paramref name="Search"/> matches the number, the description, the entry's reference or a line reference (DT-254).
+/// Journal list filters (FR-102, FR-115). Months are YYYY-MM; status: Posted, Reversed, Void, Cancelled (DT-279: Reversed or Void — every
+/// cancelled entry), or Draft (revision 6: drafts only; with no status, drafts are listed first). <paramref name="Search"/> matches the number, the description, the entry's reference or a line reference (DT-254).
 /// </summary>
 public sealed record JournalQuery(
     string? PeriodFrom, string? PeriodTo, string? Number, string? AccountId, string? CostCentreId, string? PartyType, string? PartyId,
     bool? Manual, string? Status, string? SourceType, int Page = 1, int PageSize = 50, string? Search = null);
 
-/// <summary>A row of the journal list; a draft (Status "Draft") has no number and its <paramref name="Id"/> is the draft's.</summary>
+/// <summary>
+/// A row of the journal list; a draft (Status "Draft") has no number and its <paramref name="Id"/> is the draft's. Owner findings 27 Oct 2026
+/// (DT-279): <paramref name="CancelReason"/> — why a cancelled entry (Reversed / Void) was cancelled, in the reader's language.
+/// </summary>
 public sealed record JournalEntrySummary(
     string Id, string Number, DateOnly EntryDate, string PeriodMonth, string Description, string SourceModule, string? SourceType,
     bool IsManual, string Status, decimal TotalDebit, decimal TotalCredit, string? ReversesEntryNumber, string? ReversedByEntryNumber,
-    string? Reference = null);
+    string? Reference = null, string? CancelReason = null);
 
 public sealed record JournalEntryResponse(
     string Id, string Number, DateOnly EntryDate, string PeriodMonth, string Description, string SourceModule, string? SourceType,
     SourceDocumentRef? Source, bool IsManual, string Status, decimal TotalDebit, decimal TotalCredit,
     EntryLinkRef? ReversesEntry, EntryLinkRef? ReversedByEntry, string? VoidReason, DateTime? VoidedAt, string? VoidedBy,
     string? ExportBatchNo, DateTime CreatedAt, string? CreatedBy, IReadOnlyList<JournalLineResponse> Lines, string RowVersion,
-    string? Reference = null);
+    string? Reference = null, string? CancelReason = null);
 
 public sealed record EntryLinkRef(string Id, string Number);
 

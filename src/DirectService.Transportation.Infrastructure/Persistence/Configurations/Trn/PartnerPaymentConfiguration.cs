@@ -13,7 +13,7 @@ internal sealed class PartnerPaymentConfiguration : IEntityTypeConfiguration<Par
     {
         builder.ToTable("TRN_PartnerPayments", "trn", t =>
         {
-            t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0");
+            t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0 OR ([Amount] = 0 AND [Kind] = 'Payment' AND [PreviousBalance] < 0)");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_Kind", "[Kind] IN ('Payment','Repayment')");
             t.HasCheckConstraint("CK_TRN_PartnerPayments_DeductedAmount", "[DeductedAmount] >= 0 AND ([Kind] = 'Payment' OR [DeductedAmount] = 0)");
@@ -75,6 +75,14 @@ internal sealed class PartnerPaymentConfiguration : IEntityTypeConfiguration<Par
             .HasColumnName("DeductedAmount")
             .HasColumnType("decimal(18,3)")
             .HasColumnOrder(28)
+            .HasPrecision(18, 3)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
+        builder.Property(e => e.PreviousBalance)
+            .HasColumnName("PreviousBalance")
+            .HasColumnType("decimal(18,3)")
+            .HasColumnOrder(29)
             .HasPrecision(18, 3)
             .IsRequired(true)
             .HasDefaultValueSql("0")

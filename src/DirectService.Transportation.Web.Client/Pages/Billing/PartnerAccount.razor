@@ -2,7 +2,9 @@
 @*
   SCR-28 partner account (FR-084, FR-088): partner trips with their cost, payments and the balance due; tabs for the trips, payments and the
   statement of a period (Excel / PDF). New payment (drv.settle) — never above the balance due (FR-085). DT-228: a partner who owes the company
-  (balance below zero, e.g. a trip voided after payment) — "Record repayment" by cash, bank transfer or CliQ.
+  (balance below zero, e.g. a trip voided after payment) — "Record repayment" by cash, bank transfer or CliQ. DT-277: the previous balance from
+  manual / opening entries has its own figure and tab; "Paid" is what payments paid for the trips; a negative balance is shown as what the
+  partner owes the company.
 *@
 @using DirectService.Transportation.Contracts.Trips
 @using DirectService.Transportation.Web.Client.Pages.Trips
@@ -25,7 +27,9 @@
                 }
             </Actions>
         </PageHeader>
-        <Figures Items="@([new Figure(L["prt.trips"], Fmt.Count(a.Trips)), new Figure(L["prt.cost"], Fmt.Money(a.Cost)), new Figure(L["prt.paid"], Fmt.Money(a.Paid)), new Figure(L["prt.balance"], Fmt.Money(a.BalanceDue))])" />
+        <Figures Items="@([new Figure(L["prt.trips"], Fmt.Count(a.Trips)), new Figure(L["prt.cost"], Fmt.Money(a.Cost)), new Figure(L["prt.paid"], Fmt.Money(a.Paid)),
+            .. (a.PreviousBalance != 0 ? new[] { new Figure(L["pb.tab"], Fmt.Money(Math.Abs(a.PreviousBalance)), L[a.PreviousBalance > 0 ? "pb.figureOwedTo" : "pb.figureOwes"]) } : []),
+            a.BalanceDue < 0 ? new Figure(L["prt.owesCompanyFigure"], Fmt.Money(-a.BalanceDue)) : new Figure(L["prt.balance"], Fmt.Money(a.BalanceDue))])" />
         @if (a.BalanceDue < 0)
         {
             @* DT-230: the part chosen to be deducted from the next payment(s), and the part to be returned. *@
@@ -56,6 +60,9 @@
                     break;
                 case "statement":
                     <StatementPanel Path="@($"partners/{Uri.EscapeDataString(Id)}/statement")" />
+                    break;
+                case "previous":
+                    <PreviousBalancePanel Company="@Company" Name="@a.Partner.Name" Amount="a.PreviousBalance" Entries="@(a.PreviousBalanceEntries ?? [])" Partner="true" />
                     break;
                 default:
                     @if (!Shell.Can(PermissionKeys.TripsView)) {<p class="muted pad" style="margin:0">@L["prt.tripsNeedView"]</p>}
@@ -95,12 +102,13 @@
     [Parameter] public string Company { get; set; } = "";
     [Parameter] public string Id { get; set; } = "";
 
-    private IReadOnlyList<TabItem> Tabs => [new("trips", L["prt.trips"], _a?.Trips), new("payments", L["prt.payments"], _a?.RecentPayments.Count), new("statement", L["md.statement"])];
+    private IReadOnlyList<TabItem> Tabs => [new("trips", L["prt.trips"], _a?.Trips), new("payments", L["prt.payments"], _a?.RecentPayments.Count),
+        .. (_a is { PreviousBalance: not 0 } ? new TabItem[] { new("previous", L["pb.tab"], _a.PreviousBalanceEntries?.Count) } : []), new("statement", L["md.statement"])];
 
     protected override Task OnParametersSetAsync()
     {
         // DT-272: the trip view links straight to the statement (?tab=statement).
-        if (ListUrl.Read(Nav)["tab"] is ("trips" or "payments" or "statement") and var tab) _tab = tab;
+        if (ListUrl.Read(Nav)["tab"] is ("trips" or "payments" or "statement" or "previous") and var tab) _tab = tab;
         return Load();
     }
 

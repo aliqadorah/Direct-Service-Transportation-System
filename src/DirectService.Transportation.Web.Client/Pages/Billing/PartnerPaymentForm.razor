@@ -3,7 +3,9 @@
 @*
   SCR-28 partner payment (FR-085, FR-086): partner (with its balance due shown), date, amount — refused above the balance due —, method,
   cash box or bank account, reference, notes; "Save & print" opens the payment voucher. DT-228: <c>?kind=repayment</c> records money received
-  from a partner who owes the company (balance below zero) — never above what it owes; the voucher is then a receipt voucher.
+  from a partner who owes the company (balance below zero) — never above what it owes; the voucher is then a receipt voucher. DT-277: the
+  partner's previous balance from manual / opening entries is settled with it (ticked by default): set off against the trips (a payment may
+  then be 0) or paid first; a repayment settles only what the partner owes.
 *@
 @inject Api Api
 @inject Loc L
@@ -29,10 +31,15 @@
         else {<Banner Tone="Tone.Info" Text="@L.F("prt.balanceDue", a.Partner.Name, Fmt.Money(a.BalanceDue))" />}
     }
     @if (Repayment) {<p class="help" style="margin:0">@L["prt.repayHelp"]</p>}
+    @if (_account is { PreviousBalance: not 0 } pa && (!Repayment || pa.PreviousBalance < 0))
+    {
+        <PreviousBalancePanel Company="@Company" Name="@pa.Partner.Name" Amount="pa.PreviousBalance" Entries="@(pa.PreviousBalanceEntries ?? [])" Partner="true"
+                              Include="_includePrevious" IncludeChanged="v => _includePrevious = v" />
+    }
     <div class="fg" style="grid-template-columns:repeat(3,minmax(0,1fr))">
         <ComboField TValue="string?" @bind-Value="_m.PartnerId" Options="Lookups.Partners" Label="@L["md.partner"]" Required="true" Span="2" OnSelected="_ => LoadAccount()" />
         <DateField @bind-Value="_m.PaymentDate" Label="@L["trip.date"]" Required="true" />
-        <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="0.001m" />
+        <NumberField @bind-Value="_m.Amount" Label="@L["inv.amount"]" Required="true" Min="@(OffsetOnly ? 0m : 0.001m)" />
         <PaymentFields Model="_m" />
         <TextField @bind-Value="_m.Notes" Label="@L["md.notes"]" MaxLength="500" Span="2" />
     </div>
@@ -54,6 +61,10 @@
     private bool Repayment => string.Equals(Kind, "repayment", StringComparison.OrdinalIgnoreCase);
 
     private bool CanSave => _postingReady && !_saving && Shell.Can(PermissionKeys.DrvSettle);
+
+    // DT-277: settle the previous balance with this payment (ticked by default); a payment of 0 only sets off what the partner owes.
+    private bool _includePrevious = true;
+    private bool OffsetOnly => !Repayment && _includePrevious && _account is { PreviousBalance: < 0 };
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,7 +92,7 @@
         try
         {
             var r = await Api.PostAsync<PartnerPaymentDetails>(Api.C("partner-payments"), new PartnerPaymentRequest(_m.PartnerId, _m.PaymentDate, _m.Amount, _m.PaymentMethod,
-                _m.CashBox(), _m.Bank(), _m.Ref(), string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId, Repayment ? CashCodes.Repayment : CashCodes.Payment));
+                _m.CashBox(), _m.Bank(), _m.Ref(), string.IsNullOrWhiteSpace(_m.Notes) ? null : _m.Notes.Trim(), _m.ClientId, Repayment ? CashCodes.Repayment : CashCodes.Payment, _includePrevious));
             var p = r.Payment;
             Toasts.Success(L.F(Repayment ? "prt.savedRepayment" : "prt.saved", p.Number, Fmt.Money(p.Amount)), L["ui.print"], NavModel.Href(Company, $"print/partner-payment/{p.Id}"));
             Nav.NavigateTo(NavModel.Href(Company, print ? $"print/partner-payment/{p.Id}" : $"partner-accounts/payments/{p.Id}"));

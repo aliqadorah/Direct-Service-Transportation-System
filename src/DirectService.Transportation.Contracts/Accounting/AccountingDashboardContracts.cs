@@ -13,14 +13,22 @@ public sealed record AccountingDashboardResponse(int Year, int Month, DateOnly M
     BudgetUsage? Budget, IReadOnlyList<MonthAmounts>? Trend, AgeingBuckets? ReceivablesAgeing, IReadOnlyList<AccountingReminder> Reminders, DateTime GeneratedAt);
 
 /// <summary>Key figures; a figure the user may not see is null.</summary>
-public sealed record AccountingFigures(decimal? CashAndBank, decimal? Receivables, decimal? ReceivablesUnapplied, Payables? Payables, PeriodResult? Month, PeriodResult? YearToDate);
+public sealed record AccountingFigures(decimal? CashAndBank, decimal? Receivables, decimal? ReceivablesUnapplied, Payables? Payables, PeriodResult? Month, PeriodResult? YearToDate,
+    OwedToUs? OwedToUs = null);
 
 /// <summary>
 /// What is owed (owner decision 18 Oct 2026, DT-200): to suppliers (open supplier bills, as the payables ageing), to drivers (net due of the
 /// driver accounts, RPT-19) and to partners (balance due of the partner accounts, RPT-20); a line the user may not open is null; the total
-/// is the sum of the lines shown.
+/// is the sum of the lines shown. Owner findings 27 Oct 2026 (DT-278): only the parties the company must pay (balances above zero, never
+/// negative); those who owe the company are in <see cref="OwedToUs"/>.
 /// </summary>
 public sealed record Payables(decimal? Suppliers, decimal? Drivers, decimal? Partners, decimal Total);
+
+/// <summary>
+/// DT-278: what suppliers, drivers and partners owe the company (their balances below zero, as positive amounts) — e.g. a driver's opening
+/// advance; a line the user may not open is null, the total is the sum of the lines shown.
+/// </summary>
+public sealed record OwedToUs(decimal? Suppliers, decimal? Drivers, decimal? Partners, decimal Total);
 
 /// <summary>Revenue, expenses and net profit (revenue − expenses) of a period, from the posted ledger.</summary>
 public sealed record PeriodResult(decimal Revenue, decimal Expenses, decimal NetProfit);

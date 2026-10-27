@@ -4,7 +4,9 @@
   (untick to leave for later); deduction lines (shortage, fine, other) with suggestions from shortage trips (FR-078, DT-96); net = wages −
   advances − deductions, never below zero; method and cash box / bank for the net. Confirming posts the entry and locks the items until the
   settlement is voided. DT-228: when advances and deductions exceed the wages, "Repayment from the driver" — amount (all, or part of the
-  shortfall: the rest stays an open advance for the next settlement), method, cash box / bank and reference (bank transfer, CliQ).
+  shortfall: the rest stays an open advance for the next settlement), method, cash box / bank and reference (bank transfer, CliQ). DT-276: the
+  driver's previous balance from manual / opening entries up to the date is a line of its own (ticked by default): deducted like an advance
+  when the driver owes it, added to the net when it is owed to the driver; a settlement may settle only that balance.
 *@
 @inject Api Api
 @inject Loc L
@@ -28,7 +30,7 @@
                 <ErrorSummary @ref="_summary" Extra="_extra" />
                 <Box NoPad="true">
                     <div class="bh"><span>@L.F("drv.openTripsTo", Fmt.Date(p.Date, Shell.DateFormat))</span><span class="a"><bdi class="num">@L.F("drv.selectedCount", Fmt.Count(_trips.Count))</bdi></span></div>
-                    @if (p.Trips.Count == 0) {<EmptyState Icon="check" Title="@L["drv.noOpenTrips"]" />}
+                    @if (p.Trips.Count == 0) {<EmptyState Icon="check" Title="@L[p.Advances.Count == 0 && p.PreviousBalance == 0 ? "drv.noOpenTrips" : "drv.noOpenTripsOnly"]" />}
                     else {<SettlementTripsGrid Trips="p.Trips" Company="@Company" Selectable="true" Selected="_trips" SelectedChanged="PickTrips" OpenTrips="false" />}
                 </Box>
                 <Box Title="@L["md.openAdvances"]" NoPad="true">
@@ -44,6 +46,11 @@
                         </DataGrid>
                     }
                 </Box>
+                @if (p.PreviousBalance != 0)
+                {
+                    <PreviousBalancePanel Company="@Company" Name="@p.Driver.Name" Amount="p.PreviousBalance" Entries="@(p.PreviousBalanceEntries ?? [])"
+                                          Include="_includePrevious" IncludeChanged="v => _includePrevious = v" />
+                }
                 <Box Title="@L["drv.deductions"]">
                     <Actions>
                         @if (Suggestions.Count > 0) {<Btn Small="true" Icon="scale" Text="@L["drv.suggest"]" OnClick="Suggest" />}
@@ -69,6 +76,7 @@
                 <div class="ln"><span>@L["drv.gross"]</span><Money Value="Gross" /></div>
                 <div class="ln"><span>@L["md.openAdvances"]</span><Money Value="-AdvancesTotal" /></div>
                 <div class="ln"><span>@L["drv.deductions"]</span><Money Value="-DeductionsTotal" /></div>
+                @if (Previous != 0) {<div class="ln pb-line"><span>@L["pb.title"]</span><Money Value="Previous" /></div>}
                 <div class="ln tot big" style="@(Net < 0 ? "color:var(--err)" : null)"><span>@L["drv.net"]</span><Money Value="Net" /></div>
                 <DateField @bind-Value="_m.SettlementDate" Label="@L["drv.settlementDate"]" Required="true" @bind-Value:after="Load" Help="@L["drv.dateHelp"]" />
                 @if (Net < 0)
@@ -121,7 +129,11 @@
     private decimal Gross => _p?.Trips.Where(t => _trips.Contains(t.Id)).Sum(t => t.DriverWage) ?? 0;
     private decimal AdvancesTotal => _p?.Advances.Where(a => _advances.Contains(a.Id)).Sum(a => a.Amount) ?? 0;
     private decimal DeductionsTotal => _m.Deductions.Sum(d => d.Amount ?? 0);
-    private decimal Net => Gross - AdvancesTotal - DeductionsTotal;
+    private decimal Net => Gross - AdvancesTotal - DeductionsTotal + Previous;
+
+    // DT-276: the previous balance from manual / opening entries, when ticked (signed: + owed to the driver, − owed by the driver).
+    private bool _includePrevious = true;
+    private decimal Previous => _includePrevious ? _p?.PreviousBalance ?? 0 : 0;
 
     // DT-228: what the driver repays now — the whole shortfall unless changed; the rest is carried as an open advance.
     private decimal? _repaid;
@@ -129,7 +141,7 @@
     private decimal Carried => Net < 0 && Repaid is decimal r && r > 0 && r <= -Net ? -Net - r : 0;
     private bool RepaidInvalid => Net < 0 && (Repaid is not decimal r || r <= 0 || r > -Net);
 
-    private bool CanSave => _postingReady && !_saving && (Net >= 0 || !RepaidInvalid) && (_trips.Count > 0 || _advances.Count > 0) && Shell.Can(PermissionKeys.DrvSettle);
+    private bool CanSave => _postingReady && !_saving && (Net >= 0 || !RepaidInvalid) && (_trips.Count > 0 || _advances.Count > 0 || Previous != 0) && Shell.Can(PermissionKeys.DrvSettle);
 
     private IReadOnlyList<SuggestedDeduction> Suggestions => _p?.Suggestions.Where(s => _trips.Contains(s.TripId)).ToList() ?? [];
 
@@ -177,7 +189,7 @@
             var r = await Api.PostAsync<SettlementDetails>(Api.C("settlements"), new SettlementRequest(DriverId, _m.SettlementDate,
                 _trips.Select(k => k.ToString()!).ToList(), _advances.Select(k => k.ToString()!).ToList(),
                 _m.Deductions.Where(d => d.Amount is > 0).Select(d => new SettlementDeductionRequest(d.Type, d.Amount, string.IsNullOrWhiteSpace(d.Note) ? null : d.Note.Trim())).ToList(),
-                _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(), _m.ClientId, Net < 0 ? Repaid : null));
+                _m.PaymentMethod, _m.CashBox(), _m.Bank(), _m.Ref(), _m.ClientId, Net < 0 ? Repaid : null, _includePrevious));
             var s = r.Settlement;
             Toasts.Success(s.RepaidAmount > 0 ? L.F("drv.settledRepaid", s.Number, Fmt.Money(s.RepaidAmount)) : L.F("drv.settled", s.Number, Fmt.Money(s.NetPayable)),
                 L["ui.print"], NavModel.Href(Company, $"print/settlement/{s.Id}"));

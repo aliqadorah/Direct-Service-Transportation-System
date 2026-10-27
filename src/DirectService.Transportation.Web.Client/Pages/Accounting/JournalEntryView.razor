@@ -31,7 +31,7 @@
             </Actions>
         </PageHeader>
         @if (e.Status == "Void") {<Banner Tone="Tone.Err" Text="@L.F("je.voidBanner", e.VoidReason ?? "", e.VoidedBy ?? "", Fmt.DateTime(e.VoidedAt?.ToLocalTime(), Shell.DateFormat))" />}
-        @if (e.ReversedByEntry is { } rb) {<Banner Tone="Tone.Lock" Text="@L.F("je.reversedBanner", rb.Number)"><Actions><a href="@NavModel.Href(Company, $"accounting/journal/{rb.Id}")">@L["ui.open"]</a></Actions></Banner>}
+        @if (e.ReversedByEntry is { } rb) {<Banner Tone="Tone.Lock" Text="@(e.CancelReason is { } why ? L.F("je.cancelledBanner", rb.Number, why) : L.F("je.reversedBanner", rb.Number))"><Actions><a href="@NavModel.Href(Company, $"accounting/journal/{rb.Id}")">@L["ui.open"]</a></Actions></Banner>}
         @if (e.ReversesEntry is { } ro) {<Banner Tone="Tone.Info" Text="@L.F("je.reversesBanner", ro.Number)"><Actions><a href="@NavModel.Href(Company, $"accounting/journal/{ro.Id}")">@L["ui.open"]</a></Actions></Banner>}
         <Box>
             <KeyValues Columns="4" Items="Details(e)" />

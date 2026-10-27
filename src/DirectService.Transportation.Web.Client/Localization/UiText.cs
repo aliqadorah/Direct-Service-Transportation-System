@@ -857,7 +857,7 @@ public static partial class UiText
         ["st.closed"] = ("مغلقة", "Closed"),
         ["st.posted"] = ("مرحّل", "Posted"),
         ["st.pending"] = ("معلّق", "Pending"),
-        ["st.reversed"] = ("معكوس", "Reversed"),
+        ["st.reversed"] = ("أُلغي بقيد عكسي", "Cancelled by reversal"),   // journal entries only (DT-279)
         ["st.active"] = ("نشط", "Active"),
         ["st.archived"] = ("مؤرشف", "Archived"),
         ["st.open"] = ("مفتوحة", "Open"),

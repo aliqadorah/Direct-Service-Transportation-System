@@ -235,7 +235,7 @@ public static class ErrorCatalog
         [ErrorCodes.EmailChangeLimitAdmin] = ("وصلت إلى الحد اليومي لتغييرات البريد التي تبدؤها ({0} في 24 ساعة). حاول لاحقاً.", "You reached the daily limit of email changes you can start ({0} in 24 hours). Try again later."),
         [ErrorCodes.EmailChangeLimitUser] = ("وصل هذا المستخدم إلى الحد اليومي لتغييرات البريد ({0} في 24 ساعة). حاول لاحقاً.", "This user reached the daily limit of email changes ({0} in 24 hours). Try again later."),
         [ErrorCodes.PartnerRepaymentExceedsOwed] = ("المبلغ {0} أكبر مما على الشريك للشركة ({1}).", "The amount {0} is above what the partner owes the company ({1})."),
-        [ErrorCodes.SettlementEmpty] = ("لا توجد رحلات أو سلف مفتوحة مختارة للتسوية.", "No open trips or advances are selected for the settlement."),
+        [ErrorCodes.SettlementEmpty] = ("لا توجد رحلات أو سلف مفتوحة مختارة للتسوية، ولا رصيد سابق من قيود يدوية أو افتتاحية.", "No open trips or advances are selected for the settlement, and there is no previous balance from manual or opening entries."),
         [ErrorCodes.SettlementItemUnavailable] = ("البند {0} ليس بنداً مفتوحاً لهذا السائق حتى تاريخ التسوية.", "Item {0} is not an open item of this driver up to the settlement date."),
         [ErrorCodes.PartnerPaymentIsVoid] = ("دفعة الشريك {0} ملغاة.", "Partner payment {0} is void."),
         [ErrorCodes.PartnerPaymentExceedsBalance] = ("المبلغ {0} أكبر من الرصيد المستحق للشريك {1}.", "The amount {0} is above the partner balance due {1}."),

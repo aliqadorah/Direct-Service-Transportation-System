@@ -10637,6 +10637,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("PaymentMethod")
                         .HasColumnOrder(8);
 
+                    b.Property<decimal>("PreviousBalance")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("PreviousBalance")
+                        .HasColumnOrder(29)
+                        .HasDefaultValueSql("0", "DF_TRN_PartnerPayments_PreviousBalance");
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("PublicId")
@@ -10721,7 +10728,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     b.ToTable("TRN_PartnerPayments", "trn", t =>
                         {
-                            t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0");
+                            t.HasCheckConstraint("CK_TRN_PartnerPayments_Amount", "[Amount] > 0 OR ([Amount] = 0 AND [Kind] = 'Payment' AND [PreviousBalance] < 0)");
 
                             t.HasCheckConstraint("CK_TRN_PartnerPayments_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
 
@@ -10772,6 +10779,139 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.ToTable((string)null);
 
                     b.ToView("TRN_PartnerPaymentBoundary", "trn");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PreviousBalanceItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("Id")
+                        .HasColumnOrder(0);
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AccountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("AccountId")
+                        .HasColumnOrder(7);
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Amount")
+                        .HasColumnOrder(8);
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId")
+                        .HasColumnOrder(3);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("CreatedAt")
+                        .HasColumnOrder(9)
+                        .HasDefaultValueSql("SYSUTCDATETIME()", "DF_TRN_PreviousBalanceItems_CreatedAt");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CreatedBy")
+                        .HasColumnOrder(10);
+
+                    b.Property<string>("DeleteReason")
+                        .HasMaxLength(500)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("DeleteReason")
+                        .HasColumnOrder(16);
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("DeletedAt")
+                        .HasColumnOrder(14);
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("DeletedBy")
+                        .HasColumnOrder(15);
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("IsDeleted")
+                        .HasColumnOrder(13)
+                        .HasDefaultValueSql("0", "DF_TRN_PreviousBalanceItems_IsDeleted");
+
+                    b.Property<long>("JournalEntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("JournalEntryId")
+                        .HasColumnOrder(6);
+
+                    b.Property<long?>("PartnerPaymentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PartnerPaymentId")
+                        .HasColumnOrder(5);
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("PublicId")
+                        .HasColumnOrder(1)
+                        .HasDefaultValueSql("NEWID()", "DF_TRN_PreviousBalanceItems_PublicId");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("RowVersion")
+                        .HasColumnOrder(17);
+
+                    b.Property<long?>("SettlementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("SettlementId")
+                        .HasColumnOrder(4);
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId")
+                        .HasColumnOrder(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("UpdatedAt")
+                        .HasColumnOrder(11);
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("UpdatedBy")
+                        .HasColumnOrder(12);
+
+                    b.HasKey("Id")
+                        .HasName("PK_TRN_PreviousBalanceItems");
+
+                    b.HasIndex(new[] { "AccountId" }, "IX_TRN_PreviousBalanceItems_AccountId");
+
+                    b.HasIndex(new[] { "CompanyId" }, "IX_TRN_PreviousBalanceItems_CompanyId")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex(new[] { "JournalEntryId", "AccountId" }, "IX_TRN_PreviousBalanceItems_JournalEntryId_AccountId");
+
+                    b.HasIndex(new[] { "PartnerPaymentId" }, "IX_TRN_PreviousBalanceItems_PartnerPaymentId")
+                        .HasFilter("[PartnerPaymentId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "SettlementId" }, "IX_TRN_PreviousBalanceItems_SettlementId")
+                        .HasFilter("[SettlementId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "PublicId" }, "UX_TRN_PreviousBalanceItems_PublicId")
+                        .IsUnique();
+
+                    b.ToTable("TRN_PreviousBalanceItems", "trn", t =>
+                        {
+                            t.HasCheckConstraint("CK_TRN_PreviousBalanceItems_Amount", "[Amount] <> 0");
+
+                            t.HasCheckConstraint("CK_TRN_PreviousBalanceItems_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_TRN_PreviousBalanceItems_Document", "([SettlementId] IS NOT NULL AND [PartnerPaymentId] IS NULL) OR ([SettlementId] IS NULL AND [PartnerPaymentId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.RateHistory", b =>
@@ -11357,6 +11497,13 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("PaymentMethod")
                         .HasColumnOrder(11);
 
+                    b.Property<decimal>("PreviousBalance")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("PreviousBalance")
+                        .HasColumnOrder(31)
+                        .HasDefaultValueSql("0", "DF_TRN_Settlements_PreviousBalance");
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("PublicId")
@@ -11463,7 +11610,7 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_TRN_Settlements_GrossWages", "[GrossWages] >= 0");
 
-                            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [RepaidAmount] + [CarriedForward]");
+                            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [PreviousBalance] + [RepaidAmount] + [CarriedForward]");
 
                             t.HasCheckConstraint("CK_TRN_Settlements_PaymentMethod", "[PaymentMethod] IN ('Cash','Bank','CliQ')");
 
@@ -15324,6 +15471,75 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("Partner");
 
                     b.Navigation("VoidedByUser");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PreviousBalanceItem", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Accounts_AccountId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Companies_CompanyId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Users_CreatedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Users_DeletedBy");
+
+                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_JournalEntries_JournalEntryId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.PartnerPayment", "PartnerPayment")
+                        .WithMany()
+                        .HasForeignKey("PartnerPaymentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_TRN_PartnerPayments_PartnerPaymentId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Settlement", "Settlement")
+                        .WithMany()
+                        .HasForeignKey("SettlementId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_TRN_Settlements_SettlementId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Tenants_TenantId");
+
+                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TRN_PreviousBalanceItems_Users_UpdatedBy");
+
+                    b.Navigation("Account");
+
+                    b.Navigation("JournalEntry");
+
+                    b.Navigation("PartnerPayment");
+
+                    b.Navigation("Settlement");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.RateHistory", b =>

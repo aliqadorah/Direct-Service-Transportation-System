@@ -32,6 +32,12 @@ public class Settlement : AuditableEntity, ITenantScoped, ICompanyScoped, ICashD
     public decimal RepaidAmount { get; set; }
     /// <summary>Revision 6 (DT-228): the unpaid rest after a partial repayment, carried as a new open advance to the next settlement.</summary>
     public decimal CarriedForward { get; set; }
+    /// <summary>
+    /// Revision 6 §B15 (DT-276): the driver's balance from manual / opening journal entries settled with this settlement (signed: above zero owed
+    /// to the driver, below zero owed by the driver); per account in <see cref="PreviousBalanceItem"/>. NetPayable = GrossWages − AdvancesTotal
+    /// − DeductionsTotal + PreviousBalance (+ RepaidAmount + CarriedForward when that is below zero).
+    /// </summary>
+    public decimal PreviousBalance { get; set; }
     /// <summary>How the money was paid or received.</summary>
     public string PaymentMethod { get; set; } = string.Empty;
     /// <summary>Cash box the money came from or went to.</summary>

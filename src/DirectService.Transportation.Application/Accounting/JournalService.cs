@@ -22,6 +22,9 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
 {
     public const string EntityType = "ACC.JournalEntry";
 
+    /// <summary>DT-279: the list filter for every cancelled entry — Reversed (its document was voided or changed, or the entry edited) or Void.</summary>
+    public const string Cancelled = "Cancelled";
+
     // ------------------------------------------------------------ manual entries
 
     public async Task<JournalEntryResponse> CreateManualAsync(ManualEntryRequest r, CancellationToken ct)
@@ -166,14 +169,16 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             .Skip(entrySkip).Take(entryTake)
             .Select(e => new
             {
-                e.PublicId, e.Number, e.EntryDate, e.PeriodMonth, e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status,
-                e.TotalDebit, e.TotalCredit, e.Reference,
+                e.Id, e.PublicId, e.Number, e.EntryDate, e.PeriodMonth, e.Description, e.SourceModule, e.SourceType, e.SourceId, e.IsManual, e.Status,
+                e.TotalDebit, e.TotalCredit, e.Reference, e.VoidReason,
                 Reverses = e.ReversesEntry == null ? null : e.ReversesEntry.Number,
                 ReversedBy = e.ReversedByEntry == null ? null : e.ReversedByEntry.Number,
             })
             .ToListAsync(ct).ConfigureAwait(false);
+        var reasons = await CancelReasonsAsync(rows.Select(e => new CancelRow(e.Id, e.Status, e.IsManual, e.SourceType, e.SourceId, e.VoidReason)).ToList(), ct).ConfigureAwait(false);
         var items = fromDrafts.Concat(rows.Select(e => new JournalEntrySummary(tokens.Encode<JournalEntry>(e.PublicId), e.Number, e.EntryDate, e.PeriodMonth,
-            e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status, e.TotalDebit, e.TotalCredit, e.Reverses, e.ReversedBy, e.Reference))).ToList();
+            e.Description, e.SourceModule, e.SourceType, e.IsManual, e.Status, e.TotalDebit, e.TotalCredit, e.Reverses, e.ReversedBy, e.Reference,
+            reasons.GetValueOrDefault(e.Id)))).ToList();
         return new PagedResult<JournalEntrySummary>(items, page.SafePage, page.SafePageSize, entryTotal + draftRows.Count);
     }
 
@@ -203,6 +208,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             new(L("الحساب", "Account")), new(L("مدين", "Debit"), ReportValue.Money), new(L("دائن", "Credit"), ReportValue.Money), new(L("مركز الكلفة", "Cost centre")),
             new(L("الطرف", "Party")), new(L("ملاحظة", "Note")),
             new(L("مرجع السطر", "Line reference")), new(L("رمز الضريبة", "Tax code")), new(L("الضريبة", "Tax"), ReportValue.Money), new(L("سطر ضريبة آلي", "Automatic tax line")),
+            new(L("الإلغاء", "Cancellation")), new(L("سبب الإلغاء", "Cancel reason")),
         ];
         var rows = entries.SelectMany(e => e.Lines.Select(l => (IReadOnlyList<object?>)
         [
@@ -210,11 +216,13 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             l.LineNo, l.Account.Code, en ? l.Account.NameEn ?? l.Account.NameAr : l.Account.NameAr, l.Debit, l.Credit, l.CostCentre?.Name,
             l.Party?.Name, l.Note,
             l.Reference, l.TaxCode?.Code, l.TaxAmount, l.TaxForLineNo is int src ? L($"للسطر {src}", $"for line {src}") : null,
+            e.ReversedByEntry is { } by ? L($"أُلغي بالقيد {by.Number}", $"Cancelled by {by.Number}") : e.ReversesEntry is { } of ? L($"عكس القيد {of.Number}", $"Reversal of {of.Number}") : null,
+            e.CancelReason,
         ])).ToList();
         var filters = new List<(string, string)>();
         if (q.PeriodFrom is not null || q.PeriodTo is not null) filters.Add((L("الفترة", "Period"), $"{q.PeriodFrom ?? "…"} – {q.PeriodTo ?? "…"}"));
         if (q.SourceType is not null) filters.Add((L("المصدر", "Source"), q.SourceType));
-        if (q.Status is not null) filters.Add((L("الحالة", "Status"), q.Status));
+        if (q.Status is not null) filters.Add((L("الحالة", "Status"), q.Status == Cancelled ? L("ملغاة", "Cancelled") : q.Status));
         return await exporter.ExportAsync(new ReportTable(L("اليومية", "Journal"), filters, columns, rows), format, "journal", ct).ConfigureAwait(false);
     }
 
@@ -224,7 +232,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         new Validator()
             .Check(q.PeriodFrom is null || AccountingCodes.IsMonth(q.PeriodFrom), "periodFrom")
             .Check(q.PeriodTo is null || AccountingCodes.IsMonth(q.PeriodTo), "periodTo")
-            .Check(q.Status is null || q.Status is AccountingCodes.Posted or AccountingCodes.Reversed or AccountingCodes.Void or AccountingCodes.Draft, "status")
+            .Check(q.Status is null || q.Status is AccountingCodes.Posted or AccountingCodes.Reversed or AccountingCodes.Void or AccountingCodes.Draft or Cancelled, "status")
             .Check(q.PartyType is null || PartyResolver.Types.Contains(q.PartyType), "partyType")
             .ThrowIfInvalid();
         var query = db.Set<JournalEntry>().AsNoTracking();
@@ -237,7 +245,8 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             var number = TextNormalizer.CleanCode(q.Number)!;
             query = query.Where(e => e.Number.Contains(number));
         }
-        if (q.Status is not null) query = query.Where(e => e.Status == q.Status);
+        if (q.Status == Cancelled) query = query.Where(e => e.Status == AccountingCodes.Reversed || e.Status == AccountingCodes.Void);
+        else if (q.Status is not null) query = query.Where(e => e.Status == q.Status);
         if (TextNormalizer.CleanText(q.Search) is { } search)
         {
             var code = TextNormalizer.CleanCode(search) ?? search;
@@ -304,6 +313,8 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct).ConfigureAwait(false);
         var partyNames = await parties.DescribeAsync(lines.Select(l => (l.PartyType, l.PartyId)), ct).ConfigureAwait(false);
         var docs = await sources.DescribeAsync(entries.Select(e => (e.Entry.SourceModule, e.Entry.SourceType, e.Entry.SourceId)), ct).ConfigureAwait(false);
+        var reasons = await CancelReasonsAsync(entries.Select(x => new CancelRow(x.Entry.Id, x.Entry.Status, x.Entry.IsManual, x.Entry.SourceType, x.Entry.SourceId, x.Entry.VoidReason)).ToList(), ct)
+            .ConfigureAwait(false);
 
         var byEntry = lines.GroupBy(l => l.JournalEntryId).ToDictionary(g => g.Key, g => g.OrderBy(l => l.LineNo).Select(l =>
             new JournalLineResponse(l.LineNo,
@@ -331,8 +342,57 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
                 x.ReversedBy is null ? null : new EntryLinkRef(tokens.Encode<JournalEntry>(x.ReversedBy.PublicId), x.ReversedBy.Number),
                 e.VoidReason, e.VoidedAt, x.VoidedBy, x.BatchNo, e.CreatedAt,
                 e.CreatedBy is long cb ? creators.GetValueOrDefault(cb) : null,
-                byEntry.GetValueOrDefault(e.Id) ?? [], Convert.ToBase64String(e.RowVersion), e.Reference);
+                byEntry.GetValueOrDefault(e.Id) ?? [], Convert.ToBase64String(e.RowVersion), e.Reference, reasons.GetValueOrDefault(e.Id));
         }).ToList();
+    }
+
+    private sealed record CancelRow(long Id, string Status, bool IsManual, string? SourceType, long? SourceId, string? VoidReason);
+
+    private sealed record DocumentVoid(long Id, string? Reason);
+
+    /// <summary>
+    /// Owner findings 27 Oct 2026 (DT-279): why each cancelled entry (Reversed / Void) was cancelled, in the reader's language — a voided manual
+    /// entry: its reason; an edited manual entry: replaced by the corrected entry (D-05); the opening entry: the opening balances were saved
+    /// again; an automatic entry: the void reason of its source document, or "the document was changed and posted again" (trips, advances and
+    /// receipts re-post on a change).
+    /// </summary>
+    private async Task<Dictionary<long, string>> CancelReasonsAsync(IReadOnlyCollection<CancelRow> rows, CancellationToken ct)
+    {
+        var en = ctx.Language == "en";
+        string L(string ar, string e) => en ? e : ar;
+        var result = new Dictionary<long, string>();
+        var voids = new Dictionary<(string, long), string?>();
+        foreach (var g in rows.Where(r => r.Status == AccountingCodes.Reversed && !r.IsManual && r.SourceType is not null && r.SourceId is not null).GroupBy(r => r.SourceType!))
+        {
+            var ids = g.Select(r => r.SourceId!.Value).Distinct().ToList();
+            IQueryable<DocumentVoid>? q = g.Key switch
+            {
+                "Trip" => db.Set<Domain.Trn.Trip>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "Invoice" => db.Set<Domain.Trn.Invoice>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "CreditNote" => db.Set<Domain.Trn.CreditNote>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "Receipt" => db.Set<Domain.Trn.Receipt>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "Advance" => db.Set<Domain.Trn.Advance>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "Settlement" => db.Set<Domain.Trn.Settlement>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "PartnerPayment" => db.Set<Domain.Trn.PartnerPayment>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "SupplierBill" or "Receivable" => db.Set<ApArDocument>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "ApArPayment" => db.Set<ApArPayment>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                "ApArReturn" => db.Set<ApArReturn>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
+                _ => null,
+            };
+            if (q is null) continue;
+            foreach (var d in await q.AsNoTracking().ToListAsync(ct).ConfigureAwait(false)) voids[(g.Key, d.Id)] = d.Reason;
+        }
+        foreach (var r in rows)
+        {
+            if (r.Status == AccountingCodes.Void) result[r.Id] = r.VoidReason ?? L("أُلغي القيد", "Entry voided");
+            else if (r.Status != AccountingCodes.Reversed) continue;
+            else if (r.IsManual) result[r.Id] = L("عُدّل القيد: حلّ محلّه قيد مصحَّح", "Entry edited: a corrected entry replaced it");
+            else if (r.SourceType == AccountingCodes.SourceOpening) result[r.Id] = L("حُفظت الأرصدة الافتتاحية من جديد", "Opening balances saved again");
+            else if (r.SourceType is not null && r.SourceId is long sid && voids.TryGetValue((r.SourceType, sid), out var why) && why is not null)
+                result[r.Id] = L("أُلغي المستند: ", "Document voided: ") + why;
+            else result[r.Id] = L("تغيّر المستند فرُحّل من جديد", "Document changed and posted again");
+        }
+        return result;
     }
 
     // ------------------------------------------------------------ voucher (FR-103, BR-024)

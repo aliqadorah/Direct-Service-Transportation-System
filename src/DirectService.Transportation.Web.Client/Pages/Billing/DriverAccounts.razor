@@ -17,6 +17,8 @@
     <ComboField TValue="string?" @bind-Value="_driver" SearchAsync="Lookups.SearchDriversAsync" Label="@L["drv.openAccount"]" Placeholder="@L["md.driverSearch"]" FieldClass="w260"
                 OnSelected="@(o => { if (o?.Value is { } id) Nav.NavigateTo(NavModel.Href(Company, $"driver-accounts/{id}")); })" />
     <DateField @bind-Value="_asOf" Label="@L["rep.asOf"]" FieldClass="w160" @bind-Value:after="Load" />
+    @* DT-278: owed to the driver, owes the company, or all (the accounting dashboard links here with ?side=). *@
+    <SelectField TValue="string?" @bind-Value="_side" @bind-Value:after="Load" Options="Sides" Empty="@L["tar.all"]" Label="@L["bal.show"]" FieldClass="w200" />
     <span style="margin-inline-start:auto;display:flex;gap:6px">
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="export" Text="PDF" OnClick="@(() => Export("pdf"))" />
@@ -34,12 +36,28 @@
     private LoadState _state = LoadState.Loading;
     private string? _reference, _driver;
     private DateOnly? _asOf;
+    private string? _side;
+
+    private IReadOnlyList<Option<string?>> Sides => [new("owed", L["drv.sideOwed"]), new("owes", L["bal.sideOwes"])];
 
     [Parameter] public string Company { get; set; } = "";
 
-    private string Query => _asOf is { } d ? "?asOf=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "";
+    private string Query
+    {
+        get
+        {
+            var p = new List<string>();
+            if (_asOf is { } d) p.Add("asOf=" + d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+            if (_side is not null) p.Add("side=" + _side);
+            return p.Count == 0 ? "" : "?" + string.Join('&', p);
+        }
+    }
 
-    protected override Task OnInitializedAsync() => Load();
+    protected override Task OnInitializedAsync()
+    {
+        if (ListUrl.Read(Nav)["side"] is ("owed" or "owes") and var side) _side = side;
+        return Load();
+    }
 
     private async Task Load()
     {

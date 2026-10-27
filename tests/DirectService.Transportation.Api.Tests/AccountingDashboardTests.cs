@@ -188,7 +188,8 @@ public sealed class AccountingDashboardTests(ApiFactory f)
         await OkAsync<ApArDocumentDetails>(await o.Client.PostAsJsonAsync(U(o, "/apar/bills"),
             new ApArDocumentRequest(supplier.Id, null, Today.AddDays(-1), null, null, [new ApArLineRequest("Diesel", a["5103"].Id, 400m, 0m, null)], null)));
 
-        decimal Total(Contracts.Reports.ReportResult r) => ((System.Text.Json.JsonElement)r.Totals![^1]!).GetDecimal();
+        // DT-278: the "owed" column (what the company must pay); the last column is what they owe the company.
+        decimal Total(Contracts.Reports.ReportResult r) => ((System.Text.Json.JsonElement)r.Totals![^2]!).GetDecimal();
         var drivers = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/driver-balances?asOf={D(Today)}")))!);
         var partners = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/partner-balances?asOf={D(Today)}")))!);
         Assert.True(drivers > 0 && partners > 0);

@@ -100,10 +100,21 @@ public sealed record SettlementAdvanceItem(string Id, string Number, DateOnly Ad
 /// <summary>A suggested shortage deduction from a flagged trip (FR-078, DT-96): shortage beyond tolerance × the trip's price per ton.</summary>
 public sealed record SuggestedDeduction(string TripId, string ReceiptNo, decimal ShortageWeight, decimal ExcessWeight, decimal Amount);
 
-/// <summary>Open items of a driver up to a date, pre-selected for a settlement (FR-076, FR-077), with the 8.5 totals.</summary>
+/// <summary>
+/// DT-276 / DT-277: a manual or opening journal entry naming the driver / partner that is part of its previous balance (still open, or settled by
+/// a document): the entry, its date and description, and the amount (above zero owed to the driver / partner, below zero owed by it).
+/// </summary>
+public sealed record PreviousBalanceEntry(DocRef Entry, DateOnly Date, string Description, decimal Amount);
+
+/// <summary>
+/// Open items of a driver up to a date, pre-selected for a settlement (FR-076, FR-077), with the 8.5 totals. DT-276: <paramref name="PreviousBalance"/>
+/// — the driver's balance from manual / opening journal entries up to the date (<paramref name="PreviousBalanceEntries"/>), part of the net:
+/// Net = Gross − AdvancesTotal + PreviousBalance.
+/// </summary>
 public sealed record SettlementPreview(
     Ref Driver, string? TruckPlate, DateOnly Date, IReadOnlyList<SettlementTripItem> Trips, IReadOnlyList<SettlementAdvanceItem> Advances,
-    IReadOnlyList<SuggestedDeduction> Suggestions, decimal Gross, decimal AdvancesTotal, decimal Net);
+    IReadOnlyList<SuggestedDeduction> Suggestions, decimal Gross, decimal AdvancesTotal, decimal Net, decimal PreviousBalance = 0,
+    IReadOnlyList<PreviousBalanceEntry>? PreviousBalanceEntries = null);
 
 public sealed record SettlementDeductionRequest(string? Type, decimal? Amount, string? Note);
 
@@ -111,22 +122,25 @@ public sealed record SettlementDeductionRequest(string? Type, decimal? Amount, s
 /// A settlement (FR-077 … FR-080): driver, date, the trips and advances included (omitted = every open item up to the date), deductions,
 /// method and cash box / bank for the net. Revision 6 (DT-228): when advances and deductions exceed the wages, <paramref name="RepaidAmount"/>
 /// (&gt; 0, at most the shortfall) is what the driver pays back now with that method and cash box / bank (reference required for bank
-/// transfer and CliQ); the rest is carried to the next settlement as a new open advance.
+/// transfer and CliQ); the rest is carried to the next settlement as a new open advance. DT-276: the driver's previous balance from manual /
+/// opening entries up to the date is settled too unless <paramref name="IncludePreviousBalance"/> is false; a settlement may then have no trips.
 /// </summary>
 public sealed record SettlementRequest(
     string? DriverId, DateOnly? SettlementDate, IReadOnlyList<string>? TripIds, IReadOnlyList<string>? AdvanceIds, IReadOnlyList<SettlementDeductionRequest>? Deductions,
-    string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? ClientId, decimal? RepaidAmount = null);
+    string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? ClientId, decimal? RepaidAmount = null,
+    bool? IncludePreviousBalance = null);
 
 public sealed record SettlementDeductionResponse(string Id, string Type, decimal Amount, string? Note);
 
 public sealed record SettlementResponse(
     string Id, string Number, Ref Driver, DateOnly SettlementDate, decimal GrossWages, decimal AdvancesTotal, decimal DeductionsTotal, decimal NetPayable,
     string PaymentMethod, MoneyAccountRef Account, string? Reference, string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason,
-    DateTime CreatedAt, string RowVersion, decimal RepaidAmount = 0, decimal CarriedForward = 0, DocRef? CarriedAdvance = null);
+    DateTime CreatedAt, string RowVersion, decimal RepaidAmount = 0, decimal CarriedForward = 0, DocRef? CarriedAdvance = null, decimal PreviousBalance = 0);
 
 public sealed record SettlementDetails(
     SettlementResponse Settlement, IReadOnlyList<SettlementTripItem> Trips, IReadOnlyList<SettlementAdvanceItem> Advances,
-    IReadOnlyList<SettlementDeductionResponse> Deductions, string AmountInWords, IReadOnlyList<HistoryEntry> History);
+    IReadOnlyList<SettlementDeductionResponse> Deductions, string AmountInWords, IReadOnlyList<HistoryEntry> History,
+    IReadOnlyList<PreviousBalanceEntry>? PreviousBalanceEntries = null);
 
 public sealed record SettlementListQuery(string? Driver, DateOnly? From, DateOnly? To, string? Status, string? Q, string? Sort, int Page = 1, int PageSize = 50);
 
@@ -136,18 +150,21 @@ public sealed record SettlementPage(PagedResult<SettlementResponse> Page, CashLi
 
 /// <summary>
 /// A partner payment (FR-085): never above the partner's current balance due. Revision 6 (DT-228): <paramref name="Kind"/> "Repayment" records
-/// money received from a partner who owes the company (balance below zero), never above what the partner owes.
+/// money received from a partner who owes the company (balance below zero), never above what the partner owes. DT-277: the partner's previous
+/// balance from manual / opening entries is settled with the payment (a repayment: only what the partner owes) unless
+/// <paramref name="IncludePreviousBalance"/> is false; a payment that only sets off what the partner owes against its trips may be 0.
 /// </summary>
 public sealed record PartnerPaymentRequest(
     string? PartnerId, DateOnly? PaymentDate, decimal? Amount, string? PaymentMethod, string? CashBoxId, string? BankAccountId, string? Reference, string? Notes,
-    string? ClientId, string? Kind = null);
+    string? ClientId, string? Kind = null, bool? IncludePreviousBalance = null);
 
 public sealed record PartnerPaymentResponse(
     string Id, string Number, Ref Partner, DateOnly PaymentDate, decimal Amount, string PaymentMethod, MoneyAccountRef Account, string? Reference, string? Notes,
     string Status, DocRef? JournalEntry, bool PostingPending, string? VoidReason, DateTime CreatedAt, string RowVersion, string Kind = CashCodes.Payment,
-    decimal DeductedAmount = 0);
+    decimal DeductedAmount = 0, decimal PreviousBalance = 0);
 
-public sealed record PartnerPaymentDetails(PartnerPaymentResponse Payment, string AmountInWords, IReadOnlyList<HistoryEntry> History);
+public sealed record PartnerPaymentDetails(PartnerPaymentResponse Payment, string AmountInWords, IReadOnlyList<HistoryEntry> History,
+    IReadOnlyList<PreviousBalanceEntry>? PreviousBalanceEntries = null);
 
 public sealed record PartnerPaymentListQuery(
     string? Partner, DateOnly? From, DateOnly? To, string? Method, string? Status, string? Q, string? Sort, int Page = 1, int PageSize = 50);
@@ -156,15 +173,20 @@ public sealed record PartnerPaymentPage(PagedResult<PartnerPaymentResponse> Page
 
 // ------------------------------------------------------------------ accounts and statements (FR-076, FR-083, FR-084, FR-088)
 
-/// <summary>Driver account (FR-076): open trips and advances, gross / advances / net due, balance owed to the driver, settlement history.</summary>
+/// <summary>
+/// Driver account (FR-076): open trips and advances, gross / advances / net due, balance owed to the driver, settlement history. DT-276: the
+/// previous balance from manual / opening entries still open (part of NetDue) and its entries.
+/// </summary>
 public sealed record DriverAccountResponse(
     Ref Driver, string? TruckPlate, IReadOnlyList<SettlementTripItem> OpenTrips, IReadOnlyList<SettlementAdvanceItem> OpenAdvances, decimal Gross,
-    decimal AdvancesTotal, decimal NetDue, decimal Balance, IReadOnlyList<SettlementResponse> Settlements);
+    decimal AdvancesTotal, decimal NetDue, decimal Balance, IReadOnlyList<SettlementResponse> Settlements, decimal PreviousBalance = 0,
+    IReadOnlyList<PreviousBalanceEntry>? PreviousBalanceEntries = null);
 
 /// <summary>Partner account (FR-084): partner cost of active trips, payments, balance due.</summary>
 /// <summary>DT-230: <paramref name="ToDeduct"/> — of what the partner owes, the part to be deducted from the next payment(s) (the rest is to be returned).</summary>
+/// <summary>DT-277: <paramref name="Paid"/> — what payments paid for the trips; <paramref name="PreviousBalance"/> — the open balance from manual / opening entries (part of BalanceDue).</summary>
 public sealed record PartnerAccountResponse(Ref Partner, int Trips, decimal Cost, decimal Paid, decimal BalanceDue, IReadOnlyList<PartnerPaymentResponse> RecentPayments,
-    decimal ToDeduct = 0);
+    decimal ToDeduct = 0, decimal PreviousBalance = 0, IReadOnlyList<PreviousBalanceEntry>? PreviousBalanceEntries = null);
 
 /// <summary>
 /// A statement line: date, kind (Trip, Advance, Deduction, Settlement, Payment), document, description, amounts that increase or

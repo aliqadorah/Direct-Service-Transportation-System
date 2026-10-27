@@ -405,6 +405,7 @@ public static class HelpTopics
                     "إذا زادت السلف والخصومات على الأجور (صافٍ سالب) يظهر «سداد من السائق»: المبلغ (كامل الفرق أو جزء منه) والطريقة (نقداً أو تحويل بنكي أو CliQ) والصندوق أو الحساب البنكي، والمرجع للتحويل وCliQ (مثل رقم حركة CliQ).",
                     "السداد الجزئي: يبقى الباقي سلفة مفتوحة جديدة «مرحّلة» تظهر في التسوية التالية وفي تذكيرات لوحة المحاسبة مع «سدّده السائق: المبلغ (الطريقة، المرجع)».",
                     "القيد بنفس رقم التسوية: مدين الصندوق أو البنك بالسداد، ودائن سلف السائقين. يظهر السداد في كشف التسوية (مع سند قبض) وفي كشف حساب السائق.",
+                    "رصيد سابق من قيود يدوية أو افتتاحية باسم السائق (مثل سلفة افتتاحية على 1104) يظهر في حسابه تحت «الرصيد السابق» وفي التسوية كسطر مستقل «الرصيد السابق (قيود يدوية / افتتاحية)» مع روابط القيود: إن كان على السائق يُخصم من الأجور كالسلفة (والباقي يُسدَّد أو يُرحّل)، وإن كان له يُضاف إلى الصافي. يمكن تسوية هذا الرصيد وحده دون رحلات. قيد التسوية يقفله على نفس الحسابات باسم السائق، وإلغاء التسوية يعيده.",
                 ],
                 [
                     "صافي أقل من صفر دون سداد: ممنوع؛ سجّل سداد السائق، أو ألغِ تحديد بعض السلف أو قلّل الخصومات. سداد أكبر من الفرق: ممنوع.",
@@ -425,6 +426,7 @@ public static class HelpTopics
                     "When advances and deductions exceed the wages (a negative net), “Repayment from the driver” appears: the amount (the whole difference or part of it), the method (cash, bank transfer or CliQ), the cash box or bank account, and a reference for bank transfer and CliQ (such as the CliQ transaction number).",
                     "A partial repayment leaves the rest as a new open “carried” advance, shown in the next settlement and in the accounting dashboard reminders with “Repaid by driver: amount (method, reference)”.",
                     "The entry has the settlement's number: debit the cash box or bank with the repayment, credit driver advances. The repayment is shown on the settlement statement (with a receipt voucher) and on the driver's statement.",
+                    "A previous balance from manual or opening entries naming the driver (such as an opening advance on 1104) is shown on the account under Previous balance and in the settlement as its own line, “Previous balance (manual / opening entries)”, with links to the entries: when the driver owes it, it is deducted from the wages like an advance (the rest is repaid or carried); when it is owed to the driver, it is added to the net. A settlement may settle only this balance, with no trips. The settlement's entry clears it on the same accounts with the driver; voiding the settlement restores it.",
                 ],
                 [
                     "A net below zero without a repayment: blocked; record the driver's repayment, or untick some advances or reduce the deductions. A repayment above the difference: blocked.",
@@ -443,6 +445,7 @@ public static class HelpTopics
                     "«دفعة»: المبلغ والطريقة والصندوق أو البنك ← «حفظ»؛ تُرحّل الدفعة (PPY-). اطبع سند الصرف.",
                     "إذا أصبح على الشريك للشركة (مثلاً أُلغيت رحلة بعد الدفع له) يظهر ذلك في حسابه مع «تسجيل سداد من الشريك»: المبلغ حتى ما عليه، نقداً أو تحويل بنكي أو CliQ مع المرجع؛ يُرحّل مدين الصندوق أو البنك ودائن ذمم الشركاء، ويُطبع سند قبض.",
                     "إلغاء رحلة مدفوعة للشريك أو تخفيض تكلفتها يحتاج صلاحية دفعات الشركاء وسبباً، ويُسأل عن المبلغ المدفوع: «سيعيده الشريك» (يبقى عليه حتى سداده)، أو «يُخصم من الدفعة التالية» (يُخصم تلقائياً ويظهر في سند الصرف وكشف الشريك)، أو «الدفعة لم تُصرف فعلاً» (تفتح سند الصرف لإلغائه بسببه الخاص؛ إن غطّى عدة رحلات فالإلغاء يشملها كلها). يُحفظ الاختيار مع الرحلة ويظهر في سجلها وفي كشف الشريك.",
+                    "رصيد سابق من قيود يدوية أو افتتاحية باسم الشريك يظهر في حسابه تحت «الرصيد السابق» ويُسوّى مع الدفعة التالية: إن كان على الشريك يُخصم من مستحق رحلاته (يمكن أن تكون الدفعة صفراً)، وإن كان له تُدفع له أولاً. أو يُسدَّد بسند سداد من الشريك. لا يُحتسب هذا الجزء دفعاً عن الرحلات، فلا يغيّر «مدفوعة للشريك» في قائمة الرحلات.",
                 ],
                 [
                     "مبلغ أكبر من الرصيد المستحق: ممنوع، ويظهر الرصيد. سداد أكبر مما على الشريك: ممنوع.",
@@ -456,6 +459,7 @@ public static class HelpTopics
                     "Payment: amount, method, cash box or bank → Save; the payment is posted (PPY-). Print the payment voucher.",
                     "When the partner owes the company (for example a trip voided after the partner was paid), its account says so with Record repayment: the amount up to what it owes, by cash, bank transfer or CliQ with the reference; it posts debit cash box or bank, credit partner payables, and prints a receipt voucher.",
                     "Voiding a partner trip already paid, or lowering its cost, needs the partner-payment permission and a reason, and asks what to do with the amount paid: “The partner will return it” (owed until a repayment), “Deduct it from the next payment” (set off automatically, shown on the payment voucher and the partner statement) or “The payment was not actually made” (opens the payment voucher to void it with its own reason; a payment covering several trips is voided for all of them). The choice is kept with the trip, in its history and on the partner statement.",
+                    "A previous balance from manual or opening entries naming the partner is shown on its account under Previous balance and is settled with the next payment: when the partner owes it, it is set off against what its trips are owed (the payment may then be 0); when it is owed to the partner, the payment pays it first. Or it is repaid with a partner repayment. That part never counts as paid for trips, so it does not change “Paid to partner” on the trips list.",
                 ],
                 [
                     "An amount above the balance due: blocked, with the balance shown. A repayment above what the partner owes: blocked.",

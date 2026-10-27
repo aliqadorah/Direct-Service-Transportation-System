@@ -30,6 +30,10 @@
                     </DataGrid>
                 </Box>
             }
+            @if (s.PreviousBalance != 0)
+            {
+                <PreviousBalancePanel Company="@Company" Name="@s.Driver.Name" Amount="s.PreviousBalance" Entries="@(_d.PreviousBalanceEntries ?? [])" Settled="true" />
+            }
             @if (_d.Deductions.Count > 0)
             {
                 <Box Title="@L["drv.deductions"]" NoPad="true">
@@ -74,6 +78,8 @@
         new(L["drv.gross"], Fmt.Money(s.GrossWages)),
         new(L["md.openAdvances"], Fmt.Money(s.AdvancesTotal)),
         new(L["drv.deductions"], Fmt.Money(s.DeductionsTotal)),
+        // DT-276: the previous balance from manual / opening entries settled with it.
+        .. (s.PreviousBalance != 0 ? new KeyValue[] { new(L["pb.tab"], Fmt.Money(Math.Abs(s.PreviousBalance)) + " · " + L[s.PreviousBalance > 0 ? "pb.owedToDriver" : "pb.owesCompany"]) } : []),
         new(L["cash.method"], L["pay." + s.PaymentMethod]),
         new(L["cash.account"], s.Account.Name),
         new(L["cash.reference"], s.Reference),

@@ -57,6 +57,10 @@
                 <Actions><Btn Small="true" Icon="plus" Text="@L["je.addLine"]" OnClick="AddLine" /></Actions>
                 <ChildContent>
                     @if (_m.Lines.Any(l => l.TaxCodeId is not null)) {<p class="help pad" style="margin:0;padding-bottom:0">@L["je.taxHelp"]</p>}
+                    @* Owner findings 27 Oct 2026 (DT-280): a driver or partner as party on its advances / payable account — point to the documents that
+                       settlements and partner payments use; the entry is not blocked (it becomes the party's previous balance, DT-276 / DT-277). *@
+                    @if (PartyTypes.Contains("Driver")) {<p class="help pad je-party-note" role="note" style="margin:0;padding-bottom:0"><Icon Name="info" /> @L["je.driverPartyNote"]</p>}
+                    @if (PartyTypes.Contains("Partner")) {<p class="help pad je-party-note" role="note" style="margin:0;padding-bottom:0"><Icon Name="info" /> @L["je.partnerPartyNote"]</p>}
                     <div class="tbl-wrap fill">
                         <table class="tbl je-lines">
                             <caption class="sr-only">@L["je.lines"]</caption>
@@ -302,6 +306,10 @@
     private bool MayPost => Shell.Can(PermissionKeys.AcctPostEntry);
 
     private IReadOnlyList<Option<string?>> PartyOptions(string? type) => type is null ? [] : _parties.GetValueOrDefault(type) ?? [];
+
+    /// <summary>DT-280: the party types of the lines' control accounts (Driver, Partner, …).</summary>
+    private HashSet<string> PartyTypes => _m.Lines.Select(l => Lookups.Account(l.AccountId)).Where(a => a is { IsControlAccount: true })
+        .Select(a => a!.ControlPartyType ?? "").ToHashSet(StringComparer.Ordinal);
 
     protected override Task OnParametersSetAsync()
     {

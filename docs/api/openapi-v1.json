@@ -55489,7 +55489,7 @@
         "tags": [
           "Dashboard"
         ],
-        "summary": "Pin a saved report with a measure and thresholds (FR-140)",
+        "summary": "Pin a saved report with a measure, thresholds and warn above / below (FR-140, DT-275)",
         "operationId": "postCompaniesDashboardPins",
         "parameters": [
           {
@@ -57348,6 +57348,124 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Refused by a business rule ('code' names the rule)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session has ended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission, or the tenant/company is read-only",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found (unknown, foreign or tampered identifier)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: stale version, duplicate value or plan limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{company}/reports/saved/{report}/pin-measures": {
+      "get": {
+        "tags": [
+          "Saved reports"
+        ],
+        "summary": "Values a pin of the saved report can show — number of rows and every numeric total — with their current totals (DT-275)",
+        "operationId": "getCompaniesReportsSavedPinMeasures",
+        "parameters": [
+          {
+            "name": "report",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "company",
+            "in": "path",
+            "description": "Opaque URL token (22 characters).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PinMeasureOption"
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation failed (field errors in 'errors'), or missing antiforgery token",
@@ -64161,6 +64279,16 @@
                 "$ref": "#/components/schemas/PeriodResult"
               }
             ]
+          },
+          "owedToUs": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwedToUs"
+              }
+            ]
           }
         }
       },
@@ -69241,6 +69369,18 @@
               "string"
             ],
             "format": "double"
+          },
+          "measureKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnWhen": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -69319,6 +69459,18 @@
               "null",
               "string"
             ]
+          },
+          "measureKey": {
+            "type": "string",
+            "default": ""
+          },
+          "valueKind": {
+            "type": "string",
+            "default": "money"
+          },
+          "warnWhen": {
+            "type": "string",
+            "default": "Above"
           }
         }
       },
@@ -69633,6 +69785,24 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SettlementResponse"
+            }
+          },
+          "previousBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
+          },
+          "previousBalanceEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PreviousBalanceEntry"
             }
           }
         }
@@ -72651,6 +72821,12 @@
               "null",
               "string"
             ]
+          },
+          "cancelReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -72732,6 +72908,12 @@
             ]
           },
           "reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cancelReason": {
             "type": [
               "null",
               "string"
@@ -74885,6 +75067,52 @@
           }
         }
       },
+      "OwedToUs": {
+        "required": [
+          "suppliers",
+          "drivers",
+          "partners",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "suppliers": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "drivers": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "partners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "OwnershipTypeRequest": {
         "required": [
           "name",
@@ -76032,6 +76260,24 @@
             ],
             "format": "double",
             "default": 0
+          },
+          "previousBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
+          },
+          "previousBalanceEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PreviousBalanceEntry"
+            }
           }
         }
       },
@@ -76053,6 +76299,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/HistoryEntry"
+            }
+          },
+          "previousBalanceEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PreviousBalanceEntry"
             }
           }
         }
@@ -76148,6 +76403,12 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "includePreviousBalance": {
+            "type": [
+              "null",
+              "boolean"
             ]
           }
         }
@@ -76245,6 +76506,15 @@
             "default": "Payment"
           },
           "deductedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
+          },
+          "previousBalance": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -76768,6 +77038,35 @@
           }
         }
       },
+      "PinMeasureOption": {
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "PinOrderRequest": {
         "required": [
           "pinIds"
@@ -77138,6 +77437,35 @@
           },
           "dateFormat": {
             "type": "string"
+          }
+        }
+      },
+      "PreviousBalanceEntry": {
+        "required": [
+          "entry",
+          "date",
+          "description",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/DocRef"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -79237,6 +79565,15 @@
             "items": {
               "$ref": "#/components/schemas/HistoryEntry"
             }
+          },
+          "previousBalanceEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PreviousBalanceEntry"
+            }
           }
         }
       },
@@ -79323,6 +79660,24 @@
               "string"
             ],
             "format": "double"
+          },
+          "previousBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
+          },
+          "previousBalanceEntries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PreviousBalanceEntry"
+            }
           }
         }
       },
@@ -79419,6 +79774,12 @@
               "string"
             ],
             "format": "double"
+          },
+          "includePreviousBalance": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -79557,6 +79918,15 @@
                 "$ref": "#/components/schemas/DocRef"
               }
             ]
+          },
+          "previousBalance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
           }
         }
       },
@@ -82793,6 +83163,21 @@
           },
           "rowVersion": {
             "type": "string"
+          },
+          "payment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "partnerOpen": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },

@@ -105,6 +105,10 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
             // DT-230: the part of the partner's trips set off against an amount paid earlier for trips voided or made cheaper.
             [p.DeductedAmount > 0 ? Field(L("مستحق الرحلات قبل الخصم", "Due for trips before the deduction"), N(M(p.Amount + p.DeductedAmount))) : string.Empty,
              p.DeductedAmount > 0 ? Field(L("خُصم: مدفوع سابقاً عن رحلات ملغاة أو معدّلة", "Deducted: paid earlier for voided / changed trips"), N(M(p.DeductedAmount))) : string.Empty,
+             // DT-277: the previous balance from manual / opening entries settled with the payment, and what was paid for trips.
+             p.PreviousBalance != 0 ? Field(PreviousBalanceLabel(p.PreviousBalance, L("للشريك", "to the partner"), L("على الشريك", "by the partner")), N(M(Math.Abs(p.PreviousBalance)))
+                 + " · " + E(string.Join(", ", (d.PreviousBalanceEntries ?? []).Select(x => x.Entry.Number)))) : string.Empty,
+             p.PreviousBalance != 0 ? Field(L("عن الرحلات", "For trips"), N(M(p.Kind == CashCodes.Repayment ? p.Amount + p.PreviousBalance : p.Amount - p.PreviousBalance))) : string.Empty,
              p.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(p.Notes))],
             repayment ? [L("دفع بواسطة", "Paid by"), L("قبض بواسطة", "Received by")] : [L("صرف بواسطة", "Paid by"), L("استلم بواسطة", "Received by")]);
         return await printer.OutputAsync(printer.Shell(p.Number, body, p.Status == CashCodes.Void ? "VOID" : null, mark), format, p.Number, ct).ConfigureAwait(false);
@@ -126,6 +130,7 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
             + $"<td class=\"n\">{N(t.DriverRate.ToString("0.000", CultureInfo.InvariantCulture))}</td><td class=\"n\">{N(M(t.DriverWage))}</td></tr>"));
         var advanceRows = string.Concat(d.Advances.Select(a => $"<tr><td>{N(a.Number)}</td><td>{N(D(a.AdvanceDate))}</td><td class=\"n\">{N(M(a.Amount))}</td></tr>"));
         var deductionRows = string.Concat(d.Deductions.Select(x => $"<tr><td>{E(DeductionLabel(x.Type))}</td><td>{E(x.Note)}</td><td class=\"n\">{N(M(x.Amount))}</td></tr>"));
+        var previousRows = string.Concat((d.PreviousBalanceEntries ?? []).Select(x => $"<tr><td>{N(x.Entry.Number)}</td><td>{N(D(x.Date))}</td><td>{E(x.Description)}</td><td class=\"n\">{N(M(x.Amount))}</td></tr>"));
         var statement = printer.Header(company)
             + $"<h1>{L("كشف تسوية سائق", "Driver settlement statement")}</h1><div class=\"meta\">{L("رقم", "No.")} {N(s.Number)} · {L("التاريخ", "Date")} {N(D(s.SettlementDate))}</div>"
             + $"<div class=\"fields\">{Field(L("السائق", "Driver"), E(driverName))}{Field(L("رقم اللوحة", "Plate"), N(plate))}</div>"
@@ -133,8 +138,12 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
             + $"<th>{L("الكمية", "Qty")}</th><th>{L("الأجرة", "Rate")}</th><th>{L("الأجر", "Wage")}</th></tr>{trips}</table>"
             + (d.Advances.Count == 0 ? string.Empty : $"<h2>{L("السلف", "Advances")}</h2><table><tr><th>{L("الرقم", "No.")}</th><th>{L("التاريخ", "Date")}</th><th>{L("المبلغ", "Amount")}</th></tr>{advanceRows}</table>")
             + (d.Deductions.Count == 0 ? string.Empty : $"<h2>{L("الخصومات", "Deductions")}</h2><table><tr><th>{L("النوع", "Type")}</th><th>{L("ملاحظة", "Note")}</th><th>{L("المبلغ", "Amount")}</th></tr>{deductionRows}</table>")
+            // DT-276: the previous balance from manual / opening entries settled with the settlement (+ owed to the driver, − owed by the driver).
+            + (s.PreviousBalance == 0 ? string.Empty : $"<h2>{L("الرصيد السابق (قيود يدوية / افتتاحية)", "Previous balance (manual / opening entries)")}</h2><table><tr><th>{L("القيد", "Entry")}</th><th>{L("التاريخ", "Date")}</th><th>{L("البيان", "Description")}</th><th>{L("المبلغ", "Amount")}</th></tr>{previousRows}</table>")
             + $"<div class=\"totals\"><div><span>{L("إجمالي الأجور", "Gross wages")}</span>{N(M(s.GrossWages))}</div><div><span>{L("السلف", "Advances")}</span>{N(M(s.AdvancesTotal))}</div>"
-            + $"<div><span>{L("الخصومات", "Deductions")}</span>{N(M(s.DeductionsTotal))}</div><div class=\"grand\"><span>{L("الصافي", "Net payable")}</span>{N(M(s.NetPayable))}</div>"
+            + $"<div><span>{L("الخصومات", "Deductions")}</span>{N(M(s.DeductionsTotal))}</div>"
+            + (s.PreviousBalance == 0 ? string.Empty : $"<div><span>{PreviousBalanceLabel(s.PreviousBalance, L("للسائق", "to the driver"), L("على السائق", "by the driver"))}</span>{N(M(Math.Abs(s.PreviousBalance)))}</div>")
+            + $"<div class=\"grand\"><span>{L("الصافي", "Net payable")}</span>{N(M(s.NetPayable))}</div>"
             // DT-228: what the driver repaid with the settlement and the rest carried to the next one.
             + (s.RepaidAmount == 0 ? string.Empty : $"<div><span>{E(CashSupport.RepaidText(cash.En, s.RepaidAmount, s.PaymentMethod, s.Reference))}</span>{N(M(s.RepaidAmount))}</div>")
             + (s.CarriedForward == 0 ? string.Empty : $"<div><span>{L("مرحّل كسلفة مفتوحة", "Carried as open advance")} {N(s.CarriedAdvance?.Number)}</span>{N(M(s.CarriedForward))}</div>")
@@ -148,6 +157,10 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
                 s.Reference, [], [L("دفع بواسطة", "Paid by"), L("قبض بواسطة", "Received by")]) + "</div>";
         return await printer.OutputAsync(printer.Shell(s.Number, statement + voucher, s.Status == CashCodes.Void ? "VOID" : null, mark), format, s.Number, ct).ConfigureAwait(false);
     }
+
+    /// <summary>DT-276 / DT-277: "Previous balance owed to the driver" or "… owed by the driver" (manual / opening entries).</summary>
+    private string PreviousBalanceLabel(decimal amount, string to, string by) =>
+        L("الرصيد السابق (قيود يدوية / افتتاحية) — مستحق ", "Previous balance (manual / opening entries) — owed ") + (amount > 0 ? to : by);
 
     private string DeductionLabel(string type) => type switch
     {

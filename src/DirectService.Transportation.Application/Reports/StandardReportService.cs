@@ -376,7 +376,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
              list.Sum(x => balances.GetValueOrDefault(x.Id))]);
     }
 
-    /// <summary>What the company owes each partner as of a date: partner cost of active trips − active payments (DT-99).</summary>
+    /// <summary>What the company owes each partner for its trips as of a date: partner cost of active trips − what active payments paid for trips (DT-99, DT-277).</summary>
     private async Task<Dictionary<long, decimal>> PartnerBalanceAsync(IReadOnlyCollection<long>? ids, DateOnly asOf, CancellationToken ct)
     {
         var trips = db.Set<Trip>().AsNoTracking().Where(t => t.Status == Active && t.PartnerId != null && t.TripDate <= asOf);
@@ -387,7 +387,9 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             pays = pays.Where(p => ids.Contains(p.PartnerId));
         }
         var cost = await trips.GroupBy(t => t.PartnerId!.Value).Select(g => new { g.Key, A = g.Sum(t => t.PartnerCost) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
-        var paid = await pays.GroupBy(p => p.PartnerId).Select(g => new { g.Key, A = g.Sum(p => p.Amount) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
+        // What payments paid for trips, repayments taken off (DT-228, DT-277).
+        var paid = await pays.GroupBy(p => p.PartnerId).Select(g => new { g.Key, A = g.Sum(p => p.Kind == CashCodes.Repayment ? -(p.Amount + p.PreviousBalance) : p.Amount - p.PreviousBalance) })
+            .ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
         return cost.Keys.Union(paid.Keys).ToDictionary(k => k, k => cost.GetValueOrDefault(k) - paid.GetValueOrDefault(k));
     }
 
@@ -576,7 +578,9 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
     /// zero — with the parts of the balance: wages of own-fleet trips, advances, what settlements took (deductions and net paid, less what
     /// the driver repaid), manual / opening journal entries with the driver as party; Balance = the driver statement's (RPT-13) closing
     /// balance on that date (positive = owed to the driver). Before, only open (unsettled) trips and advances were listed, so a company whose
-    /// drivers were all settled showed "No results", and journal entries (e.g. an opening advance) were missing.
+    /// drivers were all settled showed "No results", and journal entries (e.g. an opening advance) were missing. Owner findings 27 Oct 2026
+    /// (DT-278): the balance is shown without signs in two columns, "Owed to the driver" and "Owes the company" (statement closing = the first
+    /// − the second); <c>side=owed</c> / <c>side=owes</c> lists only the drivers on that side (the dashboard links).
     /// </summary>
     private async Task<ReportResult> DriverBalancesAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
@@ -585,20 +589,24 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         var ids = balances.Select(b => b.DriverId).ToList();
         var drivers = await db.Set<Driver>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.PublicId, x.FullName }).ToDictionaryAsync(x => x.Id, ct).ConfigureAwait(false);
-        var rows = balances.Where(b => drivers.ContainsKey(b.DriverId)).OrderByDescending(b => b.Balance).ThenBy(b => drivers[b.DriverId].FullName, StringComparer.CurrentCulture).ToList();
-        return Result(d, title, [new(L("كما في", "As of"), D(asOf))],
+        var side = BalanceSide(q.Side);
+        var rows = balances.Where(b => drivers.ContainsKey(b.DriverId) && OnSide(b.Balance, side))
+            .OrderByDescending(b => b.Balance).ThenBy(b => drivers[b.DriverId].FullName, StringComparer.CurrentCulture).ToList();
+        return Result(d, title, SideFilters(asOf, side, L("المستحق للسائق", "Owed to the driver"), L("على السائق للشركة", "Owes the company")),
             [C("driver", "السائق", "Driver"), C("trips", "الرحلات", "Trips", "number"), C("wages", "الأجور", "Wages", "money"), C("advances", "السلف", "Advances", "money"),
              C("settled", "المسوّى (خصومات وصافي مدفوع)", "Settled (deductions and net paid)", "money"), C("journal", "قيود يدوية وافتتاحية", "Manual and opening entries", "money"),
-             C("net", "الرصيد المستحق للسائق", "Balance owed to the driver", "money")],
-            rows.Select(r => new ResultRow([drivers[r.DriverId].FullName, r.Trips, r.Wages, r.Advances, r.Settled, r.Journal, r.Balance],
+             C("owed", "المستحق للسائق", "Owed to the driver", "money"), C("owes", "على السائق للشركة", "Owes the company", "money")],
+            rows.Select(r => new ResultRow([drivers[r.DriverId].FullName, r.Trips, r.Wages, r.Advances, r.Settled, r.Journal, Math.Max(r.Balance, 0), Math.Max(-r.Balance, 0)],
                 new DrillLink("driver-account", support.Token<Driver>(drivers[r.DriverId].PublicId), null))).ToList(),
-            [L("الإجمالي", "Total"), rows.Sum(r => r.Trips), rows.Sum(r => r.Wages), rows.Sum(r => r.Advances), rows.Sum(r => r.Settled), rows.Sum(r => r.Journal), rows.Sum(r => r.Balance)]);
+            [L("الإجمالي", "Total"), rows.Sum(r => r.Trips), rows.Sum(r => r.Wages), rows.Sum(r => r.Advances), rows.Sum(r => r.Settled), rows.Sum(r => r.Journal),
+             rows.Sum(r => Math.Max(r.Balance, 0)), rows.Sum(r => Math.Max(-r.Balance, 0))]);
     }
 
     /// <summary>
     /// RPT-20 (DT-269): every partner with something on the account up to the date: trip cost, payments, what the partner repaid, manual /
     /// opening journal entries with the partner as party; Balance = the partner statement's (RPT-14) closing balance (before, a repayment
-    /// was taken off the balance instead of added, and journal entries were missing).
+    /// was taken off the balance instead of added, and journal entries were missing). DT-278: "Owed to the partner" / "Owes the company" and
+    /// <c>side</c> as RPT-19.
     /// </summary>
     private async Task<ReportResult> PartnerBalancesAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
@@ -607,13 +615,34 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         var ids = balances.Select(b => b.PartnerId).ToList();
         var partners = await db.Set<Partner>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.PublicId, x.Name }).ToDictionaryAsync(x => x.Id, ct).ConfigureAwait(false);
-        var rows = balances.Where(b => partners.ContainsKey(b.PartnerId)).OrderByDescending(b => b.Balance).ThenBy(b => partners[b.PartnerId].Name, StringComparer.CurrentCulture).ToList();
-        return Result(d, title, [new(L("كما في", "As of"), D(asOf))],
+        var side = BalanceSide(q.Side);
+        var rows = balances.Where(b => partners.ContainsKey(b.PartnerId) && OnSide(b.Balance, side))
+            .OrderByDescending(b => b.Balance).ThenBy(b => partners[b.PartnerId].Name, StringComparer.CurrentCulture).ToList();
+        return Result(d, title, SideFilters(asOf, side, L("المستحق للشريك", "Owed to the partner"), L("على الشريك للشركة", "Owes the company")),
             [C("partner", "الشريك", "Partner"), C("cost", "التكلفة", "Cost", "money"), C("payments", "المدفوعات", "Payments", "money"),
              C("repayments", "سداد من الشريك", "Repaid by the partner", "money"), C("journal", "قيود يدوية وافتتاحية", "Manual and opening entries", "money"),
-             C("balance", "الرصيد المستحق", "Balance due", "money")],
-            rows.Select(r => new ResultRow([partners[r.PartnerId].Name, r.Cost, r.Payments, r.Repayments, r.Journal, r.Balance],
+             C("owed", "المستحق للشريك", "Owed to the partner", "money"), C("owes", "على الشريك للشركة", "Owes the company", "money")],
+            rows.Select(r => new ResultRow([partners[r.PartnerId].Name, r.Cost, r.Payments, r.Repayments, r.Journal, Math.Max(r.Balance, 0), Math.Max(-r.Balance, 0)],
                 new DrillLink("partner-account", support.Token<Partner>(partners[r.PartnerId].PublicId), null))).ToList(),
-            [L("الإجمالي", "Total"), rows.Sum(r => r.Cost), rows.Sum(r => r.Payments), rows.Sum(r => r.Repayments), rows.Sum(r => r.Journal), rows.Sum(r => r.Balance)]);
+            [L("الإجمالي", "Total"), rows.Sum(r => r.Cost), rows.Sum(r => r.Payments), rows.Sum(r => r.Repayments), rows.Sum(r => r.Journal),
+             rows.Sum(r => Math.Max(r.Balance, 0)), rows.Sum(r => Math.Max(-r.Balance, 0))]);
+    }
+
+    /// <summary>DT-278: RPT-19 / RPT-20 side — "owed" (owed to the party), "owes" (owes the company) or every party (empty).</summary>
+    private static string? BalanceSide(string? side) => (side?.Trim().ToLowerInvariant()) switch
+    {
+        null or "" => null,
+        "owed" => "owed",
+        "owes" => "owes",
+        _ => throw Fail.Field("side", ErrorCodes.ValidationFormat, new FieldRef("side")),
+    };
+
+    private static bool OnSide(decimal balance, string? side) => side switch { "owed" => balance > 0, "owes" => balance < 0, _ => true };
+
+    private List<ReportFilterValue> SideFilters(DateOnly asOf, string? side, string owed, string owes)
+    {
+        var list = new List<ReportFilterValue> { new(L("كما في", "As of"), D(asOf)) };
+        if (side is not null) list.Add(new(L("عرض", "Showing"), side == "owed" ? owed : owes));
+        return list;
     }
 }

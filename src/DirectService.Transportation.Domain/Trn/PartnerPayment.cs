@@ -29,6 +29,12 @@ public class PartnerPayment : AuditableEntity, ITenantScoped, ICompanyScoped, IC
     /// the user chose to deduct from the next payment(s) — set off, no money moved (shown on the voucher and the statement).
     /// </summary>
     public decimal DeductedAmount { get; set; }
+    /// <summary>
+    /// Revision 6 §B15 (DT-277): the partner's balance from manual / opening journal entries settled with this payment / repayment (signed: above
+    /// zero owed to the partner, below zero owed by the partner); per account in <see cref="PreviousBalanceItem"/>. The part for the partner's
+    /// trips (DT-271 coverage) is Amount − PreviousBalance for a payment and Amount + PreviousBalance for a repayment.
+    /// </summary>
+    public decimal PreviousBalance { get; set; }
     /// <summary>How the money was paid or received.</summary>
     public string PaymentMethod { get; set; } = string.Empty;
     /// <summary>Cash box the money came from or went to.</summary>

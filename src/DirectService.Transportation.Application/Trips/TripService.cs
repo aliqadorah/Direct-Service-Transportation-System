@@ -211,8 +211,9 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         if (oldPartner is not long partnerId) return null;
         await numbering.LockAsync(Configuration.DocumentTypes.PartnerPayment, ct).ConfigureAwait(false);
         var others = await db.Set<Trip>().Where(x => x.PartnerId == partnerId && x.Status == Active && x.Id != t.Id).SumAsync(x => (decimal?)x.PartnerCost, ct).ConfigureAwait(false) ?? 0;
+        // DT-277: what payments paid for trips (a previous balance settled with a payment is not a payment for trips).
         var paid = await db.Set<PartnerPayment>().Where(p => p.PartnerId == partnerId && p.Status == "Active")
-            .SumAsync(p => (decimal?)(p.Kind == "Repayment" ? -p.Amount : p.Amount), ct).ConfigureAwait(false) ?? 0;
+            .Select(Cash.PartnerPaymentService.TripPart).SumAsync(ct).ConfigureAwait(false);
         var after = others + (t.Status == Active && t.PartnerId == partnerId ? t.PartnerCost : 0);
         var overpaid = Math.Max(0, paid - after) - Math.Max(0, paid - (others + oldCost));
         if (overpaid <= 0) return null;

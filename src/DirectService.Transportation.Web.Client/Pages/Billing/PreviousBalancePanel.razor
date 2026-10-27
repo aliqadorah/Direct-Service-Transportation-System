@@ -1,0 +1,54 @@
+@*
+  DT-276 / DT-277: a driver's or partner's previous balance from manual / opening journal entries (DT-269) — who owes whom, without negative
+  amounts, and the entries behind it (each opens its journal entry). On the settlement and partner payment forms "Settle it with this
+  settlement / payment" (ticked by default); on a settlement or payment view what it settled.
+*@
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+
+<Box Title="@L[Settled ? "pb.settledTitle" : "pb.title"]" NoPad="true" Class="pb-panel">
+    <div class="pad stack" style="gap:6px">
+        <p class="pb-sentence" style="margin:0"><Tx Value="@Sentence" /></p>
+        @if (IncludeChanged.HasDelegate)
+        {
+            <label class="chk"><input type="checkbox" class="pb-include" checked="@Include" @onchange="Toggle" /> <span>@L[Partner ? "pb.includePayment" : "pb.includeSettlement"]</span></label>
+            <p class="help" style="margin:0">@L[Partner ? "pb.includePaymentHelp" : "pb.includeSettlementHelp"]</p>
+        }
+    </div>
+    @if (Entries.Count > 0)
+    {
+        <DataGrid TItem="PreviousBalanceEntry" Items="Entries" Key="e => e.Entry.Id" Caption="@L["pb.title"]" OnRowClick="Open">
+            <Columns>
+                <GridColumn TItem="PreviousBalanceEntry" Title="@L["pb.entry"]" Value="e => e.Entry.Number" Ltr="true" />
+                <GridColumn TItem="PreviousBalanceEntry" Title="@L["trip.date"]" Value="e => Fmt.Date(e.Date, Shell.DateFormat)" Ltr="true" />
+                <GridColumn TItem="PreviousBalanceEntry" Title="@L["je.description"]" Value="e => e.Description" Clip="true" />
+                <GridColumn TItem="PreviousBalanceEntry" Title="@L["pb.side"]" Value="@(e => L[e.Amount > 0 ? (Partner ? "pb.owedToPartner" : "pb.owedToDriver") : "pb.owesCompany"])" />
+                <GridColumn TItem="PreviousBalanceEntry" Title="@L["inv.amount"]" Value="e => Fmt.Money(Math.Abs(e.Amount))" Numeric="true" />
+            </Columns>
+        </DataGrid>
+    }
+</Box>
+
+@code {
+    [Parameter] public string Company { get; set; } = "";
+    /// <summary>The driver's or partner's name.</summary>
+    [Parameter] public string Name { get; set; } = "";
+    /// <summary>Signed: above zero owed to the driver / partner, below zero owed by it.</summary>
+    [Parameter] public decimal Amount { get; set; }
+    [Parameter] public IReadOnlyList<PreviousBalanceEntry> Entries { get; set; } = [];
+    /// <summary>A partner (else a driver).</summary>
+    [Parameter] public bool Partner { get; set; }
+    /// <summary>What a settlement / payment settled (its view), rather than what is open.</summary>
+    [Parameter] public bool Settled { get; set; }
+    [Parameter] public bool Include { get; set; } = true;
+    [Parameter] public EventCallback<bool> IncludeChanged { get; set; }
+
+    private string Sentence => Settled
+        ? L.F(Amount > 0 ? "pb.settledOwedTo" : "pb.settledOwedBy", Name, Fmt.Money(Math.Abs(Amount)))
+        : Amount == 0 ? L["pb.zero"] : L.F(Amount > 0 ? "pb.owedTo" : "pb.owedBy", Name, Fmt.Money(Math.Abs(Amount)));
+
+    private Task Toggle(ChangeEventArgs e) => IncludeChanged.InvokeAsync(e.Value is true || string.Equals(e.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase));
+
+    private void Open(PreviousBalanceEntry e) => Nav.NavigateTo(NavModel.Href(Company, $"accounting/journal/{e.Entry.Id}"));
+}

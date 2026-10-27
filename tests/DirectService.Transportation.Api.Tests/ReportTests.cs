@@ -113,7 +113,8 @@ public sealed class ReportTests(ApiFactory f)
 
         var asOf = Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var report = await ReadAsync<ReportResult>(await c.GetAsync(U(o, $"/reports/standard/driver-balances?asOf={asOf}")));
-        decimal Balance(string name) => Num(report.Rows.Single(r => Str(r.Values[0]) == name).Values[^1]);
+        // DT-278: owed to the driver and owes the company in two columns (never negative); balance = the first − the second.
+        decimal Balance(string name) => report.Rows.Single(r => Str(r.Values[0]) == name) is var row ? Num(row.Values[^2]) - Num(row.Values[^1]) : 0;
         async Task<decimal> Closing(DriverResponse d) => (await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/drivers/{d.Id}/statement?to={asOf}")))).Closing;
         foreach (var d in new[] { w.Driver, onlyAdvance, both, settled, journalOnly })
             Assert.Equal(await Closing(d), Balance(d.FullName));
@@ -122,6 +123,8 @@ public sealed class ReportTests(ApiFactory f)
         Assert.Equal(0m, Balance("All Settled"));                        // settled to zero, still listed
         Assert.Equal(-100m, Balance("Opening Advance"));                 // a manual entry naming the driver (as RPT-23 shows on 1104)
         Assert.Equal(report.Rows.Sum(r => Num(r.Values[^1])), Num(report.Totals![^1]));
+        Assert.Equal(report.Rows.Sum(r => Num(r.Values[^2])), Num(report.Totals![^2]));
+        Assert.All(report.Rows, r => Assert.True(Num(r.Values[^1]) >= 0 && Num(r.Values[^2]) >= 0));
         var journalLine = (await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/drivers/{journalOnly.Id}/statement?to={asOf}")))).Lines.Single();
         Assert.Equal(("Journal", 100m), (journalLine.Kind, journalLine.Decrease));
 
@@ -135,7 +138,8 @@ public sealed class ReportTests(ApiFactory f)
         {
             var r = await ReadAsync<ReportResult>(await c.GetAsync(U(o, $"/reports/standard/partner-balances?asOf={asOf}")));
             var s = await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/partners/{w.Partner.Id}/statement?to={asOf}")));
-            return (Num(Assert.Single(r.Rows).Values[^1]), s.Closing);
+            var row = Assert.Single(r.Rows);
+            return (Num(row.Values[^2]) - Num(row.Values[^1]), s.Closing);
         }
         Assert.Equal((-38m, -38m), await PartnerBalance());
         await (await c.PostAsJsonAsync(U(o, "/accounting/journal-entries"), new ManualEntryRequest(Now, "Partner adjustment",
@@ -194,9 +198,9 @@ public sealed class ReportTests(ApiFactory f)
         var shipments = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/partner-shipments")));
         Assert.Equal(88.000m, Num(Assert.Single(shipments.Rows).Values[5]));    // balance due
         var partners = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/partner-balances")));
-        Assert.Equal(88.000m, Num(Assert.Single(partners.Rows).Values[^1]));   // balance (last column since DT-269)
+        Assert.Equal(88.000m, Num(Assert.Single(partners.Rows).Values[^2]));   // owed to the partner (DT-278: owed / owes columns)
         var drivers = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/driver-balances")));
-        Assert.Equal(214.725m, Num(Assert.Single(drivers.Rows).Values[^1]));
+        Assert.Equal(214.725m, Num(Assert.Single(drivers.Rows).Values[^2]));
         foreach (var key in new[] { "customer-revenue", "routes", "materials" })
             Assert.NotEmpty((await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/" + key)))).Rows);
 

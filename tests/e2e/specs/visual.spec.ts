@@ -1056,6 +1056,58 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await run.check(page, "paid27#dashboard", { full: true });
     run.assertClean();
   });
+
+  /**
+   * Owner findings of 27 Oct, third part (DT-276…DT-280): a driver whose only balance is a manual entry on driver advances (the demo's 100) —
+   * the driver account opens on "Previous balance", the settlement shows it as its own line (no trips), the accounting dashboard separates
+   * "What we owe" from "Owed to us", and the journal's single "Cancelled" view lists a voided manual entry and a voided document with reasons.
+   */
+  test(`Visual — previous balances and cancelled entries of 27 Oct (${lang})`, async ({ page }) => {
+    test.skip(!wanted("pb27#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const t = texts(lang);
+    const run = new VisualRun(lang, "pb27");
+    await enrol(page, lang, new VisualRun(lang, "pb27-enrol", false));
+    const company = companyOf(page);
+    const w = await buildWorld(page, company);
+    await addTrip(page, w, `PB-1-${company.slice(0, 4)}`);
+    const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    const code = (x: string) => chart.find((a) => a.code === x)!.id;
+    const accounts = await api<{ cashBoxes: { id: string }[] }>(page, "GET", c(company, "accounting/money-accounts/options"));
+    const cash = accounts.cashBoxes[0].id;
+    const manual = (description: string, debit: number) => api<{ id: string; rowVersion: string }>(page, "POST", c(company, "accounting/journal-entries"), {
+      entryDate: today(), description, rowVersion: null, lines: [
+        { accountId: code("1104"), debit, credit: 0, costCentreId: null, party: { type: "Driver", id: w.driver }, note: null },
+        { accountId: code("110101"), debit: 0, credit: debit, costCentreId: null, party: null, note: null }] });
+    // The driver's balance from a manual entry (as JV-00042 in the demo company); the trip above is settled first so only it stays open.
+    await api(page, "POST", c(company, "settlements"), { driverId: w.driver, settlementDate: today(), deductions: [], paymentMethod: "Cash", cashBoxId: cash,
+      includePreviousBalance: false });
+    await manual(lang === "ar" ? "سلفة افتتاحية على السائق" : "Opening driver advance", 100);
+    // Cancelled entries: a voided manual entry and a voided document (an advance).
+    const typo = await manual(lang === "ar" ? "قيد مكرر" : "Duplicate entry", 12);
+    await api(page, "POST", c(company, `accounting/journal-entries/${typo.id}/void`), { reason: lang === "ar" ? "أُدخل مرتين" : "Entered twice", rowVersion: typo.rowVersion });
+    const adv = await api<{ advance: { id: string; rowVersion: string } }>(page, "POST", c(company, "advances"),
+      { driverId: w.driver, advanceDate: today(), amount: 7, paymentMethod: "Cash", cashBoxId: cash });
+    await api(page, "POST", c(company, `advances/${adv.advance.id}/void`), { reason: lang === "ar" ? "لم يستلمها السائق" : "Driver did not take it", rowVersion: adv.advance.rowVersion });
+
+    expect(await open(page, `/c/${company}/driver-accounts/${w.driver}`)).toBe(true);
+    await expect(page.locator(".pb-panel")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "pb27#driver-account", { full: true });
+    expect(await open(page, `/c/${company}/driver-accounts/${w.driver}/settle`)).toBe(true);
+    await expect(page.locator(".pb-panel")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".pb-line")).toBeVisible();
+    await run.check(page, "pb27#settlement", { full: true });
+    expect(await open(page, `/c/${company}/accounting/dashboard`)).toBe(true);
+    await expect(page.locator(".adash-owed-to-us")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "pb27#dashboard", { full: true });
+    expect(await open(page, `/c/${company}/accounting/journal`)).toBe(true);
+    await expect(page.locator("main table tbody tr").first()).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("tab", { name: t("je.cancelledView") }).click();
+    await expect(page.locator(".je-cancelled-help")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("main table tbody tr")).toHaveCount(2, { timeout: 15_000 });
+    await run.check(page, "pb27#journal-cancelled", { full: true });
+    run.assertClean();
+  });
 }
 
 /**

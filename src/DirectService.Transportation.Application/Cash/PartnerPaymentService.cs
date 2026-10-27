@@ -17,17 +17,28 @@ namespace DirectService.Transportation.Application.Cash;
 /// <summary>
 /// Partner payments (FR-085 … FR-087, 9.11): numbered; entry Dr partner payable (with the partner), Cr cash/bank; never above the
 /// partner's current balance due (Σ partner cost of active trips − Σ active payments, checked under the payment-number lock so two
-/// payments cannot together exceed it); void with reason (drv.settle): reversal, number kept.
+/// payments cannot together exceed it); void with reason (drv.settle): reversal, number kept. Owner findings 27 Oct 2026 (DT-277): the
+/// partner's previous balance from manual / opening journal entries (DT-269) is settled with the next payment (set off when the partner owes
+/// it, paid on top when owed to the partner) or by a repayment, cleared on the same accounts with the partner (<see cref="PreviousBalances"/>);
+/// only the rest of a payment / repayment counts for the partner's trips (<see cref="TripPart"/>, DT-271 coverage).
 /// </summary>
 public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter, AuditTrail audit)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter, AuditTrail audit, PreviousBalances previous)
 {
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";
 
     /// <summary>
-    /// What the company owes a partner now: partner cost of active trips − active payments (+ repayments from the partner, DT-228). Below
-    /// zero the partner owes the company (a trip voided or made cheaper after the partner was paid).
+    /// DT-277: what a payment paid for the partner's trips (its amount less the previous balance it settled), negative for a repayment (what came
+    /// back for trips: its amount less the previous balance it settled). The same rule as trn.TRN_PartnerPaymentBoundary.
+    /// </summary>
+    public static readonly Expression<Func<PartnerPayment, decimal>> TripPart =
+        p => p.Kind == CashCodes.Repayment ? -(p.Amount + p.PreviousBalance) : p.Amount - p.PreviousBalance;
+
+    /// <summary>
+    /// What the company owes a partner now for its trips: partner cost of active trips − what active payments paid for trips (+ repayments
+    /// from the partner, DT-228; previous balances settled with them left out, DT-277). Below zero the partner owes the company (a trip voided
+    /// or made cheaper after the partner was paid).
     /// </summary>
     public async Task<(decimal Cost, decimal Paid)> BalanceAsync(long partnerId, DateOnly? upTo, CancellationToken ct)
     {
@@ -39,7 +50,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
             payQ = payQ.Where(p => p.PaymentDate <= d);
         }
         var cost = await tripsQ.SumAsync(t => (decimal?)t.PartnerCost, ct).ConfigureAwait(false) ?? 0;
-        var paid = await payQ.SumAsync(p => (decimal?)(p.Kind == CashCodes.Repayment ? -p.Amount : p.Amount), ct).ConfigureAwait(false) ?? 0;
+        var paid = await payQ.Select(TripPart).SumAsync(ct).ConfigureAwait(false);
         return (cost, paid);
     }
 
@@ -68,14 +79,15 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         var notes = TextNormalizer.CleanText(r.Notes);
         new Validator().Check(!string.IsNullOrWhiteSpace(r.PartnerId), "partnerId", ErrorCodes.ValidationRequired).MaxLength("notes", notes, 500).ThrowIfInvalid();
         var (_, decimals) = await cash.CurrencyAsync(ct).ConfigureAwait(false);
-        var amount = CashSupport.Amount(r.Amount, decimals);
+        var kind = string.IsNullOrWhiteSpace(r.Kind) ? CashCodes.Payment
+            : new[] { CashCodes.Payment, CashCodes.Repayment }.FirstOrDefault(k => string.Equals(k, r.Kind.Trim(), StringComparison.OrdinalIgnoreCase))
+              ?? throw Fail.Field("kind", ErrorCodes.ValidationFormat, new FieldRef("kind"));
+        // DT-277: a payment of 0 only sets off what the partner owes from manual / opening entries against its trips (checked below).
+        var amount = kind == CashCodes.Payment && r.Amount == 0 && r.IncludePreviousBalance != false ? 0 : CashSupport.Amount(r.Amount, decimals);
         var date = await cash.DateAsync(r.PaymentDate, "paymentDate", ct).ConfigureAwait(false);
         // An archived partner can still be paid its balance due (DT-97).
         var partner = await cash.PartyAsync<Partner>("partnerId", r.PartnerId, ct).ConfigureAwait(false);
         var money = await cash.ChooseAsync(r.PaymentMethod, r.CashBoxId, r.BankAccountId, r.Reference, ct).ConfigureAwait(false);
-        var kind = string.IsNullOrWhiteSpace(r.Kind) ? CashCodes.Payment
-            : new[] { CashCodes.Payment, CashCodes.Repayment }.FirstOrDefault(k => string.Equals(k, r.Kind.Trim(), StringComparison.OrdinalIgnoreCase))
-              ?? throw Fail.Field("kind", ErrorCodes.ValidationFormat, new FieldRef("kind"));
         var payment = new PartnerPayment
         {
             Kind = kind,
@@ -93,17 +105,32 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
                 payment.Number = await numbering.NextAsync(Configuration.DocumentTypes.PartnerPayment, c).ConfigureAwait(false);
                 // Under the number lock: the balance cannot change through another payment meanwhile (FR-085).
                 var (cost, paid) = await BalanceAsync(partner.Id, null, c).ConfigureAwait(false);
-                if (kind == CashCodes.Payment && amount > cost - paid)
-                    throw Fail.RuleOn("amount", ErrorCodes.PartnerPaymentExceedsBalance, Money.Format(amount), Money.Format(Math.Max(cost - paid, 0)));
-                // DT-230: a balance due above zero means the newer trips have absorbed what was paid earlier for voided / cheaper trips: the
-                // part chosen to be deducted is set off with this payment (shown on its voucher and the statement; no money, no entry).
-                if (kind == CashCodes.Payment) payment.DeductedAmount = await RemainingDeductAsync(partner.Id, c).ConfigureAwait(false);
-                // DT-228: a repayment never above what the partner owes the company.
-                if (kind == CashCodes.Repayment && amount > paid - cost)
-                    throw Fail.RuleOn("amount", ErrorCodes.PartnerRepaymentExceedsOwed, Money.Format(amount), Money.Format(Math.Max(paid - cost, 0)));
+                var due = cost - paid;
+                // DT-277: the previous balance up to the date, settled first — owed to the partner: paid from this payment (the rest pays trips);
+                // owed by the partner: set off against the trips due (a payment, at most what the trips are owed) or repaid (a repayment).
+                var open = r.IncludePreviousBalance == false ? [] : await previous.OpenAsync(AccountingCodes.PartyPartner, partner.Id, date, c).ConfigureAwait(false);
+                var owedToPartner = open.Sum(o => o.Amount);
+                var settle = kind == CashCodes.Payment
+                    ? (owedToPartner > 0 ? Math.Min(amount, owedToPartner) : -Math.Min(-owedToPartner, Math.Max(due, 0)))
+                    : (owedToPartner < 0 ? -Math.Min(amount, -owedToPartner) : 0);
+                var items = PreviousBalances.Take(open, settle);
+                payment.PreviousBalance = items.Sum(i => i.Amount);
+                if (kind == CashCodes.Payment)
+                {
+                    if (amount == 0 && payment.PreviousBalance >= 0) throw Fail.Field("amount", ErrorCodes.ValidationRange, new FieldRef("amount"));
+                    if (amount - payment.PreviousBalance > Math.Max(due, 0))
+                        throw Fail.RuleOn("amount", ErrorCodes.PartnerPaymentExceedsBalance, Money.Format(amount), Money.Format(Math.Max(Math.Max(due, 0) + payment.PreviousBalance, 0)));
+                    // DT-230: a balance due above zero means the newer trips have absorbed what was paid earlier for voided / cheaper trips: the
+                    // part chosen to be deducted is set off with this payment (shown on its voucher and the statement; no money, no entry).
+                    payment.DeductedAmount = await RemainingDeductAsync(partner.Id, c).ConfigureAwait(false);
+                }
+                // DT-228: a repayment never above what the partner owes the company (for trips, and from manual / opening entries).
+                if (kind == CashCodes.Repayment && amount + payment.PreviousBalance > Math.Max(-due, 0))
+                    throw Fail.RuleOn("amount", ErrorCodes.PartnerRepaymentExceedsOwed, Money.Format(amount), Money.Format(Math.Max(-due, 0) - Math.Min(owedToPartner, 0)));
                 db.Set<PartnerPayment>().Add(payment);
                 if (await support.SaveCreateAsync<PartnerPayment>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
-                var entry = await posting.PostOrPendAsync(BuildEntry(payment, money.AccountId), c).ConfigureAwait(false);
+                previous.Add(items, null, payment.Id);
+                var entry = await posting.PostOrPendAsync(BuildEntry(payment, money.AccountId, items), c).ConfigureAwait(false);
                 payment.JournalEntryId = entry?.Id;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
@@ -164,17 +191,26 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
 
     /// <summary>
     /// Partner payment entry (8.6): Dr partner payable with the partner, Cr cash / bank. A repayment from the partner (DT-228): Dr cash /
-    /// bank, Cr partner payable with the partner.
+    /// bank, Cr partner payable with the partner. DT-277: partner payable takes only the trip part (amount ∓ previous balance); the previous
+    /// balance is cleared on the accounts of its manual / opening lines with the partner (<see cref="PreviousBalances.Lines"/>).
     /// </summary>
-    public PostingRequest BuildEntry(PartnerPayment p, long moneyAccountId)
+    public PostingRequest BuildEntry(PartnerPayment p, long moneyAccountId, IReadOnlyList<PreviousBalances.Open> previousItems)
     {
         ArgumentNullException.ThrowIfNull(p);
+        ArgumentNullException.ThrowIfNull(previousItems);
         var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, p.PartnerId);
+        var lines = new List<PostingLine>();
         if (p.Kind == CashCodes.Repayment)
-            return new PostingRequest(p.PaymentDate, (cash.En ? "Partner repayment " : "سداد من شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false,
-                [CashSupport.Debit(moneyAccountId, p.Amount), PostingLine.CreditKey(PostingKeys.PartnerPayable, p.Amount, party)]);
-        return new PostingRequest(p.PaymentDate, (cash.En ? "Partner payment " : "دفعة شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false,
-            [PostingLine.DebitKey(PostingKeys.PartnerPayable, p.Amount, party), CashSupport.Credit(moneyAccountId, p.Amount)]);
+        {
+            if (p.Amount > 0) lines.Add(CashSupport.Debit(moneyAccountId, p.Amount));
+            if (p.Amount + p.PreviousBalance > 0) lines.Add(PostingLine.CreditKey(PostingKeys.PartnerPayable, p.Amount + p.PreviousBalance, party));
+            lines.AddRange(PreviousBalances.Lines(previousItems, party));
+            return new PostingRequest(p.PaymentDate, (cash.En ? "Partner repayment " : "سداد من شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false, lines);
+        }
+        if (p.Amount - p.PreviousBalance > 0) lines.Add(PostingLine.DebitKey(PostingKeys.PartnerPayable, p.Amount - p.PreviousBalance, party));
+        lines.AddRange(PreviousBalances.Lines(previousItems, party));
+        if (p.Amount > 0) lines.Add(CashSupport.Credit(moneyAccountId, p.Amount));
+        return new PostingRequest(p.PaymentDate, (cash.En ? "Partner payment " : "دفعة شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false, lines);
     }
 
     // ============================================================ reads
@@ -244,17 +280,19 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
     internal async Task<PartnerPaymentDetails> DetailsAsync(long id, CancellationToken ct)
     {
         var row = await Rows(db.Set<PartnerPayment>().AsNoTracking().Where(p => p.Id == id)).SingleAsync(ct).ConfigureAwait(false);
-        return new PartnerPaymentDetails(ToResponse(row), await cash.WordsAsync(row.P.Amount, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
+        var settled = await previous.OfDocumentAsync(null, id, ct).ConfigureAwait(false);
+        return new PartnerPaymentDetails(ToResponse(row), await cash.WordsAsync(row.P.Amount, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false),
+            await previous.EntriesAsync(settled, ct).ConfigureAwait(false));
     }
 
     internal PartnerPaymentResponse ToResponse(Row x) => new(support.Token<PartnerPayment>(x.P.PublicId), x.P.Number, new Ref(support.Token<Partner>(x.PartnerPid), x.PartnerName),
         x.P.PaymentDate, x.P.Amount, x.P.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName), x.P.Reference, x.P.Notes, x.P.Status,
         cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.P.VoidReason, DateTime.SpecifyKind(x.P.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(x.P.RowVersion),
-        x.P.Kind, x.P.DeductedAmount);
+        x.P.Kind, x.P.DeductedAmount, x.P.PreviousBalance);
 }
 
 /// <summary>Pending-posting retries for partner payments.</summary>
-public sealed class PartnerPaymentPostingHandler(IAppDbContext db, IUrlTokenService tokens, PartnerPaymentService payments, CashSupport cash)
+public sealed class PartnerPaymentPostingHandler(IAppDbContext db, IUrlTokenService tokens, PartnerPaymentService payments, CashSupport cash, PreviousBalances previous)
     : CashPostingHandler<PartnerPayment>(db, tokens)
 {
     public override string SourceType => PartnerPaymentService.SourceType;
@@ -262,5 +300,5 @@ public sealed class PartnerPaymentPostingHandler(IAppDbContext db, IUrlTokenServ
     protected override string VoidCode => ErrorCodes.PartnerPaymentIsVoid;
 
     protected override async Task<PostingRequest?> EntryAsync(PartnerPayment d, CancellationToken ct) =>
-        payments.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false));
+        payments.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), await previous.OfDocumentAsync(null, d.Id, ct).ConfigureAwait(false));
 }

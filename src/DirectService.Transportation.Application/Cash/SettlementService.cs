@@ -22,9 +22,12 @@ namespace DirectService.Transportation.Application.Cash;
 /// items and reverses the entry. Revision 6 (DT-228): when advances and deductions exceed the wages, the driver repays part or all of the
 /// shortfall with the settlement (Dr cash / bank, Cr driver advances, same STL entry); an unpaid rest becomes a new open advance
 /// ("Carried", no money moved, kept on driver advances by the same entry) for the next settlement. Void reverses it and voids that advance.
+/// Owner findings 27 Oct 2026 (DT-276): the driver's previous balance from manual / opening journal entries up to the date (DT-269) is part of
+/// the settlement — net = wages − advances − deductions + previous balance — and its entry clears it on the same accounts with the driver
+/// (<see cref="PreviousBalances"/>); a settlement may settle only that balance (no trips, no advances).
 /// </summary>
 public sealed class SettlementService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, TripService trips)
+    INumberingService numbering, PostingEngine posting, TripService trips, PreviousBalances previous)
 {
     public const string EntityType = "TRN.Settlement";
     public const string SourceType = "Settlement";
@@ -59,8 +62,10 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         var suggestions = await SuggestionsAsync(OpenTrips(driver.Id, upTo), ct).ConfigureAwait(false);
         var gross = tripItems.Sum(t => t.DriverWage);
         var advances = advanceItems.Sum(a => a.Amount);
+        var open = await previous.OpenAsync(AccountingCodes.PartyDriver, driver.Id, upTo, ct).ConfigureAwait(false);
+        var balance = open.Sum(o => o.Amount);
         return new SettlementPreview(new Ref(support.Token<Driver>(driver.PublicId), driver.FullName), driver.PlateNumber, upTo, tripItems, advanceItems, suggestions,
-            gross, advances, gross - advances);
+            gross, advances, gross - advances + balance, balance, balance == 0 ? [] : await previous.EntriesAsync(open, ct).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -111,11 +116,14 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
                 stl.Number = await numbering.NextAsync(Configuration.DocumentTypes.Settlement, c).ConfigureAwait(false);
                 var tripList = await Pick(OpenTrips(driver.Id, date), r.TripIds, "tripIds", t => t.PublicId, support.Decode<Trip>, c).ConfigureAwait(false);
                 var advanceList = await Pick(OpenAdvances(driver.Id, date), r.AdvanceIds, "advanceIds", a => a.PublicId, support.Decode<Advance>, c).ConfigureAwait(false);
-                if (tripList.Count == 0 && advanceList.Count == 0) throw Fail.Rule(ErrorCodes.SettlementEmpty);
+                // DT-276: the previous balance up to the date, read under the settlement number like the open items.
+                var open = r.IncludePreviousBalance == false ? [] : await previous.OpenAsync(AccountingCodes.PartyDriver, driver.Id, date, c).ConfigureAwait(false);
+                stl.PreviousBalance = open.Sum(o => o.Amount);
+                if (tripList.Count == 0 && advanceList.Count == 0 && stl.PreviousBalance == 0) throw Fail.Rule(ErrorCodes.SettlementEmpty);
                 stl.GrossWages = tripList.Sum(t => t.DriverWage);
                 stl.AdvancesTotal = advanceList.Sum(a => a.Amount);
                 stl.DeductionsTotal = deductions.Sum(d => d.Amount);
-                var net = stl.GrossWages - stl.AdvancesTotal - stl.DeductionsTotal;
+                var net = stl.GrossWages - stl.AdvancesTotal - stl.DeductionsTotal + stl.PreviousBalance;
                 // 8.5 / FR-079: never below zero — a shortfall is repaid by the driver (all or part) and the rest carried (DT-228).
                 if (net < 0)
                 {
@@ -129,6 +137,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
                 stl.NetPayable = Math.Max(net, 0);
                 db.Set<Settlement>().Add(stl);
                 if (await support.SaveCreateAsync<Settlement>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
+                previous.Add(open, stl.Id, null);
                 if (stl.CarriedForward > 0)
                 {
                     // The unpaid rest: a new open advance of the driver, numbered like any advance, dated with the settlement.
@@ -161,7 +170,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
                 var posted = await db.Set<JournalEntry>().Where(e => e.SourceModule == AccountingCodes.ModuleTrn && e.SourceType == TripService.SourceType && ids.Contains(e.SourceId!.Value)
                     && e.Status == AccountingCodes.Posted && e.ReversesEntryId == null).Select(e => e.Id).ToListAsync(c).ConfigureAwait(false);
                 var accruedGross = tripList.Where(t => (t.JournalEntryId is long j && posted.Contains(j)) || pending.Contains(t.Id)).Sum(t => t.DriverWage);
-                var request = BuildEntry(stl, money.AccountId, accruedGross);
+                var request = BuildEntry(stl, money.AccountId, accruedGross, open);
                 if (request is not null)
                 {
                     var entry = await posting.PostOrPendAsync(request, c).ConfigureAwait(false);
@@ -223,14 +232,16 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
     /// <summary>
     /// Settlement entry (8.6): Dr driver payable (accrued wages, with the driver) and driver wage expense (the rest, BR-031a); Cr driver
     /// advances (with the driver), driver deductions, cash / bank (net). Null when every amount is zero. DT-228: Dr cash / bank for the
-    /// driver's repayment; driver advances are credited only with what leaves them (settled advances − the carried rest, which stays).
+    /// driver's repayment; driver advances are credited only with what leaves them (settled advances − the carried rest, which stays). DT-276:
+    /// the previous balance is cleared on the accounts of its manual / opening lines with the driver (<see cref="PreviousBalances.Lines"/>).
     /// </summary>
-    public PostingRequest? BuildEntry(Settlement s, long moneyAccountId, decimal accruedGross)
+    public PostingRequest? BuildEntry(Settlement s, long moneyAccountId, decimal accruedGross, IReadOnlyList<PreviousBalances.Open> previousItems)
     {
         ArgumentNullException.ThrowIfNull(s);
-        if (s.GrossWages == 0 && s.AdvancesTotal == 0 && s.DeductionsTotal == 0) return null;
+        ArgumentNullException.ThrowIfNull(previousItems);
         var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, s.DriverId);
-        var lines = new List<PostingLine>();
+        var lines = PreviousBalances.Lines(previousItems, party).ToList();
+        if (s.GrossWages == 0 && s.AdvancesTotal == 0 && s.DeductionsTotal == 0 && lines.Count == 0) return null;
         if (accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverPayable, accruedGross, party));
         if (s.GrossWages - accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverWageExpense, s.GrossWages - accruedGross, party));
         // Deductions above the wages can leave more on driver advances than was settled (a debit then).
@@ -355,24 +366,27 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         var deductions = (await db.Set<SettlementDeduction>().AsNoTracking().Where(d => d.SettlementId == id).OrderBy(d => d.Id)
                 .Select(d => new { d.PublicId, d.DeductionType, d.Amount, d.Note }).ToListAsync(ct).ConfigureAwait(false))
             .Select(d => new SettlementDeductionResponse(support.Token<SettlementDeduction>(d.PublicId), d.DeductionType, d.Amount, d.Note)).ToList();
+        var settledBalance = await previous.OfDocumentAsync(id, null, ct).ConfigureAwait(false);
         return new SettlementDetails(ToResponse(row), tripItems, advanceItems, deductions, await cash.WordsAsync(row.S.NetPayable, ct).ConfigureAwait(false),
-            await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
+            await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false), await previous.EntriesAsync(settledBalance, ct).ConfigureAwait(false));
     }
 
     internal SettlementResponse ToResponse(Row x) => new(support.Token<Settlement>(x.S.PublicId), x.S.Number, new Ref(support.Token<Driver>(x.DriverPid), x.DriverName),
         x.S.SettlementDate, x.S.GrossWages, x.S.AdvancesTotal, x.S.DeductionsTotal, x.S.NetPayable, x.S.PaymentMethod, cash.Account(x.BoxPid, x.BoxName, x.BankPid, x.BankName),
         x.S.Reference, x.S.Status, cash.Entry(x.EntryPid, x.EntryNumber), x.Pending, x.S.VoidReason, DateTime.SpecifyKind(x.S.CreatedAt, DateTimeKind.Utc),
         Convert.ToBase64String(x.S.RowVersion), x.S.RepaidAmount, x.S.CarriedForward,
-        x.CarriedPid is Guid cp ? new DocRef(support.Token<Advance>(cp), x.CarriedNumber!) : null);
+        x.CarriedPid is Guid cp ? new DocRef(support.Token<Advance>(cp), x.CarriedNumber!) : null, x.S.PreviousBalance);
 }
 
 /// <summary>Pending-posting retries for settlements.</summary>
-public sealed class SettlementPostingHandler(IAppDbContext db, IUrlTokenService tokens, SettlementService settlements, CashSupport cash) : CashPostingHandler<Settlement>(db, tokens)
+public sealed class SettlementPostingHandler(IAppDbContext db, IUrlTokenService tokens, SettlementService settlements, CashSupport cash, PreviousBalances previous)
+    : CashPostingHandler<Settlement>(db, tokens)
 {
     public override string SourceType => SettlementService.SourceType;
 
     protected override string VoidCode => ErrorCodes.SettlementIsVoid;
 
     protected override async Task<PostingRequest?> EntryAsync(Settlement d, CancellationToken ct) =>
-        settlements.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), await settlements.AccruedGrossAsync(d, ct).ConfigureAwait(false));
+        settlements.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), await settlements.AccruedGrossAsync(d, ct).ConfigureAwait(false),
+            await previous.OfDocumentAsync(d.Id, null, ct).ConfigureAwait(false));
 }

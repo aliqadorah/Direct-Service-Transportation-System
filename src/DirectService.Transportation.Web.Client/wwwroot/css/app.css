@@ -150,9 +150,10 @@ svg.ic { width: var(--ic); height: var(--ic); flex: none; stroke: currentColor; 
 
 /* ============================================================ boxes and layout */
 .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); min-width: 0; }
-.box > .bh { display: flex; align-items: center; gap: var(--sp-4); padding: 7px var(--sp-6); border-bottom: 1px solid var(--border); font-weight: var(--fw-semibold); }
+/* A table card wraps its content in .box-x (DT-234): its own header row keeps the header style. */
+.box > .bh, .box > .box-x > .bh { display: flex; align-items: center; gap: var(--sp-4); padding: 7px var(--sp-6); border-bottom: 1px solid var(--border); font-weight: var(--fw-semibold); }
 .box > .bh h2 { font-size: inherit; font-weight: inherit; }
-.box > .bh .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); font-weight: var(--fw-regular); }
+.box > .bh .a, .box > .box-x > .bh .a { margin-inline-start: auto; display: flex; gap: var(--sp-3); font-weight: var(--fw-regular); }
 .pad { padding: var(--sp-6) var(--sp-7); }
 .fill { flex: 1; min-height: 0; overflow: auto; }
 /* DT-247: cards that flow down the page at their own height — dashboards and list-plus-panel pages. The page (.content) is the only

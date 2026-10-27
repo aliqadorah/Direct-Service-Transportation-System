@@ -24,7 +24,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// always equals the statement's closing balance on that date.
 /// </summary>
 public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport support, CashSupport cash, SettlementService settlements,
-    PartnerPaymentService payments, ISpreadsheetService sheets)
+    PartnerPaymentService payments, ISpreadsheetService sheets, PreviousBalances previous)
 {
     private const int KindTrip = 0, KindAdvance = 1, KindDeduction = 2, KindSettlement = 3, KindPayment = 4, KindJournal = 5;
 
@@ -41,7 +41,8 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var history = await settlements.Rows(db.Set<Settlement>().AsNoTracking().Where(s => s.DriverId == driver.Id).OrderByDescending(s => s.SettlementDate).ThenByDescending(s => s.Id).Take(50))
             .ToListAsync(ct).ConfigureAwait(false);
         return new DriverAccountResponse(new Ref(support.Token<Driver>(driver.PublicId), driver.FullName), driver.PlateNumber, preview.Trips, preview.Advances, preview.Gross,
-            preview.AdvancesTotal, preview.Net, events.Sum(e => e.Increase - e.Decrease), history.Select(settlements.ToResponse).ToList());
+            preview.AdvancesTotal, preview.Net, events.Sum(e => e.Increase - e.Decrease), history.Select(settlements.ToResponse).ToList(), preview.PreviousBalance,
+            preview.PreviousBalanceEntries);
     }
 
     private async Task<List<Event>> DriverEventsAsync(long driverId, DateOnly? to, CancellationToken ct)
@@ -96,10 +97,12 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var count = await db.Set<Trip>().CountAsync(t => t.PartnerId == partner.Id && t.Status == TripService.Active, ct).ConfigureAwait(false);
         var recent = await payments.Rows(db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partner.Id).OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).Take(20))
             .ToListAsync(ct).ConfigureAwait(false);
-        // DT-269: the balance includes manual / opening entries with the partner as party, like the statement.
-        var journal = (await JournalBalancesAsync(AccountingCodes.PartyPartner, DateOnly.MaxValue, ct).ConfigureAwait(false)).GetValueOrDefault(partner.Id);
-        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid + journal, recent.Select(payments.ToResponse).ToList(),
-            await payments.ToDeductAsync(partner.Id, ct).ConfigureAwait(false));
+        // DT-269 / DT-277: the balance includes manual / opening entries with the partner as party, like the statement: "paid" is what payments paid
+        // for the trips, the previous balance what is still open of those entries (the rest was settled with payments).
+        var open = await previous.OpenAsync(AccountingCodes.PartyPartner, partner.Id, DateOnly.MaxValue, ct).ConfigureAwait(false);
+        var balance = open.Sum(o => o.Amount);
+        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid + balance, recent.Select(payments.ToResponse).ToList(),
+            await payments.ToDeductAsync(partner.Id, ct).ConfigureAwait(false), balance, balance == 0 ? [] : await previous.EntriesAsync(open, ct).ConfigureAwait(false));
     }
 
     public async Task<StatementResponse> PartnerStatementAsync(string token, DateOnly? from, DateOnly? to, CancellationToken ct)
@@ -137,9 +140,7 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
     // ============================================================ manual and opening entries with the party (DT-269)
 
     /// <summary>Lines of manual entries (with their reversals) and of the opening entry that name the party, up to a date.</summary>
-    private IQueryable<EntryLine> PartyJournalLines(string partyType, DateOnly upTo) =>
-        db.Set<EntryLine>().AsNoTracking().Where(l => l.PartyType == partyType && l.PartyId != null && l.JournalEntry.EntryDate <= upTo
-            && (l.JournalEntry.IsManual || l.JournalEntry.SourceType == AccountingCodes.SourceOpening));
+    private IQueryable<EntryLine> PartyJournalLines(string partyType, DateOnly upTo) => PreviousBalances.PartyLines(db, partyType, upTo);
 
     private async Task<List<Event>> JournalEventsAsync(string partyType, long partyId, DateOnly upTo, CancellationToken ct)
     {

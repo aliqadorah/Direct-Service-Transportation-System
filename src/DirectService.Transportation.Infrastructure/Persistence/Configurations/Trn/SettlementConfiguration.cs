@@ -21,7 +21,7 @@ internal sealed class SettlementConfiguration : IEntityTypeConfiguration<Settlem
             t.HasCheckConstraint("CK_TRN_Settlements_VoidReason_VoidedBy_VoidedAt", "[Status] <> 'Void' OR ([VoidReason] IS NOT NULL AND [VoidedBy] IS NOT NULL AND [VoidedAt] IS NOT NULL)");
             t.HasCheckConstraint("CK_TRN_Settlements_CashBoxId_BankAccountId", "([PaymentMethod] = 'Cash' AND [CashBoxId] IS NOT NULL AND [BankAccountId] IS NULL) OR ([PaymentMethod] IN ('Bank','CliQ') AND [BankAccountId] IS NOT NULL AND [CashBoxId] IS NULL)");
             t.HasCheckConstraint("CK_TRN_Settlements_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
-            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [RepaidAmount] + [CarriedForward]");
+            t.HasCheckConstraint("CK_TRN_Settlements_NetPayable", "[NetPayable] >= 0 AND [NetPayable] = [GrossWages] - [AdvancesTotal] - [DeductionsTotal] + [PreviousBalance] + [RepaidAmount] + [CarriedForward]");
             // Revision 6 (DT-228): a repayment by the driver (and the carried rest) only when the net would be negative.
             t.HasCheckConstraint("CK_TRN_Settlements_RepaidAmount_CarriedForward", "[RepaidAmount] >= 0 AND [CarriedForward] >= 0 AND ([NetPayable] = 0 OR ([RepaidAmount] = 0 AND [CarriedForward] = 0))");
         });
@@ -104,6 +104,14 @@ internal sealed class SettlementConfiguration : IEntityTypeConfiguration<Settlem
             .HasColumnName("CarriedForward")
             .HasColumnType("decimal(18,3)")
             .HasColumnOrder(30)
+            .HasPrecision(18, 3)
+            .IsRequired(true)
+            .HasDefaultValueSql("0")
+            .ValueGeneratedNever();
+        builder.Property(e => e.PreviousBalance)
+            .HasColumnName("PreviousBalance")
+            .HasColumnType("decimal(18,3)")
+            .HasColumnOrder(31)
             .HasPrecision(18, 3)
             .IsRequired(true)
             .HasDefaultValueSql("0")

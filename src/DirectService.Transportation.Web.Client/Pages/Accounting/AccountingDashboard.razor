@@ -4,13 +4,15 @@
   (default the current one): cash and bank balances, receivables and payables, revenue, expenses and net profit of the month and of the year to
   date, budget usage of the approved budget; revenue vs expenses of the last 12 months and the receivables ageing as small bar charts (values
   also in text for screen readers); reminders computed from the data, each with a count and a link; quick links. The API leaves out what the
-  user may not open; everything is of the company in the address.
+  user may not open; everything is of the company in the address. Owner findings 27 Oct 2026 (DT-278): "What we owe" (parties the company must
+  pay) and "Owed to us" (drivers, partners and suppliers who owe the company) are separate cards and boxes, never negative, each line opening
+  the list filtered to that side.
 *@
 @inject Api Api
 @inject Loc L
 @inject ShellState Shell
 
-<LiveRefresh EntityTypes="@(["ACC.JournalEntry", "ACC.JournalDraft", "ACC.PendingPosting", "ACC.Period", "ACC.Budget", "TRN.Invoice", "TRN.Receipt", "ACC.ApArDocument"])" OnChange="Load" />
+<LiveRefresh EntityTypes="@(["ACC.JournalEntry", "ACC.JournalDraft", "ACC.PendingPosting", "ACC.Period", "ACC.Budget", "TRN.Invoice", "TRN.Receipt", "ACC.ApArDocument", "TRN.Settlement", "TRN.PartnerPayment"])" OnChange="Load" />
 <PageHeader Title="@L["nav.accountingDashboard"]" Help="accounting-dashboard" Crumbs="@([new Crumb(L["nav.accounting"]), new Crumb(L["nav.accountingDashboard"])])">
     <Actions>
         <span class="row" role="group" aria-label="@L["adash.period"]" style="gap:8px;align-items:flex-end">
@@ -82,12 +84,13 @@
             <div class="stack">
                 @if (d.Figures?.Payables is { } owed)
                 {
-                    @* Owner decision 18 Oct 2026: what is owed to suppliers, drivers and partners, each linking to its accounts page, with the total. *@
-                    <Box Title="@L["adash.owedTitle"]" NoPad="true">
+                    @* Owner decision 18 Oct 2026: what is owed to suppliers, drivers and partners, each linking to its accounts page, with the total.
+                       DT-278: only those the company must pay; the links open the lists filtered to them. *@
+                    <Box Title="@L["adash.owedTitle"]" NoPad="true" Class="adash-owed">
                         <table class="grid">
                             <caption class="sr-only">@L["adash.owedTitle"]</caption>
                             <tbody>
-                                @foreach (var (key, amount, route) in OwedLines(owed))
+                                @foreach (var (key, amount, route) in OwedLines(owed.Suppliers, owed.Drivers, owed.Partners, "owed"))
                                 {
                                     <tr>
                                         <td><a href="@NavModel.Href(Company, route)">@L[key]</a></td>
@@ -97,6 +100,26 @@
                             </tbody>
                             <tfoot><tr><td>@L["ui.total"]</td><td class="n"><bdi class="num">@Fmt.Money(owed.Total)</bdi></td></tr></tfoot>
                         </table>
+                    </Box>
+                }
+                @if (d.Figures?.OwedToUs is { } ours)
+                {
+                    @* DT-278: drivers, partners and suppliers who owe the company (e.g. an opening driver advance), as positive amounts. *@
+                    <Box Title="@L["adash.owedToUsTitle"]" NoPad="true" Class="adash-owed-to-us">
+                        <table class="grid">
+                            <caption class="sr-only">@L["adash.owedToUsTitle"]</caption>
+                            <tbody>
+                                @foreach (var (key, amount, route) in OwedLines(ours.Suppliers, ours.Drivers, ours.Partners, "owes"))
+                                {
+                                    <tr>
+                                        <td><a href="@NavModel.Href(Company, route)">@L[key]</a></td>
+                                        <td class="n"><bdi class="num">@Fmt.Money(amount)</bdi></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot><tr><td>@L["ui.total"]</td><td class="n"><bdi class="num">@Fmt.Money(ours.Total)</bdi></td></tr></tfoot>
+                        </table>
+                        <p class="help pad" style="margin:0">@L["adash.owedToUsHelp"]</p>
                     </Box>
                 }
                 <Box Title="@L["adash.reminders"]" NoPad="true">
@@ -191,19 +214,23 @@
         if (f.CashAndBank is decimal cash) list.Add(new Figure(L["adash.cash"], Fmt.Money(cash), asOf));
         if (f.Receivables is decimal rec) list.Add(new Figure(L["adash.receivables"], Fmt.Money(rec), asOf));
         if (f.Payables is { } pay) list.Add(new Figure(L["adash.payables"], Fmt.Money(pay.Total), asOf));
+        if (f.OwedToUs is { } ours) list.Add(new Figure(L["adash.owedToUs"], Fmt.Money(ours.Total), asOf));
         if (d.Budget is { } b)
             list.Add(new Figure(L["adash.budgetUsage"], b.ExpenseUsedPercent is decimal p ? Fmt.Percent(p, 1) : "—",
                 L.F("adash.budgetNote", b.BudgetName, Fmt.Percent(b.YearElapsedPercent, 1))));
         return list;
     }
 
-    /// <summary>The lines of what is owed the user may open: suppliers (payables list), drivers (driver accounts), partners (partner accounts).</summary>
-    private static IReadOnlyList<(string Key, decimal Amount, string Route)> OwedLines(Payables p)
+    /// <summary>
+    /// The lines the user may open: suppliers (payables list), drivers (driver accounts), partners (partner accounts); DT-278: the account lists
+    /// filtered to the side (<c>side=owed</c> — the company must pay them, <c>side=owes</c> — they owe the company).
+    /// </summary>
+    private static IReadOnlyList<(string Key, decimal Amount, string Route)> OwedLines(decimal? suppliers, decimal? drivers, decimal? partners, string side)
     {
         var lines = new List<(string, decimal, string)>();
-        if (p.Suppliers is decimal s) lines.Add(("adash.owedSuppliers", s, "accounting/payables"));
-        if (p.Drivers is decimal d) lines.Add(("adash.owedDrivers", d, "driver-accounts"));
-        if (p.Partners is decimal pt) lines.Add(("adash.owedPartners", pt, "partner-accounts"));
+        if (suppliers is decimal s) lines.Add(("adash.owedSuppliers", s, "accounting/payables"));
+        if (drivers is decimal d) lines.Add(("adash.owedDrivers", d, "driver-accounts?side=" + side));
+        if (partners is decimal pt) lines.Add(("adash.owedPartners", pt, "partner-accounts?side=" + side));
         return lines;
     }
 

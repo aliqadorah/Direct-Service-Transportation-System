@@ -761,6 +761,15 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 && (l.JournalEntry.IsManual || l.JournalEntry.SourceType == AccountingCodes.SourceOpening))
             .GroupBy(l => new { l.AccountId, l.JournalEntryId }).Select(g => new GapLine(g.Key.AccountId, g.Key.JournalEntryId, g.Sum(l => l.Debit - l.Credit)))
             .ToListAsync(ct).ConfigureAwait(false);
+        // DT-276 / DT-277: what settlements and partner payments settled of those lines — their entries clear it on the same account (owed to the
+        // party → debit), so a settled manual / opening amount is no longer a documents difference.
+        var settledLines = await db.Set<Domain.Trn.PreviousBalanceItem>().AsNoTracking().Where(i => ids.Contains(i.AccountId) && i.JournalEntry.EntryDate <= asOf
+                && ((i.Settlement != null && i.Settlement.Status == "Active" && i.Settlement.SettlementDate <= asOf)
+                    || (i.PartnerPayment != null && i.PartnerPayment.Status == "Active" && i.PartnerPayment.PaymentDate <= asOf)))
+            .GroupBy(i => new { i.AccountId, i.JournalEntryId }).Select(g => new GapLine(g.Key.AccountId, g.Key.JournalEntryId, g.Sum(i => i.Amount)))
+            .ToListAsync(ct).ConfigureAwait(false);
+        gapLines = gapLines.Concat(settledLines).GroupBy(g => (g.AccountId, g.JournalEntryId))
+            .Select(g => new GapLine(g.Key.AccountId, g.Key.JournalEntryId, g.Sum(x => x.B))).ToList();
         var gapEntryIds = gapLines.Select(g => g.JournalEntryId).Distinct().ToList();
         var entries = await db.Set<JournalEntry>().AsNoTracking().Where(e => gapEntryIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
         bool Matches(Account a, string? module, string? type, long? id) =>
@@ -795,7 +804,8 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             }
             // DT-262: documents figures for every control account — rebuilt from the documents, or (where they cannot rebuild it) what documents posted.
             var rebuilt = await DocumentBalanceAsync(a, asOf, ct).ConfigureAwait(false);
-            var documents = rebuilt ?? posted.GetValueOrDefault(a.Id);
+            // What documents posted, less the lines that cleared settled manual / opening amounts (DT-276 / DT-277; they belong with those entries).
+            var documents = rebuilt ?? posted.GetValueOrDefault(a.Id) - settledLines.Where(s => s.AccountId == a.Id).Sum(s => s.B);
             var mineGap = gapLines.Where(g => g.AccountId == a.Id).ToList();
             var manual = mineGap.Where(g => entries[g.JournalEntryId].IsManual).Sum(g => g.B);
             var opening = mineGap.Where(g => !entries[g.JournalEntryId].IsManual).Sum(g => g.B);
@@ -865,7 +875,9 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         {
             var cost = await db.Set<Domain.Trn.Trip>().AsNoTracking().Where(t => t.Status == "Active" && t.PartnerId != null && t.TripDate <= asOf).SumAsync(t => t.PartnerCost, ct)
                 .ConfigureAwait(false);
-            var paid = await db.Set<Domain.Trn.PartnerPayment>().AsNoTracking().Where(p => p.Status == "Active" && p.PaymentDate <= asOf).SumAsync(p => p.Amount, ct).ConfigureAwait(false);
+            // DT-277: what payments paid for trips (repayments taken off; previous balances settled with them are cleared on their own accounts).
+            var paid = await db.Set<Domain.Trn.PartnerPayment>().AsNoTracking().Where(p => p.Status == "Active" && p.PaymentDate <= asOf)
+                .Select(Cash.PartnerPaymentService.TripPart).SumAsync(ct).ConfigureAwait(false);
             total = (total ?? 0) - (cost - paid);
         }
         if (keys.Contains(PostingKeys.DriverAdvances))
