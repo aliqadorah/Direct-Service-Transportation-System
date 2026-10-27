@@ -24,15 +24,21 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     /// <summary>
     /// The test database. The shared API collection uses DirectServiceMaster_ApiTests; migration tests use their own database (DT-231), so the
-    /// data other tests leave behind (e.g. driver repayments) never decides whether a migration can be rolled back.
+    /// data other tests leave behind (e.g. driver repayments) never decides whether a migration can be rolled back. Null: the database named
+    /// by DST_API_TEST_DB (the performance check's own DirectServiceMaster_PerfTests, DT-227), else DirectServiceMaster_ApiTests.
     /// </summary>
-    protected virtual string DatabaseName => "DirectServiceMaster_ApiTests";
+    protected virtual string? DatabaseName => null;
 
     /// <summary>The connection string of this factory's database (CI gives the server and credentials in DST_API_TEST_DB).</summary>
-    public string Database => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("DST_API_TEST_DB") ?? ConnectionString)
+    public string Database
     {
-        InitialCatalog = DatabaseName,
-    }.ConnectionString;
+        get
+        {
+            var b = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("DST_API_TEST_DB") ?? ConnectionString);
+            if (DatabaseName is { } own) b.InitialCatalog = own;
+            return b.ConnectionString;
+        }
+    }
 
     public const string ConnectionString =
         "Server=localhost;Database=DirectServiceMaster_ApiTests;Integrated Security=true;TrustServerCertificate=true;Encrypt=true";
@@ -351,19 +357,19 @@ public sealed class RecordingNotifier : IRealtimeNotifier
 /// <summary>DT-231: the trips-list migration test on its own database (no other test's data in it).</summary>
 public sealed class TripListMigrationFactory : ApiFactory
 {
-    protected override string DatabaseName => "DirectServiceMaster_MigrationTests";
+    protected override string? DatabaseName => "DirectServiceMaster_MigrationTests";
 }
 
 /// <summary>DT-259: the journal line tax upgrade / rollback test on its own database.</summary>
 public sealed class JournalTaxUpgradeFactory : ApiFactory
 {
-    protected override string DatabaseName => "DirectServiceMaster_TaxUpgradeTests";
+    protected override string? DatabaseName => "DirectServiceMaster_TaxUpgradeTests";
 }
 
 /// <summary>DT-231: the settlement upgrade / rollback test on its own database.</summary>
 public sealed class SettlementUpgradeFactory : ApiFactory
 {
-    protected override string DatabaseName => "DirectServiceMaster_UpgradeTests";
+    protected override string? DatabaseName => "DirectServiceMaster_UpgradeTests";
 }
 
 /// <summary>
@@ -372,7 +378,7 @@ public sealed class SettlementUpgradeFactory : ApiFactory
 /// </summary>
 public sealed class SystemEmailFactory : ApiFactory
 {
-    protected override string DatabaseName => "DirectServiceMaster_EmailTests";
+    protected override string? DatabaseName => "DirectServiceMaster_EmailTests";
 
     /// <summary>The development mode's folder of this run.</summary>
     public string DropFolder { get; } = Path.Combine(Path.GetTempPath(), "dst-email-tests-" + Guid.NewGuid().ToString("N"));

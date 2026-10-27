@@ -13,7 +13,7 @@
 
 <Modal @bind-Open="_open" Title="@L["cols.title"]" Busy="_busy" Icon="columns">
     <ChildContent>
-        <p class="help" style="margin:0">@L[_source == "Personal" ? "cols.personal" : _source == "CompanyDefault" ? "cols.companyDefault" : "cols.builtIn"]</p>
+        <p class="help" style="margin:0">@L[_source == "Personal" ? "cols.personal" : _source == "CompanyDefault" ? "cols.companyDefault" : Default is null ? "cols.builtIn" : "cols.builtInSome"]</p>
         <ul class="stack" style="list-style:none;margin:0;padding:0;gap:4px" aria-label="@L["cols.title"]">
             @for (var i = 0; i < _rows.Count; i++)
             {
@@ -48,7 +48,10 @@
     /// <summary>Every column the list can show, in its default order: key and title.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<(string Key, string Title)> Columns { get; set; } = [];
 
-    /// <summary>The columns to show, in order (null = all, in the default order).</summary>
+    /// <summary>The columns shown without a saved view, in order (DT-273: optional columns start hidden); null = all.</summary>
+    [Parameter] public IReadOnlyList<string>? Default { get; set; }
+
+    /// <summary>The columns to show, in order (null = the default columns).</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>?> OnChange { get; set; }
 
     protected override async Task OnInitializedAsync()
@@ -72,7 +75,7 @@
 
     private void Open()
     {
-        var shown = _current ?? Columns.Select(c => c.Key).ToList();
+        var shown = _current ?? Default ?? Columns.Select(c => c.Key).ToList();
         _rows = [.. shown.Select(k => new Row(k, Columns.First(c => c.Key == k).Title) { On = true }),
                  .. Columns.Where(c => !shown.Contains(c.Key)).Select(c => new Row(c.Key, c.Title))];
         _error = null;

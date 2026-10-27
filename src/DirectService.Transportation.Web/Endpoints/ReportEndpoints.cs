@@ -65,6 +65,8 @@ internal static class ReportEndpoints
             await svc.DeleteAsync(report, ct).ConfigureAwait(false);
             return TypedResults.NoContent();
         }).RequirePermission(PermissionKeys.ReportsView);
+        s.MapGet("/{report}/pin-measures", async (string report, SavedReportService svc, CancellationToken ct) =>
+            TypedResults.Ok(await svc.PinMeasuresAsync(report, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
         s.MapPost("/{report}/run", async (string report, DateOnly? from, DateOnly? to, SavedReportService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.RunAsync(report, from, to, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
         s.MapPost("/{report}/export", async (string report, DateOnly? from, DateOnly? to, string? format, SavedReportService svc, CancellationToken ct) =>

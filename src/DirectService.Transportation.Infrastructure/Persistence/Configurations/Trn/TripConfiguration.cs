@@ -388,6 +388,10 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
             .HasFilter("[InvoiceId] IS NULL");
         builder.HasIndex(new[] { "CompanyId", "DriverId", "Status" }, "IX_TRN_Trips_Unsettled")
             .HasFilter("[SettlementId] IS NULL");
+        // DT-271: partner trips in payment order (trip date, receipt number) for the running cost of trn.TRN_TripPartnerCoverage.
+        builder.HasIndex(new[] { "TenantId", "CompanyId", "PartnerId", "TripDate", "ReceiptNoKey", "Id" }, "IX_TRN_Trips_PartnerOrder")
+            .IncludeProperties("PartnerCost")
+            .HasFilter("[PartnerId] IS NOT NULL AND [Status] = 'Active' AND [IsDeleted] = 0");
         builder.HasIndex(new[] { "DriverId" }, "IX_TRN_Trips_DriverId");
         builder.HasIndex(new[] { "CustomerId" }, "IX_TRN_Trips_CustomerId");
         builder.HasIndex(new[] { "LoadingSiteId" }, "IX_TRN_Trips_LoadingSiteId");

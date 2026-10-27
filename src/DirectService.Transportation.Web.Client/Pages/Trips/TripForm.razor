@@ -40,6 +40,16 @@
                 <Actions>@if (_trip.Invoice is not null) {<a href="@NavModel.Href(Company, $"invoices/{_trip.Invoice.Id}")">@L.F("trip.openInvoice", _trip.Invoice.Number ?? "")</a>}</Actions>
             </Banner>
         }
+        @if (_trip is { Status: "Active", Payment: "Settled" or "PartnerPaid" or "PartnerPartlyPaid" or "PartnerUnpaid" } paid)
+        {
+            @* DT-272: how the trip was paid — the driver settlement, or the partner's payments (oldest trips first) with the partner statement. *@
+            <Banner Tone="@(paid.Payment == "PartnerPartlyPaid" ? Tone.Warn : Tone.Info)" Text="@PaymentNote(paid)">
+                <Actions>
+                    @if (paid.Settlement is { } stl) {<a href="@NavModel.Href(Company, $"driver-accounts/settlements/{stl.Id}")">@L.F("trip.openSettlement", stl.Number ?? "")</a>}
+                    else if (paid.Partner is { } partner && Shell.Can(PermissionKeys.DrvView)) {<a href="@NavModel.Href(Company, $"partner-accounts/{partner.Id}?tab=statement")">@L["trip.openPartnerStatement"]</a>}
+                </Actions>
+            </Banner>
+        }
         @if (_trip?.NeedsReview == true && _trip.ReviewNote is not null) {<Banner Tone="Tone.Warn" Text="@_trip.ReviewNote" />}
         @foreach (var w in _warnings) {<Banner Tone="Tone.Warn" Text="@w.Message" />}
         <div class="cols fill" style="grid-template-columns:1fr 300px;align-items:start">
@@ -120,6 +130,15 @@
                    Error="@_paidError" OnChoose="PaidChosen" />
 
 @code {
+    /// <summary>DT-272: the payment line of the trip view.</summary>
+    private string PaymentNote(TripResponse t) => t.Payment switch
+    {
+        "Settled" => L.F("trip.paySettled", t.Settlement?.Number ?? ""),
+        "PartnerPaid" => L.F("trip.payPartnerPaid", t.Partner?.Name ?? ""),
+        "PartnerPartlyPaid" => L.F("trip.payPartly", t.Partner?.Name ?? "", Fmt.Money(t.PartnerOpen), Fmt.Money(t.PartnerCost)),
+        _ => L.F("trip.payPartnerUnpaid", t.Partner?.Name ?? ""),
+    };
+
     private TripModel _m = new();
     private TripResponse? _trip;
     private IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry> _history = [];

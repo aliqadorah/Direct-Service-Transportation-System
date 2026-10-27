@@ -1,4 +1,4 @@
-@* Status tags of a trip (UX-05): void, or billing (unbilled / invoiced) + settled, and the flags shortage, tariff breach, manual rate,
+@* Status tags of a trip (UX-05): void, or billing (unbilled / invoiced) + settled / paid to partner / partly paid (DT-272), and the flags shortage, tariff breach, manual rate,
    needs review, posting pending. *@
 @using DirectService.Transportation.Contracts.Trips
 @inject Loc L
@@ -7,7 +7,7 @@
     else
     {
         <StatusTag Status="@(Trip.Billing == "Invoiced" ? "invoiced" : "unbilled")" />
-        @if (Trip.IsSettled) {<StatusTag Status="settled" />}
+        <TripPaymentTag Trip="Trip" />
     }
     @if (Trip.IsShortageFlagged) {<StatusTag Status="short" />}
     @if (Trip.IsTariffBreach) {<StatusTag Status="breach" />}

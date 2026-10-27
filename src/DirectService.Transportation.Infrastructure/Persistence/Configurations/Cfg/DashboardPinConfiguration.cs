@@ -13,6 +13,7 @@ internal sealed class DashboardPinConfiguration : IEntityTypeConfiguration<Dashb
     {
         builder.ToTable("DashboardPins", "cfg", t =>
         {
+            t.HasCheckConstraint("CK_DashboardPins_WarnWhen", "[WarnWhen] IN ('Above','Below')");
             t.HasCheckConstraint("CK_DashboardPins_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
         });
 
@@ -64,6 +65,14 @@ internal sealed class DashboardPinConfiguration : IEntityTypeConfiguration<Dashb
             .HasColumnOrder(7)
             .HasPrecision(18, 3)
             .IsRequired(false);
+        // Revision 6 (owner findings 27 Oct 2026, DT-275): §B14.
+        builder.Property(e => e.WarnWhen)
+            .HasColumnName("WarnWhen")
+            .HasColumnType("varchar(10)")
+            .IsUnicode(false)
+            .HasMaxLength(10)
+            .IsRequired(true)
+            .HasDefaultValueSql("'Above'");
         builder.Property(e => e.CriticalThreshold)
             .HasColumnName("CriticalThreshold")
             .HasColumnType("decimal(18,3)")

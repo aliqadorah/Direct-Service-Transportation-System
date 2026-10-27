@@ -25,6 +25,9 @@ public sealed record TripWarning(string Code, string Message);
 /// <summary>
 /// A trip with its frozen prices and amounts (PRD 7.1.1, 8.2). <see cref="Billing"/> is Unbilled / Invoiced; <see cref="Status"/>
 /// Active / Void; <see cref="BreachAmount"/> = (price − tariff price) × billing quantity, negative = loss (FR-023).
+/// DT-271: <see cref="IsSettled"/> = paid — a driver trip in a settlement, a partner trip fully covered by the partner's payments (oldest trips
+/// first); <see cref="Payment"/> Settled / Unsettled (driver trips), PartnerPaid / PartnerPartlyPaid / PartnerUnpaid (partner trips), null when
+/// void; <see cref="PartnerOpen"/> = the part of the partner cost still to pay (partner trips).
 /// </summary>
 public sealed record TripResponse(
     string Id, string ReceiptNo, DateOnly TripDate, DateOnly LoadingDate, DateOnly? UnloadingDate,
@@ -34,7 +37,8 @@ public sealed record TripResponse(
     decimal Revenue, decimal DriverWage, decimal PartnerCost, decimal Margin, decimal? ShortageWeight, decimal? ShortagePct,
     bool IsShortageFlagged, bool IsTariffBreach, bool IsManualRate, bool NeedsReview, string? ReviewNote,
     string Status, string Billing, bool IsSettled, bool CanEdit, DocRef? Invoice, DocRef? Settlement, DocRef? JournalEntry, bool PostingPending,
-    string? VoidReason, string? Notes, IReadOnlyDictionary<string, JsonElement> CustomValues, DateTime CreatedAt, string RowVersion);
+    string? VoidReason, string? Notes, IReadOnlyDictionary<string, JsonElement> CustomValues, DateTime CreatedAt, string RowVersion,
+    string? Payment = null, decimal? PartnerOpen = null);
 
 /// <summary>Inputs of the trip form's live calculation (UX-17): weights and prices as typed; nothing is saved.</summary>
 public sealed record TripCalculationRequest(

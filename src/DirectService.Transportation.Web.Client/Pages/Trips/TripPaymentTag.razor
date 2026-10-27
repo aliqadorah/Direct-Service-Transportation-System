@@ -1,0 +1,28 @@
+@* DT-272: settlement / payment state of a trip — "Settled" (driver trip in a settlement), "Paid to partner", "Partly paid · x open" (partner trip
+   partly covered by the partner's payments). With All the unpaid states show too (the list's "Settlement / payment" column). *@
+@using DirectService.Transportation.Contracts.Trips
+@inject Loc L
+@switch (Trip.Payment)
+{
+    case "Settled":
+        <StatusTag Status="settled" />
+        break;
+    case "PartnerPaid":
+        <StatusTag Status="partnerPaid" />
+        break;
+    case "PartnerPartlyPaid":
+        <Badge Tone="Tone.Warn" Icon="clock" Text="@L.F("trip.partlyOpen", Fmt.Money(Trip.PartnerOpen))" />
+        break;
+    case "Unsettled" when All:
+        <StatusTag Status="unsettled" />
+        break;
+    case "PartnerUnpaid" when All:
+        <StatusTag Status="partnerUnpaid" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public TripResponse Trip { get; set; } = default!;
+    /// <summary>Also show "Not settled" / "Not paid to partner".</summary>
+    [Parameter] public bool All { get; set; }
+}

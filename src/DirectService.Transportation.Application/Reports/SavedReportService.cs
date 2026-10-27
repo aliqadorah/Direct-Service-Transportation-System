@@ -182,6 +182,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         {
             var index = int.TryParse(x.P.Measure, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var i) ? i : 0;
             var label = x.P.Measure;
+            var kind = "number";
             decimal? value = null;
             string? problem = null;
             // A report no longer visible (unshared, source permission removed) shows neither its name nor a value (FR-141, review B10-9).
@@ -189,9 +190,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             try
             {
                 if (!visible) throw Fail.Forbidden();
-                var def = Parse(x.Definition);
-                label = def.Measures is { } ms && index < ms.Count ? ms[index].Function + (ms[index].Field is { } f ? " " + f : string.Empty) : x.P.Measure;
-                value = await builder.TotalAsync(x.Source, def, index, ct).ConfigureAwait(false);
+                // DT-275: the measure by its key (older pins: the measure's index), named in the reader's language.
+                (value, label, kind) = await builder.PinValueAsync(x.Source, Parse(x.Definition), x.P.Measure, ct).ConfigureAwait(false);
             }
             catch (AppException ex)
             {
@@ -204,30 +204,52 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             }
             var reportRef = visible ? new Ref(support.Token<SavedReport>(x.ReportPid), x.Name) : new Ref(string.Empty, string.Empty);
             result.Add(new DashboardPinResponse(support.Token<DashboardPin>(x.P.PublicId), reportRef, index, label, value,
-                x.P.WarningThreshold, x.P.CriticalThreshold, problem is not null ? "unavailable" : State(value, x.P.WarningThreshold, x.P.CriticalThreshold), x.P.SortOrder, problem));
+                x.P.WarningThreshold, x.P.CriticalThreshold, problem is not null ? "unavailable" : PinStates.State(value, x.P.WarningThreshold, x.P.CriticalThreshold, x.P.WarnWhen),
+                x.P.SortOrder, problem, x.P.Measure, kind, x.P.WarnWhen));
         }
         return result;
     }
 
     /// <summary>Exceeded at or above the critical threshold, warning at or above the warning threshold, otherwise normal.</summary>
-    public static string State(decimal? value, decimal? warning, decimal? critical) =>
-        value is not decimal v ? "normal" : critical is decimal c && v >= c ? "exceeded" : warning is decimal w && v >= w ? "warning" : "normal";
+    public static string State(decimal? value, decimal? warning, decimal? critical) => PinStates.State(value, warning, critical, PinStates.Above);
+
+    /// <summary>The values a pin of this report can show, with their current totals (pin dialog, DT-275).</summary>
+    public async Task<IReadOnlyList<PinMeasureOption>> PinMeasuresAsync(string token, CancellationToken ct)
+    {
+        var report = await FindVisibleAsync(token, ct).ConfigureAwait(false);
+        return await builder.PinMeasuresAsync(report.Source, Parse(report.Definition), ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The pin's measure key, direction and thresholds checked (DT-275): the key must be one the report offers, the direction Above or Below,
+    /// and the critical threshold at or beyond the warning threshold in that direction (each threshold optional).
+    /// </summary>
+    private async Task<(string Key, string WarnWhen)> CheckPinAsync(SavedReport report, DashboardPinRequest r, string? currentKey, string? currentWarnWhen, CancellationToken ct)
+    {
+        var key = r.MeasureKey?.Trim() is { Length: > 0 } k ? k
+            : r.Measure is int m ? m.ToString(System.Globalization.CultureInfo.InvariantCulture) : currentKey ?? "0";
+        var warnWhen = r.WarnWhen is null ? currentWarnWhen ?? PinStates.Above
+            : new[] { PinStates.Above, PinStates.Below }.FirstOrDefault(d => string.Equals(d, r.WarnWhen.Trim(), StringComparison.OrdinalIgnoreCase));
+        var known = key.Length <= 60 && await builder.HasPinOptionAsync(report.Source, Parse(report.Definition), key, ct).ConfigureAwait(false);
+        new Validator().Check(known, r.MeasureKey is null ? "measure" : "measureKey", ErrorCodes.ReportMeasure)
+            .Check(warnWhen is not null, "warnWhen", ErrorCodes.ValidationFormat)
+            .Check(warnWhen is null || PinStates.Ordered(r.WarningThreshold, r.CriticalThreshold, warnWhen), "criticalThreshold",
+                warnWhen == PinStates.Below ? ErrorCodes.ReportThresholdsBelow : ErrorCodes.ReportThresholds)
+            .ThrowIfInvalid();
+        return (key, warnWhen!);
+    }
 
     public async Task<DashboardPinResponse> PinAsync(DashboardPinRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
         var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", ErrorCodes.ValidationRequired, new FieldRef("savedReportId")), ct).ConfigureAwait(false);
-        var measures = Parse(report.Definition).Measures?.Count ?? 0;
-        var measure = r.Measure ?? 0;
-        new Validator().Check(measure >= 0 && measure < measures, "measure", ErrorCodes.ReportMeasure)
-            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ReportThresholds)
-            .ThrowIfInvalid();
+        var (measure, warnWhen) = await CheckPinAsync(report, r, null, null, ct).ConfigureAwait(false);
         var me = UserId;
         var order = (await db.Set<DashboardPin>().Where(p => p.UserId == me).MaxAsync(p => (int?)p.SortOrder, ct).ConfigureAwait(false) ?? 0) + 10;
         var pin = new DashboardPin
         {
-            UserId = me, SavedReportId = report.Id, Measure = measure.ToString(System.Globalization.CultureInfo.InvariantCulture), WarningThreshold = r.WarningThreshold,
-            CriticalThreshold = r.CriticalThreshold, SortOrder = order,
+            UserId = me, SavedReportId = report.Id, Measure = measure, WarningThreshold = r.WarningThreshold, CriticalThreshold = r.CriticalThreshold, WarnWhen = warnWhen,
+            SortOrder = order,
         };
         db.Set<DashboardPin>().Add(pin);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -239,11 +261,9 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         ArgumentNullException.ThrowIfNull(r);
         var pin = await MyPinAsync(token, ct).ConfigureAwait(false);
         var report = await db.Set<SavedReport>().AsNoTracking().SingleAsync(x => x.Id == pin.SavedReportId, ct).ConfigureAwait(false);
-        var measure = r.Measure ?? int.Parse(pin.Measure, System.Globalization.CultureInfo.InvariantCulture);
-        new Validator().Check(measure >= 0 && measure < (Parse(report.Definition).Measures?.Count ?? 0), "measure", ErrorCodes.ReportMeasure)
-            .Check(r.WarningThreshold is null || r.CriticalThreshold is null || r.WarningThreshold <= r.CriticalThreshold, "warningThreshold", ErrorCodes.ReportThresholds)
-            .ThrowIfInvalid();
-        pin.Measure = measure.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var (measure, warnWhen) = await CheckPinAsync(report, r, pin.Measure, pin.WarnWhen, ct).ConfigureAwait(false);
+        pin.Measure = measure;
+        pin.WarnWhen = warnWhen;
         pin.WarningThreshold = r.WarningThreshold;
         pin.CriticalThreshold = r.CriticalThreshold;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);

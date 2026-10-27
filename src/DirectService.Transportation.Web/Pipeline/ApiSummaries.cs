@@ -473,7 +473,8 @@ internal static class ApiSummaries
         // Reports and dashboard (B10)
         ["GET /api/v1/companies/{company}/dashboard/"] = "Dashboard: today or month-to-date figures, alert cards, cash and bank balances, pinned reports — each by permission (FR-137 … FR-141)",
         ["GET /api/v1/companies/{company}/dashboard/pins"] = "The user's pinned reports with value and normal / warning / exceeded state (FR-140)",
-        ["POST /api/v1/companies/{company}/dashboard/pins"] = "Pin a saved report with a measure and thresholds (FR-140)",
+        ["POST /api/v1/companies/{company}/dashboard/pins"] = "Pin a saved report with a measure, thresholds and warn above / below (FR-140, DT-275)",
+        ["GET /api/v1/companies/{company}/reports/saved/{report}/pin-measures"] = "Values a pin of the saved report can show — number of rows and every numeric total — with their current totals (DT-275)",
         ["PUT /api/v1/companies/{company}/dashboard/pins/{pin}"] = "Change a pin's measure or thresholds (FR-140)",
         ["POST /api/v1/companies/{company}/dashboard/pins/order"] = "Reorder the user's pins (FR-140)",
         ["POST /api/v1/companies/{company}/dashboard/pins/{pin}/delete"] = "Remove a pin from the dashboard (FR-140)",

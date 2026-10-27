@@ -982,6 +982,80 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await run.check(page, "fix27#sign-in-security", { full: true });
     run.assertClean();
   });
+
+  /**
+   * Owner findings of 27 Oct, second part (DT-271…DT-275): the Created Trips list with partner trips paid, partly paid and unpaid (the
+   * Partner column shown by default, then the optional columns from the Columns chooser), the trip view of a partly paid trip, the pin
+   * dialog of a detail report (Number of rows and the totals, warn below, the card preview) and the pinned card on the dashboard.
+   */
+  test(`Visual — paid trips and pins of 27 Oct (${lang})`, async ({ page }) => {
+    test.skip(!wanted("paid27#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const t = texts(lang);
+    const run = new VisualRun(lang, "paid27");
+    await enrol(page, lang, new VisualRun(lang, "paid27-enrol", false));
+    const company = companyOf(page);
+    const w = await buildWorld(page, company);
+    const partner = await api<{ id: string }>(page, "POST", c(company, "partners"), { name: lang === "ar" ? "النور للنقل" : "Al-Noor Transport" });
+    const rented = await api<{ id: string }>(page, "POST", c(company, "ownership-types"), { name: "Rented", fleetClass: "External" });
+    const year = Number(today().slice(0, 4)) + 1;
+    const driver = await api<{ id: string }>(page, "POST", c(company, "drivers"), {
+      fullName: lang === "ar" ? "سامي العبادي" : "Sami Abbadi", nationalId: String(9_000_000_000 + Math.floor(Math.random() * 999_999_999)), phone1: "0791234567",
+      licenceNo: "L-2", licenceType: "C", licenceExpiry: `${year}-01-01`, paymentMethod: "Cash", plateNumber: `10-${Math.floor(10000 + Math.random() * 89999)}`,
+      truckType: "Volvo", capacityTons: 32, ownershipTypeId: rented.id, partnerId: partner.id, registrationExpiry: `${year}-01-01`, insuranceExpiry: `${year}-01-01`,
+      inspectionExpiry: `${year}-01-01` });
+    await api(page, "POST", c(company, "tariffs"), { partyType: "Partner", partyId: partner.id, price: 2.75, validFrom: `${today().slice(0, 7)}-01` });
+    const tag = company.slice(0, 4);
+    const trip = async (receiptNo: string) => (await api<{ trip: { id: string; partnerCost: number } }>(page, "POST", c(company, "trips"), {
+      receiptNo, tripDate: today(), driverId: driver.id, customerId: w.customer, loadingSiteId: w.loading, unloadingSiteId: w.unloading, materialId: w.material,
+      partnerId: partner.id, loadedWeight: 30, unloadedWeight: 30, notes: lang === "ar" ? "حمولة ثانية" : "Second load" })).trip;
+    const paid = await trip(`PT-1-${tag}`);
+    const partly = await trip(`PT-2-${tag}`);
+    await trip(`PT-3-${tag}`);
+    await addTrip(page, w, `OWN-1-${tag}`);
+    const accounts = await api<{ cashBoxes: { id: string }[] }>(page, "GET", c(company, "accounting/money-accounts/options"));
+    await api(page, "POST", c(company, "partner-payments"), { partnerId: partner.id, paymentDate: today(), amount: paid.partnerCost + 20, paymentMethod: "Cash",
+      cashBoxId: accounts.cashBoxes[0].id });
+
+    expect(await open(page, `/c/${company}/trips/list`)).toBe(true);
+    await expect(page.locator("main table tbody tr")).toHaveCount(4, { timeout: 15_000 });
+    await expect(page.locator("main table thead")).toContainText(t("md.partner"));
+    await run.check(page, "paid27#trips");
+    await button(page.locator("main"), t("cols.title")).click();
+    for (const key of ["fleetType", "invoice", "payment", "notes"]) await page.locator(`#col-TRN\\.Trips-${key}`).check();
+    await run.check(page, "paid27#columns");
+    await button(page.locator(".dialog"), t("cols.saveMine")).click();
+    await expect(page.locator("main table thead")).toContainText(t("trip.payment"), { timeout: 15_000 });
+    await run.check(page, "paid27#trips-columns");
+    await page.getByRole("button", { name: t("trip.f.partner") }).click();
+    await page.getByRole("button", { name: t("trip.f.unsettled") }).click();
+    await expect(page.locator("main table tbody tr")).toHaveCount(2, { timeout: 15_000 });
+    await run.check(page, "paid27#trips-unsettled");
+    expect(await open(page, `/c/${company}/trips/${partly.id}`)).toBe(true);
+    await expect(page.locator("main .banner").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "paid27#trip-partly");
+
+    const name = lang === "ar" ? "رحلات الشهر" : "Trips of the month";
+    await api(page, "POST", c(company, "reports/saved"), { name, source: "trips", isShared: false,
+      definition: { rows: null, column: null, measures: null, filters: null, sort: null, top: null, detail: true, columns: ["receiptNo", "revenue", "partnerCost", "loadedWeight"] } });
+    expect(await open(page, `/c/${company}/reports/saved`)).toBe(true);
+    await page.getByRole("button", { name: t("sr.pinOf", name) }).click();
+    await expect(page.locator("#pin-measure option")).toHaveCount(4, { timeout: 15_000 });
+    await page.locator("#pin-measure").selectOption({ index: 1 });
+    await page.locator("#pin-direction").selectOption({ index: 1 });
+    await page.locator("#pin-warning").fill("1000000");
+    await page.locator("#pin-warning").blur();
+    await page.locator("#pin-critical").fill("1");
+    await page.locator("#pin-critical").blur();
+    await expect(page.locator(".pin-preview .pin-card")).toHaveAttribute("data-state", "warning");
+    await run.check(page, "paid27#pin-dialog");
+    await button(page.locator(".dialog"), t("sr.pin")).click();
+    await expect(page.locator(".dialog")).toHaveCount(0, { timeout: 15_000 });
+    expect(await open(page, `/c/${company}`)).toBe(true);
+    await expect(page.locator(".pin-card").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "paid27#dashboard", { full: true });
+    run.assertClean();
+  });
 }
 
 /**

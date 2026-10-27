@@ -48,6 +48,9 @@ public abstract class FieldBase<TValue> : InputBase<TValue>
 
     protected bool Invalid => ErrorText is not null;
 
+    /// <summary>The typed text could not be read (e.g. not a number) — the value keeps its last good value, so a dialog must not send it.</summary>
+    public bool HasInputError => LocalError is not null;
+
     protected virtual string? DescribedBy => Invalid ? ElementId + "-e" : Help is not null ? ElementId + "-h" : null;
 
     protected override void OnParametersSet()

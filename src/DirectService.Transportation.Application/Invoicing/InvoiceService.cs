@@ -54,7 +54,8 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         if (Pid<UnloadingSite>(q.UnloadingSite, "unloadingSite") is Guid u) query = query.Where(t => t.UnloadingSite.PublicId == u);
         if (Pid<Material>(q.Material, "material") is Guid m) query = query.Where(t => t.Material.PublicId == m);
         var rows = await trips.Rows(query.OrderBy(t => t.TripDate).ThenBy(t => t.Id).Take(5000)).ToListAsync(ct).ConfigureAwait(false);
-        var list = rows.Select(trips.ToResponse).ToList();
+        var open = await trips.PartnerOpenAsync(rows, ct).ConfigureAwait(false);
+        var list = rows.Select(r => trips.ToResponse(r, open)).ToList();
         return new UnbilledTripsResponse(list, list.Count, list.Sum(t => t.BillingQty), list.Sum(t => t.Revenue));
     }
 

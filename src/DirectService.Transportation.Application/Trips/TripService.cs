@@ -571,25 +571,42 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         ["revenue"] = t => t.Revenue,
         ["shortagePct"] = t => t.ShortagePct,
         ["createdAt"] = t => t.CreatedAt,
+        ["partner"] = t => t.Partner!.Name,
+        ["invoice"] = t => t.Invoice!.Number,
     };
+
+    /// <summary>
+    /// DT-271 (owner findings 27 Oct 2026): "settled" means paid, for every trip. A driver trip (no partner) is paid by the driver settlement
+    /// that holds it; a partner trip when the partner's net payments cover its cost — payments allocated to the partner's active trips oldest
+    /// first (trip date, receipt number), the DT-230 rule. A partly covered trip is unpaid, a voided one never paid. The trip list uses the
+    /// <see cref="PaymentCuts"/> (filter, totals, paging, export); the report builder this expression over the view trn.TRN_TripPartnerCoverage.
+    /// </summary>
+    public static readonly Expression<Func<Trip, bool>> IsPaid = t =>
+        (t.PartnerId == null && t.SettlementId != null) || (t.PartnerId != null && t.PartnerCoverage != null && t.PartnerCoverage.OpenAmount == 0);
 
     public async Task<TripPage> ListAsync(TripListQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
-        var filtered = await SearchAsync(Filter(q), q.Q, ct).ConfigureAwait(false);
+        var (query, cuts) = await FilterAsync(q, ct).ConfigureAwait(false);
+        var filtered = await SearchAsync(query, q.Q, ct).ConfigureAwait(false);
         var totals = await filtered.GroupBy(_ => 1).Select(g => new TripTotals(g.Count(), g.Sum(t => t.LoadedWeight), g.Sum(t => t.UnloadedWeight ?? 0m),
             g.Sum(t => t.Revenue), g.Sum(t => t.DriverWage), g.Sum(t => t.PartnerCost), g.Sum(t => t.Revenue - t.DriverWage - t.PartnerCost))).SingleOrDefaultAsync(ct).ConfigureAwait(false)
             ?? new TripTotals(0, 0, 0, 0, 0, 0, 0);
         var paging = new PageRequest(q.Page, q.PageSize);
         var sorted = MasterDataSupport.Sort(filtered, q.Sort, SortFields, "-tripDate").ThenByDescending(t => t.Id);
         var rows = await Rows(sorted.Skip(paging.Skip).Take(paging.SafePageSize)).ToListAsync(ct).ConfigureAwait(false);
-        return new TripPage(new PagedResult<TripResponse>(rows.Select(ToResponse).ToList(), paging.SafePage, paging.SafePageSize, totals.Trips), totals);
+        var open = await PartnerOpenAsync(rows, ct, cuts).ConfigureAwait(false);
+        return new TripPage(new PagedResult<TripResponse>(rows.Select(r => ToResponse(r, open)).ToList(), paging.SafePage, paging.SafePageSize, totals.Trips), totals);
     }
 
-    /// <summary>Every trip of the filtered list in list order (export; at most 50,000 rows).</summary>
-    internal async Task<IReadOnlyList<Row>> AllAsync(TripListQuery q, CancellationToken ct) =>
-        await Rows(MasterDataSupport.Sort(await SearchAsync(Filter(q), q.Q, ct).ConfigureAwait(false), q.Sort, SortFields, "-tripDate").ThenByDescending(t => t.Id).Take(50_000))
+    /// <summary>Every trip of the filtered list in list order (export; at most 50,000 rows) with the payment cuts used to filter them, if any.</summary>
+    internal async Task<(IReadOnlyList<Row> Rows, PaymentCuts? Cuts)> AllAsync(TripListQuery q, CancellationToken ct)
+    {
+        var (query, cuts) = await FilterAsync(q, ct).ConfigureAwait(false);
+        var rows = await Rows(MasterDataSupport.Sort(await SearchAsync(query, q.Q, ct).ConfigureAwait(false), q.Sort, SortFields, "-tripDate").ThenByDescending(t => t.Id).Take(50_000))
             .ToListAsync(ct).ConfigureAwait(false);
+        return (rows, cuts);
+    }
 
     /// <summary>
     /// Search by any part of the receipt number, case and spaces ignored (DT-75). Drivers (with their plates), customers and sites
@@ -606,6 +623,39 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         var matching = query.Where(t => EF.Functions.Like(t.ReceiptNoSearch!, pattern));
         var ids = await matching.Select(t => t.Id).Take(5001).ToListAsync(ct).ConfigureAwait(false);
         return ids.Count <= 5000 ? db.Set<Trip>().AsNoTracking().Where(t => ids.Contains(t.Id)) : matching;
+    }
+
+    /// <summary>The list filters; "settled" reads the partners' payment cuts first (DT-271), which the rows then reuse.</summary>
+    private async Task<(IQueryable<Trip> Query, PaymentCuts? Cuts)> FilterAsync(TripListQuery q, CancellationToken ct)
+    {
+        var query = Filter(q);
+        long? partner = null;
+        if (Pid<Partner>(q.Partner, "partner") is Guid p)
+        {
+            // By the partner's id rather than a join on its public id, so the partner trips' index (IX_TRN_Trips_PartnerOrder) serves it.
+            partner = await db.Set<Partner>().AsNoTracking().Where(x => x.PublicId == p).Select(x => (long?)x.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? -1;
+            query = query.Where(t => t.PartnerId == partner);
+        }
+        var settled = YesNo(q.Settled, "settled");
+        if (settled is null) return (query, null);
+        var cuts = await CutsAsync(partner is long one ? [one] : null, ct).ConfigureAwait(false);
+        var unpaid = cuts.Unpaid();   // true only for active partner trips not fully paid
+        Expression<Func<Trip, bool>> driverOpen = t => t.PartnerId == null && t.SettlementId == null;
+        Expression<Func<Trip, bool>> partnerVoid = t => t.PartnerId != null && t.Status != Active;
+        Expression<Func<Trip, bool>> paidCandidates = t => (t.PartnerId == null && t.SettlementId != null) || (t.PartnerId != null && t.Status == Active);
+        query = settled.Value
+            ? query.Where(paidCandidates).Where(Expression.Lambda<Func<Trip, bool>>(Expression.Not(unpaid.Body), unpaid.Parameters))
+            : query.Where(Or(Or(driverOpen, partnerVoid), unpaid));
+        return (query, cuts);
+    }
+
+    /// <summary>a || b over one trip parameter.</summary>
+    private static Expression<Func<Trip, bool>> Or(Expression<Func<Trip, bool>> a, Expression<Func<Trip, bool>> b) =>
+        Expression.Lambda<Func<Trip, bool>>(Expression.OrElse(a.Body, new Rebind(b.Parameters[0], a.Parameters[0]).Visit(b.Body)), a.Parameters);
+
+    private sealed class Rebind(ParameterExpression from, ParameterExpression to) : ExpressionVisitor
+    {
+        protected override Expression VisitParameter(ParameterExpression node) => node == from ? to : base.VisitParameter(node);
     }
 
     private IQueryable<Trip> Filter(TripListQuery q)
@@ -625,7 +675,6 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             "invoiced" => query.Where(t => t.InvoiceId != null),
             _ => throw Fail.Field("billing", ErrorCodes.ValidationFormat, new FieldRef("billing")),
         };
-        query = YesNo(q.Settled, "settled") switch { true => query.Where(t => t.SettlementId != null), false => query.Where(t => t.SettlementId == null), _ => query };
         query = (q.Fleet?.Trim().ToLowerInvariant()) switch
         {
             null or "" => query,
@@ -642,7 +691,6 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         if (q.To is DateOnly to) query = query.Where(t => t.TripDate <= to);
         if (Pid<Driver>(q.Driver, "driver") is Guid d) query = query.Where(t => t.Driver.PublicId == d);
         if (Pid<Customer>(q.Customer, "customer") is Guid c) query = query.Where(t => t.Customer.PublicId == c);
-        if (Pid<Partner>(q.Partner, "partner") is Guid p) query = query.Where(t => t.Partner != null && t.Partner.PublicId == p);
         if (Pid<LoadingSite>(q.LoadingSite, "loadingSite") is Guid l) query = query.Where(t => t.LoadingSite.PublicId == l);
         if (Pid<UnloadingSite>(q.UnloadingSite, "unloadingSite") is Guid u) query = query.Where(t => t.UnloadingSite.PublicId == u);
         if (Pid<Material>(q.Material, "material") is Guid m) query = query.Where(t => t.Material.PublicId == m);
@@ -666,7 +714,8 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         var uid = ctx.UserId;
         var rows = await Rows(db.Set<Trip>().AsNoTracking().Where(t => t.CreatedBy == uid).OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id).Take(10))
             .ToListAsync(ct).ConfigureAwait(false);
-        return rows.Select(ToResponse).ToList();
+        var open = await PartnerOpenAsync(rows, ct).ConfigureAwait(false);
+        return rows.Select(r => ToResponse(r, open)).ToList();
     }
 
     /// <summary>Quick-entry defaults from the user's last saved trip, still active records only (FR-007, DT-70).</summary>
@@ -708,13 +757,100 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         return await support.HistoryAsync(EntityType, t.Id, ct).ConfigureAwait(false);
     }
 
-    internal async Task<TripResponse> ResponseAsync(long id, CancellationToken ct) =>
-        ToResponse(await Rows(db.Set<Trip>().AsNoTracking().Where(t => t.Id == id)).SingleAsync(ct).ConfigureAwait(false));
+    internal async Task<TripResponse> ResponseAsync(long id, CancellationToken ct)
+    {
+        var row = await Rows(db.Set<Trip>().AsNoTracking().Where(t => t.Id == id)).SingleAsync(ct).ConfigureAwait(false);
+        return ToResponse(row, await PartnerOpenAsync([row], ct).ConfigureAwait(false));
+    }
 
-    internal TripResponse ToResponse(Row r)
+    /// <summary>
+    /// DT-271: where each partner's payments run out — the boundary day (trn.TRN_PartnerPaymentBoundary) and, on that day, the open part of
+    /// each trip in receipt-number order. Trips before the day are paid, trips after it open; a partner without a boundary is paid in full.
+    /// Two small queries (one row per partner, then the boundary days' trips) instead of a running total over every trip, so the list
+    /// filter is a plain condition on the trip date (NFR-01: 500,000 trips).
+    /// </summary>
+    internal sealed class PaymentCuts(IReadOnlyDictionary<long, (DateOnly Day, IReadOnlyDictionary<long, decimal> DayOpen)> cuts)
+    {
+        public static readonly PaymentCuts None = new(new Dictionary<long, (DateOnly, IReadOnlyDictionary<long, decimal>)>());
+
+        public IReadOnlyDictionary<long, (DateOnly Day, IReadOnlyDictionary<long, decimal> DayOpen)> Partners { get; } = cuts;
+
+        /// <summary>The part still to pay of an active partner trip.</summary>
+        public decimal Open(Trip t) =>
+            t.PartnerId is not long p || !Partners.TryGetValue(p, out var cut) || t.TripDate < cut.Day ? 0m
+            : t.TripDate > cut.Day ? t.PartnerCost
+            : cut.DayOpen.TryGetValue(t.Id, out var open) ? open : 0m;
+
+        /// <summary>The active partner trips not yet fully paid: after their partner's boundary day, or open on it.</summary>
+        public Expression<Func<Trip, bool>> Unpaid()
+        {
+            var t = Expression.Parameter(typeof(Trip), "t");
+            Expression body = Expression.Constant(false);
+            foreach (var (partner, cut) in Partners)
+                body = Expression.OrElse(body, Expression.AndAlso(
+                    Expression.Equal(Expression.Property(t, nameof(Trip.PartnerId)), Expression.Constant(partner, typeof(long?))),
+                    Expression.GreaterThan(Expression.Property(t, nameof(Trip.TripDate)), Expression.Constant(cut.Day))));
+            var open = Partners.Values.SelectMany(c => c.DayOpen.Where(o => o.Value > 0).Select(o => o.Key)).ToList();
+            if (open.Count > 0)
+                body = Expression.OrElse(body, Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(long)], Expression.Constant(open), Expression.Property(t, nameof(Trip.Id))));
+            return Expression.Lambda<Func<Trip, bool>>(body, t);
+        }
+    }
+
+    /// <summary>The payment cuts of the given partners (null = every partner of the company).</summary>
+    internal async Task<PaymentCuts> CutsAsync(IReadOnlyCollection<long>? partners, CancellationToken ct)
+    {
+        var query = db.Set<PartnerPaymentBoundary>().AsNoTracking().Where(b => b.BoundaryDate != null);
+        // The partners as constants (IN (…)): the filter then reaches the per-day totals of only these partners in the view.
+        if (partners is not null) query = query.Where(b => EF.Constant(partners.ToList()).Contains(b.PartnerId));
+        var bounds = await query.Select(b => new { b.PartnerId, Day = b.BoundaryDate!.Value, b.Paid, b.CostBefore }).ToListAsync(ct).ConfigureAwait(false);
+        if (bounds.Count == 0) return PaymentCuts.None;
+        var ids = bounds.Select(b => b.PartnerId).ToList();
+        var days = bounds.Select(b => b.Day).Distinct().ToList();
+        // The boundary days' trips in the view's order (receipt number in the database's collation, then id).
+        var dayTrips = await db.Set<Trip>().AsNoTracking()
+            .Where(t => t.Status == Active && t.PartnerId != null && EF.Constant(ids).Contains(t.PartnerId.Value) && days.Contains(t.TripDate))
+            .OrderBy(t => t.ReceiptNoKey).ThenBy(t => t.Id).Select(t => new { t.Id, Partner = t.PartnerId!.Value, t.TripDate, t.PartnerCost })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var cuts = new Dictionary<long, (DateOnly, IReadOnlyDictionary<long, decimal>)>();
+        foreach (var b in bounds)
+        {
+            var open = new Dictionary<long, decimal>();
+            var toDate = b.CostBefore;
+            foreach (var t in dayTrips.Where(x => x.Partner == b.PartnerId && x.TripDate == b.Day))
+            {
+                toDate += t.PartnerCost;
+                open[t.Id] = toDate <= b.Paid ? 0m : toDate - t.PartnerCost >= b.Paid ? t.PartnerCost : toDate - b.Paid;
+            }
+            cuts[b.PartnerId] = (b.Day, open);
+        }
+        return new PaymentCuts(cuts);
+    }
+
+    /// <summary>DT-271: the part still to pay of the rows' active partner trips (trip id → open amount; absent = not a partner trip).</summary>
+    internal async Task<IReadOnlyDictionary<long, decimal>> PartnerOpenAsync(IReadOnlyCollection<Row> rows, CancellationToken ct, PaymentCuts? known = null)
+    {
+        var trips = rows.Where(r => r.T.PartnerId is not null && r.T.Status == Active).Select(r => r.T).ToList();
+        if (trips.Count == 0) return new Dictionary<long, decimal>();
+        var cuts = known ?? await CutsAsync(trips.Select(t => t.PartnerId!.Value).Distinct().ToList(), ct).ConfigureAwait(false);
+        return trips.ToDictionary(t => t.Id, cuts.Open);
+    }
+
+    /// <summary>Payment state of a trip (DT-271): driver trips by their settlement, partner trips by the open part of their cost.</summary>
+    private static (string? State, decimal? Open) Payment(Trip t, IReadOnlyDictionary<long, decimal> open)
+    {
+        if (t.Status != Active) return (null, null);
+        if (t.PartnerId is null) return (t.SettlementId is null ? "Unsettled" : "Settled", null);
+        var left = open.TryGetValue(t.Id, out var v) ? v : 0m;
+        return (left <= 0 ? "PartnerPaid" : left < t.PartnerCost ? "PartnerPartlyPaid" : "PartnerUnpaid", left);
+    }
+
+    internal TripResponse ToResponse(Row r, IReadOnlyDictionary<long, decimal> open)
     {
         ArgumentNullException.ThrowIfNull(r);
+        ArgumentNullException.ThrowIfNull(open);
         var t = r.T;
+        var (payment, partnerOpen) = Payment(t, open);
         return new TripResponse(support.Token<Trip>(t.PublicId), t.ReceiptNo, t.TripDate, t.LoadingDate, t.UnloadingDate,
             new Ref(support.Token<Driver>(r.DriverPid), r.DriverName), t.TruckPlateAtSave, new Ref(support.Token<Customer>(r.CustomerPid), r.CustomerName),
             new Ref(support.Token<LoadingSite>(r.LoadingPid), r.LoadingName), new Ref(support.Token<UnloadingSite>(r.UnloadingPid), r.UnloadingName),
@@ -723,10 +859,11 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             t.TariffPrice is decimal tp ? Money.Round((t.CustomerPrice - tp) * t.BillingQty) : null,
             t.DriverRate, t.RateSource, t.RateMonth, t.PartnerRate, t.Revenue, t.DriverWage, t.PartnerCost, t.Revenue - t.DriverWage - t.PartnerCost,
             t.ShortageWeight, t.ShortagePct, t.IsShortageFlagged, t.IsTariffBreach, t.IsManualRate, t.NeedsReview, t.ReviewNote,
-            t.Status, t.InvoiceId is null ? "Unbilled" : "Invoiced", t.SettlementId is not null, t.Status == Active && t.InvoiceId is null && t.SettlementId is null,
+            t.Status, t.InvoiceId is null ? "Unbilled" : "Invoiced", payment is "Settled" or "PartnerPaid", t.Status == Active && t.InvoiceId is null && t.SettlementId is null,
             r.InvoicePid is Guid i ? new DocRef(support.Token<Invoice>(i), r.InvoiceNumber) : null,
             r.SettlementPid is Guid s ? new DocRef(support.Token<Settlement>(s), r.SettlementNumber) : null,
             r.EntryPid is Guid e ? new DocRef(support.Token<JournalEntry>(e), r.EntryNumber) : null, r.Pending,
-            t.VoidReason, t.Notes, CustomFieldService.Read(t.CustomValues), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(t.RowVersion));
+            t.VoidReason, t.Notes, CustomFieldService.Read(t.CustomValues), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(t.RowVersion),
+            payment, partnerOpen);
     }
 }

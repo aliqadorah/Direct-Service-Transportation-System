@@ -51,6 +51,7 @@ public static class Statuses
     public static readonly IReadOnlyDictionary<string, (Tone Tone, string? Icon)> All = new Dictionary<string, (Tone, string?)>(StringComparer.Ordinal)
     {
         ["unbilled"] = (Tone.Info, "clock"), ["invoiced"] = (Tone.Ok, "check"), ["settled"] = (Tone.Mute, "check"), ["void"] = (Tone.Err, "x"),
+        ["unsettled"] = (Tone.Mute, "clock"), ["partnerPaid"] = (Tone.Ok, "check"), ["partlyPaid"] = (Tone.Warn, "clock"), ["partnerUnpaid"] = (Tone.Info, "clock"),
         ["short"] = (Tone.Warn, "scale"), ["breach"] = (Tone.Err, "alert"), ["manual"] = (Tone.Warn, "edit"), ["review"] = (Tone.Warn, "alert"),
         ["draft"] = (Tone.Mute, "edit"), ["unpaid"] = (Tone.Info, "clock"), ["partial"] = (Tone.Warn, "clock"), ["partReturned"] = (Tone.Warn, "refresh"), ["closed"] = (Tone.Ok, "check"),
         ["posted"] = (Tone.Ok, "check"), ["pending"] = (Tone.Warn, "clock"), ["reversed"] = (Tone.Mute, "refresh"),

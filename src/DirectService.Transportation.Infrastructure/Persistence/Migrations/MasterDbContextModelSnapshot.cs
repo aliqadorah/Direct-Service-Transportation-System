@@ -3883,6 +3883,15 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         .HasColumnName("UserId")
                         .HasColumnOrder(4);
 
+                    b.Property<string>("WarnWhen")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(10)")
+                        .HasColumnName("WarnWhen")
+                        .HasDefaultValueSql("'Above'", "DF_DashboardPins_WarnWhen");
+
                     b.Property<decimal?>("WarningThreshold")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)")
@@ -3905,6 +3914,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.ToTable("DashboardPins", "cfg", t =>
                         {
                             t.HasCheckConstraint("CK_DashboardPins_DeletedAt_DeletedBy_DeleteReason", "[IsDeleted] = 0 OR ([DeletedAt] IS NOT NULL AND [DeletedBy] IS NOT NULL AND [DeleteReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_DashboardPins_WarnWhen", "[WarnWhen] IN ('Above','Below')");
                         });
                 });
 
@@ -10728,6 +10739,41 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerPaymentBoundary", b =>
+                {
+                    b.Property<long>("PartnerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PartnerId");
+
+                    b.Property<DateOnly?>("BoundaryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("BoundaryDate");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId");
+
+                    b.Property<decimal>("CostBefore")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("CostBefore");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Paid");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("PartnerId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("TRN_PartnerPaymentBoundary", "trn");
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.RateHistory", b =>
                 {
                     b.Property<long>("Id")
@@ -12117,6 +12163,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "PartnerId" }, "IX_TRN_Trips_PartnerId");
 
+                    b.HasIndex(new[] { "TenantId", "CompanyId", "PartnerId", "TripDate", "ReceiptNoKey", "Id" }, "IX_TRN_Trips_PartnerOrder")
+                        .HasFilter("[PartnerId] IS NOT NULL AND [Status] = 'Active' AND [IsDeleted] = 0");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "TenantId", "CompanyId", "PartnerId", "TripDate", "ReceiptNoKey", "Id" }, "IX_TRN_Trips_PartnerOrder"), new[] { "PartnerCost" });
+
                     b.HasIndex(new[] { "CompanyId", "ReceiptNoSearch" }, "IX_TRN_Trips_ReceiptNoSearch")
                         .HasFilter("[IsDeleted] = 0");
 
@@ -12165,6 +12216,46 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_TRN_Trips_VoidReason_VoidedBy_VoidedAt", "[Status] <> 'Void' OR ([VoidReason] IS NOT NULL AND [VoidedBy] IS NOT NULL AND [VoidedAt] IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.TripPartnerCoverage", b =>
+                {
+                    b.Property<long>("TripId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TripId");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("CompanyId");
+
+                    b.Property<decimal>("OpenAmount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("OpenAmount");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("Paid");
+
+                    b.Property<decimal>("PartnerCost")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasColumnName("PartnerCost");
+
+                    b.Property<long>("PartnerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("PartnerId");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("TripId");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("TRN_TripPartnerCoverage", "trn");
                 });
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.UnloadingSite", b =>
@@ -15739,6 +15830,17 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.TripPartnerCoverage", b =>
+                {
+                    b.HasOne("DirectService.Transportation.Domain.Trn.Trip", "Trip")
+                        .WithOne("PartnerCoverage")
+                        .HasForeignKey("DirectService.Transportation.Domain.Trn.TripPartnerCoverage", "TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+                });
+
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.UnloadingSite", b =>
                 {
                     b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
@@ -15817,6 +15919,11 @@ namespace DirectService.Transportation.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Settlement", b =>
                 {
                     b.Navigation("Deductions");
+                });
+
+            modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Trip", b =>
+                {
+                    b.Navigation("PartnerCoverage");
                 });
 #pragma warning restore 612, 618
         }

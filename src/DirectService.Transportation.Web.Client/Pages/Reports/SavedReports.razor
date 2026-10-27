@@ -55,14 +55,29 @@
 
 <Modal @bind-Open="_pinning" Title="@L.F("sr.pinTitle", _target?.Name ?? "")" Busy="_busy" Icon="pin">
     <ChildContent>
-        <SelectField TValue="int?" @bind-Value="_measure" Options="MeasureOptions" Label="@L["sr.measure"]" />
-        <NumberField @bind-Value="_warning" Label="@L["sr.warning"]" Help="@L["sr.thresholdHelp"]" />
-        <NumberField @bind-Value="_critical" Label="@L["sr.critical"]" />
+        @if (_measures is null)
+        {
+            @if (_measuresError is not null) {<Banner Tone="Tone.Err" Text="@_measuresError" />}
+            else {<Skeleton Kind="SkeletonKind.Form" />}
+        }
+        else
+        {
+            @* DT-275: "Number of rows" and every numeric total of the report, never an empty list; warn above or below; a preview of the card. *@
+            <SelectField TValue="string" @bind-Value="_measure" Options="MeasureOptions" Label="@L["sr.measure"]" Id="pin-measure" />
+            <SelectField TValue="string" @bind-Value="_warnWhen" @bind-Value:after="ThresholdsChanged" Options="WarnOptions" Label="@L["sr.warnWhen"]" Id="pin-direction" />
+            <NumberField @ref="_warnField" @bind-Value="_warning" @bind-Value:after="ThresholdsChanged" Label="@L["sr.warning"]" Help="@L["sr.thresholdHelp"]" Id="pin-warning" />
+            <NumberField @ref="_critField" @bind-Value="_critical" @bind-Value:after="ThresholdsChanged" Label="@L["sr.critical"]" Help="@L["sr.criticalHelp"]" Error="@CriticalError" Id="pin-critical" />
+            <div class="pin-preview" aria-live="polite">
+                <p class="help" style="margin:0 0 2px">@L["sr.preview"]</p>
+                <PinCard Report="@(_target?.Name ?? "")" MeasureLabel="@(Chosen?.Label ?? "")" Value="Chosen?.Value" Kind="@(Chosen?.Kind ?? "number")"
+                         State="@PinStates.State(Chosen?.Value, _warning, _critical, _warnWhen)" Warning="_warning" Critical="_critical" WarnWhen="@_warnWhen" />
+            </div>
+        }
         @if (_pinError is not null) {<Banner Tone="Tone.Err" Text="@_pinError" />}
     </ChildContent>
     <Footer>
         <Btn Text="@L["ui.cancel"]" OnClick="() => _pinning = false" />
-        <Btn Primary="true" Icon="pin" Text="@L["sr.pin"]" Busy="_busy" OnClick="Pin" />
+        <Btn Primary="true" Icon="pin" Text="@L["sr.pin"]" Busy="_busy" Disabled="@(_measures is null)" OnClick="Pin" />
     </Footer>
 </Modal>
 <ConfirmDialog @bind-Open="_deleting" Title="@L.F("ml.deleteTitle", _target?.Name ?? "")" Danger="true" ConfirmText="@L["ml.delete"]" Message="@L["sr.deleteText"]"
@@ -78,21 +93,31 @@
     private int _page = 1;
     private SavedReportResponse? _target;
     private bool _pinning, _deleting, _busy;
-    private int? _measure = 0;
+    private string _measure = "rows", _warnWhen = PinStates.Above;
     private decimal? _warning, _critical;
+    private IReadOnlyList<PinMeasureOption>? _measures;
+    private string? _measuresError, _criticalError;
+    private NumberField? _warnField, _critField;
 
     [Parameter] public string Company { get; set; } = "";
 
     private IReadOnlyList<TabItem> Views => [new("all", L["ml.all"]), new("mine", L["sr.mine"]), new("shared", L["sr.shared"]), new("pinned", L["sr.pinned"])];
 
-    private IReadOnlyList<Option<int?>> MeasureOptions =>
-        (_target?.Definition.Measures ?? []).Select((m, i) => new Option<int?>(i, (MeasureName(m.Function) + " " + FieldLabel(m.Field)).Trim())).ToList();
+    /// <summary>The server's list for the report (DT-275): "Number of rows" first, then every numeric total, named in the reader's language.</summary>
+    private IReadOnlyList<Option<string>> MeasureOptions => (_measures ?? []).Select(m => new Option<string>(m.Key, m.Label)).ToList();
 
-    private string MeasureName(string function) => L["rb." + function] is var f && !f.StartsWith("rb.", StringComparison.Ordinal) ? f : function;
+    private IReadOnlyList<Option<string>> WarnOptions => [new(PinStates.Above, L["sr.warnAbove"]), new(PinStates.Below, L["sr.warnBelow"])];
+
+    private PinMeasureOption? Chosen => _measures?.FirstOrDefault(m => m.Key == _measure);
+
+    /// <summary>The critical threshold must be at or beyond the warning threshold in the chosen direction (checked again by the server).</summary>
+    private string? CriticalError => _criticalError
+        ?? (PinStates.Ordered(_warning, _critical, _warnWhen) ? null : L[_warnWhen == PinStates.Below ? "sr.critBelow" : "sr.critAbove"]);
+
+    /// <summary>A server message on the critical threshold is dropped once the user changes the thresholds or the direction.</summary>
+    private void ThresholdsChanged() => _criticalError = null;
 
     private string SourceLabel(string key) => _sources.FirstOrDefault(s => s.Key == key)?.Label ?? key;
-
-    private string? FieldLabel(string? field) => field is null ? null : _sources.SelectMany(s => s.Fields).FirstOrDefault(f => f.Key == field)?.Label ?? field;
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,25 +151,41 @@
         catch (ApiException e) { Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }
 
-    private void AskPin(SavedReportResponse r)
+    private async Task AskPin(SavedReportResponse r)
     {
         _target = r;
-        _measure = 0;
+        _measure = "rows";
+        _warnWhen = PinStates.Above;
         _warning = _critical = null;
-        _pinError = null;
+        _pinError = _measuresError = _criticalError = null;
+        _measures = null;
         _pinning = true;
+        try
+        {
+            var measures = await Api.GetAsync<IReadOnlyList<PinMeasureOption>>(Api.C($"reports/saved/{Uri.EscapeDataString(r.Id)}/pin-measures"));
+            if (_target?.Id != r.Id) return;   // another report was opened meanwhile
+            _measures = measures;
+            _measure = measures.FirstOrDefault()?.Key ?? "rows";
+        }
+        catch (ApiException e) { _measuresError = e.Problem.Detail ?? L["ui.loadFailed"]; }
     }
 
     private async Task Pin()
     {
+        // A threshold that is not a number keeps its message on the field; the order of the two is checked here and on the server.
+        if (_warnField?.HasInputError == true || _critField?.HasInputError == true || CriticalError is not null) return;
         _busy = true;
         _pinError = null;
         try
         {
-            await Api.PostAsync<DashboardPinResponse>(Api.C("dashboard/pins"), new DashboardPinRequest(_target!.Id, _measure ?? 0, _warning, _critical));
+            await Api.PostAsync<DashboardPinResponse>(Api.C("dashboard/pins"), new DashboardPinRequest(_target!.Id, null, _warning, _critical, _measure, _warnWhen));
             _pinning = false;
             Toasts.Success(L.F("sr.pinnedToast", _target.Name), L["nav.dashboard"], NavModel.Href(Company, ""));
             await Load();
+        }
+        catch (ApiException e) when (e.Problem.Errors?.FirstOrDefault(x => x.Field == "criticalThreshold") is { } crit)
+        {
+            _criticalError = crit.Message;
         }
         catch (ApiException e) { _pinError = e.Problem.Detail; }
         finally { _busy = false; }

@@ -298,8 +298,9 @@ public static class ErrorCatalog
         [ErrorCodes.ReportFilterValueRequired] = ("{0}: أدخل القيمة.", "{0}: enter the value."),
         [ErrorCodes.ReportFilterValueFormat] = ("{0}: القيمة لا تناسب الحقل. التاريخ بالشكل 2026-10-31، والرقم بالأرقام فقط، ونعم/لا بـ true أو false، وللقوائم اختر من الخيارات.", "{0}: the value does not fit the field. Write dates as 2026-10-31, numbers in digits only, yes/no as true or false, and pick list values from the options."),
         [ErrorCodes.ReportName] = ("اكتب اسم التقرير ({0} حرفاً على الأكثر).", "Enter the report name (at most {0} characters)."),
-        [ErrorCodes.ReportMeasure] = ("اختر مقياساً من مقاييس التقرير المحفوظ (التقارير في «وضع التفاصيل» لا تُثبّت).", "Choose one of the saved report's measures (reports in “Detail mode” cannot be pinned)."),
-        [ErrorCodes.ReportThresholds] = ("حد التنبيه يجب ألا يتجاوز الحد الحرج.", "The warning threshold must not be above the critical threshold."),
+        [ErrorCodes.ReportMeasure] = ("اختر من القائمة «المقياس المعروض»: عدد الصفوف أو أحد مجاميع التقرير.", "Choose from the “Measure shown” list: the number of rows or one of the report's totals."),
+        [ErrorCodes.ReportThresholds] = ("مع «التنبيه عند تجاوز الحد» يجب ألا يقل الحد الحرج عن حد التنبيه.", "With “Warn when above”, the critical threshold must not be below the warning threshold."),
+        [ErrorCodes.ReportThresholdsBelow] = ("مع «التنبيه عند النزول عن الحد» يجب ألا يزيد الحد الحرج على حد التنبيه.", "With “Warn when below”, the critical threshold must not be above the warning threshold."),
     };
 
     /// <summary>
@@ -602,4 +603,5 @@ public static class ErrorCodes
     public const string ReportName = "report.name";
     public const string ReportMeasure = "report.measure";
     public const string ReportThresholds = "report.thresholds";
+    public const string ReportThresholdsBelow = "report.thresholdsBelow";
 }

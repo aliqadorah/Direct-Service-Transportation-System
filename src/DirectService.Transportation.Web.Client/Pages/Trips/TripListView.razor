@@ -28,7 +28,7 @@
     <div class="row" role="group" aria-label="@L["ui.filter"]" style="flex-wrap:wrap;gap:6px;flex:none">
         <Chip Text="@L["trip.f.unbilled"]" On="@(F("billing") == "unbilled")" OnClick="@(() => Toggle("billing", "unbilled"))" />
         <Chip Text="@L["trip.f.invoiced"]" On="@(F("billing") == "invoiced")" OnClick="@(() => Toggle("billing", "invoiced"))" />
-        <Chip Text="@L["trip.f.unsettled"]" On="@(F("settled") == "no")" OnClick="@(() => Toggle("settled", "no"))" />
+        <Chip Text="@L["trip.f.unsettled"]" Title="@L["trip.f.unsettledHelp"]" On="@(F("settled") == "no")" OnClick="@(() => Toggle("settled", "no"))" />
         <Chip Text="@L["md.fleetOwn"]" On="@(F("fleet") == "own")" OnClick="@(() => Toggle("fleet", "own"))" />
         <Chip Text="@L["md.fleetExternal"]" On="@(F("fleet") == "external")" OnClick="@(() => Toggle("fleet", "external"))" />
         <Chip Text="@L["trip.f.partner"]" On="@(F("partnerTrips") == "yes")" OnClick="@(() => Toggle("partnerTrips", "yes"))" />
@@ -49,7 +49,7 @@
     <Btn Icon="filter" Text="@L["trip.apply"]" OnClick="Apply" />
     @if (HasFilters) {<Btn Ghost="true" Text="@L["ui.clear"]" OnClick="ClearAll" />}
     <span style="margin-inline-start:auto;display:flex;gap:6px">
-        <ColumnChooser ViewKey="TRN.Trips" Columns="ColumnChoices" OnChange="c => _columns = c" />
+        <ColumnChooser ViewKey="TRN.Trips" Columns="ColumnChoices" Default="TripGrid.DefaultOrder" OnChange="c => _columns = c" />
         <Btn Small="true" Icon="export" Text="Excel" OnClick="@(() => Export("xlsx"))" />
         <Btn Small="true" Icon="export" Text="CSV" OnClick="@(() => Export("csv"))" />
         <Btn Small="true" Icon="print" Text="PDF" OnClick="@(() => Export("pdf"))" />

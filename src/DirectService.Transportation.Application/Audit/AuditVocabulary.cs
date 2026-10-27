@@ -493,6 +493,7 @@ public static class AuditVocabulary
         ["Measure"] = F("المقياس", "Measure"),
         ["WarningThreshold"] = F("حد التنبيه", "Warning threshold", Kind.Money),
         ["CriticalThreshold"] = F("الحد الحرج", "Critical threshold", Kind.Money),
+        ["WarnWhen"] = F("التنبيه عند", "Warn when", Kind.Code),
         ["ViewKey"] = F("الجدول", "Table"),
         ["FileName"] = F("الملف", "File"),
         ["Mode"] = F("الوضع", "Mode", Kind.Code),
@@ -655,6 +656,9 @@ public static class AuditVocabulary
         ["Return"] = new("يعيده الشريك", "The partner returns it"),
         ["Deduct"] = new("يُخصم من الدفعة التالية", "Deducted from the next payment"),
         ["NotPaid"] = new("لم تُصرف الدفعة", "Payment not actually made"),
+        // Dashboard pins (DT-275)
+        ["Above"] = new("ارتفاع القيمة عن الحد", "Above the threshold"),
+        ["Below"] = new("انخفاض القيمة عن الحد", "Below the threshold"),
         // Invoices
         ["Trip"] = new("فاتورة رحلات", "Trip invoice"),
         ["Manual"] = new("يدوي", "Manual"),

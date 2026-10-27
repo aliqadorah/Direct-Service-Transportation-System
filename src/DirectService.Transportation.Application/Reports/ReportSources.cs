@@ -130,7 +130,9 @@ public static class ReportSources
                 .Bool("tariffBreach", "مخالفة تعرفة", "Tariff breach", t => t.IsTariffBreach)
                 .Bool("needsReview", "تحتاج مراجعة", "Needs review", t => t.NeedsReview)
                 .Bool("invoiced", "مفوترة", "Invoiced", t => t.InvoiceId != null)
-                .Bool("settled", "مسوّاة", "Settled", t => t.SettlementId != null)
+                // DT-271: settled = paid (driver trips in a settlement; partner trips covered by the partner's payments, oldest first).
+                .Bool("settled", "مسوّاة / مدفوعة", "Settled / paid", Trips.TripService.IsPaid)
+                .Amount("partnerOpen", "المتبقي للشريك", "Open to partner", FieldTypes.Money, t => t.PartnerCoverage != null ? t.PartnerCoverage.OpenAmount : 0m)
                 .Text("status", "الحالة", "Status", t => t.Status),
             "tripDate", FieldCatalog.Trip, t => t.CustomValues, t => t.Status == Active, t => t.PublicId, "trip"),
 

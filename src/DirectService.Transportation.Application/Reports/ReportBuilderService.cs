@@ -255,19 +255,72 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
         await PlanAsync(Source(sourceKey), d, null, null, ct).ConfigureAwait(false);
     }
 
-    /// <summary>The grand total of one measure over everything the definition selects (dashboard pins, FR-140).</summary>
-    public async Task<decimal?> TotalAsync(string sourceKey, ReportDefinition d, int measure, CancellationToken ct)
+    /// <summary>
+    /// What a dashboard pin can show (owner finding 27 Oct 2026, DT-275): always "Number of rows" (key "rows"), then the report's own totals —
+    /// a summary report's measures (key = the measure's index; a plain count is the number of rows already) or a detail report's numeric
+    /// columns (key "sum:&lt;field&gt;"). Before, only the summary measures were offered, so a detail report showed an empty list.
+    /// </summary>
+    private static List<(string Key, string Fn, FieldDef? Field)> PinOptions(Plan p)
     {
-        ArgumentNullException.ThrowIfNull(d);
-        var s = Source(sourceKey);
-        if (d.Detail || d.Measures is null || measure < 0 || measure >= d.Measures.Count) throw Fail.Field("measure", ErrorCodes.ReportMeasure);
-        var plan = await PlanAsync(s, d, null, null, ct).ConfigureAwait(false);
-        var method = TotalMethod.MakeGenericMethod(s.Row);
-        var totals = await ((Task<IReadOnlyList<decimal?>>)method.Invoke(this, [plan, ct])!).ConfigureAwait(false);
-        return totals[measure];
+        var list = new List<(string, string, FieldDef?)> { ("rows", "count", null) };
+        if (!p.Definition.Detail)
+            list.AddRange(p.Measures.Select((m, i) => (i.ToString(CultureInfo.InvariantCulture), m.Fn, m.Field)).Where(m => !(m.Fn == "count" && m.Field is null)));
+        else
+            list.AddRange(p.Definition.Columns!.Select(c => p.Fields.First(f => f.Key == c)).Where(f => f.Measurable).Distinct().Select(f => ("sum:" + f.Key, "sum", (FieldDef?)f)));
+        return list;
     }
 
-    private static readonly MethodInfo GroupedMethod = typeof(ReportBuilderService).GetMethod(nameof(GroupedAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
+    /// <summary>The pin options of a definition with their current totals (pin dialog and its preview).</summary>
+    public async Task<IReadOnlyList<PinMeasureOption>> PinMeasuresAsync(string sourceKey, ReportDefinition d, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        var plan = await PlanAsync(Source(sourceKey), d, null, null, ct).ConfigureAwait(false);
+        var options = PinOptions(plan);
+        var values = await PinTotalsAsync(plan, options.Select(o => (o.Fn, o.Field)).ToList(), ct).ConfigureAwait(false);
+        return options.Select((o, i) => new PinMeasureOption(o.Key, PinLabel(o.Key, o.Fn, o.Field), MeasureKind(o.Fn, o.Field), values[i])).ToList();
+    }
+
+    /// <summary>
+    /// A pin's value, name and kind by its key. Older pins keep their measure index (a plain count = the number of rows); a key the report no
+    /// longer has (measure removed, switched to detail) is refused with <c>report.measure</c>.
+    /// </summary>
+    public async Task<(decimal? Value, string Label, string Kind)> PinValueAsync(string sourceKey, ReportDefinition d, string key, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        var plan = await PlanAsync(Source(sourceKey), d, null, null, ct).ConfigureAwait(false);
+        var option = PinOption(plan, key) ?? throw Fail.Field("measureKey", ErrorCodes.ReportMeasure);
+        var value = (await PinTotalsAsync(plan, [(option.Fn, option.Field)], ct).ConfigureAwait(false))[0];
+        return (value, PinLabel(option.Key, option.Fn, option.Field), MeasureKind(option.Fn, option.Field));
+    }
+
+    /// <summary>Checks that a pin key belongs to the definition (pin and edit).</summary>
+    public async Task<bool> HasPinOptionAsync(string sourceKey, ReportDefinition d, string key, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        return PinOption(await PlanAsync(Source(sourceKey), d, null, null, ct).ConfigureAwait(false), key) is not null;
+    }
+
+    private static (string Key, string Fn, FieldDef? Field)? PinOption(Plan p, string key)
+    {
+        if (int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var i))
+            return !p.Definition.Detail && i < p.Measures.Count ? (p.Measures[i].Fn == "count" && p.Measures[i].Field is null ? "rows" : key, p.Measures[i].Fn, p.Measures[i].Field) : null;
+        var options = PinOptions(p);
+        return options.Any(o => o.Key == key) ? options.First(o => o.Key == key) : null;
+    }
+
+    private string PinLabel(string key, string fn, FieldDef? f) => key == "rows" ? L("عدد الصفوف", "Number of rows") : MeasureLabel(fn, f);
+
+    /// <summary>Grand totals of any number of measures, six per SQL aggregate (the grouping row's measure slots).</summary>
+    private async Task<IReadOnlyList<decimal?>> PinTotalsAsync(Plan p, List<(string Fn, FieldDef? Field)> measures, CancellationToken ct)
+    {
+        var result = new List<decimal?>();
+        var method = TotalMethod.MakeGenericMethod(p.Source.Row);
+        foreach (var chunk in measures.Chunk(MaxMeasures))
+            result.AddRange(await ((Task<IReadOnlyList<decimal?>>)method.Invoke(this, [p with { Measures = [.. chunk] }, ct])!).ConfigureAwait(false));
+        return result;
+    }
+
+    private static readonly MethodInfo GroupedMethod =typeof(ReportBuilderService).GetMethod(nameof(GroupedAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly MethodInfo DetailMethod = typeof(ReportBuilderService).GetMethod(nameof(DetailAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly MethodInfo TotalMethod = typeof(ReportBuilderService).GetMethod(nameof(TotalsAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
 

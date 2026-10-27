@@ -5,6 +5,7 @@
   (balance below zero, e.g. a trip voided after payment) — "Record repayment" by cash, bank transfer or CliQ.
 *@
 @using DirectService.Transportation.Contracts.Trips
+@using DirectService.Transportation.Web.Client.Pages.Trips
 @inject Api Api
 @inject Loc L
 @inject ShellState Shell
@@ -72,6 +73,7 @@
                                 <GridColumn TItem="TripResponse" Title="@L["drv.wageQty"]" Value="t => Fmt.Qty(t.BillingQty)" Numeric="true" />
                                 <GridColumn TItem="TripResponse" Title="@L["trip.partnerRate"]" Value="t => Fmt.Money(t.PartnerRate, 4)" Numeric="true" />
                                 <GridColumn TItem="TripResponse" Title="@L["trip.partnerCost"]" Value="t => Fmt.Money(t.PartnerCost)" Numeric="true" Footer="@Fmt.Money(_trips.Totals.PartnerCost)" />
+                                <GridColumn TItem="TripResponse" Title="@L["trip.payment"]"><Template><TripPaymentTag Trip="context" All="true" /></Template></GridColumn>
                             </Columns>
                         </DataGrid>
                         <Pager Page="_page" PageSize="50" Total="_trips.Page.TotalCount" OnPage="Go" />
@@ -95,7 +97,12 @@
 
     private IReadOnlyList<TabItem> Tabs => [new("trips", L["prt.trips"], _a?.Trips), new("payments", L["prt.payments"], _a?.RecentPayments.Count), new("statement", L["md.statement"])];
 
-    protected override Task OnParametersSetAsync() => Load();
+    protected override Task OnParametersSetAsync()
+    {
+        // DT-272: the trip view links straight to the statement (?tab=statement).
+        if (ListUrl.Read(Nav)["tab"] is ("trips" or "payments" or "statement") and var tab) _tab = tab;
+        return Load();
+    }
 
     private async Task Load()
     {

@@ -21,6 +21,8 @@ public class DashboardPin : AuditableEntity, ITenantScoped, ICompanyScoped
     public decimal? WarningThreshold { get; set; }
     /// <summary>Value at which the card shows exceeded.</summary>
     public decimal? CriticalThreshold { get; set; }
+    /// <summary>When the card warns (DT-275): "Above" — at or above the thresholds (as before); "Below" — at or below them.</summary>
+    public string WarnWhen { get; set; } = "Above";
     /// <summary>Display order (ascending).</summary>
     public int SortOrder { get; set; }
     public User User { get; set; } = null!;
