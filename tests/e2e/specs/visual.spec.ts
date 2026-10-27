@@ -940,6 +940,48 @@ for (const lang of ["ar", "en"] as Lang[]) {
     await run.check(page, "bpl26#pl-month", { full: true });
     run.assertClean();
   });
+
+  /**
+   * Owner findings of 27 Oct (DT-268…DT-270): the budget with the grid (top card at full height, one page scrollbar) and with a filter that
+   * matches no account (filters in one row, the message in the grid's card); RPT-19 with drivers who have trips, an advance and a settled
+   * account; Tenant → Companies → Sign-in security with the corrected texts.
+   */
+  test(`Visual — fixes of 27 Oct (${lang})`, async ({ page }) => {
+    test.skip(!wanted("fix27#"), "not among VISUAL_ONLY");
+    test.setTimeout(15 * 60_000);
+    const t = texts(lang);
+    const run = new VisualRun(lang, "fix27");
+    await enrol(page, lang, new VisualRun(lang, "fix27-enrol", false));
+    const company = companyOf(page);
+    const { w } = await documents(page, company);
+    const chart = await api<{ id: string; code: string }[]>(page, "GET", c(company, "accounting/accounts"));
+    const code = (x: string) => chart.find((a) => a.code === x)!.id;
+    const year = Number(today().slice(0, 4));
+    // A driver advance by a manual entry naming the driver (as on the demo company's 1104).
+    await api(page, "POST", c(company, "accounting/journal-entries"), { entryDate: today(), description: lang === "ar" ? "سلفة افتتاحية" : "Opening advance", lines: [
+      { accountId: code("1104"), debit: 100, credit: 0, costCentreId: null, party: { type: "Driver", id: w.driver }, note: null },
+      { accountId: code("110101"), debit: 0, credit: 100, costCentreId: null, party: null, note: null }] });
+    await api(page, "POST", c(company, "accounting/cost-centres"), { code: "BR-S", name: lang === "ar" ? "فرع الجنوب" : "South branch", rowVersion: null });
+    const budget = await api<{ id: string }>(page, "POST", c(company, "accounting/budgets"), { fiscalYear: year, name: `Draft ${year} / مسودة` });
+
+    expect(await open(page, `/c/${company}/accounting/budgets/${budget.id}`)).toBe(true);
+    await expect(page.locator("table.bud-grid input[data-c]").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "fix27#budget-grid", { full: true });
+    await page.getByLabel(t("je.costCentre")).selectOption({ index: 1 });   // the new cost centre: no postings yet → no account
+    await expect(page.locator("section.bud-box .empty")).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "fix27#budget-empty", { full: true });
+
+    expect(await open(page, `/c/${company}/reports/financial?report=driver-balances`)).toBe(true);
+    await expect(page.locator("#rep-head h2")).toContainText("RPT-19", { timeout: 15_000 });
+    await expect(page.locator("main table tbody tr").first()).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "fix27#rpt19", { full: true });
+
+    expect(await open(page, "/tenant/companies")).toBe(true);
+    await page.getByRole("tab", { name: t("ten.security") }).click();
+    await expect(page.getByText(t("ten.securityHelp"))).toBeVisible({ timeout: 15_000 });
+    await run.check(page, "fix27#sign-in-security", { full: true });
+    run.assertClean();
+  });
 }
 
 /**

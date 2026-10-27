@@ -35,7 +35,7 @@ public sealed class ReportTests(ApiFactory f)
     private static readonly DateOnly Now = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(3));
 
     private sealed record World(SignedInUser Owner, CustomerResponse Customer, PartnerResponse Partner, DriverResponse Driver, DriverResponse PartnerDriver, MaterialResponse Material,
-        string CashBox, List<TripResponse> Trips);
+        string CashBox, List<TripResponse> Trips, string LoadingSite = "", string UnloadingSite = "", string OwnType = "");
 
     private async Task<World> WorldAsync()
     {
@@ -73,7 +73,75 @@ public sealed class ReportTests(ApiFactory f)
             await Trip("R-2", own, null, 30.000m, 29.500m, 6.500m, "C-1"),
             await Trip("R-3", ext, partner.Id, 32.000m, 32.000m, null, "C-2"),
         };
-        return new World(o, customer, partner, own, ext, material, box.Id, trips);
+        return new World(o, customer, partner, own, ext, material, box.Id, trips, loading.Id, unloading.Id, types.Single(t => t.IsBuiltIn).Id);
+    }
+
+    /// <summary>
+    /// Owner finding 27 Oct 2026 (DT-269): RPT-19 lists every driver with something on the account — only trips, only an advance, both, all
+    /// settled (balance 0), only a manual entry naming the driver — and each balance equals the RPT-13 closing balance on the same date;
+    /// RPT-20 adds a partner's repayment (it was taken off) and manual entries, equal to the RPT-14 closing balance.
+    /// </summary>
+    [Fact]
+    public async Task Driver_and_partner_balances_equal_the_statements_closing_balance()
+    {
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var c = o.Client;
+        var n = 0;
+        async Task<DriverResponse> Own(string name) => await ReadAsync<DriverResponse>(await c.PostAsJsonAsync(U(o, "/drivers"),
+            new DriverRequest(name, $"98712345{70 + ++n}", "0791234567", null, null, "L-1", "C", Now.AddYears(1), "Cash", null, null, null, $"10-3333{n}", "Volvo", null, 32m, w.OwnType, null,
+                Now.AddYears(1), Now.AddYears(1), Now.AddYears(1), null, null, null, null)));
+        async Task<TripResponse> Trip(string receipt, DriverResponse d) => (await ReadAsync<TripSaveResult>(await c.PostAsJsonAsync(U(o, "/trips"),
+            new TripRequest(receipt, Now, null, null, d.Id, w.Customer.Id, w.LoadingSite, w.UnloadingSite, w.Material.Id, null, 20.000m, 20.000m, null, null, null, null, null, null, null)))).Trip;
+        async Task<AdvanceResponse> Advance(DriverResponse d, decimal amount) => (await ReadAsync<AdvanceDetails>(await c.PostAsJsonAsync(U(o, "/advances"),
+            new AdvanceRequest(d.Id, Now, amount, "Cash", w.CashBox, null, null, null, null, null)))).Advance;
+
+        var onlyAdvance = await Own("Only Advance");
+        await Advance(onlyAdvance, 40);
+        var both = await Own("Trips And Advance");
+        await Trip("R-B1", both);
+        await Advance(both, 15);
+        var settled = await Own("All Settled");
+        var st = await Trip("R-S1", settled);
+        var sa = await Advance(settled, 10);
+        await (await c.PostAsJsonAsync(U(o, "/settlements"), new SettlementRequest(settled.Id, Now, [st.Id], [sa.Id], [], "Cash", w.CashBox, null, null, null))).EnsureOkAsync();
+        var journalOnly = await Own("Opening Advance");
+        var accounts = (await c.GetFromJsonAsync<List<AccountResponse>>(U(o, "/accounting/accounts")))!.ToDictionary(a => a.Code);
+        await (await c.PostAsJsonAsync(U(o, "/accounting/journal-entries"), new ManualEntryRequest(Now, "Opening driver advance",
+            [new JournalLineRequest(accounts["1104"].Id, 100, 0, null, new PartyRequest("Driver", journalOnly.Id), null), new JournalLineRequest(accounts["110101"].Id, 0, 100, null, null, null)], null)))
+            .EnsureOkAsync();
+
+        var asOf = Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var report = await ReadAsync<ReportResult>(await c.GetAsync(U(o, $"/reports/standard/driver-balances?asOf={asOf}")));
+        decimal Balance(string name) => Num(report.Rows.Single(r => Str(r.Values[0]) == name).Values[^1]);
+        async Task<decimal> Closing(DriverResponse d) => (await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/drivers/{d.Id}/statement?to={asOf}")))).Closing;
+        foreach (var d in new[] { w.Driver, onlyAdvance, both, settled, journalOnly })
+            Assert.Equal(await Closing(d), Balance(d.FullName));
+        Assert.True(Balance(w.Driver.FullName) > 0);                    // only trips: wages owed
+        Assert.Equal(-40m, Balance("Only Advance"));                     // only an advance: the driver owes it
+        Assert.Equal(0m, Balance("All Settled"));                        // settled to zero, still listed
+        Assert.Equal(-100m, Balance("Opening Advance"));                 // a manual entry naming the driver (as RPT-23 shows on 1104)
+        Assert.Equal(report.Rows.Sum(r => Num(r.Values[^1])), Num(report.Totals![^1]));
+        var journalLine = (await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/drivers/{journalOnly.Id}/statement?to={asOf}")))).Lines.Single();
+        Assert.Equal(("Journal", 100m), (journalLine.Kind, journalLine.Decrease));
+
+        // Partner: trip cost 88 paid, the trip voided after payment (the partner will return it) → −88; repaid 50 → −38 (before DT-269 the
+        // repayment was taken off: −138); a manual entry crediting the partner 30 → −8.
+        await (await c.PostAsJsonAsync(U(o, "/partner-payments"), new PartnerPaymentRequest(w.Partner.Id, Now, 88, "Cash", w.CashBox, null, null, null, null))).EnsureOkAsync();
+        var paidTrip = (await ReadAsync<TripDetails>(await c.GetAsync(U(o, $"/trips/{w.Trips[2].Id}")))).Trip;
+        await (await c.PostAsJsonAsync(U(o, $"/trips/{paidTrip.Id}/void"), new TripVoidRequest("Cancelled", paidTrip.RowVersion, "Return"))).EnsureOkAsync();
+        await (await c.PostAsJsonAsync(U(o, "/partner-payments"), new PartnerPaymentRequest(w.Partner.Id, Now, 50, "Cash", w.CashBox, null, null, null, null, "Repayment"))).EnsureOkAsync();
+        async Task<(decimal Report, decimal Statement)> PartnerBalance()
+        {
+            var r = await ReadAsync<ReportResult>(await c.GetAsync(U(o, $"/reports/standard/partner-balances?asOf={asOf}")));
+            var s = await ReadAsync<StatementResponse>(await c.GetAsync(U(o, $"/partners/{w.Partner.Id}/statement?to={asOf}")));
+            return (Num(Assert.Single(r.Rows).Values[^1]), s.Closing);
+        }
+        Assert.Equal((-38m, -38m), await PartnerBalance());
+        await (await c.PostAsJsonAsync(U(o, "/accounting/journal-entries"), new ManualEntryRequest(Now, "Partner adjustment",
+            [new JournalLineRequest(accounts["5102"].Id, 30, 0, null, null, null), new JournalLineRequest(accounts["2103"].Id, 0, 30, null, new PartyRequest("Partner", w.Partner.Id), null)], null)))
+            .EnsureOkAsync();
+        Assert.Equal((-8m, -8m), await PartnerBalance());
     }
 
     private static decimal Num(object? v) => v is JsonElement e && e.ValueKind == JsonValueKind.Number ? e.GetDecimal() : throw new InvalidOperationException($"not a number: {v}");
@@ -126,9 +194,9 @@ public sealed class ReportTests(ApiFactory f)
         var shipments = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/partner-shipments")));
         Assert.Equal(88.000m, Num(Assert.Single(shipments.Rows).Values[5]));    // balance due
         var partners = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/partner-balances")));
-        Assert.Equal(88.000m, Num(Assert.Single(partners.Rows).Values[3]));
+        Assert.Equal(88.000m, Num(Assert.Single(partners.Rows).Values[^1]));   // balance (last column since DT-269)
         var drivers = await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/driver-balances")));
-        Assert.Equal(214.725m, Num(Assert.Single(drivers.Rows).Values[4]));
+        Assert.Equal(214.725m, Num(Assert.Single(drivers.Rows).Values[^1]));
         foreach (var key in new[] { "customer-revenue", "routes", "materials" })
             Assert.NotEmpty((await ReadAsync<ReportResult>(await o.Client.GetAsync(U(o, "/reports/standard/" + key)))).Rows);
 

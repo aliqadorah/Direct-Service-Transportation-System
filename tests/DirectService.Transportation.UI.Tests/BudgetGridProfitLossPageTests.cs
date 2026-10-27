@@ -144,6 +144,31 @@ public sealed class BudgetGridProfitLossPageTests : PageTestBase
         Assert.DoesNotContain("\"accountId\":\"e2\"", body, StringComparison.Ordinal);   // cleared: not saved
     }
 
+    /// <summary>
+    /// Owner finding 27 Oct 2026 (DT-268): the top card flows at its full height (never a strip with its own scrollbar), the filters sit in
+    /// one row aligned at the top (a help text under one field does not move the others), and an empty filter result shows its message in
+    /// the grid's card, right under the filters.
+    /// </summary>
+    [Fact]
+    public void Budget_layout_top_card_flows_filters_align_and_an_empty_result_sits_in_the_grid_card()
+    {
+        Respond("accounting/cost-centres/options", new[] { new MasterOption("cc1", "CC1 – North") });
+        Respond("accounting/budgets/cost-centre-accounts", Array.Empty<string>());
+        var cut = Editor();
+        var form = cut.Find("form");
+        Assert.Contains("flow", form.ClassList);
+        Assert.DoesNotContain("fill", form.ClassList);
+        var filters = cut.Find(".bud-filters");
+        Assert.Equal(3, filters.QuerySelectorAll("select, input[type=search]").Length);   // account type, cost centre, search in one row
+
+        Select(cut, L["je.costCentre"], "CC1 – North");                               // no account posted with it
+        cut.WaitForAssertion(() => Assert.Contains(L["bud.noRows"], cut.Markup));
+        Assert.Contains(L.F("bud.centreHelp", 2025, 2026), cut.Find(".bud-filters").TextContent);   // the help stays under its field, in the row
+        var box = cut.Find("section.bud-box");
+        Assert.Contains(L["bud.noRows"], box.TextContent);
+        Assert.Empty(cut.FindAll("table.bud-grid"));
+    }
+
     [Fact]
     public void A_cell_that_is_not_an_amount_is_marked_and_blocks_saving()
     {

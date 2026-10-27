@@ -3,7 +3,9 @@ using System.Text;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Transportation.Web.Client.Help;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Transportation.Web.Client.Localization;
 using DirectService.Transportation.Web.Client.Pages.Console;
 using DirectService.Transportation.Web.Client.Pages.Tenant;
 using DirectService.Transportation.Web.Client.Services;
@@ -213,6 +215,24 @@ public sealed class PlatformPageTests : PageTestBase
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "PUT" && r.Path == "/tenant/security" && r.Body!.Contains("\"rowVersion\":\"RV1\"", StringComparison.Ordinal)));
     }
 
+    /// <summary>
+    /// Owner finding 27 Oct 2026 (DT-270): tenant-facing help pages and the sign-in texts never say that two-step verification is always
+    /// required, and never mention platform staff (the provider console's own help topics may).
+    /// </summary>
+    private static readonly string[] SignInKeys = ["ten.securityHelp", "ten.require2faHelp", "acct.mandatory", "acct.setupNote", "acct.inviteDone", "acct.checkEmailText"];
+
+    private static readonly string[] OutdatedWording =
+        ["platform staff", "موظفو المنصة", "موظفي المنصة", "always required", "إلزامي دائماً", "Two-step verification cannot be turned off.", "لا يمكن تعطيل التحقق بخطوتين."];
+
+    [Fact]
+    public void Tenant_help_and_sign_in_texts_have_no_outdated_two_step_or_staff_wording()
+    {
+        var texts = HelpTopics.All.SelectMany(t => new[] { t.Ar, t.En }).SelectMany(h => new[] { h.Title, h.Summary, h.Who }.Concat(h.Steps).Concat(h.Problems)).ToList();
+        texts.AddRange(SignInKeys.SelectMany(k => new[] { UiText.All[k].Ar, UiText.All[k].En }));
+        foreach (var bad in OutdatedWording)
+            Assert.DoesNotContain(texts, t => t.Contains(bad, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>Revision 6 item 2: "Require two-step verification for all users" — off by default, saved with the security settings.</summary>
     [Fact]
     public void Tenant_security_turns_on_require_2fa_for_all_users()
@@ -226,6 +246,12 @@ public sealed class PlatformPageTests : PageTestBase
         Act(() => cut.FindAll("[role=tab]").First(b => b.TextContent.Contains(L["ten.security"], StringComparison.Ordinal)).Click());
         cut.WaitForAssertion(() => Assert.Contains(L["ten.require2fa"], cut.Markup));
         Assert.Contains(L["ten.require2faHelp"], cut.Markup);
+        // Owner finding 27 Oct 2026 (DT-270): two-step verification is optional unless required; no word about platform staff here.
+        Assert.Contains(L["ten.securityHelp"], cut.Markup);
+        Assert.Equal(("تنطبق هذه الإعدادات على كل مستخدمي المنشأة.", "These settings apply to every user of the organisation."), UiText.All["ten.securityHelp"]);
+        Assert.Equal("When on, every user without two-step verification must set it up at their next sign-in.", UiText.All["ten.require2faHelp"].En);
+        Assert.DoesNotContain("المنصة", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("إلزامي دائماً", cut.Markup, StringComparison.Ordinal);
         AngleSharp.Dom.IElement toggle() => cut.FindAll("[role=switch]").Single(s => s.ParentElement!.TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)
             || (s.GetAttribute("aria-labelledby") is { } id && cut.Find("#" + id).TextContent.Contains(L["ten.require2fa"], StringComparison.Ordinal)));
         Assert.Equal("false", toggle().GetAttribute("aria-checked"));

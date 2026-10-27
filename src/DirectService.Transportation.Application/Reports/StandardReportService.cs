@@ -23,7 +23,8 @@ namespace DirectService.Transportation.Application.Reports;
 /// statement, driver and partner balances. Trips count when active, by trip date; tonnage = loaded weight (DT-114). Every row links to its
 /// record or a filtered list (FR-149); every report exports to Excel/CSV/PDF (FR-150).
 /// </summary>
-public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, ReportExporter exporter)
+public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, ReportExporter exporter,
+    Cash.AccountStatementService statements)
 {
     private const string Active = "Active";
     public const int MaxYears = 10;
@@ -84,8 +85,8 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
         ["cash-bank-statement"] = ("حركة صندوق أو حساب بنكي مع الرصيد.", "Movements of a cash box or bank account with the balance."),
         ["receivables-ageing"] = ("ما على العملاء موزّعاً حسب أيام التأخير في تاريخ محدد.", "What customers owe, by days overdue on a given date."),
         ["payables-ageing"] = ("ما للموردين موزّعاً حسب أيام التأخير في تاريخ محدد.", "What is owed to suppliers, by days overdue on a given date."),
-        ["driver-balances"] = ("رصيد كل سائق في تاريخ محدد: الأجور المستحقة ناقص السلف والتسويات.", "Each driver's balance on a date: wages earned less advances and settlements."),
-        ["partner-balances"] = ("رصيد كل شريك في تاريخ محدد: كلفة الرحلات ناقص الدفعات.", "Each partner's balance on a date: trip costs less payments."),
+        ["driver-balances"] = ("رصيد كل سائق في تاريخ محدد كما في كشف حسابه: الأجور ناقص السلف والتسويات، مع القيود اليدوية والافتتاحية باسمه.", "Each driver's balance on a date, as on the driver statement: wages less advances and settlements, with manual and opening entries naming the driver."),
+        ["partner-balances"] = ("رصيد كل شريك في تاريخ محدد كما في كشف حسابه: كلفة الرحلات ناقص الدفعات، مع السداد والقيود اليدوية والافتتاحية باسمه.", "Each partner's balance on a date, as on the partner statement: trip costs less payments, with repayments and manual and opening entries naming the partner."),
         ["registers"] = ("سجلات الفواتير والإشعارات الدائنة والمقبوضات والسلف والتسويات ودفعات الشركاء.", "Registers of invoices, credit notes, receipts, advances, settlements and partner payments."),
         ["e-invoicing"] = ("حالة إرسال الفواتير إلى الفوترة الإلكترونية: المقبولة والمرفوضة والتي تنتظر.", "E-invoice submissions: accepted, rejected and waiting."),
         ["reconciliation"] = ("أرصدة الحسابات المساعدة (العملاء والسائقون والشركاء) مقارنة بحساباتها في الأستاذ.", "Sub-ledger balances (customers, drivers, partners) compared with their ledger control accounts."),
@@ -570,49 +571,49 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
 
     // ============================================================ RPT-19 / RPT-20 balances
 
+    /// <summary>
+    /// RPT-19 (owner finding 27 Oct 2026, DT-269): every driver with something on the account up to the date — also when it is settled to
+    /// zero — with the parts of the balance: wages of own-fleet trips, advances, what settlements took (deductions and net paid, less what
+    /// the driver repaid), manual / opening journal entries with the driver as party; Balance = the driver statement's (RPT-13) closing
+    /// balance on that date (positive = owed to the driver). Before, only open (unsettled) trips and advances were listed, so a company whose
+    /// drivers were all settled showed "No results", and journal entries (e.g. an opening advance) were missing.
+    /// </summary>
     private async Task<ReportResult> DriverBalancesAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
         var asOf = q.AsOf ?? await support.TodayAsync(ct).ConfigureAwait(false);
-        // Open = not settled: wages of own-fleet active trips and active advances without a settlement, up to the date (8.5, DT-93).
-        // Open as of the date: not settled, or settled by a settlement dated after it or voided (review B10-2).
-        var wages = await db.Set<Trip>().AsNoTracking().Where(t => t.Status == Active && t.PartnerId == null && t.TripDate <= asOf && t.DriverWage != 0
-                && (t.SettlementId == null || t.Settlement!.Status != Active || t.Settlement.SettlementDate > asOf))
-            .GroupBy(t => t.DriverId).Select(g => new { g.Key, A = g.Sum(t => t.DriverWage), N = g.Count() }).ToListAsync(ct).ConfigureAwait(false);
-        var advances = await db.Set<Advance>().AsNoTracking().Where(a => a.Status == CashCodes.Active && a.AdvanceDate <= asOf
-                && (a.SettlementId == null || a.Settlement!.Status != Active || a.Settlement.SettlementDate > asOf))
-            .GroupBy(a => a.DriverId).Select(g => new { g.Key, A = g.Sum(a => a.Amount) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
-        var ids = wages.Select(w => w.Key).Union(advances.Keys).ToList();
+        var balances = await statements.DriverBalancesAsync(asOf, ct).ConfigureAwait(false);
+        var ids = balances.Select(b => b.DriverId).ToList();
         var drivers = await db.Set<Driver>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.PublicId, x.FullName }).ToDictionaryAsync(x => x.Id, ct).ConfigureAwait(false);
-        var rows = ids.Where(drivers.ContainsKey).Select(id =>
-        {
-            var w = wages.FirstOrDefault(x => x.Key == id);
-            var wage = w?.A ?? 0;
-            var adv = advances.GetValueOrDefault(id);
-            return (Driver: drivers[id], Trips: w?.N ?? 0, Wage: wage, Advances: adv, Net: wage - adv);
-        }).OrderByDescending(r => r.Net).ToList();
+        var rows = balances.Where(b => drivers.ContainsKey(b.DriverId)).OrderByDescending(b => b.Balance).ThenBy(b => drivers[b.DriverId].FullName, StringComparer.CurrentCulture).ToList();
         return Result(d, title, [new(L("كما في", "As of"), D(asOf))],
-            [C("driver", "السائق", "Driver"), C("trips", "رحلات مفتوحة", "Open trips", "number"), C("wages", "أجور مفتوحة", "Open wages", "money"),
-             C("advances", "سلف مفتوحة", "Open advances", "money"), C("net", "الصافي المستحق", "Net due", "money")],
-            rows.Select(r => new ResultRow([r.Driver.FullName, r.Trips, r.Wage, r.Advances, r.Net], new DrillLink("driver-account", support.Token<Driver>(r.Driver.PublicId), null))).ToList(),
-            [L("الإجمالي", "Total"), rows.Sum(r => r.Trips), rows.Sum(r => r.Wage), rows.Sum(r => r.Advances), rows.Sum(r => r.Net)]);
+            [C("driver", "السائق", "Driver"), C("trips", "الرحلات", "Trips", "number"), C("wages", "الأجور", "Wages", "money"), C("advances", "السلف", "Advances", "money"),
+             C("settled", "المسوّى (خصومات وصافي مدفوع)", "Settled (deductions and net paid)", "money"), C("journal", "قيود يدوية وافتتاحية", "Manual and opening entries", "money"),
+             C("net", "الرصيد المستحق للسائق", "Balance owed to the driver", "money")],
+            rows.Select(r => new ResultRow([drivers[r.DriverId].FullName, r.Trips, r.Wages, r.Advances, r.Settled, r.Journal, r.Balance],
+                new DrillLink("driver-account", support.Token<Driver>(drivers[r.DriverId].PublicId), null))).ToList(),
+            [L("الإجمالي", "Total"), rows.Sum(r => r.Trips), rows.Sum(r => r.Wages), rows.Sum(r => r.Advances), rows.Sum(r => r.Settled), rows.Sum(r => r.Journal), rows.Sum(r => r.Balance)]);
     }
 
+    /// <summary>
+    /// RPT-20 (DT-269): every partner with something on the account up to the date: trip cost, payments, what the partner repaid, manual /
+    /// opening journal entries with the partner as party; Balance = the partner statement's (RPT-14) closing balance (before, a repayment
+    /// was taken off the balance instead of added, and journal entries were missing).
+    /// </summary>
     private async Task<ReportResult> PartnerBalancesAsync(Def d, string title, StandardReportQuery q, CancellationToken ct)
     {
         var asOf = q.AsOf ?? await support.TodayAsync(ct).ConfigureAwait(false);
-        var cost = await db.Set<Trip>().AsNoTracking().Where(t => t.Status == Active && t.PartnerId != null && t.TripDate <= asOf)
-            .GroupBy(t => t.PartnerId!.Value).Select(g => new { g.Key, A = g.Sum(t => t.PartnerCost) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
-        var paid = await db.Set<PartnerPayment>().AsNoTracking().Where(p => p.Status == CashCodes.Active && p.PaymentDate <= asOf)
-            .GroupBy(p => p.PartnerId).Select(g => new { g.Key, A = g.Sum(p => p.Amount) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
-        var ids = cost.Keys.Union(paid.Keys).ToList();
+        var balances = await statements.PartnerBalancesAsync(asOf, ct).ConfigureAwait(false);
+        var ids = balances.Select(b => b.PartnerId).ToList();
         var partners = await db.Set<Partner>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.PublicId, x.Name }).ToDictionaryAsync(x => x.Id, ct).ConfigureAwait(false);
-        var rows = ids.Where(partners.ContainsKey).Select(id => (P: partners[id], Cost: cost.GetValueOrDefault(id), Paid: paid.GetValueOrDefault(id)))
-            .OrderByDescending(r => r.Cost - r.Paid).ToList();
+        var rows = balances.Where(b => partners.ContainsKey(b.PartnerId)).OrderByDescending(b => b.Balance).ThenBy(b => partners[b.PartnerId].Name, StringComparer.CurrentCulture).ToList();
         return Result(d, title, [new(L("كما في", "As of"), D(asOf))],
-            [C("partner", "الشريك", "Partner"), C("cost", "التكلفة", "Cost", "money"), C("payments", "المدفوعات", "Payments", "money"), C("balance", "الرصيد المستحق", "Balance due", "money")],
-            rows.Select(r => new ResultRow([r.P.Name, r.Cost, r.Paid, r.Cost - r.Paid], new DrillLink("partner-account", support.Token<Partner>(r.P.PublicId), null))).ToList(),
-            [L("الإجمالي", "Total"), rows.Sum(r => r.Cost), rows.Sum(r => r.Paid), rows.Sum(r => r.Cost - r.Paid)]);
+            [C("partner", "الشريك", "Partner"), C("cost", "التكلفة", "Cost", "money"), C("payments", "المدفوعات", "Payments", "money"),
+             C("repayments", "سداد من الشريك", "Repaid by the partner", "money"), C("journal", "قيود يدوية وافتتاحية", "Manual and opening entries", "money"),
+             C("balance", "الرصيد المستحق", "Balance due", "money")],
+            rows.Select(r => new ResultRow([partners[r.PartnerId].Name, r.Cost, r.Payments, r.Repayments, r.Journal, r.Balance],
+                new DrillLink("partner-account", support.Token<Partner>(partners[r.PartnerId].PublicId), null))).ToList(),
+            [L("الإجمالي", "Total"), rows.Sum(r => r.Cost), rows.Sum(r => r.Payments), rows.Sum(r => r.Repayments), rows.Sum(r => r.Journal), rows.Sum(r => r.Balance)]);
     }
 }

@@ -1,4 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
+using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
@@ -6,6 +7,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,11 +18,15 @@ namespace DirectService.Transportation.Application.Cash;
 /// driver — wages of active own-fleet trips − active advances − deductions and net payments of active settlements; partner — partner
 /// cost of active trips − active payments. Statements show the opening balance, each event with a running balance, totals and the
 /// closing balance; partner statements carry the shipment details (date, receipt, route, weight, rate, cost).
+/// Owner finding 27 Oct 2026 (DT-269): manual journal entries and the opening entry with the driver or partner as party (e.g. an opening
+/// driver advance on 1104, which RPT-23 shows) are part of the account too: credit = owed to the party, debit = owed by it. RPT-19 / RPT-20
+/// take every balance from <see cref="DriverBalancesAsync"/> / <see cref="PartnerBalancesAsync"/>, built from the same rules, so a balance
+/// always equals the statement's closing balance on that date.
 /// </summary>
 public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport support, CashSupport cash, SettlementService settlements,
     PartnerPaymentService payments, ISpreadsheetService sheets)
 {
-    private const int KindTrip = 0, KindAdvance = 1, KindDeduction = 2, KindSettlement = 3, KindPayment = 4;
+    private const int KindTrip = 0, KindAdvance = 1, KindDeduction = 2, KindSettlement = 3, KindPayment = 4, KindJournal = 5;
 
     private sealed record Event(DateOnly Date, int Order, long Id, string Kind, DocRef Document, string Description, decimal Increase, decimal Decrease,
         string? Route = null, decimal? Weight = null, decimal? Rate = null);
@@ -53,6 +59,7 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
             $"{t.Route} · {t.Material}", t.DriverWage, 0, t.Route, t.WageQty, t.DriverRate)));
         events.AddRange(advRows.Select(a => new Event(a.AdvanceDate, KindAdvance, a.Id, "Advance", new DocRef(support.Token<Advance>(a.PublicId), a.Number),
             cash.En ? "Advance" : "سلفة", 0, a.Amount)));
+        events.AddRange(await JournalEventsAsync(AccountingCodes.PartyDriver, driverId, upTo, ct).ConfigureAwait(false));
         foreach (var s in stlRows)
         {
             var doc = new DocRef(support.Token<Settlement>(s.PublicId), s.Number);
@@ -89,7 +96,9 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
         var count = await db.Set<Trip>().CountAsync(t => t.PartnerId == partner.Id && t.Status == TripService.Active, ct).ConfigureAwait(false);
         var recent = await payments.Rows(db.Set<PartnerPayment>().AsNoTracking().Where(p => p.PartnerId == partner.Id).OrderByDescending(p => p.PaymentDate).ThenByDescending(p => p.Id).Take(20))
             .ToListAsync(ct).ConfigureAwait(false);
-        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid, recent.Select(payments.ToResponse).ToList(),
+        // DT-269: the balance includes manual / opening entries with the partner as party, like the statement.
+        var journal = (await JournalBalancesAsync(AccountingCodes.PartyPartner, DateOnly.MaxValue, ct).ConfigureAwait(false)).GetValueOrDefault(partner.Id);
+        return new PartnerAccountResponse(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), count, cost, paid, cost - paid + journal, recent.Select(payments.ToResponse).ToList(),
             await payments.ToDeductAsync(partner.Id, ct).ConfigureAwait(false));
     }
 
@@ -118,10 +127,86 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
                         ? (cash.En ? $" · deducted {Accounting.Money.Format(p.DeductedAmount)} paid earlier for voided / changed trips" : $" · خُصم {Accounting.Money.Format(p.DeductedAmount)} مدفوع سابقاً عن رحلات ملغاة أو معدّلة")
                         : string.Empty), 0, p.Amount)))
             .ToList();
+        events.AddRange(await JournalEventsAsync(AccountingCodes.PartyPartner, partner.Id, t, ct).ConfigureAwait(false));
         events.AddRange(overRows.Select(o => new Event(DateOnly.FromDateTime(o.CreatedAt), KindPayment, o.Id,
             "Overpaid", new DocRef(support.Token<Trip>(o.TripPid), o.ReceiptNo), OverpaidText(o.Handling, o.Amount, o.Payment), 0, 0))
             .Where(e => e.Date <= t));
         return Statement(new Ref(support.Token<Partner>(partner.PublicId), partner.Name), f, t, events);
+    }
+
+    // ============================================================ manual and opening entries with the party (DT-269)
+
+    /// <summary>Lines of manual entries (with their reversals) and of the opening entry that name the party, up to a date.</summary>
+    private IQueryable<EntryLine> PartyJournalLines(string partyType, DateOnly upTo) =>
+        db.Set<EntryLine>().AsNoTracking().Where(l => l.PartyType == partyType && l.PartyId != null && l.JournalEntry.EntryDate <= upTo
+            && (l.JournalEntry.IsManual || l.JournalEntry.SourceType == AccountingCodes.SourceOpening));
+
+    private async Task<List<Event>> JournalEventsAsync(string partyType, long partyId, DateOnly upTo, CancellationToken ct)
+    {
+        var rows = await PartyJournalLines(partyType, upTo).Where(l => l.PartyId == partyId)
+            .Select(l => new { l.Id, l.JournalEntry.EntryDate, l.JournalEntry.PublicId, l.JournalEntry.Number, l.JournalEntry.Description, l.Note, l.Debit, l.Credit })
+            .ToListAsync(ct).ConfigureAwait(false);
+        return rows.Select(r => new Event(r.EntryDate, KindJournal, r.Id, "Journal", new DocRef(support.Token<JournalEntry>(r.PublicId), r.Number),
+            string.IsNullOrWhiteSpace(r.Note) ? r.Description : $"{r.Description} · {r.Note}", r.Credit, r.Debit)).ToList();
+    }
+
+    private async Task<Dictionary<long, decimal>> JournalBalancesAsync(string partyType, DateOnly upTo, CancellationToken ct) =>
+        await PartyJournalLines(partyType, upTo).GroupBy(l => l.PartyId!.Value).Select(g => new { g.Key, B = g.Sum(l => l.Credit - l.Debit) })
+            .ToDictionaryAsync(x => x.Key, x => x.B, ct).ConfigureAwait(false);
+
+    // ============================================================ balances of every driver / partner (RPT-19, RPT-20; DT-269)
+
+    /// <summary>A driver's account on a date, by part: wages − advances − settled (deductions and net paid, less repaid) + journal entries.</summary>
+    public sealed record DriverBalance(long DriverId, int Trips, decimal Wages, decimal Advances, decimal Settled, decimal Journal)
+    {
+        public decimal Balance => Wages - Advances - Settled + Journal;
+    }
+
+    /// <summary>A partner's account on a date, by part: trip cost − payments + repayments + journal entries.</summary>
+    public sealed record PartnerBalance(long PartnerId, int Trips, decimal Cost, decimal Payments, decimal Repayments, decimal Journal)
+    {
+        public decimal Balance => Cost - Payments + Repayments + Journal;
+    }
+
+    /// <summary>Every driver with something on the account up to <paramref name="asOf"/>, by the rules of the driver statement.</summary>
+    public async Task<List<DriverBalance>> DriverBalancesAsync(DateOnly asOf, CancellationToken ct)
+    {
+        var wages = await db.Set<Trip>().AsNoTracking().Where(t => t.Status == TripService.Active && t.PartnerId == null && t.TripDate <= asOf)
+            .GroupBy(t => t.DriverId).Select(g => new { g.Key, N = g.Count(), A = g.Sum(t => t.DriverWage) }).ToDictionaryAsync(x => x.Key, ct).ConfigureAwait(false);
+        var advances = await db.Set<Advance>().AsNoTracking().Where(a => a.Status == CashCodes.Active && a.CarriedFromSettlementId == null && a.AdvanceDate <= asOf)
+            .GroupBy(a => a.DriverId).Select(g => new { g.Key, A = g.Sum(a => a.Amount) }).ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
+        var settled = await db.Set<Settlement>().AsNoTracking().Where(s => s.Status == CashCodes.Active && s.SettlementDate <= asOf)
+            .GroupBy(s => s.DriverId).Select(g => new
+            {
+                g.Key,
+                A = g.Sum(s => (s.DeductionsTotal > 0 ? s.DeductionsTotal : 0) + (s.NetPayable > 0 ? s.NetPayable : 0) - (s.RepaidAmount > 0 ? s.RepaidAmount : 0)),
+            })
+            .ToDictionaryAsync(x => x.Key, x => x.A, ct).ConfigureAwait(false);
+        var journal = await JournalBalancesAsync(AccountingCodes.PartyDriver, asOf, ct).ConfigureAwait(false);
+        return wages.Keys.Union(advances.Keys).Union(settled.Keys).Union(journal.Keys).Distinct()
+            .Select(id => new DriverBalance(id, wages.TryGetValue(id, out var w) ? w.N : 0, w?.A ?? 0, advances.GetValueOrDefault(id), settled.GetValueOrDefault(id),
+                journal.GetValueOrDefault(id)))
+            .ToList();
+    }
+
+    /// <summary>Every partner with something on the account up to <paramref name="asOf"/>, by the rules of the partner statement.</summary>
+    public async Task<List<PartnerBalance>> PartnerBalancesAsync(DateOnly asOf, CancellationToken ct)
+    {
+        var cost = await db.Set<Trip>().AsNoTracking().Where(t => t.Status == TripService.Active && t.PartnerId != null && t.TripDate <= asOf)
+            .GroupBy(t => t.PartnerId!.Value).Select(g => new { g.Key, N = g.Count(), A = g.Sum(t => t.PartnerCost) }).ToDictionaryAsync(x => x.Key, ct).ConfigureAwait(false);
+        var pays = await db.Set<PartnerPayment>().AsNoTracking().Where(p => p.Status == CashCodes.Active && p.PaymentDate <= asOf)
+            .GroupBy(p => p.PartnerId).Select(g => new
+            {
+                g.Key,
+                Paid = g.Sum(p => p.Kind == CashCodes.Repayment ? 0 : p.Amount),
+                Repaid = g.Sum(p => p.Kind == CashCodes.Repayment ? p.Amount : 0),
+            })
+            .ToDictionaryAsync(x => x.Key, ct).ConfigureAwait(false);
+        var journal = await JournalBalancesAsync(AccountingCodes.PartyPartner, asOf, ct).ConfigureAwait(false);
+        return cost.Keys.Union(pays.Keys).Union(journal.Keys).Distinct()
+            .Select(id => new PartnerBalance(id, cost.TryGetValue(id, out var c) ? c.N : 0, c?.A ?? 0, pays.TryGetValue(id, out var p) ? p.Paid : 0, p?.Repaid ?? 0,
+                journal.GetValueOrDefault(id)))
+            .ToList();
     }
 
     // ============================================================ common

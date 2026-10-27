@@ -45,7 +45,7 @@
             <ImportPanel PreviewPath="@($"accounting/budgets/{b.Id}/import/preview")" ImportPath="@($"accounting/budgets/{b.Id}/import")" Done="@($"accounting/budgets/{b.Id}")"
                          Help="@L["bud.importHelp"]" OnImported="Imported" />
         }
-        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack fill" style="min-height:0">
+        <EditForm EditContext="_ctx" OnValidSubmit="Save" class="stack flow">   @* DT-268: full height, never a strip that scrolls *@
             <ProblemValidator @ref="_problems" />
             <ErrorSummary @ref="_summary" Extra="_extra" />
             <section class="box pad" style="flex:none">
@@ -56,7 +56,7 @@
                 </div>
             </section>
         </EditForm>
-        <div class="row bud-tools" role="group" aria-label="@L["ui.filter"]">
+        <div class="row bud-tools bud-filters" role="group" aria-label="@L["ui.filter"]">
             <SelectField TValue="string" Value="_type" ValueChanged="SetType" ValueExpression="() => _type" Options="TypeOptions" Label="@L["bud.typeFilter"]" FieldClass="w200" />
             @if (_centres.Count > 0)
             {
