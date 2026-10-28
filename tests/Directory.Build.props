@@ -7,13 +7,18 @@
     (global.json "test.runner"), built as an executable, with the code-coverage extension, so that `dotnet test (project) (coverage options)`
     takes the same arguments for each project on Windows and on Linux. The UI project lacked the coverage extension: its test host refused
     the coverage options (exit code 5 = invalid command line, "zero tests ran", handshake failure) in the first GitHub run.
+    It applies to every project whose name ends in ".Tests" (any new test project gets it without a line of its own, DT-287); other
+    projects under tests/ (the helper library DirectService.Testing) stay plain libraries that no test command runs.
   -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <IsTestHelperLibrary Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTestHelperLibrary>
     <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsTestHelperLibrary)' != 'true'">
+    <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(IsTestHelperLibrary)' != 'true'">
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <Using Include="Xunit" />
