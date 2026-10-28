@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.UserSessions â€” Tenant-scoped (TenantId NULL for provider staff).
 /// </summary>
+[StoredName("CORE.UserSession")]
+[TokenLabel("UserSession")]
 public class UserSession : AuditableEntity, INullableTenantScoped
 {
     /// <summary>Owning tenant; NULL for provider staff.</summary>

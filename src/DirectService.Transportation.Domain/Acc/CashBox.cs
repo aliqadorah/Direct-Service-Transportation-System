@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.CashBoxes â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.CashBox")]
+[TokenLabel("CashBox")]
 public class CashBox : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

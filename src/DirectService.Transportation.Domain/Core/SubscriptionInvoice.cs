@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.SubscriptionInvoices â€” Tenant-scoped.
 /// </summary>
+[StoredName("CORE.SubscriptionInvoice")]
+[TokenLabel("SubscriptionInvoice")]
 public class SubscriptionInvoice : AuditableEntity, ITenantScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

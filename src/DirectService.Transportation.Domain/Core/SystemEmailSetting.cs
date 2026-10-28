@@ -6,6 +6,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// platform staff, used only once a test email with it has succeeded); an activated row replaces the Active one, which becomes Retired.
 /// The client secret is stored encrypted (Data Protection) and never returned or logged.
 /// </summary>
+[StoredName("CORE.SystemEmailSetting")]
+[TokenLabel("SystemEmailSetting")]
 public class SystemEmailSetting : AuditableEntity
 {
     /// <summary>Active / Pending / Retired.</summary>

@@ -1,0 +1,629 @@
+{
+  "emailTemplates": {
+    "ConfirmEmailChange": "ConfirmEmailChange",
+    "EmailChangeAsked": "EmailChangeAsked",
+    "EmailChanged": "EmailChanged",
+    "Invitation": "Invitation",
+    "PasswordReset": "PasswordReset",
+    "SecretExpiring": "SecretExpiring",
+    "StaffInvitation": "StaffInvitation",
+    "SupportDecision": "SupportDecision",
+    "SupportEnded": "SupportEnded",
+    "SystemEmailFailures": "SystemEmailFailures",
+    "TenantDeleted": "TenantDeleted",
+    "TestEmail": "TestEmail",
+    "TwoFactorChanged": "TwoFactorChanged",
+    "VerifyAddedEmail": "VerifyEmail",
+    "VerifyEmail": "VerifyEmail"
+  },
+  "emailSecretLinkTemplates": [
+    "ConfirmEmailChange",
+    "Invitation",
+    "PasswordReset",
+    "StaffInvitation",
+    "VerifyEmail"
+  ],
+  "notificationTypes": [
+    "ACC.PostingFailed",
+    "CORE.ExportFailed",
+    "CORE.ExportReady",
+    "CORE.InvitationAccepted",
+    "CORE.PaymentFailed",
+    "CORE.SupportRequested",
+    "EINV.Rejected",
+    "EINV.SetupError"
+  ],
+  "permissionKeys": {
+    "AcctApar": "acc.acct.apar",
+    "AcctMaint": "acc.acct.maint",
+    "AcctPost": "acc.acct.post",
+    "AcctPostEntry": "acc.acct.postentry",
+    "AcctSetup": "acc.acct.setup",
+    "AcctView": "acc.acct.view",
+    "BudgetApprove": "acc.budget.approve",
+    "BudgetManage": "acc.budget.manage",
+    "BudgetView": "acc.budget.view",
+    "DrvAdvance": "trn.drv.advance",
+    "DrvSettle": "trn.drv.settle",
+    "DrvView": "trn.drv.view",
+    "InvIssue": "trn.inv.issue",
+    "InvView": "trn.inv.view",
+    "InvVoid": "trn.inv.void",
+    "JeExport": "acc.je.export",
+    "JeView": "acc.je.view",
+    "MastersManage": "trn.masters.manage",
+    "RcptManage": "trn.rcpt.manage",
+    "ReportsView": "trn.reports.view",
+    "SettingsManage": "core.settings.manage",
+    "TenantManage": "core.tenant.manage",
+    "TripsEdit": "trn.trips.edit",
+    "TripsView": "trn.trips.view",
+    "TripsVoid": "trn.trips.void",
+    "UsersManage": "core.users.manage"
+  },
+  "permissionSeed": [
+    {
+      "Id": "1",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a01",
+      "PermissionKey": "trn.trips.view",
+      "GroupName": "Trips"
+    },
+    {
+      "Id": "2",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a02",
+      "PermissionKey": "trn.trips.edit",
+      "GroupName": "Trips"
+    },
+    {
+      "Id": "3",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a03",
+      "PermissionKey": "trn.trips.void",
+      "GroupName": "Trips"
+    },
+    {
+      "Id": "4",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a04",
+      "PermissionKey": "trn.inv.view",
+      "GroupName": "Invoicing"
+    },
+    {
+      "Id": "5",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a05",
+      "PermissionKey": "trn.inv.issue",
+      "GroupName": "Invoicing"
+    },
+    {
+      "Id": "6",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a06",
+      "PermissionKey": "trn.inv.void",
+      "GroupName": "Invoicing"
+    },
+    {
+      "Id": "7",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a07",
+      "PermissionKey": "trn.rcpt.manage",
+      "GroupName": "Receipts"
+    },
+    {
+      "Id": "8",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a08",
+      "PermissionKey": "trn.drv.view",
+      "GroupName": "Drivers & partners"
+    },
+    {
+      "Id": "9",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a09",
+      "PermissionKey": "trn.drv.advance",
+      "GroupName": "Drivers & partners"
+    },
+    {
+      "Id": "10",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a10",
+      "PermissionKey": "trn.drv.settle",
+      "GroupName": "Drivers & partners"
+    },
+    {
+      "Id": "11",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a11",
+      "PermissionKey": "acc.je.view",
+      "GroupName": "Journal"
+    },
+    {
+      "Id": "12",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a12",
+      "PermissionKey": "acc.je.export",
+      "GroupName": "Journal"
+    },
+    {
+      "Id": "13",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a13",
+      "PermissionKey": "acc.acct.view",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "14",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a14",
+      "PermissionKey": "acc.acct.post",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "15",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a15",
+      "PermissionKey": "acc.acct.apar",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "16",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a16",
+      "PermissionKey": "acc.acct.setup",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "17",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a17",
+      "PermissionKey": "acc.acct.maint",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "18",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a18",
+      "PermissionKey": "trn.reports.view",
+      "GroupName": "Reports & master data"
+    },
+    {
+      "Id": "19",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a19",
+      "PermissionKey": "trn.masters.manage",
+      "GroupName": "Reports & master data"
+    },
+    {
+      "Id": "20",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a20",
+      "PermissionKey": "core.settings.manage",
+      "GroupName": "Administration"
+    },
+    {
+      "Id": "21",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a21",
+      "PermissionKey": "core.users.manage",
+      "GroupName": "Administration"
+    },
+    {
+      "Id": "22",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a22",
+      "PermissionKey": "core.tenant.manage",
+      "GroupName": "Tenant"
+    },
+    {
+      "Id": "23",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a23",
+      "PermissionKey": "acc.budget.view",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "24",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a24",
+      "PermissionKey": "acc.budget.manage",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "25",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a25",
+      "PermissionKey": "acc.budget.approve",
+      "GroupName": "Accounting"
+    },
+    {
+      "Id": "26",
+      "PublicId": "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a26",
+      "PermissionKey": "acc.acct.postentry",
+      "GroupName": "Accounting"
+    }
+  ],
+  "planSeed": [
+    {
+      "Id": "1",
+      "PublicId": "3f9a1c7e-2d44-4b8e-8f1a-6c0b9e2d7a01",
+      "Code": "TRIAL"
+    }
+  ],
+  "presetRoles": {
+    "Accountant": "Accountant",
+    "Administrator": "Administrator",
+    "Dispatcher": "Dispatcher",
+    "Owner": "Owner",
+    "Viewer": "Viewer"
+  },
+  "presetRoleGrants": {
+    "Owner": [
+      "acc.acct.apar",
+      "acc.acct.maint",
+      "acc.acct.post",
+      "acc.acct.postentry",
+      "acc.acct.setup",
+      "acc.acct.view",
+      "acc.budget.approve",
+      "acc.budget.manage",
+      "acc.budget.view",
+      "acc.je.export",
+      "acc.je.view",
+      "core.settings.manage",
+      "core.tenant.manage",
+      "core.users.manage",
+      "trn.drv.advance",
+      "trn.drv.settle",
+      "trn.drv.view",
+      "trn.inv.issue",
+      "trn.inv.view",
+      "trn.inv.void",
+      "trn.masters.manage",
+      "trn.rcpt.manage",
+      "trn.reports.view",
+      "trn.trips.edit",
+      "trn.trips.view",
+      "trn.trips.void"
+    ],
+    "Administrator": [
+      "acc.acct.apar",
+      "acc.acct.maint",
+      "acc.acct.post",
+      "acc.acct.postentry",
+      "acc.acct.setup",
+      "acc.acct.view",
+      "acc.budget.approve",
+      "acc.budget.manage",
+      "acc.budget.view",
+      "acc.je.export",
+      "acc.je.view",
+      "core.settings.manage",
+      "core.users.manage",
+      "trn.drv.advance",
+      "trn.drv.settle",
+      "trn.drv.view",
+      "trn.inv.issue",
+      "trn.inv.view",
+      "trn.inv.void",
+      "trn.masters.manage",
+      "trn.rcpt.manage",
+      "trn.reports.view",
+      "trn.trips.edit",
+      "trn.trips.view",
+      "trn.trips.void"
+    ],
+    "Accountant": [
+      "acc.acct.apar",
+      "acc.acct.post",
+      "acc.acct.postentry",
+      "acc.acct.view",
+      "acc.budget.manage",
+      "acc.budget.view",
+      "acc.je.export",
+      "acc.je.view",
+      "trn.drv.advance",
+      "trn.drv.settle",
+      "trn.drv.view",
+      "trn.inv.issue",
+      "trn.inv.view",
+      "trn.inv.void",
+      "trn.rcpt.manage",
+      "trn.reports.view",
+      "trn.trips.view"
+    ],
+    "Dispatcher": [
+      "trn.drv.view",
+      "trn.masters.manage",
+      "trn.reports.view",
+      "trn.trips.edit",
+      "trn.trips.view",
+      "trn.trips.void"
+    ],
+    "Viewer": [
+      "acc.acct.view",
+      "acc.budget.view",
+      "acc.je.view",
+      "trn.drv.view",
+      "trn.inv.view",
+      "trn.reports.view",
+      "trn.trips.view"
+    ]
+  },
+  "settingKeys": {
+    "AccrueDriverWage": "TRN.AccrueDriverWage",
+    "BillOnUnloadedWeight": "TRN.BillOnUnloadedWeight",
+    "IbanPattern": "CORE.IbanPattern",
+    "InvoiceApproval": "TRN.InvoiceApproval",
+    "IsDemo": "CORE.IsDemo",
+    "JordanIbanPattern": "^JO[0-9]{2}[A-Z]{4}[0-9]{4}[A-Z0-9]{18}$",
+    "JordanPhonePattern": "^(07[789][0-9]{7}|06[0-9]{7})$",
+    "LockTariffs": "TRN.LockTariffs",
+    "PayDriverOnLoadedWeight": "TRN.PayDriverOnLoadedWeight",
+    "PhonePattern": "CORE.PhonePattern",
+    "SetupPrefix": "CORE.Setup.",
+    "ShortageTolerancePct": "TRN.ShortageTolerancePct",
+    "SupplierDeductionAttempted": "ACC.SupplierDeductionAttempted"
+  },
+  "documentTypes": {
+    "Advance": "TRN.Advance",
+    "ApArPayment": "ACC.ApArPayment",
+    "ApArReturn": "ACC.ApArReturn",
+    "CreditNote": "TRN.CreditNote",
+    "Invoice": "TRN.Invoice",
+    "JournalEntry": "ACC.JournalEntry",
+    "JournalExport": "ACC.JournalExport",
+    "PartnerPayment": "TRN.PartnerPayment",
+    "Receipt": "TRN.Receipt",
+    "Receivable": "ACC.Receivable",
+    "Settlement": "TRN.Settlement",
+    "SupplierBill": "ACC.SupplierBill"
+  },
+  "postingKeys": {
+    "DiscountAllowed": "TRN.DiscountAllowed",
+    "DriverAdvances": "TRN.DriverAdvances",
+    "DriverDeductions": "TRN.DriverDeductions",
+    "DriverPayable": "TRN.DriverPayable",
+    "DriverWageExpense": "TRN.DriverWageExpense",
+    "OpeningBalanceDifference": "ACC.OpeningBalanceDifference",
+    "OtherRevenue": "TRN.OtherRevenue",
+    "PartnerCostExpense": "TRN.PartnerCostExpense",
+    "PartnerPayable": "TRN.PartnerPayable",
+    "SalesTaxInput": "ACC.SalesTaxInput",
+    "SalesTaxOutput": "ACC.SalesTaxOutput",
+    "SupplierDeductions": "ACC.SupplierDeductions",
+    "TradeReceivables": "TRN.TradeReceivables",
+    "TransportRevenue": "TRN.TransportRevenue"
+  },
+  "notificationConstants": {
+    "EInvoiceRejected": "EINV.Rejected",
+    "EInvoiceSetupError": "EINV.SetupError",
+    "ExportFailed": "CORE.ExportFailed",
+    "ExportReady": "CORE.ExportReady",
+    "InvitationAccepted": "CORE.InvitationAccepted",
+    "PaymentFailed": "CORE.PaymentFailed",
+    "PostingFailed": "ACC.PostingFailed",
+    "SupportRequested": "CORE.SupportRequested"
+  },
+  "accountingCodes": {
+    "Active": "Active",
+    "Archived": "Archived",
+    "Draft": "Draft",
+    "ModuleAcc": "ACC",
+    "ModuleTrn": "TRN",
+    "PartyApAr": "ApArParty",
+    "PartyCustomer": "Customer",
+    "PartyDriver": "Driver",
+    "PartyPartner": "Partner",
+    "Posted": "Posted",
+    "Reversed": "Reversed",
+    "SourceManual": "Manual",
+    "SourceOpening": "Opening",
+    "Void": "Void"
+  },
+  "accountingCodeLists": {
+    "AccountTypes": [
+      "Asset",
+      "Liability",
+      "Equity",
+      "Revenue",
+      "Expense"
+    ],
+    "ControlPartyTypes": [
+      "Customer",
+      "Driver",
+      "Partner",
+      "Supplier"
+    ]
+  },
+  "fieldCatalogEntityTypes": {
+    "Customer": "TRN.Customer",
+    "Driver": "TRN.Driver",
+    "Trip": "TRN.Trip"
+  },
+  "codes": {
+    "EntityType": [
+      "ACC.Account",
+      "ACC.ApArDocument",
+      "ACC.ApArParty",
+      "ACC.ApArPayment",
+      "ACC.ApArReturn",
+      "ACC.Budget",
+      "ACC.JournalDraft",
+      "ACC.JournalEntry",
+      "ACC.JournalTemplate",
+      "ACC.TaxCode",
+      "CFG.SavedReport",
+      "TRN.Advance",
+      "TRN.CreditNote",
+      "TRN.Customer",
+      "TRN.Driver",
+      "TRN.EInvoiceSubmission",
+      "TRN.Invoice",
+      "TRN.Material",
+      "TRN.MonthlySiteRate",
+      "TRN.OwnershipType",
+      "TRN.Partner",
+      "TRN.PartnerPayment",
+      "TRN.Receipt",
+      "TRN.Settlement",
+      "TRN.Tariff",
+      "TRN.Trip"
+    ],
+    "SourceType": [
+      "Advance",
+      "ApArPayment",
+      "ApArReturn",
+      "CreditNote",
+      "Invoice",
+      "PartnerPayment",
+      "Receipt",
+      "Settlement",
+      "Trip"
+    ],
+    "SourceModule": [],
+    "PartyType": [],
+    "PartyModule": [],
+    "ControlPartyType": []
+  },
+  "reportSources": {
+    "trips": [
+      "billingQty",
+      "customer",
+      "customerPrice",
+      "driver",
+      "driverRate",
+      "driverWage",
+      "fleetClass",
+      "invoiced",
+      "loadedWeight",
+      "loadingDate",
+      "loadingSite",
+      "margin",
+      "material",
+      "needsReview",
+      "partner",
+      "partnerCost",
+      "partnerOpen",
+      "plate",
+      "receiptNo",
+      "revenue",
+      "settled",
+      "shortageFlag",
+      "shortagePct",
+      "shortageWeight",
+      "status",
+      "tariffBreach",
+      "tripDate",
+      "unloadedWeight",
+      "unloadingSite"
+    ],
+    "invoices": [
+      "customer",
+      "discount",
+      "dueDate",
+      "extraFees",
+      "invoiceDate",
+      "number",
+      "paid",
+      "remaining",
+      "returned",
+      "status",
+      "subtotal",
+      "tax",
+      "total",
+      "type"
+    ],
+    "credit-notes": [
+      "creditDate",
+      "customer",
+      "invoice",
+      "number",
+      "reason",
+      "status",
+      "subtotal",
+      "tax",
+      "total"
+    ],
+    "receipts": [
+      "amount",
+      "customer",
+      "invoice",
+      "method",
+      "number",
+      "onAccount",
+      "receiptDate",
+      "status",
+      "unallocated"
+    ],
+    "advances": [
+      "advanceDate",
+      "amount",
+      "driver",
+      "method",
+      "number",
+      "settled",
+      "status"
+    ],
+    "settlements": [
+      "advances",
+      "deductions",
+      "driver",
+      "gross",
+      "method",
+      "net",
+      "number",
+      "settlementDate",
+      "status"
+    ],
+    "partner-payments": [
+      "amount",
+      "method",
+      "number",
+      "partner",
+      "paymentDate",
+      "status"
+    ],
+    "journal-lines": [
+      "account",
+      "accountType",
+      "costCentre",
+      "credit",
+      "debit",
+      "description",
+      "entry",
+      "entryDate",
+      "manual",
+      "net",
+      "source",
+      "status"
+    ],
+    "drivers": [
+      "capacity",
+      "inspectionExpiry",
+      "insuranceExpiry",
+      "licenceExpiry",
+      "name",
+      "ownershipType",
+      "partner",
+      "paymentMethod",
+      "plate",
+      "registrationExpiry",
+      "status",
+      "truckType"
+    ],
+    "customers": [
+      "city",
+      "name",
+      "paymentTerms",
+      "status",
+      "taxNumber"
+    ]
+  },
+  "clientStoredNameLiterals": [
+    "ACC.Account",
+    "ACC.ApArDocument",
+    "ACC.BankAccount",
+    "ACC.Budget",
+    "ACC.CashBox",
+    "ACC.CostCentre",
+    "ACC.JournalDraft",
+    "ACC.JournalEntry",
+    "ACC.JournalTemplate",
+    "ACC.PendingPosting",
+    "ACC.Period",
+    "TRN.Advance",
+    "TRN.CreditNote",
+    "TRN.Customer",
+    "TRN.Driver",
+    "TRN.EInvoiceSubmission",
+    "TRN.Invoice",
+    "TRN.LoadingSite",
+    "TRN.Material",
+    "TRN.OwnershipType",
+    "TRN.Partner",
+    "TRN.PartnerPayment",
+    "TRN.Receipt",
+    "TRN.Settlement",
+    "TRN.Tariff",
+    "TRN.Trip",
+    "TRN.Trips",
+    "TRN.UnloadingSite"
+  ]
+}

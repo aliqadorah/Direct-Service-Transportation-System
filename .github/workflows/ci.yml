@@ -45,6 +45,12 @@ jobs:
       - name: Build
         run: dotnet build DirectService.Transportation.slnx --no-restore -c Release
 
+      # First: the architecture tests compare every name stored in data (entity stored names, URL token labels, keys, cookies, Data
+      # Protection purposes, the OpenAPI document) with the golden files of the restore tag (platform restructuring, DT-283).
+      - name: Architecture tests (stored names, golden files)
+        run: |
+          dotnet test --project tests/DirectService.Architecture.Tests -c Release --no-build \n            --coverage --coverage-output-format cobertura --coverage-output Architecture.cobertura.xml
+
       - name: Unit and component tests (Domain, Application, UI) with coverage
         run: |
           set -e

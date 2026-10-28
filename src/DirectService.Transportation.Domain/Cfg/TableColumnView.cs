@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.TableColumnViews â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.TableColumnView")]
+[TokenLabel("TableColumnView")]
 public class TableColumnView : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

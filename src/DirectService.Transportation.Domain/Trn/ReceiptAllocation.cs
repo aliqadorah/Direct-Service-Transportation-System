@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// customer's open invoices; a receipt may be applied to several invoices, and what is not allocated stays on account. Existing receipts
 /// against one invoice were migrated as one allocation of their full amount.
 /// </summary>
+[StoredName("TRN.ReceiptAllocation")]
+[TokenLabel("ReceiptAllocation")]
 public class ReceiptAllocation : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_SettlementDeductions â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.SettlementDeduction")]
+[TokenLabel("SettlementDeduction")]
 public class SettlementDeduction : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

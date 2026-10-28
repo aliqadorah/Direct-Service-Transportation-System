@@ -6,6 +6,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// a partner repayment), "Deduct" (set off against the next partner payment(s), see <see cref="PartnerPayment.DeductedAmount"/>) or
 /// "NotPaid" (the payment was not actually made: <see cref="PartnerPaymentId"/> was voided for this trip).
 /// </summary>
+[StoredName("TRN.PartnerOverpayment")]
+[TokenLabel("PartnerOverpayment")]
 public class PartnerOverpayment : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

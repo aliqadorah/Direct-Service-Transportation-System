@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.PendingPostings â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.PendingPosting")]
+[TokenLabel("PendingPosting")]
 public class PendingPosting : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

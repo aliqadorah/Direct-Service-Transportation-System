@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_CreditNoteLines â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.CreditNoteLine")]
+[TokenLabel("CreditNoteLine")]
 public class CreditNoteLine : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

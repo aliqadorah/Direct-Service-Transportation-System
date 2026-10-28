@@ -1,0 +1,8 @@
+{
+  "file": "docs/api/openapi-v1.json",
+  "sha256Lf": "ba487b86bb181dce7017d72b6765e47b204b36d001c346fac969ec930673a01d",
+  "title": "Direct Service Transportation API",
+  "paths": 449,
+  "operations": 521,
+  "schemas": 409
+}

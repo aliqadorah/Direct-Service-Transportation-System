@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_Tariffs â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.Tariff")]
+[TokenLabel("Tariff")]
 public class Tariff : AuditableEntity, ITenantScoped, ICompanyScoped, IArchivable
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

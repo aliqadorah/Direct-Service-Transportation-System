@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// Arabic and English description, status and display order. Seeded with the Jordanian VAT rates; edited in Settings → Tax codes. A code used
 /// on a posted journal line cannot be deleted or change its rate (deactivate it and create a new one instead).
 /// </summary>
+[StoredName("ACC.TaxCode")]
+[TokenLabel("TaxCode")]
 public class TaxCode : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

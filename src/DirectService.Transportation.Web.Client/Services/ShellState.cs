@@ -109,7 +109,7 @@ public sealed class ShellState : IDisposable
     }
 
     /// <summary>Device preference key of the user's theme (DT-244).</summary>
-    public string ThemeKey => "theme." + (Me?.Id ?? "-");
+    public string ThemeKey => PrefKeys.Theme + (Me?.Id ?? "-");
 
     public void SetNotifications(int unread)
     {

@@ -119,7 +119,10 @@ public sealed class SystemEmailOptions
     public const string Section = "Email";
 
     /// <summary>Development mode: the folder the .eml files are written to.</summary>
-    public string DropFolder { get; set; } = ".local/mail";
+    public string DropFolder { get; set; } = DefaultDropFolder;
+
+    /// <summary>Default drop folder, relative to the working directory (pinned, platform design §e, E-34).</summary>
+    public const string DefaultDropFolder = ".local/mail";
 
     /// <summary>Development mode: the sender address of the files (Microsoft 365 uses the mailbox of the settings).</summary>
     public string From { get; set; } = "no-reply@directservice.local";

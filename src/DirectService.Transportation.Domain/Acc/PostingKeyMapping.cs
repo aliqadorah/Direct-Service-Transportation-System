@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.PostingKeyMappings â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.PostingKeyMapping")]
+[TokenLabel("PostingKeyMapping")]
 public class PostingKeyMapping : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

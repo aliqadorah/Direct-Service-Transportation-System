@@ -24,7 +24,7 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
     IUserAuthenticatorKeyStore<User>,
     IUserTwoFactorRecoveryCodeStore<User>
 {
-    private readonly IDataProtector _secretProtector = protection.CreateProtector("DST.Users.TwoFactorSecret.v1");
+    private readonly IDataProtector _secretProtector = protection.CreateProtector(Security.DataProtectionPurposes.TwoFactorSecret);
     private static readonly string[] TenantFilter = [QueryFilters.Tenant];
 
     private IQueryable<User> Users => db.Set<User>().IgnoreQueryFilters(TenantFilter);

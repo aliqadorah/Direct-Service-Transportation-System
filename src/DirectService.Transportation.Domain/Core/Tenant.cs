@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.Tenants â€” Platform-wide.
 /// </summary>
+[StoredName("CORE.Tenant")]
+[TokenLabel("Tenant")]
 public class Tenant : AuditableEntity
 {
     /// <summary>Organisation name entered at sign-up.</summary>

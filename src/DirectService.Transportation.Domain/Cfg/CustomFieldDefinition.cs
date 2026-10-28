@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.CustomFieldDefinitions â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.CustomFieldDefinition")]
+[TokenLabel("CustomFieldDefinition")]
 public class CustomFieldDefinition : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

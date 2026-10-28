@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.EInvoiceSettings â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.EInvoiceSettings")]
+[TokenLabel("EInvoiceSettings")]
 public class EInvoiceSettings : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

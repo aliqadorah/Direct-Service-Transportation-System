@@ -21,8 +21,8 @@ Accounting is a **shared module**: every system posts into it through its postin
 ## Where the work stands
 | Stage | Content | State |
 |---|---|---|
-| 1 | Design: `01_Restructuring_Design.md` | done, awaiting owner review |
-| 2 | Shared + Platform split (behaviour unchanged) | not started |
+| 1 | Design: `01_Restructuring_Design.md` | done; reviewed, owner decisions recorded in section k (28 Oct 2026) |
+| 2 | Shared + Platform split (behaviour unchanged) | in progress: session 1 (step 0 — every stored name pinned, golden tests in `tests/DirectService.Architecture.Tests`) done 28 Oct 2026; sessions 2–8 planned in `BUILD_STATUS.md` |
 | 3 | Accounting module + posting contract | not started |
 | 4 | Transportation module, UI composition, host rename, menu by product | not started |
 | 5 | Products, subscriptions, per-product trials, manual activation, starter module, guides | not started |

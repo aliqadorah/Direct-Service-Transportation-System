@@ -99,7 +99,7 @@ public sealed class EInvoiceStore(MasterDbContext db, IDataScope scope) : IEInvo
 /// <summary>Credentials encrypted with ASP.NET Core Data Protection under their own purpose (SEC-09).</summary>
 public sealed class DataProtectionSecretProtector(IDataProtectionProvider provider) : ISecretProtector
 {
-    private readonly IDataProtector _protector = provider.CreateProtector("DST.EInvoice.Credentials.v1");
+    private readonly IDataProtector _protector = provider.CreateProtector(Security.DataProtectionPurposes.EInvoiceCredentials);
 
     public byte[] Protect(string value) => _protector.Protect(System.Text.Encoding.UTF8.GetBytes(value));
 

@@ -95,7 +95,7 @@ public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider 
             .ConfigureAwait(false);
         var users = await ActiveUsersAsync(tenantId, ct).ConfigureAwait(false);
         var trips = await TripsThisMonthAsync(tenantId, ct).ConfigureAwait(false);
-        var bytes = await files.SizeAsync($"exports/{tenantId}/", ct).ConfigureAwait(false);
+        var bytes = await files.SizeAsync($"{Collaboration.ExportService.Root}{tenantId}/", ct).ConfigureAwait(false);
         return new UsageResponse(companies, plan.MaxCompanies, users, plan.MaxActiveUsers, trips, plan.MaxTripsPerMonth, Math.Round(bytes / 1048576m, 2), plan.MaxStorageMb);
     }
 

@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.JournalEntries â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.JournalEntry")]
+[TokenLabel("JournalEntry")]
 public class JournalEntry : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

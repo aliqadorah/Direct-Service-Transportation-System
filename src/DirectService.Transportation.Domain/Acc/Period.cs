@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.Periods â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.Period")]
+[TokenLabel("Period")]
 public class Period : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

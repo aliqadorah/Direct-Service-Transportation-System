@@ -101,11 +101,14 @@ internal static class MimeMessageBuilder
 /// <summary>The logo every email carries (embedded in this assembly).</summary>
 internal static class EmailLogo
 {
+    /// <summary>The embedded resource's LogicalName (the csproj's EmbeddedResource; pinned, platform design §e, E-32).</summary>
+    public const string ResourceName = "DST.Email.Logo.png";
+
     public static readonly byte[] Png = Load();
 
     private static byte[] Load()
     {
-        using var s = typeof(EmailLogo).Assembly.GetManifestResourceStream("DST.Email.Logo.png") ?? throw new InvalidOperationException("Email logo resource missing.");
+        using var s = typeof(EmailLogo).Assembly.GetManifestResourceStream(ResourceName) ?? throw new InvalidOperationException("Email logo resource missing.");
         using var m = new MemoryStream();
         s.CopyTo(m);
         return m.ToArray();

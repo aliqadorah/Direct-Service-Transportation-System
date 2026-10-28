@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.ImportBatches â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.ImportBatch")]
+[TokenLabel("ImportBatch")]
 public class ImportBatch : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

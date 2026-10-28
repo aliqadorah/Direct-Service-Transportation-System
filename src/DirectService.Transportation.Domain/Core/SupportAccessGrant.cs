@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.SupportAccessGrants â€” Tenant-scoped.
 /// </summary>
+[StoredName("CORE.SupportAccessGrant")]
+[TokenLabel("SupportAccessGrant")]
 public class SupportAccessGrant : AuditableEntity, ITenantScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

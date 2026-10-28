@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.RecordLocks â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.RecordLock")]
+[TokenLabel("RecordLock")]
 public class RecordLock : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

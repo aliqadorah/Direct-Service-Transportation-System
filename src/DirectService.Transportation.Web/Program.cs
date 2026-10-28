@@ -32,8 +32,8 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery(o =>
 {
-    o.HeaderName = "X-XSRF-TOKEN";
-    o.Cookie.Name = "__Host-dst-af";
+    o.HeaderName = AuthCookies.AntiforgeryHeader;
+    o.Cookie.Name = AuthCookies.Antiforgery;
     o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     o.Cookie.SameSite = SameSiteMode.Strict;
 });

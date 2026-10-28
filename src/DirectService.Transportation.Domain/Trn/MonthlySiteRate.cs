@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_MonthlySiteRates â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.MonthlySiteRate")]
+[TokenLabel("MonthlySiteRate")]
 public class MonthlySiteRate : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

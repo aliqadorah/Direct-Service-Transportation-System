@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_Drivers â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.Driver")]
+[TokenLabel("Driver")]
 public class Driver : AuditableEntity, ITenantScoped, ICompanyScoped, IArchivable
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

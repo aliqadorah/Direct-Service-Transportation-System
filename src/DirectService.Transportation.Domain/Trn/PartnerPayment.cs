@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_PartnerPayments â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.PartnerPayment")]
+[TokenLabel("PartnerPayment")]
 public class PartnerPayment : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocument
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

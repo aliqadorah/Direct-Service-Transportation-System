@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.SavedReports â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.SavedReport")]
+[TokenLabel("SavedReport")]
 public class SavedReport : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

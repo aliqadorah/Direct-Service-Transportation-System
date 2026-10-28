@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_InvoiceLayouts â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.InvoiceLayout")]
+[TokenLabel("InvoiceLayout")]
 public class InvoiceLayout : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_RateHistory â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.RateHistory")]
+[TokenLabel("RateHistory")]
 public class RateHistory : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

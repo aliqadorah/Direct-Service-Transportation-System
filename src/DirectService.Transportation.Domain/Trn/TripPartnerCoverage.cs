@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// cover (computed per day, then within the first day the payments do not cover). The partner's net payments (payments − repayments from the partner, active only — the DT-230 rule) are allocated to its active
 /// trips oldest first (trip date, then receipt number); a trip is paid when nothing of its partner cost is left open. Read-only.
 /// </summary>
+[StoredName("TRN.TripPartnerCoverage")]
+[TokenLabel("TripPartnerCoverage")]
 public class TripPartnerCoverage : ITenantScoped, ICompanyScoped
 {
     /// <summary>The partner trip.</summary>

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace DirectService.Transportation.Web.Security;
 
-/// <summary>Authentication schemes (ADR-05).</summary>
+/// <summary>Authentication schemes (ADR-05). Pinned literals (platform design §e, E-25): a scheme name is part of its cookie's protector purpose.</summary>
 public static class AuthSchemes
 {
     /// <summary>Full application session (after password + 2FA).</summary>
@@ -15,11 +15,21 @@ public static class AuthSchemes
     public const string Mfa = "dst-mfa";
 }
 
+/// <summary>Claim types inside the auth cookies (pinned, E-25).</summary>
 public static class AppClaims
 {
     public const string SessionToken = "dst:sid";
     public const string SecurityStamp = "dst:stamp";
     public const string Stage = "dst:stage";
+}
+
+/// <summary>Cookie and header names (pinned literals, platform design §e, E-25): renaming one signs everyone out or refuses every open form.</summary>
+public static class AuthCookies
+{
+    public const string App = "__Host-dst";
+    public const string Mfa = "__Host-dst-mfa";
+    public const string Antiforgery = "__Host-dst-af";
+    public const string AntiforgeryHeader = "X-XSRF-TOKEN";
 }
 
 internal static class AuthSetup
@@ -29,7 +39,7 @@ internal static class AuthSetup
         services.AddAuthentication(AuthSchemes.App)
             .AddCookie(AuthSchemes.App, o =>
             {
-                o.Cookie.Name = "__Host-dst";
+                o.Cookie.Name = AuthCookies.App;
                 Harden(o);
                 o.ExpireTimeSpan = TimeSpan.FromHours(12); // absolute lifetime is enforced by the session row (Q-04)
                 o.SlidingExpiration = false;
@@ -37,7 +47,7 @@ internal static class AuthSetup
             })
             .AddCookie(AuthSchemes.Mfa, o =>
             {
-                o.Cookie.Name = "__Host-dst-mfa";
+                o.Cookie.Name = AuthCookies.Mfa;
                 Harden(o);
                 o.ExpireTimeSpan = TimeSpan.FromMinutes(10);
                 o.SlidingExpiration = false;

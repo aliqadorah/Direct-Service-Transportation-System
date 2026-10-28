@@ -65,7 +65,7 @@ internal sealed partial class ExportWorker(IServiceScopeFactory scopes, IExportQ
                 LogJobFailed(log, job.Id, ex);
                 await exports.FailedAsync(job, ct).ConfigureAwait(false);
             }
-            await sp.GetRequiredService<IFileStore>().PurgeAsync("exports/", ExportService.Keep, ct).ConfigureAwait(false);
+            await sp.GetRequiredService<IFileStore>().PurgeAsync(ExportService.Root, ExportService.Keep, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

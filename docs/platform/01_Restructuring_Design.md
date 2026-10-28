@@ -1,7 +1,7 @@
 # Direct Service platform — Restructuring design (Stage 1)
 
 _Prepared 27 Oct 2026. Design only: no code, project, migration or configuration was changed. Based on the code at commit `d0ef83d` (restore tag `pre-modules-final-2026-10-27`), `BUILD_STATUS.md`, the ADRs in `docs/step2/01_Architecture_and_Build_Plan.md`, `docs/design/Database_Design_Revision6.md` and `docs/step9/Setup_and_Run.md`._
-_Status: **awaiting owner review**. The owner's decisions are listed in section k._
+_Status: **reviewed by the owner; decisions recorded in section k (28 Oct 2026)**. Stage 2 session 1 (step 0, the pins of section e) done 28 Oct 2026 — see e.4._
 
 Contents
 - a. Inventory and placement
@@ -344,7 +344,7 @@ Journal lines name a party by `PartyModule` + `PartyType` + `PartyId`, for examp
   - A future POS uses the same parties.
 - **`trn.TRN_Customers` stays in Transportation** as the transport profile of a customer, linked to its party by `ApArPartyId`.
   - From Stage 3, saving a transport customer **ensures** the linked party: it creates one when it is missing, using the code that already exists for receivables (`ApArPartyService` "the accounting party of a transport customer").
-  - Existing unlinked customers are linked lazily, the first time they are saved or invoiced. A one-time backfill is optional (K-07b). It inserts new party rows and fills the empty `ApArPartyId`; nothing is moved or renamed.
+  - Existing unlinked customers are linked **at once in Stage 3** by a one-time, idempotent data step (owner decision K-07b, 28 Oct 2026). It inserts new party rows and fills the empty `ApArPartyId`; running it again changes nothing; nothing is moved or renamed.
 - **Historic and new journal lines keep their party values.** A transport customer's lines stay `TRN/Customer/<id>`; nothing is re-pointed. Statements, ageing and balances ask `IPartyProvider` for "all party references of this party". That returns `ACC/ApArParty/9` plus `TRN/Customer/17` when the two are linked, so one customer shows one statement.
 - **Suppliers** are already `acc.ApArParties` (role Supplier) and become shared without change.
 - **Drivers and partners stay in Transportation** (`trn.TRN_Drivers`, `trn.TRN_Partners`). They remain accounting parties through the `IPartyProvider` that Transportation registers for module `TRN`, types `Driver` and `Partner`. That provider supplies:
@@ -550,6 +550,52 @@ Rule for the rename and the split: **every value below stays byte-for-byte ident
 | E-37 | OpenAPI document | title "Direct Service Transportation API"; schema ids = C# DTO names | title → "Direct Service API" (cosmetic, K-18); DTO names unchanged in Stages 2–4, so `docs/api/openapi-v1.json` stays identical apart from the title (diff checked) |
 
 Golden data for E-1, E-3, E-4, E-6, E-8…E-20 is generated once from the restore tag into `tests/Architecture.Tests/Golden/*.json` and compared on every build.
+
+### e.4 Where each value is pinned (Stage 2 step 0, done 28 Oct 2026, DT-281 … DT-285)
+
+Every value kept its byte-for-byte value; the golden files in `tests/DirectService.Architecture.Tests/Golden/` were generated from the restore tag by the tag's own code (`tools/golden-gen`), and the 22 architecture tests compare the current code with them. Paths below are relative to `src/` unless they start with `tests/`. "Pinned in" = the single place the value is defined; "not stored" = the item turned out not to be a value stored in data or used as a key.
+
+| # | Pinned in | Notes |
+|---|---|---|
+| E-1 | `[StoredName("TRN.Trip")]` on all 78 entities (`DirectService.Transportation.Domain/{Acc,Cfg,Core,Trn}/*.cs`), read by `Domain/Common/StoredNames.cs` | used by `AuditSaveChangesInterceptor.EntityTypeName` (audit log, append-only / delete messages, `LiveChangeInterceptor` live refresh), `EntityResolver` (record locks), `AuditDescriber`, `CompanyExportService`, tenant deletion. A type without its pin throws; it never falls back to the code name |
+| E-2 | `Application/Abstractions/EntityTypeMap.cs` | stored name → type from the **EF model** (all modules) + the pins; replaces the assembly scans in `EntityResolver`, `AuditDescriber` and `TenantLifecycleService.DeleteTenantAsync`. Golden: the same 73 / 76 / 68 types as at the tag |
+| E-3 | `[TokenLabel("Trip")]` on all 78 entities; prefix `UrlTokenService.InfoPrefix` = `DST-URL:` (`Infrastructure/Security/UrlTokenService.cs`) | golden: a fixed key + GUID gives the tag's token for every type |
+| E-4 | `Application/Notifications/EmailTemplateNames.cs` (14 constants) | `nameof` removed from `EmailTemplates`, `SystemEmailService`, `EmailOutbox`. Golden: each template method still stores its name (`VerifyAddedEmail` stores `VerifyEmail`) |
+| E-5 | `CompanyExportService.RecordType` → `StoredNames.ShortOf` | the type column value without its module (`Trip` of `TRN.Trip`), never the class name |
+| E-6 | not a pin — guarded by the golden property list of every entity | test `No_entity_property_is_renamed` |
+| E-7 | not stored (migration metadata only) | unchanged in this session; `has-pending-model-changes` clean |
+| E-8 | `EntityType` constants of the services (golden "codes": 26 values) and the E-1 pins | the ~97 action names are literals passed to `audit.Record` (never computed from code names); left as they are |
+| E-9 | E-1 pins (server); 28 literals in the browser app (`RecordLockGuard EntityType="TRN.Trip"`, `LiveRefresh`, links) | test: every such literal is a golden stored name or view key |
+| E-10 | the services' `EntityType` constants (`TripService`, `TariffService`, `BudgetService`, accounting and master-data imports) passed to `ImportSupport.Batch` | golden "codes" (same values as E-1) |
+| E-11 | `Application/Configuration/FieldCatalog.cs` (`Trip`, `Driver`, `Customer` constants) | golden |
+| E-12 | `Application/Accounting/PostingKeys.cs` | golden (14 keys) |
+| E-13 | `Application/Configuration/ConfigurationKeys.cs` (`DocumentTypes`) | golden |
+| E-14 | `Application/Configuration/ConfigurationKeys.cs` (`SettingKeys`) | golden |
+| E-15 | `ViewKey="TRN.Trips"` in `Web.Client/Pages/Trips/TripListView.razor` | golden |
+| E-16 | `Application/Reports/ReportSources.cs` (source keys and field keys) | golden: the 10 sources; every field key of the tag still exists |
+| E-17 | not stored as type names (pins hold ids and measures; standard report keys appear in URLs only) | nothing to pin |
+| E-18 | `Application/Collaboration/NotificationService.cs` constants + `NotificationTexts` catalogue; link paths in `NotificationLinks.cs` | golden (8 types) |
+| E-19 | `Application/Accounting/PostingKeys.cs` (`AccountingCodes`: modules, source and party codes, CHECK lists) and the `SourceType` constants of the document services | golden; `TRN` / `ACC` are data codes, never namespaces |
+| E-20 | `Contracts/Security/PermissionKeys.cs` (`PermissionKeys`, `PresetRoles`); seed rows `Infrastructure/Persistence/Seed/ReferenceDataSeed.cs` | golden: 26 keys with seed Ids, PublicIds and groups; plan `TRIAL`; preset grants |
+| E-21 | the file name `Web.Client/wwwroot/DirectService.Transportation.Web.Client.lib.module.js` (= assembly name, cannot be a constant) | test: the file exists under the browser app's assembly name; renamed with the assembly in Stage 4 |
+| E-22 | `DataProtectionSetup.ApplicationName` (`Web/Security/DataProtectionSetup.cs`) | golden |
+| E-23 | `Infrastructure/Security/DataProtectionPurposes.cs` (4 purposes) | used by `UserStore`, `EInvoiceStore`, `EmailOutbox`; test forbids an inline `CreateProtector("…")` |
+| E-24 | `DataProtectionSetup.DefaultKeysPath` = `.local/keys` | the folder itself untouched (read only) |
+| E-25 | `AuthSchemes`, `AppClaims`, new `AuthCookies` (`Web/Security/AuthSetup.cs`) | cookies, antiforgery cookie and header; used by `AuthSetup`, `Program.cs`, `OpenApiSetup`; golden reads the cookie names from the real authentication set-up |
+| E-26 | `ReplaySafeAuthenticatorTokenProvider.Name`, `StaffService.InvitationTokenProvider` / `InvitationPurpose` | already constants; `Default` is the framework's provider name |
+| E-27 | `Contracts/Collaboration/LiveHubNames.cs` (path, group prefix, hub methods, 4 events) | shared by `LiveHub` / `SignalRNotifier` and the browser's `LiveUpdates`; hub methods now carry `[HubMethodName]` with the same names |
+| E-28 | `Web.Client/Services/PrefKeys.cs` (`dst.`, `theme.`, `nav.`); `wwwroot/js/ui.js` (`"dst." + key`), `wwwroot/js/theme.js` (`dst.theme`) | test reads both scripts |
+| E-29 | `<UserSecretsId>` in `Web/…Web.csproj` and `Infrastructure/…Infrastructure.csproj` | golden |
+| E-30 | not stored — configuration and environment names (`DST_` prefix in `DesignTimeDbContextFactory`, `DST_TEST_DB`, …) | unchanged; not data |
+| E-31 | `UrlTokenOptions.Section` (`UrlTokens`) + `Key` | unchanged |
+| E-32 | `EmailLogo.ResourceName` (`Infrastructure/Email/MimeMessageBuilder.cs`) = the csproj LogicalName `DST.Email.Logo.png`; fonts `fonts/<file>` (Application csproj) | golden: the manifest resources of the infrastructure assembly |
+| E-33 | `ExportService.Root` = `exports/` (`Application/Collaboration/ExportService.cs`, used by the folder format, `Billing` storage usage and `ExportWorker`); `LocalFileStore.DefaultRoot` = `App_Data/files` | golden: the folder of a sample export |
+| E-34 | `SystemEmailOptions.DefaultDropFolder` = `.local/mail` (`Application/Platform/SystemEmail.cs`) | golden |
+| E-35 | not stored — the launch profile name (`Properties/launchSettings.json`, `.claude/launch.json`) | renamed in Stage 4 |
+| E-36 | routes — golden OpenAPI (449 paths, 521 operations) | |
+| E-37 | `docs/api/openapi-v1.json` — golden SHA-256 (LF) | re-exported from the host on 28 Oct 2026: byte-identical |
+
+Also found **not stored** (left as they are): the ZIP entry names of the company export (table names, written once, never read back), the payment gateway's application-lock name `dst:…` (a SQL lock of the running process) and exception type names in e-mail delivery error texts.
 
 ---
 
@@ -826,7 +872,7 @@ Common to every stage:
   - `DirectService.Accounting.*` projects. acc.* entities and configurations, `cfg.EInvoiceSettings`, `core.MaintenanceLogs` and every accounting service, endpoint, worker (pending postings, e-invoicing engine) and page move here.
   - `IAccountingPosting`, `IPostingSourceHandler`, `IPostingKeyProvider`, `IPartyProvider` / `IPartyDirectory`, `IPartyBalanceSource`, `IReconciliationSource`, `IPeriodCloseCheck`, `ICashMovementSource`, `IEInvoiceDocumentSource`, `IChartTemplateExtension`. Transport code switches from `PostingEngine` / `Set<JournalEntry>` to the contracts.
   - Cross-module navigations replaced by ids.
-  - Shared customers (b): ensure-party on save; optional backfill only if K-07b says yes.
+  - Shared customers (b): ensure-party on save, plus the one-time, idempotent step that links every existing transport customer to a party (K-07b, decided 28 Oct 2026).
   - Tax codes move to Accounting → Setup & control (route, permissions, redirect).
   - Chart template: 4103 / 4105 "Other income" for new companies; general template + transport extension (K-13).
 - **Must stay unchanged:** every posting (same lines, accounts, parties, numbers, descriptions), pending-posting behaviour, reversal links, reports RPT-13…24 and P&L / TB / BS figures, the DT-226…280 rules, the API (except the tax-codes alias).
@@ -882,31 +928,33 @@ Common to every stage:
 
 ---
 
-## k. Owner decisions needed
+## k. Owner decisions (decided 26/27 Oct 2026, recorded 28 Oct 2026)
 
-| # | Question | Recommendation |
-|---|---|---|
-| K-01 | When staff turn a product's trial offer **off**, do tenants already in that trial keep it? | **Yes**, until it ends. Staff can end or extend one tenant's trial manually |
-| K-02 | Can a tenant try the same product more than once? | **No**, once per tenant per product (staff can still extend or grant manually) |
-| K-03 | Default trial length for a new offer | **14 days** (same as `App:TrialDays`), adjustable per product 1–90 |
-| K-04 | Does Transportation include Accounting? | **Yes**: TRN always includes ACC. ACC can be subscribed alone |
-| K-05 | What happens when a product's trial or subscription ends? | **Read-only with all data kept** (view, print, export); deletion only through the existing tenant lifecycle |
-| K-06 | Who may start a free trial on the tenant side? | **Owner only** (`core.tenant.manage`) |
-| K-07 | Shared customers: `acc.ApArParties` as the shared register, `trn.TRN_Customers` as the linked transport profile (section b) | **Yes** |
-| K-07b | Link every existing transport customer to a party now (one-time insert of missing parties), or lazily on next save/invoice? | **Lazily** (no data step); a one-time backfill is a small extra if wanted |
-| K-08 | Migrations in a separate `src/Hosts/DirectService.Database` project (an addition to the approved layout) or inside `DirectService.Web`? | **Separate project** (tests and tools need migrations without the web host) |
-| K-09 | Allow module Infrastructure projects to reference the Platform anchor entities `Tenant`, `Company`, `User` for FK mapping only (exception E-1)? | **Yes** (the alternative is mapping by name everywhere, which is less safe) |
-| K-10 | E-invoicing engine (JoFotara connector, settings, ICV counter, worker) in Accounting? | **Yes**; transport invoices plug in through `IEInvoiceDocumentSource` |
-| K-11 | `core.MaintenanceLogs` owned by Accounting (table stays in `core`)? | **Yes** |
-| K-12 | `trn.reports.view` becomes the cross-product "Reports" permission (code unchanged) so Accounting-only tenants can use the report builder and saved reports? | **Yes** |
-| K-13 | Chart template: a general template for every new company, plus transport accounts and TRN mappings added when TRN is activated? (4103 / 4105 → Other income, 5206 Operating, new companies only — already decided) | **Yes** |
-| K-14 | Sign-up: new tenants start the TRIAL plan with TRN + ACC (as today), or choose a product at sign-up? | **TRN + ACC as today** until a second product is on sale; then a product choice on the sign-up page |
-| K-15 | Product names: "Direct Service Transportation" / «دايركت سيرفس للنقل», "Direct Service Accounting" / «دايركت سيرفس للمحاسبة»; platform "Direct Service" / «دايركت سيرفس» | Confirm the Arabic names |
-| K-16 | Manual payment methods | Cash, Bank transfer, CliQ, Cheque, Card (offline), Complimentary |
-| K-17 | Does a manual activation or renewal issue the normal `SUB-` tax invoice (marked paid)? | **Yes** (one tax record, whatever the payment path) |
-| K-18 | OpenAPI title, page titles and emails say "Direct Service" (platform) and the product name where a product is meant | **Yes** |
-| K-19 | Plan limits of new products in `core.PlanLimits`; the four existing columns stay authoritative | **Yes** |
-| K-20 | Lazy-loading module UI assemblies per product | **Not now** |
-| K-21 | Development key ring after the host rename: copy `.local/keys` to the new host folder (old folder kept until you confirm), plus the start-up check (E-24) | **Yes** |
-| K-22 | Database design revision 7 (section f.2: six new `core` tables, no rename, no move) — approve before Stage 5 | Approve at the start of Stage 5 |
-| K-23 | Stage order and estimates (section j); start Stage 2 after this review | **As proposed** |
+All K-01 … K-23 are approved as recommended, **except K-07b** (changed: link every existing customer now, in Stage 3).
+
+| # | Question | Recommendation | Decision |
+|---|---|---|---|
+| K-01 | When staff turn a product's trial offer **off**, do tenants already in that trial keep it? | **Yes**, until it ends. Staff can end or extend one tenant's trial manually | Approved as recommended |
+| K-02 | Can a tenant try the same product more than once? | **No**, once per tenant per product (staff can still extend or grant manually) | Approved as recommended |
+| K-03 | Default trial length for a new offer | **14 days** (same as `App:TrialDays`), adjustable per product 1–90 | Approved as recommended |
+| K-04 | Does Transportation include Accounting? | **Yes**: TRN always includes ACC. ACC can be subscribed alone | Approved as recommended |
+| K-05 | What happens when a product's trial or subscription ends? | **Read-only with all data kept** (view, print, export); deletion only through the existing tenant lifecycle | Approved as recommended |
+| K-06 | Who may start a free trial on the tenant side? | **Owner only** (`core.tenant.manage`) | Approved as recommended |
+| K-07 | Shared customers: `acc.ApArParties` as the shared register, `trn.TRN_Customers` as the linked transport profile (section b) | **Yes** | Approved as recommended |
+| K-07b | Link every existing transport customer to a party now (one-time insert of missing parties), or lazily on next save/invoice? | **Lazily** (no data step); a one-time backfill is a small extra if wanted | **Changed: link every existing transport customer to a shared party now**, with a one-time, idempotent data step (inserts the missing parties and fills the empty `ApArPartyId`; running it again changes nothing). Done in **Stage 3**, when shared customers are built — not before |
+| K-08 | Migrations in a separate `src/Hosts/DirectService.Database` project (an addition to the approved layout) or inside `DirectService.Web`? | **Separate project** (tests and tools need migrations without the web host) | Approved as recommended |
+| K-09 | Allow module Infrastructure projects to reference the Platform anchor entities `Tenant`, `Company`, `User` for FK mapping only (exception E-1)? | **Yes** (the alternative is mapping by name everywhere, which is less safe) | Approved as recommended |
+| K-10 | E-invoicing engine (JoFotara connector, settings, ICV counter, worker) in Accounting? | **Yes**; transport invoices plug in through `IEInvoiceDocumentSource` | Approved as recommended |
+| K-11 | `core.MaintenanceLogs` owned by Accounting (table stays in `core`)? | **Yes** | Approved as recommended |
+| K-12 | `trn.reports.view` becomes the cross-product "Reports" permission (code unchanged) so Accounting-only tenants can use the report builder and saved reports? | **Yes** | Approved as recommended |
+| K-13 | Chart template: a general template for every new company, plus transport accounts and TRN mappings added when TRN is activated? (4103 / 4105 → Other income, 5206 Operating, new companies only — already decided) | **Yes** | Approved as recommended |
+| K-14 | Sign-up: new tenants start the TRIAL plan with TRN + ACC (as today), or choose a product at sign-up? | **TRN + ACC as today** until a second product is on sale; then a product choice on the sign-up page | Approved as recommended |
+| K-15 | Product names: "Direct Service Transportation" / «دايركت سيرفس للنقل», "Direct Service Accounting" / «دايركت سيرفس للمحاسبة»; platform "Direct Service" / «دايركت سيرفس» | Confirm the Arabic names | **Confirmed**: platform «دايركت سيرفس», «دايركت سيرفس للنقل», «دايركت سيرفس للمحاسبة» |
+| K-16 | Manual payment methods | Cash, Bank transfer, CliQ, Cheque, Card (offline), Complimentary | Approved as recommended |
+| K-17 | Does a manual activation or renewal issue the normal `SUB-` tax invoice (marked paid)? | **Yes** (one tax record, whatever the payment path) | Approved as recommended |
+| K-18 | OpenAPI title, page titles and emails say "Direct Service" (platform) and the product name where a product is meant | **Yes** | Approved as recommended |
+| K-19 | Plan limits of new products in `core.PlanLimits`; the four existing columns stay authoritative | **Yes** | Approved as recommended |
+| K-20 | Lazy-loading module UI assemblies per product | **Not now** | Approved as recommended |
+| K-21 | Development key ring after the host rename: copy `.local/keys` to the new host folder (old folder kept until you confirm), plus the start-up check (E-24) | **Yes** | Approved as recommended |
+| K-22 | Database design revision 7 (section f.2: six new `core` tables, no rename, no move) — approve before Stage 5 | Approve at the start of Stage 5 | Approved as recommended (revision 7 is presented for approval at the start of Stage 5) |
+| K-23 | Stage order and estimates (section j); start Stage 2 after this review | **As proposed** | **Approved**: stage order as proposed. Each stage is split into several sessions of 2–4 hours; each session ends with a local commit, all tests green and a short report. Each stage ends with a local tag `stageN-done-YYYY-MM-DD`, which the owner pushes |

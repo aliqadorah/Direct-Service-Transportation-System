@@ -43,7 +43,7 @@ internal static class OpenApiSetup
             {
                 Type = SecuritySchemeType.ApiKey,
                 In = ParameterLocation.Cookie,
-                Name = "__Host-dst",
+                Name = Security.AuthCookies.App,
                 Description = "Session cookie issued after password + two-factor sign-in.",
             };
             foreach (var server in doc.Servers ?? [])

@@ -7,15 +7,12 @@ using Microsoft.EntityFrameworkCore;
 namespace DirectService.Transportation.Infrastructure.Persistence;
 
 /// <summary>
-/// Maps namespaced entity names (the audit/lock naming, e.g. TRN.Trip) to entity types and resolves URL tokens
+/// Maps namespaced entity names (the audit/lock naming, e.g. TRN.Trip — the pinned stored names, platform design §e, E-1/E-2) to entity types and resolves URL tokens
 /// to internal ids through the normal query filters, so a record of another tenant/company is never found.
 /// </summary>
 public sealed class EntityResolver(MasterDbContext db, IUrlTokenService tokens) : IEntityResolver
 {
-    private static readonly FrozenDictionary<string, Type> Types =
-        typeof(AuditableEntity).Assembly.GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(AuditableEntity).IsAssignableFrom(t))
-            .ToFrozenDictionary(t => $"{t.Namespace!.Split('.')[^1].ToUpperInvariant()}.{t.Name}", t => t, StringComparer.Ordinal);
+    private FrozenDictionary<string, Type> Types => EntityTypeMap.Records(db.Model);
 
     private static readonly MethodInfo ResolveGeneric =
         typeof(EntityResolver).GetMethod(nameof(ResolveTyped), BindingFlags.NonPublic | BindingFlags.Instance)!;

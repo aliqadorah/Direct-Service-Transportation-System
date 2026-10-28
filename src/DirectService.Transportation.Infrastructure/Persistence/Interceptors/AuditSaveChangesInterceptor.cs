@@ -403,11 +403,13 @@ public sealed class AuditSaveChangesInterceptor(IDataScope scope, IChangeContext
         return true;
     }
 
-    /// <summary>Namespaced entity type written to the audit log, e.g. TRN.Trip, CORE.User (design §3.2).</summary>
+    /// <summary>
+    /// Namespaced entity type written to the audit log, e.g. TRN.Trip, CORE.User (design §3.2): the entity's pinned
+    /// <see cref="StoredNameAttribute"/> (platform design §e, E-1), never computed from its namespace or class name.
+    /// </summary>
     public static string EntityTypeName(object entity)
     {
-        var type = entity.GetType();
-        var module = type.Namespace?.Split('.').LastOrDefault()?.ToUpperInvariant() ?? "APP";
-        return $"{module}.{type.Name}";
+        ArgumentNullException.ThrowIfNull(entity);
+        return StoredNames.Of(entity.GetType());
     }
 }

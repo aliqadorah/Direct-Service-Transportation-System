@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// <summary>
 /// acc.ApArEInvoiceSubmissions â€” Company-scoped.
 /// </summary>
+[StoredName("ACC.ApArEInvoiceSubmission")]
+[TokenLabel("ApArEInvoiceSubmission")]
 public class ApArEInvoiceSubmission : AuditableEntity, ITenantScoped, ICompanyScoped, IEInvoiceSubmission
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

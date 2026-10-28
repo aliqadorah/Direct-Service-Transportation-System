@@ -80,9 +80,9 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
         var waiting = await rows.CountAsync(e => e.Status == EmailStatus.Pending || e.Status == EmailStatus.Sending, ct).ConfigureAwait(false);
         var failed = await rows.CountAsync(e => e.Status == EmailStatus.Failed && e.ResentAt == null, ct).ConfigureAwait(false);
         var failedDay = await rows.CountAsync(e => e.Status == EmailStatus.Failed && e.FailedAt >= day, ct).ConfigureAwait(false);
-        var lastSuccess = await rows.Where(e => e.SentAt != null && e.Template != nameof(EmailTemplates.TestEmail)).MaxAsync(e => e.SentAt, ct).ConfigureAwait(false);
+        var lastSuccess = await rows.Where(e => e.SentAt != null && e.Template != EmailTemplateNames.TestEmail).MaxAsync(e => e.SentAt, ct).ConfigureAwait(false);
         // Working / failing: the outcome of the latest attempt with the settings in use (tests of pending settings are not counted).
-        var latest = await rows.Where(e => e.LastAttemptAt != null && e.Template != nameof(EmailTemplates.TestEmail)).OrderByDescending(e => e.LastAttemptAt)
+        var latest = await rows.Where(e => e.LastAttemptAt != null && e.Template != EmailTemplateNames.TestEmail).OrderByDescending(e => e.LastAttemptAt)
             .Select(e => new { e.ErrorKind, e.Status }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         bool? working = latest is null ? null : latest.Status == EmailStatus.Sent;
         return new SystemEmailStatus(working, lastSuccess, waiting, failed, failedDay, DaysLeft(active), O.PerMinute, working == false ? latest!.ErrorKind : null);
@@ -222,7 +222,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
         new Validator().Require("testAddress", address).MaxLength("testAddress", address, 254).Check(address is null || IsAddress(address), "testAddress").ThrowIfInvalid();
         // Test emails go out at once (not through the queue and its per-address limit): at most 10 in 10 minutes for the whole console.
         var since = Now.AddMinutes(-10);
-        if (await db.Set<EmailOutbox>().CountAsync(e => e.Template == nameof(EmailTemplates.TestEmail) && e.CreatedAt >= since, ct).ConfigureAwait(false) >= 10)
+        if (await db.Set<EmailOutbox>().CountAsync(e => e.Template == EmailTemplateNames.TestEmail && e.CreatedAt >= since, ct).ConfigureAwait(false) >= 10)
             throw new AppException(ErrorCodes.RateLimited, 429);
 
         var pending = await db.Set<SystemEmailSetting>().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Pending, ct).ConfigureAwait(false);
@@ -281,7 +281,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
     // ================================================================= delivery log and resend
 
     /// <summary>Templates whose single-use link a flow can make again (the old link stops working).</summary>
-    private static readonly HashSet<string> NewLinkTemplates = [nameof(EmailTemplates.PasswordReset), nameof(EmailTemplates.VerifyEmail), nameof(EmailTemplates.StaffInvitation)];
+    private static readonly HashSet<string> NewLinkTemplates = [EmailTemplateNames.PasswordReset, EmailTemplateNames.VerifyEmail, EmailTemplateNames.StaffInvitation];
 
     public async Task<PagedResult<EmailLogItem>> LogAsync(EmailLogQuery q, CancellationToken ct)
     {
@@ -311,9 +311,9 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
         : NewLinkTemplates.Contains(template) ? ("newLink", null)
         : template switch
         {
-            nameof(EmailTemplates.Invitation) => (null, "askCompanyAdmin"),
-            nameof(EmailTemplates.ConfirmEmailChange) => (null, "askUser"),
-            nameof(EmailTemplates.TestEmail) => (null, "sendTest"),
+            EmailTemplateNames.Invitation => (null, "askCompanyAdmin"),
+            EmailTemplateNames.ConfirmEmailChange => (null, "askUser"),
+            EmailTemplateNames.TestEmail => (null, "sendTest"),
             _ => (null, "gone"),
         };
 
@@ -340,10 +340,10 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
             // A new single-use link from the flow itself (the same checks as when the person asks: an inactive account gets nothing).
             switch (row.Template)
             {
-                case nameof(EmailTemplates.PasswordReset):
+                case EmailTemplateNames.PasswordReset:
                     await accounts.RequestPasswordResetAsync(row.Recipient, ct).ConfigureAwait(false);
                     break;
-                case nameof(EmailTemplates.VerifyEmail):
+                case EmailTemplateNames.VerifyEmail:
                     await accounts.ResendVerificationAsync(row.Recipient, ct).ConfigureAwait(false);
                     break;
                 default:

@@ -8,6 +8,7 @@
     <Project Path="src/DirectService.Transportation.Web.Client/DirectService.Transportation.Web.Client.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DirectService.Architecture.Tests/DirectService.Architecture.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Api.Tests/DirectService.Transportation.Api.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Application.Tests/DirectService.Transportation.Application.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Domain.Tests/DirectService.Transportation.Domain.Tests.csproj" />

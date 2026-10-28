@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.Plans â€” Platform-wide.
 /// </summary>
+[StoredName("CORE.Plan")]
+[TokenLabel("Plan")]
 public class Plan : AuditableEntity
 {
     /// <summary>Short unique plan code, e.g. BASIC, PRO.</summary>

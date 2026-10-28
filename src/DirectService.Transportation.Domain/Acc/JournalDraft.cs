@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// not posted, never part of any balance or report. Posting validates it in full, posts it through the posting engine (number taken then,
 /// period lock checked then) and removes the draft in the same transaction.
 /// </summary>
+[StoredName("ACC.JournalDraft")]
+[TokenLabel("JournalDraft")]
 public class JournalDraft : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

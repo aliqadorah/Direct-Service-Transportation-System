@@ -7,6 +7,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// The log keeps recipient, type, language, times, status and the reason of a failure — never a link token. Not written to the audit log
 /// (a technical log of its own); changes of the settings and resends by staff are.
 /// </summary>
+[StoredName("CORE.EmailOutbox")]
+[TokenLabel("EmailOutbox")]
 public class EmailOutbox
 {
     public long Id { get; set; }

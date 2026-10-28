@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.UserRecoveryCodes â€” Tenant-scoped (TenantId NULL for provider staff).
 /// </summary>
+[StoredName("CORE.UserRecoveryCode")]
+[TokenLabel("UserRecoveryCode")]
 public class UserRecoveryCode : AuditableEntity, INullableTenantScoped
 {
     /// <summary>Owning tenant; NULL for provider staff.</summary>

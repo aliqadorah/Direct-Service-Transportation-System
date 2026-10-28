@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DirectService.Transportation.Api.Tests" />
+    <InternalsVisibleTo Include="DirectService.Architecture.Tests" />
   </ItemGroup>
 
 </Project>

@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.AuditLogs â€” Append-only log.
 /// </summary>
+[StoredName("CORE.AuditLog")]
+[TokenLabel("AuditLog")]
 public class AuditLog : INullableTenantScoped, IAppendOnly
 {
     /// <summary>Internal key.</summary>

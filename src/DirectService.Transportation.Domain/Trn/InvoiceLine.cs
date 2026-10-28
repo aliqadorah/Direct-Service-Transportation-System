@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_InvoiceLines â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.InvoiceLine")]
+[TokenLabel("InvoiceLine")]
 public class InvoiceLine : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

@@ -6,6 +6,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// credit − debit, expense debit − credit). One line per account and cost centre; a line on a parent account excludes lines on its
 /// sub-accounts for the same cost centre (no double counting).
 /// </summary>
+[StoredName("ACC.BudgetLine")]
+[TokenLabel("BudgetLine")]
 public class BudgetLine : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

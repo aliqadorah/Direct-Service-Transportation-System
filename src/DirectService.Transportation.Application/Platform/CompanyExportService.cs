@@ -109,8 +109,9 @@ public sealed class CompanyExportService(IAppDbContext db, IRequestContext ctx, 
     private Type? RecordType(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
+        // By the stored name without its module ("Trip" of TRN.Trip, pinned: platform design §e, E-5), never the class name.
         _recordTypes ??= db.Model.GetEntityTypes().Select(e => e.ClrType).Where(t => typeof(AuditableEntity).IsAssignableFrom(t))
-            .GroupBy(t => t.Name, StringComparer.Ordinal).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            .GroupBy(StoredNames.ShortOf, StringComparer.Ordinal).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         return _recordTypes.GetValueOrDefault(name[(name.LastIndexOf('.') + 1)..]);
     }
 

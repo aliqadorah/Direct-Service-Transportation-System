@@ -57,7 +57,10 @@ public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFile
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);
 
-    internal static string Folder(long tenantId, long companyId, Guid userPid) => $"exports/{tenantId}/{companyId}/{userPid:N}/";
+    /// <summary>Root folder of export files in the file store (pinned path format, platform design §e, E-33).</summary>
+    public const string Root = "exports/";
+
+    internal static string Folder(long tenantId, long companyId, Guid userPid) => $"{Root}{tenantId}/{companyId}/{userPid:N}/";
 
     public async Task<ExportJobResponse> EnqueueAsync(ExportRequest r, CancellationToken ct)
     {

@@ -15,8 +15,8 @@ namespace DirectService.Transportation.Infrastructure.Email;
 /// <summary>The client secret and the queued messages, each under its own Data Protection purpose (SEC-09).</summary>
 public sealed class DataProtectionEmailProtector(IDataProtectionProvider provider) : IEmailProtector
 {
-    private readonly IDataProtector _secret = provider.CreateProtector("DST.SystemEmail.ClientSecret.v1");
-    private readonly IDataProtector _payload = provider.CreateProtector("DST.SystemEmail.Outbox.v1");
+    private readonly IDataProtector _secret = provider.CreateProtector(Security.DataProtectionPurposes.SystemEmailClientSecret);
+    private readonly IDataProtector _payload = provider.CreateProtector(Security.DataProtectionPurposes.SystemEmailOutbox);
 
     public byte[] ProtectSecret(string secret) => _secret.Protect(System.Text.Encoding.UTF8.GetBytes(secret));
 
@@ -211,7 +211,7 @@ public sealed partial class EmailDispatcher(MasterDbContext db, IEnumerable<IEma
             LogNotSent(log, row.Template, row.Attempts, result.ErrorKind);
         }
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return (result.Sent, failed && row.Template is not nameof(EmailTemplates.SystemEmailFailures));
+        return (result.Sent, failed && row.Template is not EmailTemplateNames.SystemEmailFailures);
     }
 
     private static void Fail(EmailOutbox row, DateTime now, string kind, string? detail)
@@ -225,9 +225,9 @@ public sealed partial class EmailDispatcher(MasterDbContext db, IEnumerable<IEma
     {
         var now = clock.GetUtcNow().UtcDateTime;
         var since = now.AddHours(-6);
-        if (await db.Set<EmailOutbox>().AnyAsync(e => e.Template == nameof(EmailTemplates.SystemEmailFailures) && e.CreatedAt >= since, ct).ConfigureAwait(false)) return;
+        if (await db.Set<EmailOutbox>().AnyAsync(e => e.Template == EmailTemplateNames.SystemEmailFailures && e.CreatedAt >= since, ct).ConfigureAwait(false)) return;
         var day = now.AddHours(-24);
-        var count = await db.Set<EmailOutbox>().CountAsync(e => e.Status == EmailStatus.Failed && e.FailedAt >= day && e.Template != nameof(EmailTemplates.SystemEmailFailures), ct)
+        var count = await db.Set<EmailOutbox>().CountAsync(e => e.Status == EmailStatus.Failed && e.FailedAt >= day && e.Template != EmailTemplateNames.SystemEmailFailures, ct)
             .ConfigureAwait(false);
         foreach (var s in await StaffAsync(ct).ConfigureAwait(false))
             await email.SendAsync(EmailTemplates.SystemEmailFailures(s.Email!, s.FullName, count, Link(), s.LanguageCode), ct).ConfigureAwait(false);

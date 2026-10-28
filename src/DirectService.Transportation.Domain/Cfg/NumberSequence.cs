@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.NumberSequences â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.NumberSequence")]
+[TokenLabel("NumberSequence")]
 public class NumberSequence : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

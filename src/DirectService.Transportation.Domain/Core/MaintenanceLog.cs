@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.MaintenanceLogs â€” Append-only log.
 /// </summary>
+[StoredName("CORE.MaintenanceLog")]
+[TokenLabel("MaintenanceLog")]
 public class MaintenanceLog : ITenantScoped, ICompanyScoped, IAppendOnly
 {
     /// <summary>Internal key.</summary>

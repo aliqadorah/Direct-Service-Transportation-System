@@ -420,7 +420,8 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         await db.InTransactionAsync(async c =>
         {
             await AnonymiseAsync(t.Id, now, c).ConfigureAwait(false);
-            foreach (var type in typeof(AuditableEntity).Assembly.GetTypes().Where(x => typeof(AuditableEntity).IsAssignableFrom(x) && x != typeof(Tenant) && !x.IsAbstract && x.IsClass
+            // Every record type of the EF model (all modules; platform design §e, E-2), not an assembly scan.
+            foreach (var type in EntityTypeMap.Records(db.Model).Values.Where(x => x != typeof(Tenant)
                          && (typeof(ITenantScoped).IsAssignableFrom(x) || typeof(INullableTenantScoped).IsAssignableFrom(x))))
                 await ((Task)SoftDeleteMethod.MakeGenericMethod(type).Invoke(this, [t.Id, system, now, c])!).ConfigureAwait(false);
             t.Status = LifecycleCodes.Deleted;

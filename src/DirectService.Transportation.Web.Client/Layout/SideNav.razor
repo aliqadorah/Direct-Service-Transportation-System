@@ -96,7 +96,7 @@
     [Parameter] public bool Provider { get; set; }
 
     /// <summary>Device preference of this user (DT-237): "mini=1;open=nav.billing,nav.accounting".</summary>
-    private string PrefKey => "nav." + (Shell.Me?.Id ?? "-");
+    private string PrefKey => PrefKeys.Nav + (Shell.Me?.Id ?? "-");
 
     protected override void OnInitialized()
     {

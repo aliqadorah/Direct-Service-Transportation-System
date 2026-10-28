@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
+using DirectService.Transportation.Contracts.Collaboration;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace DirectService.Transportation.Web.Client.Services;
@@ -59,14 +60,14 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
         {
             if (_hub is null)
             {
-                _hub = new HubConnectionBuilder().WithUrl(nav.ToAbsoluteUri("/hubs/live")).WithAutomaticReconnect().Build();
-                _hub.On<JsonElement>("recordChanged", OnRecord);
-                _hub.On<JsonElement>("lockChanged", OnLock);
-                _hub.On<JsonElement>("notification", n => Notification?.Invoke(n));
-                _hub.On<JsonElement>("supportEnded", e => SupportEnded?.Invoke(e));
+                _hub = new HubConnectionBuilder().WithUrl(nav.ToAbsoluteUri(LiveHubNames.Path)).WithAutomaticReconnect().Build();
+                _hub.On<JsonElement>(LiveHubNames.RecordChanged, OnRecord);
+                _hub.On<JsonElement>(LiveHubNames.LockChanged, OnLock);
+                _hub.On<JsonElement>(LiveHubNames.Notification, n => Notification?.Invoke(n));
+                _hub.On<JsonElement>(LiveHubNames.SupportEnded, e => SupportEnded?.Invoke(e));
                 _hub.Reconnected += async _ =>
                 {
-                    try { if (_company is not null) await _hub.InvokeAsync<bool>("JoinCompany", _company).ConfigureAwait(false); }
+                    try { if (_company is not null) await _hub.InvokeAsync<bool>(LiveHubNames.JoinCompany, _company).ConfigureAwait(false); }
                     catch (Exception e) when (e is HttpRequestException or InvalidOperationException or TaskCanceledException or Microsoft.AspNetCore.SignalR.HubException) { }
                     Reconnected?.Invoke();   // screens reload either way
                 };
@@ -79,9 +80,9 @@ public sealed class LiveUpdates(NavigationManager nav) : IAsyncDisposable
                 await _hub.StartAsync().ConfigureAwait(false);
             }
             if (_company == company) return;
-            if (_company is not null) await _hub.InvokeAsync("LeaveCompany", _company).ConfigureAwait(false);
+            if (_company is not null) await _hub.InvokeAsync(LiveHubNames.LeaveCompany, _company).ConfigureAwait(false);
             _company = company;
-            await _hub.InvokeAsync<bool>("JoinCompany", company).ConfigureAwait(false);
+            await _hub.InvokeAsync<bool>(LiveHubNames.JoinCompany, company).ConfigureAwait(false);
         }
         catch (Exception e) when (e is HttpRequestException or InvalidOperationException or TaskCanceledException or Microsoft.AspNetCore.SignalR.HubException)
         {

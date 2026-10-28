@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// the entry description and Reference, and lines (account, cost centre, line description, optional amounts). "Use template" fills a new
 /// entry, which is then edited and saved as a draft or posted as usual; a template never posts anything (no recurring posting).
 /// </summary>
+[StoredName("ACC.JournalTemplate")]
+[TokenLabel("JournalTemplate")]
 public class JournalTemplate : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Cfg;
 /// <summary>
 /// cfg.DashboardPins â€” Company-scoped.
 /// </summary>
+[StoredName("CFG.DashboardPin")]
+[TokenLabel("DashboardPin")]
 public class DashboardPin : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

@@ -17,7 +17,12 @@ namespace DirectService.Transportation.Web.Security;
 /// </summary>
 internal static class DataProtectionSetup
 {
+    /// <summary>Isolates the key ring (platform design §e, E-22): a pinned literal forever — changing it signs everyone out and makes every
+    /// value protected with Data Protection unreadable. It is not the assembly or product name and never follows a rename.</summary>
     public const string ApplicationName = "DirectService.Transportation";
+
+    /// <summary>Default key folder, relative to the content root (E-24).</summary>
+    public const string DefaultKeysPath = ".local/keys";
 
     public static void Add(IServiceCollection services, IConfiguration config, IHostEnvironment env)
     {
@@ -39,5 +44,5 @@ internal static class DataProtectionSetup
 
     /// <summary>The key folder: <c>DataProtection:KeysPath</c> (default <c>.local/keys</c>), relative paths under the content root.</summary>
     public static DirectoryInfo KeysFolder(IConfiguration config, IHostEnvironment env) =>
-        new(Path.GetFullPath(config["DataProtection:KeysPath"] is { Length: > 0 } p ? p : ".local/keys", env.ContentRootPath));
+        new(Path.GetFullPath(config["DataProtection:KeysPath"] is { Length: > 0 } p ? p : DefaultKeysPath, env.ContentRootPath));
 }

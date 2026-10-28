@@ -46,12 +46,16 @@ public sealed class UrlTokenOptionsValidator : IValidateOptions<UrlTokenOptions>
 
 /// <summary>
 /// Hashed URL identifiers (SEC-22, ADR-07): the record's random PublicId encrypted with AES-256 under a key
-/// derived per entity type (HKDF-SHA256, info = entity name), base64url-encoded to 22 characters.
+/// derived per entity type (HKDF-SHA256, info = <see cref="InfoPrefix"/> + the entity's pinned <see cref="TokenLabelAttribute"/>, platform
+/// design §e, E-3 — never the class name, so moving or renaming a class keeps every link), base64url-encoded to 22 characters.
 /// Deterministic (bookmarks keep working), unguessable, and a token of one entity type never opens another.
 /// A tampered token decrypts to a random GUID that does not exist, so the caller answers 404.
 /// </summary>
 public sealed class UrlTokenService : IUrlTokenService
 {
+    /// <summary>HKDF info prefix of the per-type key (stored in every URL id; never change).</summary>
+    public const string InfoPrefix = "DST-URL:";
+
     private readonly byte[] _master;
     private readonly ConcurrentDictionary<Type, byte[]> _keys = new();
 
@@ -93,5 +97,5 @@ public sealed class UrlTokenService : IUrlTokenService
 
     private byte[] KeyFor(Type type) =>
         _keys.GetOrAdd(type, t => HKDF.DeriveKey(HashAlgorithmName.SHA256, _master, 32, salt: [],
-            info: Encoding.UTF8.GetBytes("DST-URL:" + t.Name)));
+            info: Encoding.UTF8.GetBytes(InfoPrefix + StoredNames.TokenLabelOf(t))));
 }

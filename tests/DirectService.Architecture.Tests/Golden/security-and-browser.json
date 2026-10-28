@@ -1,0 +1,76 @@
+{
+  "dataProtectionApplicationName": "DirectService.Transportation",
+  "dataProtectionPurposes": [
+    "DST.EInvoice.Credentials.v1",
+    "DST.SystemEmail.ClientSecret.v1",
+    "DST.SystemEmail.Outbox.v1",
+    "DST.Users.TwoFactorSecret.v1"
+  ],
+  "dataProtectionDefaultKeysPath": ".local/keys",
+  "authSchemes": {
+    "App": "dst",
+    "Mfa": "dst-mfa"
+  },
+  "claims": {
+    "SecurityStamp": "dst:stamp",
+    "SessionToken": "dst:sid",
+    "Stage": "dst:stage"
+  },
+  "cookieApp": "__Host-dst",
+  "cookieMfa": "__Host-dst-mfa",
+  "antiforgeryCookie": "__Host-dst-af",
+  "antiforgeryHeader": "X-XSRF-TOKEN",
+  "identityTokenProviders": {
+    "replaySafe": "ReplaySafeAuthenticator",
+    "staffInvitationProvider": "StaffInvitation",
+    "staffInvitationPurpose": "StaffInvitation"
+  },
+  "urlTokenInfoPrefix": "DST-URL:",
+  "signalRPath": "/hubs/live",
+  "signalRGroupOfCompany1": "co:1",
+  "signalRHubMethods": [
+    "JoinCompany",
+    "LeaveCompany"
+  ],
+  "signalRServerEvents": [
+    "lockChanged",
+    "notification",
+    "recordChanged",
+    "supportEnded"
+  ],
+  "signalRClientEvents": [
+    "lockChanged",
+    "notification",
+    "recordChanged",
+    "supportEnded"
+  ],
+  "signalRClientInvokes": [
+    "JoinCompany",
+    "LeaveCompany"
+  ],
+  "localStorage": {
+    "prefix": "dst.",
+    "beforeSignInTheme": "dst.theme",
+    "themeKeyPrefix": "theme.",
+    "navKeyPrefix": "nav."
+  },
+  "files": {
+    "exportsRoot": "exports/",
+    "exportFolderOfSample": "exports/7/9/6f1c2a3b4d5e4f608a7b9c0d1e2f3a4b/",
+    "fileStoreDefaultRoot": "App_Data/files",
+    "mailDropFolder": ".local/mail",
+    "embeddedResources": [
+      "DST.Email.Logo.png"
+    ]
+  },
+  "userSecretsIds": {
+    "web": "dst-web-7f3e2a1c",
+    "infrastructure": "dst-infrastructure-designtime"
+  },
+  "blazorJsInitializer": [
+    "DirectService.Transportation.Web.Client.lib.module.js"
+  ],
+  "viewKeys": [
+    "TRN.Trips"
+  ]
+}

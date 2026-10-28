@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_OwnershipTypes â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.OwnershipType")]
+[TokenLabel("OwnershipType")]
 public class OwnershipType : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

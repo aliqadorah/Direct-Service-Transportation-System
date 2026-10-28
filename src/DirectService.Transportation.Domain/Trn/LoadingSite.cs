@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// <summary>
 /// trn.TRN_LoadingSites â€” Company-scoped.
 /// </summary>
+[StoredName("TRN.LoadingSite")]
+[TokenLabel("LoadingSite")]
 public class LoadingSite : AuditableEntity, ITenantScoped, ICompanyScoped, ISite
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

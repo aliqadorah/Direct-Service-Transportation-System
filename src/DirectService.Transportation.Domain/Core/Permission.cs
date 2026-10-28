@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.Permissions â€” Platform-wide.
 /// </summary>
+[StoredName("CORE.Permission")]
+[TokenLabel("Permission")]
 public class Permission : AuditableEntity
 {
     /// <summary>Namespaced key checked on the server, e.g. trn.trips.view.</summary>

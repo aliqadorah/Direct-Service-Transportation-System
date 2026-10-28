@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.TermsAcceptances â€” Tenant-scoped.
 /// </summary>
+[StoredName("CORE.TermsAcceptance")]
+[TokenLabel("TermsAcceptance")]
 public class TermsAcceptance : AuditableEntity, ITenantScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

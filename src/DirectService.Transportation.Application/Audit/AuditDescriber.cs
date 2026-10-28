@@ -60,13 +60,11 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
 
     private string L(string ar, string en) => En ? en : ar;
 
-    private static readonly Dictionary<string, Type> Types = typeof(AuditLog).Assembly.GetTypes()
-        .Where(t => t.IsClass && !t.IsAbstract && t.Namespace is not null && t.GetProperty("Id")?.PropertyType == typeof(long)
-            && t.Namespace.Split('.').Last() is "Acc" or "Cfg" or "Core" or "Trn")
-        .ToDictionary(t => t.Namespace!.Split('.').Last().ToUpperInvariant() + "." + t.Name, StringComparer.Ordinal);
+    /// <summary>Record types by their stored name (pinned, design §e, E-1/E-2), from the EF model.</summary>
+    private System.Collections.Frozen.FrozenDictionary<string, Type> Types => EntityTypeMap.WithLongId(db.Model);
 
     /// <summary>The CLR type of a property of a record type (decides how a value is shown), null when unknown.</summary>
-    private static Type? ClrType(string? entityType, string column)
+    private Type? ClrType(string? entityType, string column)
     {
         if (entityType is null || !Types.TryGetValue(entityType, out var t)) return null;
         var p = t.GetProperty(column);
@@ -224,7 +222,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             }
             _erased = await ErasedRecords.FindAsync(d.Db, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null)
                 .Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct).ConfigureAwait(false);
-            if (rows.Any(r => r.Old.Concat(r.New).Any(kv => KindOf(r.Row.EntityType, kv.Key) == Kind.DateTime)))
+            if (rows.Any(r => r.Old.Concat(r.New).Any(kv => d.KindOf(r.Row.EntityType, kv.Key) == Kind.DateTime)))
             {
                 var zone = await d.Db.Set<Company>().AsNoTracking().Where(c => c.Id == d.Ctx.CompanyId).Select(c => c.TimeZone).SingleOrDefaultAsync(ct).ConfigureAwait(false);
                 if (zone is not null && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var tz)) _zone = tz;
@@ -489,7 +487,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                 if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var id) && _byId.TryGetValue((target, id), out var found)) return found.Name;
                 return v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var unknown) && unknown < 0 ? Dash : L("(غير معروف)", "(unknown)");
             }
-            var kind = KindOf(type, column);
+            var kind = d.KindOf(type, column);
             if (type == "CFG.CompanySetting" && column == "SettingValue") kind = Kind.Auto;
             switch (kind)
             {
@@ -499,7 +497,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                     return pct.ToString("0.##", CultureInfo.InvariantCulture) + "%";
                 case Kind.Number when v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var num):
                     // Weights and quantities with 3 decimals as on the screens; counts and days whole.
-                    return num.ToString(ClrType(type, column) == typeof(decimal) ? "#,##0.000" : "#,##0.###", CultureInfo.InvariantCulture);
+                    return num.ToString(d.ClrType(type, column) == typeof(decimal) ? "#,##0.000" : "#,##0.###", CultureInfo.InvariantCulture);
                 case Kind.Date when v.ValueKind == JsonValueKind.String && DateOnly.TryParseExact(v.GetString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day):
                     return day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
                 case Kind.DateTime when v.ValueKind == JsonValueKind.String && DateTime.TryParse(v.GetString(), CultureInfo.InvariantCulture,
@@ -562,7 +560,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         {
             // A payable or a receivable opens its own screen.
             var kind = type == "ACC.ApArDocument" ? d._documentKinds.GetValueOrDefault(found.Id) : LinkKind(type);
-            if (kind is null || found.PublicId is not Guid pid || !Types.TryGetValue(type, out var clr)) return null;
+            if (kind is null || found.PublicId is not Guid pid || !d.Types.TryGetValue(type, out var clr)) return null;
             return new HistoryLink(kind, d.Tokens.Encode(clr, pid), text ?? found.Name);
         }
     }
@@ -675,7 +673,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
     }
 
     /// <summary>How a column's value is shown: the vocabulary's kind, else from the property's type.</summary>
-    private static Kind KindOf(string? entityType, string column)
+    private Kind KindOf(string? entityType, string column)
     {
         if (Field(entityType, column) is { } f && f.Kind != Kind.Auto) return f.Kind;
         var clr = ClrType(entityType, column);

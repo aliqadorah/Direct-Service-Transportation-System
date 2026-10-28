@@ -10,7 +10,10 @@ namespace DirectService.Transportation.Infrastructure.Files;
 /// </summary>
 public sealed class LocalFileStore(IConfiguration config) : IFileStore
 {
-    private readonly string _root = Path.GetFullPath(config["Files:Root"] ?? Path.Combine(AppContext.BaseDirectory, "App_Data", "files"));
+    /// <summary>Default root under the application folder when <c>Files:Root</c> is not set (pinned, platform design §e, E-33).</summary>
+    public const string DefaultRoot = "App_Data/files";
+
+    private readonly string _root = Path.GetFullPath(config["Files:Root"] ?? Path.Combine(AppContext.BaseDirectory, DefaultRoot));
 
     private string PathOf(string key)
     {

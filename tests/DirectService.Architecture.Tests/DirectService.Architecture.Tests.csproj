@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DirectService.Architecture.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The host references every project (composition root), so every stored name and key is reachable from here. -->
+    <ProjectReference Include="..\..\src\DirectService.Transportation.Web\DirectService.Transportation.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Golden files generated once from the restore tag pre-modules-final-2026-10-27 (platform design §e and §i.3). Never edit a value. -->
+    <None Include="Golden\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

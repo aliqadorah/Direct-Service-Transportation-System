@@ -6,6 +6,8 @@ namespace DirectService.Transportation.Domain.Trn;
 /// are paid, trips after it open; on that day the trips are covered in receipt-number order from what is left after <see cref="CostBefore"/>.
 /// No boundary date: every trip of the partner is paid. Read-only.
 /// </summary>
+[StoredName("TRN.PartnerPaymentBoundary")]
+[TokenLabel("PartnerPaymentBoundary")]
 public class PartnerPaymentBoundary : ITenantScoped, ICompanyScoped
 {
     /// <summary>The partner.</summary>

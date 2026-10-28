@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.UserCompanyRoles â€” Tenant-scoped.
 /// </summary>
+[StoredName("CORE.UserCompanyRole")]
+[TokenLabel("UserCompanyRole")]
 public class UserCompanyRole : AuditableEntity, ITenantScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

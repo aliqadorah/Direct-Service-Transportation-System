@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Acc;
 /// a name, a status (Draft → Approved, back to Draft) and its lines. Only one Approved budget per company and year
 /// (<c>UX_Budgets_CompanyId_FiscalYear_Approved</c>); it is the one compared with the actuals (Budget vs Actual, accounting dashboard).
 /// </summary>
+[StoredName("ACC.Budget")]
+[TokenLabel("Budget")]
 public class Budget : AuditableEntity, ITenantScoped, ICompanyScoped
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>

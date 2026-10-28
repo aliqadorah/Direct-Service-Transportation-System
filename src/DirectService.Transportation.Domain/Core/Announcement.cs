@@ -5,6 +5,8 @@ namespace DirectService.Transportation.Domain.Core;
 /// <summary>
 /// core.Announcements â€” Platform-wide.
 /// </summary>
+[StoredName("CORE.Announcement")]
+[TokenLabel("Announcement")]
 public class Announcement : AuditableEntity
 {
     /// <summary>Notice title.</summary>
