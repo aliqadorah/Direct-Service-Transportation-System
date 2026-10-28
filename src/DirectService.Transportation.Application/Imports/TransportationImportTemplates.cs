@@ -4,7 +4,6 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +16,7 @@ namespace DirectService.Transportation.Application.Imports;
 /// rows of trips, the master-data lists, tariffs, chart of accounts (with opening balances) and journal entries, in the reader's language.
 /// The shared <c>ImportTemplateService</c> lays out the file. The accounting kinds split off with the Accounting module (Stage 3).
 /// </summary>
-public sealed class TransportationImportTemplates(IAppDbContext db, IRequestContext ctx, StandardFieldService fields, CustomFieldService customFields,
+public sealed class TransportationImportTemplates(IAppDbContext db, IRequestContext ctx, IStandardFields fields, ICustomFields customFields,
     MasterDataSupport support) : IImportTemplateProvider
 {
     public IReadOnlyList<string> Kinds { get; } =
@@ -249,7 +248,7 @@ public sealed class TransportationImportTemplates(IAppDbContext db, IRequestCont
     private async Task<IEnumerable<Col>> CustomAsync(string entity, DateOnly today, CancellationToken ct) =>
         (await customFields.DefinitionsAsync(entity, ct).ConfigureAwait(false)).Where(d => !d.IsHidden).Select(d =>
         {
-            var options = CustomFieldService.ReadOptions(d.Options);
+            var options = CustomFieldValues.ReadOptions(d.Options);
             var (format, sample) = d.FieldType switch
             {
                 CustomFieldTypes.Number => (Number(4), (object?)1m),

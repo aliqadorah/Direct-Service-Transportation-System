@@ -74,8 +74,7 @@ public static class DependencyInjection
         services.AddScoped<JournalImportService>();
 
         // Master data and field configuration (B3)
-        services.AddScoped<CustomFieldService>();
-        services.AddScoped<StandardFieldService>();
+        services.AddScoped<IFieldCatalogProvider, TransportationFieldCatalog>();
         services.AddScoped<MasterDataSupport>();
         services.AddScoped<Audit.AuditDescriber>();
         services.AddScoped<DriverService>();

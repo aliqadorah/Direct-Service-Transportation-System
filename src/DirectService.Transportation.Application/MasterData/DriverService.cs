@@ -17,7 +17,7 @@ namespace DirectService.Transportation.Application.MasterData;
 /// alerts (expired or within 30 days, FR-154); archive/restore and delete only while unreferenced (FR-162); truck changes appear
 /// in the history old → new (FR-153). Writes need masters.manage; edits respect record locks (BR-039).
 /// </summary>
-public sealed partial class DriverService(IAppDbContext db, MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields,
+public sealed partial class DriverService(IAppDbContext db, MasterDataSupport support, IStandardFields fields, ICustomFields customFields,
     IChangeContext changes, IRecordLockGuard locks, IRequestContext ctx)
 {
     public const string EntityType = "TRN.Driver";
@@ -330,7 +330,7 @@ public sealed partial class DriverService(IAppDbContext db, MasterDataSupport su
         new(support.Token<Driver>(d.PublicId), d.FullName, d.NationalId, d.Phone1, d.Phone2, d.Address, d.LicenceNo, d.LicenceType, d.LicenceExpiry,
             d.PaymentMethod, d.BankName, d.Iban, d.CliqAlias, d.PlateNumber, d.TruckType, d.TrailerNo, d.CapacityTons,
             new Ref(support.Token<OwnershipType>(d.OwnershipType.PublicId), OwnershipTypeNames.Display(d.OwnershipType.Name, ctx.Language)), d.OwnershipType.FleetClass, PartnerRef(d.Partner),
-            d.RegistrationExpiry, d.InsuranceExpiry, d.InspectionExpiry, d.Status, d.Notes, CustomFieldService.Read(d.CustomValues), Alerts(d, today),
+            d.RegistrationExpiry, d.InsuranceExpiry, d.InspectionExpiry, d.Status, d.Notes, CustomFieldValues.Read(d.CustomValues), Alerts(d, today),
             Convert.ToBase64String(d.RowVersion));
 
     private Ref? PartnerRef(Partner? p) => p is null ? null : new Ref(support.Token<Partner>(p.PublicId), p.Name);

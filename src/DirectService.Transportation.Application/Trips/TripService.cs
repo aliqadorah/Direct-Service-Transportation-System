@@ -54,7 +54,7 @@ public sealed record TripDraft(
 /// (FR-008); quick-entry defaults (FR-007); history (FR-015).
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, StandardFieldService fields, CustomFieldService customFields,
+    IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, IStandardFields fields, ICustomFields customFields,
     CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, AuditTrail audit, Platform.PlanLimits? limits = null)
 {
     /// <summary>Trips saved this month must fit the plan (P-07); viewing and exporting are never limited (BR-013).</summary>
@@ -864,7 +864,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             r.InvoicePid is Guid i ? new DocRef(support.Token<Invoice>(i), r.InvoiceNumber) : null,
             r.SettlementPid is Guid s ? new DocRef(support.Token<Settlement>(s), r.SettlementNumber) : null,
             r.EntryPid is Guid e ? new DocRef(support.Token<JournalEntry>(e), r.EntryNumber) : null, r.Pending,
-            t.VoidReason, t.Notes, CustomFieldService.Read(t.CustomValues), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(t.RowVersion),
+            t.VoidReason, t.Notes, CustomFieldValues.Read(t.CustomValues), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(t.RowVersion),
             payment, partnerOpen);
     }
 }

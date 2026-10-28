@@ -561,7 +561,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             l.Trip is null ? null : new Ref(support.Token<Trip>(l.Trip.PublicId), l.Trip.ReceiptNo), l.Description, l.Quantity, l.UnitPrice, l.Amount, l.Returned,
             l.Trip?.LoadingDate, l.Trip?.UnloadingDate, l.Trip?.TruckPlateAtSave, l.Trip?.Driver, l.Trip?.Loading, l.Trip?.Unloading, l.Trip?.Material,
             l.Trip?.LoadedWeight, l.Trip?.UnloadedWeight,
-            CustomFieldService.Read(l.Trip?.CustomValues).ToDictionary(kv => kv.Key, kv => CustomFieldService.Text(kv.Value) ?? string.Empty, StringComparer.Ordinal))).ToList();
+            CustomFieldValues.Read(l.Trip?.CustomValues).ToDictionary(kv => kv.Key, kv => CustomFieldValues.Text(kv.Value) ?? string.Empty, StringComparer.Ordinal))).ToList();
     }
 
     internal InvoiceResponse ToResponse(Row r, DateOnly today)

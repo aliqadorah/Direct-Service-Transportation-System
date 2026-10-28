@@ -25,7 +25,7 @@ namespace DirectService.Transportation.Application.Trips;
 /// defaults and the row is flagged Needs review; rejected rows are skipped and reported. Each import is logged in cfg.ImportBatches.
 /// </summary>
 public sealed class TripImportService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    TripService trips, StandardFieldService fields, CustomFieldService customFields, IMonthlyRateLock rateLock, IChangeContext changes, IErrorText errorText)
+    TripService trips, IStandardFields fields, ICustomFields customFields, IMonthlyRateLock rateLock, IChangeContext changes, IErrorText errorText)
 {
     private sealed record Column(string Key, params string[] Aliases);
 
@@ -281,7 +281,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
             {
                 var text = customIndex[d.FieldKey] >= 0 ? row[customIndex[d.FieldKey]] : null;
                 if (text is null) continue;
-                if (CustomFieldService.TryParseCell(d, text, out var v)) { if (v is JsonElement value) custom[d.FieldKey] = value; }
+                if (CustomFieldValues.TryParseCell(d, text, out var v)) { if (v is JsonElement value) custom[d.FieldKey] = value; }
                 else if (tolerant) review.Add(customFields.Label(d));
                 else Problem("custom." + d.FieldKey, ErrorCodes.ImportInvalid, null, customFields.Label(d), text);
             }

@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Application.MasterData;
 /// for due dates), custom fields and the configured standard fields (FR-180, FR-182). Created only here, never from the trip form
 /// (FR-167). Archive/restore; delete only while no trip, invoice, receipt, credit note or tariff refers to it (BR-040).
 /// </summary>
-public sealed class CustomerService(IAppDbContext db, MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields,
+public sealed class CustomerService(IAppDbContext db, MasterDataSupport support, IStandardFields fields, ICustomFields customFields,
     IChangeContext changes, IRecordLockGuard locks)
 {
     public const string EntityType = "TRN.Customer";
@@ -219,5 +219,5 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
     internal CustomerResponse ToResponse(Customer c) =>
         new(support.Token<Customer>(c.PublicId), c.Name, c.TaxNumber, c.RegistrationNo, c.Phone, c.Email, c.Address, c.City, c.ContactPerson,
             c.PaymentTermsDays, c.ApArParty is null ? null : new Ref(support.Token<ApArParty>(c.ApArParty.PublicId), c.ApArParty.Name),
-            c.Status, c.Notes, CustomFieldService.Read(c.CustomValues), Convert.ToBase64String(c.RowVersion));
+            c.Status, c.Notes, CustomFieldValues.Read(c.CustomValues), Convert.ToBase64String(c.RowVersion));
 }

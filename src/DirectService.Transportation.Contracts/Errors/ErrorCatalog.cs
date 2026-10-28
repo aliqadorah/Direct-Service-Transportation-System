@@ -424,7 +424,7 @@ public static class ErrorCodes
     public const string ConfirmationRequired = "confirmation.required";
     public const string TenantUnavailable = "tenant.unavailable";
     public const string InvitationEmailMismatch = "invitation.emailMismatch";
-    public const string ReasonRequired = "validation.reasonRequired";
+    public const string ReasonRequired = SharedErrorCodes.ReasonRequired;
     public const string Antiforgery = "auth.antiforgery";
     public const string ServerError = "server.error";
 
@@ -460,23 +460,23 @@ public static class ErrorCodes
     public const string ImportMissingColumn = SharedErrorCodes.ImportMissingColumn;
     public const string ImportHasErrors = "import.hasErrors";
     public const string ImportFormula = SharedErrorCodes.ImportFormula;
-    public const string ImportDuplicate = "import.duplicate";
+    public const string ImportDuplicate = SharedErrorCodes.ImportDuplicate;
     public const string ImportUnknown = "import.unknown";
     public const string ImportInvalid = "import.invalid";
     public const string PendingNoHandler = "pending.noHandler";
     public const string JournalIsReversal = "journal.isReversal";
 
     public const string BuiltInFixed = "masters.builtInFixed";
-    public const string FieldCore = "field.core";
-    public const string FieldAlwaysRequired = "field.alwaysRequired";
-    public const string FieldUnknown = "field.unknown";
-    public const string CustomFieldHasData = "customField.hasData";
-    public const string CustomFieldTypeFixed = "customField.typeFixed";
-    public const string CustomFieldOptions = "customField.options";
-    public const string CustomFieldOptionInUse = "customField.optionInUse";
+    public const string FieldCore = SharedErrorCodes.FieldCore;
+    public const string FieldAlwaysRequired = SharedErrorCodes.FieldAlwaysRequired;
+    public const string FieldUnknown = SharedErrorCodes.FieldUnknown;
+    public const string CustomFieldHasData = SharedErrorCodes.CustomFieldHasData;
+    public const string CustomFieldTypeFixed = SharedErrorCodes.CustomFieldTypeFixed;
+    public const string CustomFieldOptions = SharedErrorCodes.CustomFieldOptions;
+    public const string CustomFieldOptionInUse = SharedErrorCodes.CustomFieldOptionInUse;
     public const string DriverPartnerOwnFleet = "driver.partnerOwnFleet";
-    public const string FieldConditional = "field.conditional";
-    public const string FieldCannotRequire = "field.cannotRequire";
+    public const string FieldConditional = SharedErrorCodes.FieldConditional;
+    public const string FieldCannotRequire = SharedErrorCodes.FieldCannotRequire;
     public const string OwnershipFleetInUse = "ownership.fleetInUse";
 
     public const string TariffDuplicate = "tariff.duplicate";

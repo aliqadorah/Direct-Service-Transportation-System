@@ -14,7 +14,7 @@ namespace DirectService.Transportation.Application.Invoicing;
 /// the claim's first page (loading site, route, material), annex columns in order (built-in trip columns and the trip custom fields),
 /// labels, footer, signature boxes, logo and QR. A company without a saved layout prints the built-in default.
 /// </summary>
-public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, CustomFieldService customFields)
+public sealed class InvoiceLayoutService(IAppDbContext db, IRequestContext ctx, ICustomFields customFields)
 {
     public static readonly IReadOnlyList<string> BuiltInColumns =
         ["receiptNo", "truckPlate", "loadingDate", "unloadingDate", "loadedWeight", "unloadedWeight", "billingQty", "unitPrice", "amount", "driver", "loadingSite", "unloadingSite", "material"];

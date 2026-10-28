@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.MasterData;
 /// rejected row blocks the import; a committed import is one transaction logged in cfg.ImportBatches.
 /// </summary>
 public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields, Reports.ReportExporter exporter,
+    MasterDataSupport support, IStandardFields fields, ICustomFields customFields, Reports.ReportExporter exporter,
     DriverService drivers, CustomerService customers, PartnerService partners, MaterialService materials,
     LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, IErrorText errorText)
 {
@@ -242,13 +242,13 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
 
     private static IEnumerable<object?> CustomCells(IReadOnlyList<CustomFieldDefinition> defs, string? json)
     {
-        var values = CustomFieldService.Read(json);
+        var values = CustomFieldValues.Read(json);
         foreach (var d in defs)
         {
             if (!values.TryGetValue(d.FieldKey, out var v)) yield return null;
-            else if (d.FieldType == Contracts.Configuration.CustomFieldTypes.Number && v.TryGetDecimal(out var n)) yield return n;
-            else if (d.FieldType == Contracts.Configuration.CustomFieldTypes.Checkbox) yield return v.ValueKind == JsonValueKind.True;
-            else yield return CustomFieldService.Text(v);
+            else if (d.FieldType == CustomFieldTypes.Number && v.TryGetDecimal(out var n)) yield return n;
+            else if (d.FieldType == CustomFieldTypes.Checkbox) yield return v.ValueKind == JsonValueKind.True;
+            else yield return CustomFieldValues.Text(v);
         }
     }
 
@@ -331,7 +331,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
             {
                 var text = customIndex[d.FieldKey] >= 0 ? row[customIndex[d.FieldKey]] : null;
                 if (text is null) continue;
-                if (!CustomFieldService.TryParseCell(d, text, out var v)) problems.Add(row.RowNumber, rowKey, ErrorCodes.ImportInvalid, customFields.Label(d), text);
+                if (!CustomFieldValues.TryParseCell(d, text, out var v)) problems.Add(row.RowNumber, rowKey, ErrorCodes.ImportInvalid, customFields.Label(d), text);
                 else if (v is JsonElement value) custom[d.FieldKey] = value;
             }
 

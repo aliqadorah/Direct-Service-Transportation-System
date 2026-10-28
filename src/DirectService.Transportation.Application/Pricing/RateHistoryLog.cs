@@ -70,8 +70,8 @@ public sealed class RateHistoryLog(IAppDbContext db, IRequestContext ctx, TimePr
         {
             var before = Parse(r.OldValues);
             var after = Parse(r.NewValues);
-            var action = after.TryGetValue(ActionKey, out var a) ? CustomFieldService.Text(a) ?? "Update" : "Update";
-            var subject = after.TryGetValue(SubjectKey, out var s) ? CustomFieldService.Text(s) : null;
+            var action = after.TryGetValue(ActionKey, out var a) ? CustomFieldValues.Text(a) ?? "Update" : "Update";
+            var subject = after.TryGetValue(SubjectKey, out var s) ? CustomFieldValues.Text(s) : null;
             var changes = new List<FieldChange>();
             foreach (var key in after.Keys.Where(k => !k.StartsWith('_')))
             {
@@ -103,7 +103,7 @@ public sealed class RateHistoryLog(IAppDbContext db, IRequestContext ctx, TimePr
     /// <summary>A snapshot value in the reader's words: amounts with 3 decimals, dates DD/MM/YYYY, codes in words, "All" for an empty scope.</summary>
     private static string Readable(string key, JsonElement? value, bool en)
     {
-        var text = value is { } v ? CustomFieldService.Text(v) : null;
+        var text = value is { } v ? CustomFieldValues.Text(v) : null;
         if (string.IsNullOrWhiteSpace(text))
             return key is "Party" or "Material" or "LoadingSite" or "UnloadingSite" ? (en ? "All" : "الكل") : "—";
         if (key is "Price" or "OwnFleetRate" or "ExternalFleetRate" && decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))

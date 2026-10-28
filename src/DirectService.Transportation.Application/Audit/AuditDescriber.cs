@@ -444,8 +444,8 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
 
         private IEnumerable<FieldChange> CustomChanges(string? type, JsonElement? oldValue, JsonElement? newValue, bool erased)
         {
-            var before = Configuration.CustomFieldService.Read(oldValue is { ValueKind: JsonValueKind.String } ov ? ov.GetString() : null);
-            var after = Configuration.CustomFieldService.Read(newValue is { ValueKind: JsonValueKind.String } nv ? nv.GetString() : null);
+            var before = CustomFieldValues.Read(oldValue is { ValueKind: JsonValueKind.String } ov ? ov.GetString() : null);
+            var after = CustomFieldValues.Read(newValue is { ValueKind: JsonValueKind.String } nv ? nv.GetString() : null);
             foreach (var key in before.Keys.Union(after.Keys).Order(StringComparer.Ordinal))
             {
                 var label = type is not null && _customLabels.TryGetValue((type, key), out var l) ? l : key;
@@ -464,7 +464,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             JsonValueKind.String when DateOnly.TryParseExact(value.GetString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
                 => day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
             JsonValueKind.Null or JsonValueKind.Undefined => Dash,
-            _ => Configuration.CustomFieldService.Text(value) is { Length: > 0 } t ? t : Dash,
+            _ => CustomFieldValues.Text(value) is { Length: > 0 } t ? t : Dash,
         };
 
         private string Label(string? type, string column, FieldWords? words)

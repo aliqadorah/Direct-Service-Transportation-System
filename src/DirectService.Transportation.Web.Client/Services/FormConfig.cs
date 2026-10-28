@@ -1,4 +1,3 @@
-using DirectService.Transportation.Contracts.Configuration;
 
 namespace DirectService.Transportation.Web.Client.Services;
 

@@ -1,8 +1,9 @@
 using System.Text.Json;
 
-namespace DirectService.Transportation.Contracts.Configuration;
+namespace DirectService.Shared.Contracts;
 
-// Field configuration (PRD 7.9.3, FR-179 … FR-184). Entities: TRN.Trip, TRN.Driver, TRN.Customer.
+// Field configuration (PRD 7.9.3, FR-179 … FR-184): the shared engine in Shared.Infrastructure; the entities come from the modules
+// (TRN.Trip, TRN.Driver, TRN.Customer) (Stage 2 session 7, DT-318).
 
 /// <summary>A custom field definition (FR-179). <see cref="HasData"/>: the field can then only be hidden and its type is fixed (FR-181).</summary>
 public sealed record CustomFieldResponse(

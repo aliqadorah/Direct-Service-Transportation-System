@@ -11,7 +11,7 @@ namespace DirectService.Transportation.Application.Trips;
 /// Excel / CSV export of the filtered trip list (FR-009, FR-017, FR-018 data): the company's field labels, the visible custom
 /// fields, frozen prices, amounts, flags and status; or the printout (PDF / HTML, FR-150).
 /// </summary>
-public sealed class TripExportService(TripService trips, ISpreadsheetService sheets, IRequestContext ctx, StandardFieldService fields, CustomFieldService customFields,
+public sealed class TripExportService(TripService trips, ISpreadsheetService sheets, IRequestContext ctx, IStandardFields fields, ICustomFields customFields,
     Reports.ReportExporter exporter)
 {
     public async Task<GeneratedFile> ExportAsync(TripListQuery q, string? format, CancellationToken ct)
@@ -44,7 +44,7 @@ public sealed class TripExportService(TripService trips, ISpreadsheetService she
         foreach (var r in all)
         {
             var t = trips.ToResponse(r, open);
-            var values = CustomFieldService.Read(r.T.CustomValues);
+            var values = CustomFieldValues.Read(r.T.CustomValues);
             rows.Add([.. new object?[]
             {
                 t.ReceiptNo, t.TripDate, t.LoadingDate, t.UnloadingDate, t.Driver.Name, t.TruckPlate, t.Customer.Name, t.LoadingSite.Name, t.UnloadingSite.Name,
@@ -82,6 +82,6 @@ public sealed class TripExportService(TripService trips, ISpreadsheetService she
         JsonValueKind.Number when v.TryGetDecimal(out var n) => n,
         JsonValueKind.True => true,
         JsonValueKind.False => false,
-        _ => CustomFieldService.Text(v),
+        _ => CustomFieldValues.Text(v),
     };
 }

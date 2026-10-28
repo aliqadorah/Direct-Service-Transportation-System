@@ -1,11 +1,5 @@
 namespace DirectService.Transportation.Application.Configuration;
 
-/// <summary>A built-in field of a configurable entity (FR-182).</summary>
-/// <param name="Key">Field key used in requests, cfg.StandardFieldConfigs.FieldKey and column views.</param>
-/// <param name="IsCore">Core trip field (US-27): renamable, never hidden.</param>
-/// <param name="AlwaysRequired">Required by the business rules (PRD 7.1.1, 7.8.1): cannot be hidden or made optional (design rule).</param>
-public sealed record StandardField(string Key, string LabelAr, string LabelEn, bool IsCore, bool AlwaysRequired);
-
 /// <summary>
 /// The entities whose fields are configurable (PRD 7.9.3, flow 9.14: trips, drivers, customers) and their built-in fields in
 /// default display order.
@@ -105,4 +99,24 @@ public static class FieldCatalog
 
     public static StandardField? Find(string entityType, string? key) =>
         key is null ? null : For(entityType).FirstOrDefault(f => f.Key == key);
+}
+
+/// <summary>The configurable entities of this application for the shared field engine (<see cref="IFieldCatalogProvider"/>, DT-318).</summary>
+public sealed class TransportationFieldCatalog(IAppDbContext db) : IFieldCatalogProvider
+{
+    public IReadOnlyList<string> Entities => FieldCatalog.Entities;
+
+    public IReadOnlyList<StandardField> For(string entityType) => FieldCatalog.For(entityType);
+
+    public bool IsConditional(string entityType, string key) => FieldCatalog.IsConditional(entityType, key);
+
+    public bool CannotRequire(string entityType, string key) => FieldCatalog.CannotRequire(entityType, key);
+
+    public IQueryable<string?> CustomValues(string entityType) => entityType switch
+    {
+        FieldCatalog.Trip => db.Set<Domain.Trn.Trip>().Select(t => t.CustomValues),
+        FieldCatalog.Driver => db.Set<Domain.Trn.Driver>().Select(t => t.CustomValues),
+        FieldCatalog.Customer => db.Set<Domain.Trn.Customer>().Select(t => t.CustomValues),
+        _ => throw Fail.NotFound(),
+    };
 }

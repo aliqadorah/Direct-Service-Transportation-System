@@ -37,6 +37,11 @@ public static class DependencyInjection
         services.AddSingleton<IFileStore, LocalFileStore>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddScoped<ColumnViewService>();
+        services.AddScoped<FieldCatalogs>();
+        services.AddScoped<CustomFieldService>();
+        services.AddScoped<ICustomFields>(sp => sp.GetRequiredService<CustomFieldService>());
+        services.AddScoped<StandardFieldService>();
+        services.AddScoped<IStandardFields>(sp => sp.GetRequiredService<StandardFieldService>());
         services.AddScoped<GlobalSearchService>();
         services.AddScoped<ImportTemplateService>();
         services.AddScoped<RecordLockService>();

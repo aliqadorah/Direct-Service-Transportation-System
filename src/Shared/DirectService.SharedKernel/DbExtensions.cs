@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 public static class DbExtensions
 {
@@ -34,7 +34,7 @@ public static class DbExtensions
         if (string.IsNullOrEmpty(rowVersion)) return;
         byte[] bytes;
         try { bytes = Convert.FromBase64String(rowVersion); }
-        catch (FormatException) { throw Fail.Field("rowVersion", Contracts.Errors.ErrorCodes.ValidationFormat); }
+        catch (FormatException) { throw Fail.Field("rowVersion", SharedErrorCodes.ValidationFormat); }
         var entry = db.Set<TEntity>().Entry(entity);
         entry.Property("RowVersion").OriginalValue = bytes;
         if (entry.State == Microsoft.EntityFrameworkCore.EntityState.Unchanged)

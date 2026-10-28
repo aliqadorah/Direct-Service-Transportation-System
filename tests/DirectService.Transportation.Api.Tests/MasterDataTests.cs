@@ -5,7 +5,6 @@ using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Common;
-using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;

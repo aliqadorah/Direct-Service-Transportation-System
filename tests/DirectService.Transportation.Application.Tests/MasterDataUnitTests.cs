@@ -1,7 +1,6 @@
 using System.Text.Json;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 
@@ -46,8 +45,8 @@ public sealed class MasterDataUnitTests
     [InlineData(CustomFieldTypes.Text, "  two   words ", "two words")]
     public void Import_cells_parse_by_field_type(string type, string cell, string expected)
     {
-        Assert.True(CustomFieldService.TryParseCell(Def(type), cell, out var value));
-        Assert.Equal(expected, CustomFieldService.Text(value!.Value));
+        Assert.True(CustomFieldValues.TryParseCell(Def(type), cell, out var value));
+        Assert.Equal(expected, CustomFieldValues.Text(value!.Value));
     }
 
     [Theory]
@@ -56,16 +55,16 @@ public sealed class MasterDataUnitTests
     [InlineData(CustomFieldTypes.Checkbox, "maybe")]
     [InlineData(CustomFieldTypes.List, "East")]
     public void Invalid_cells_are_rejected(string type, string cell) =>
-        Assert.False(CustomFieldService.TryParseCell(Def(type, "North", "South"), cell, out _));
+        Assert.False(CustomFieldValues.TryParseCell(Def(type, "North", "South"), cell, out _));
 
     [Fact]
     public void List_values_must_be_one_of_the_options_and_empty_cells_give_no_value()
     {
-        Assert.True(CustomFieldService.TryParseCell(Def(CustomFieldTypes.List, "North", "South"), "South", out var v));
+        Assert.True(CustomFieldValues.TryParseCell(Def(CustomFieldTypes.List, "North", "South"), "South", out var v));
         Assert.Equal("South", v!.Value.GetString());
-        Assert.True(CustomFieldService.TryParseCell(Def(CustomFieldTypes.Number), "  ", out var empty));
+        Assert.True(CustomFieldValues.TryParseCell(Def(CustomFieldTypes.Number), "  ", out var empty));
         Assert.Null(empty);
-        Assert.Empty(CustomFieldService.Read("not json"));
+        Assert.Empty(CustomFieldValues.Read("not json"));
     }
 
     [Theory]

@@ -23,4 +23,15 @@ public static class SharedErrorCodes
     public const string ImportEmpty = "import.empty";
     public const string ImportMissingColumn = "import.missingColumn";
     public const string ImportFormula = "import.formula";
+    public const string ReasonRequired = "validation.reasonRequired";
+    public const string ImportDuplicate = "import.duplicate";
+    public const string FieldUnknown = "field.unknown";
+    public const string FieldCore = "field.core";
+    public const string FieldAlwaysRequired = "field.alwaysRequired";
+    public const string FieldConditional = "field.conditional";
+    public const string FieldCannotRequire = "field.cannotRequire";
+    public const string CustomFieldHasData = "customField.hasData";
+    public const string CustomFieldTypeFixed = "customField.typeFixed";
+    public const string CustomFieldOptions = "customField.options";
+    public const string CustomFieldOptionInUse = "customField.optionInUse";
 }
