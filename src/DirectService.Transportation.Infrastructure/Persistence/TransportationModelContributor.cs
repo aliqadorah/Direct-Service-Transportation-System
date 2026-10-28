@@ -40,13 +40,13 @@ public sealed class TransportationModelContributor : IModelContributor
                     new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("JSON_VALUE", args, true, [true, false], typeof(string), args[0].TypeMapping),
                 ],
                 true, [false, true], typeof(DateOnly), null));
-        var fold = typeof(Application.Abstractions.SqlText).GetMethod(nameof(Application.Abstractions.SqlText.Fold))!;
+        var fold = typeof(SqlText).GetMethod(nameof(SqlText.Fold))!;
         modelBuilder.HasDbFunction(fold).HasTranslation(args =>
             new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("TRANSLATE",
                 [
                     args[0],
-                    new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFragmentExpression("N'" + Application.Abstractions.SqlText.From + "'"),
-                    new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFragmentExpression("N'" + Application.Abstractions.SqlText.To + "'"),
+                    new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFragmentExpression("N'" + SqlText.From + "'"),
+                    new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFragmentExpression("N'" + SqlText.To + "'"),
                 ],
                 true, [true, false, false], typeof(string), args[0].TypeMapping));
     }

@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Arabic spelling variants for search (FR-187, A-12): hamza forms of alef (أ إ آ → ا), taa marbuta (ة → ه) and alef maqsura (ى → ي) are

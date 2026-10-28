@@ -115,13 +115,13 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     /// plan code or name, subscription invoices by number or payment reference, platform staff by name or e-mail; at most 5 hits per kind.
     /// Invoices and subscriptions point to their tenant. Company data (trips, invoices, drivers) is never searched here.
     /// </summary>
-    public async Task<Contracts.Collaboration.SearchResponse> SearchAsync(string? q, CancellationToken ct)
+    public async Task<SearchResponse> SearchAsync(string? q, CancellationToken ct)
     {
         _ = StaffId;
         var text = MasterDataSupport.SearchText(q);
         if (text is null || text.Length < 2) return new(q ?? "", []);
         const int max = 5;
-        var hits = new List<Contracts.Collaboration.SearchHit>();
+        var hits = new List<SearchHit>();
         var tenants = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted);
         var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email!.Contains(text)).Select(u => u.TenantId);
         foreach (var t in await tenants.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id)).OrderBy(t => t.Name).Take(max)

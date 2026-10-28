@@ -40,6 +40,13 @@ public static class TextNormalizer
     public static string Key(string? value) =>
         ToAsciiDigits(value).Replace(" ", string.Empty, StringComparison.Ordinal).Trim().ToUpperInvariant();
 
+    /// <summary>Phone, IBAN and similar codes: ASCII digits, no spaces or dashes; null when empty (also the search text for codes).</summary>
+    public static string? Compact(string? value)
+    {
+        var v = CleanCode(value)?.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal);
+        return string.IsNullOrEmpty(v) ? null : v;
+    }
+
     /// <summary>Digits only (verification codes).</summary>
     public static string DigitsOnly(string? value) =>
         new(ToAsciiDigits(value).Where(char.IsAsciiDigit).ToArray());

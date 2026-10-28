@@ -249,11 +249,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     public static string? Name(string? value) => TextNormalizer.CleanText(TextNormalizer.ToAsciiDigits(value));
 
     /// <summary>Phone, IBAN and similar codes: ASCII digits, no spaces or dashes; null when empty.</summary>
-    public static string? Compact(string? value)
-    {
-        var v = TextNormalizer.CleanCode(value)?.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal);
-        return string.IsNullOrEmpty(v) ? null : v;
-    }
+    public static string? Compact(string? value) => TextNormalizer.Compact(value);
 
     /// <summary>Truck plate: ASCII digits, upper case, no spaces (unique within the company, DT-37).</summary>
     public static string? Plate(string? value)

@@ -15,8 +15,9 @@ public static class DependencyInjection
 {
     /// <summary>
     /// The shared building blocks every module uses: the Shared part of the model (cfg tables), the save interceptors (audit, live
-    /// changes), URL tokens, numbering, the entity resolver, PDF and QR rendering, the file store, spreadsheets, column views and record
-    /// locks (the holder's name through a module's <see cref="IUserNames"/>). The host registers the DbContext.
+    /// changes), URL tokens, numbering, the entity resolver, PDF and QR rendering, the file store, spreadsheets, column views, the global
+    /// search (hits from the modules' <see cref="ISearchProvider"/>s) and record locks (the holder's name through a module's
+    /// <see cref="IUserNames"/>). The host registers the DbContext.
     /// </summary>
     public static IServiceCollection AddSharedInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddSingleton<IFileStore, LocalFileStore>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddScoped<ColumnViewService>();
+        services.AddScoped<GlobalSearchService>();
         services.AddScoped<RecordLockService>();
         services.AddScoped<IRecordLockGuard>(sp => sp.GetRequiredService<RecordLockService>());
         return services;

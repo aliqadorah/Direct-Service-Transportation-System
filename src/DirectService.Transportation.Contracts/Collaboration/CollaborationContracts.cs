@@ -1,13 +1,5 @@
 namespace DirectService.Transportation.Contracts.Collaboration;
 
-// ------------------------------------------------------------------ global search (FR-187)
-
-/// <summary>A search hit: record type (trip, invoice, driver …), its token, a title and a detail line.</summary>
-public sealed record SearchHit(string Type, string Id, string Title, string? Detail);
-
-/// <summary>Hits grouped by type, at most a few per type; only types the caller may view.</summary>
-public sealed record SearchResponse(string Query, IReadOnlyList<SearchHit> Hits);
-
 // ------------------------------------------------------------------ notifications (FR-190)
 
 /// <summary>

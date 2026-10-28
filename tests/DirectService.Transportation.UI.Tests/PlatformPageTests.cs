@@ -295,7 +295,7 @@ public sealed class PlatformPageTests : PageTestBase
     [Fact]
     public async Task Console_search_lists_provider_hits_with_their_screens_and_a_matching_hint()
     {
-        Respond("/platform/search", new Contracts.Collaboration.SearchResponse("نقل", [
+        Respond("/platform/search", new SearchResponse("نقل", [
             new(ConsoleSearchKinds.Tenant, "t1", "نقليات الجنوب", "Trial"), new(ConsoleSearchKinds.Invoice, "t1", "SUB-000042", "نقليات الجنوب · 40.000 · Due"),
             new(ConsoleSearchKinds.Staff, "u7", "رنا", "rana@platform.test")]));
         var hits = await Services.GetRequiredService<AppSession>().ConsoleSearchAsync("نقل", CancellationToken.None);
