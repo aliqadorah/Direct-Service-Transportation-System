@@ -6,6 +6,7 @@ using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
+using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

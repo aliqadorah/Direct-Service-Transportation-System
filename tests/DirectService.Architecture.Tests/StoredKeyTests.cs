@@ -1,6 +1,7 @@
 using System.Reflection;
 using DirectService.Transportation.Application.Notifications;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Database;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

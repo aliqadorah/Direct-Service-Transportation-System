@@ -46,7 +46,9 @@ jobs:
         run: dotnet build DirectService.Transportation.slnx --no-restore -c Release
 
       # First: the architecture tests compare every name stored in data (entity stored names, URL token labels, keys, cookies, Data
-      # Protection purposes, the OpenAPI document) with the golden files of the restore tag (platform restructuring, DT-283).
+      # Protection purposes, the OpenAPI document) with the golden files of the restore tag (platform restructuring, DT-283), and check the
+      # migration history: the 20 migration ids in src/Hosts/DirectService.Database, the history table, no model change against the
+      # snapshot (the in-process form of `dotnet ef migrations has-pending-model-changes`, DT-294).
       - name: Architecture tests (stored names, golden files)
         run: |
           dotnet test --project tests/DirectService.Architecture.Tests -c Release --no-build \
@@ -63,6 +65,7 @@ jobs:
       # PDFs are printed with the runner's Google Chrome (/usr/bin/google-chrome, found automatically). Ubuntu 24.04 does not let
       # Chrome create its own sandbox (no unprivileged user namespaces), so it runs without it, as in the container image; it only
       # opens the application's own printout HTML with scripts off and network requests refused.
+      # Both test databases are created from the migrations of src/Hosts/DirectService.Database (MasterDatabase.UseMasterDatabase).
       - name: Database and API tests (integration, isolation, security) with coverage
         env:
           DST_TEST_DB: Server=localhost,1433;Database=DirectServiceMaster_Tests;User Id=sa;Password=${{ env.SQL_PASSWORD }};TrustServerCertificate=true;Encrypt=true

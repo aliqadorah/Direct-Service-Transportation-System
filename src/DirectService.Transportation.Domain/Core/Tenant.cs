@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.Tenant")]
 [TokenLabel("Tenant")]
-public class Tenant : AuditableEntity
+public class Tenant : AuditableEntity, ITenantRoot
 {
     /// <summary>Organisation name entered at sign-up.</summary>
     public string Name { get; set; } = string.Empty;

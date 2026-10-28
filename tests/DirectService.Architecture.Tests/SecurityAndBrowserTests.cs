@@ -119,7 +119,7 @@ public sealed class SecurityAndBrowserTests
 
         string UserSecrets(string csproj) => Regex.Match(Source(csproj), "<UserSecretsId>([^<]+)</UserSecretsId>").Groups[1].Value;
         Same(Value("userSecretsIds", "web"), UserSecrets("src/DirectService.Transportation.Web/DirectService.Transportation.Web.csproj"));
-        Same(Value("userSecretsIds", "infrastructure"), UserSecrets("src/DirectService.Transportation.Infrastructure/DirectService.Transportation.Infrastructure.csproj"));
+        Same(Value("userSecretsIds", "infrastructure"), UserSecrets("src/Hosts/DirectService.Database/DirectService.Database.csproj"));
 
         // The Blazor JS initializer must carry the browser app's assembly name (E-21; renamed with the assembly in Stage 4).
         var client = typeof(DirectService.Transportation.Web.Client.Services.PrefKeys).Assembly.GetName().Name!;

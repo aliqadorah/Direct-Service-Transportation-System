@@ -1,7 +1,8 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Domain.Core;
-using DirectService.Transportation.Infrastructure.Persistence;
-using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Database;
+using DirectService.Shared.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Testing;
@@ -32,10 +33,10 @@ public sealed class DatabaseFixture : IAsyncLifetime
     public MasterDbContext CreateContext(DataScope scope, TimeProvider? clock = null)
     {
         var options = new DbContextOptionsBuilder<MasterDbContext>()
-            .UseSqlServer(ConnectionString)
+            .UseMasterDatabase(ConnectionString)
             .AddInterceptors(new AuditSaveChangesInterceptor(scope, new ChangeContext(), clock ?? TimeProvider.System))
             .Options;
-        return new MasterDbContext(options, scope);
+        return new MasterDbContext(options, scope, MasterModel.Contributors);
     }
 
     /// <summary>Creates a tenant with one user and one company; returns their ids.</summary>

@@ -1,7 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Web.Workers;

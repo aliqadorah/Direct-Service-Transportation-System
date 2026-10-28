@@ -9,7 +9,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.EmailOutbox")]
 [TokenLabel("EmailOutbox")]
-public class EmailOutbox
+public class EmailOutbox : INotAudited
 {
     public long Id { get; set; }
     /// <summary>Random public identifier used by the console (resend).</summary>

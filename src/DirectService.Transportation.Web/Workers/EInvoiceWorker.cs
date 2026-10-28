@@ -5,7 +5,7 @@ using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
 using DirectService.Transportation.Infrastructure.EInvoicing;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Web.Workers;

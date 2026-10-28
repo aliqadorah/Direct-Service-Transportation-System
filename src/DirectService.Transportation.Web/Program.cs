@@ -4,7 +4,7 @@ using DirectService.Transportation.Application;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Infrastructure;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Web;
 using DirectService.Transportation.Web.Endpoints;
 using DirectService.Transportation.Web.Pipeline;

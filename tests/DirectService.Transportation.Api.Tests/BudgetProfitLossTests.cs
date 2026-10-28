@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using System.Text;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Ledger;
-using DirectService.Transportation.Infrastructure.Persistence.Migrations;
+using DirectService.Database.Migrations;
 using Microsoft.EntityFrameworkCore;
 using static DirectService.Transportation.Api.Tests.PartBSupport;
 

@@ -2,7 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Core;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Web.Workers;

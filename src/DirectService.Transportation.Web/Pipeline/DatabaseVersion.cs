@@ -1,4 +1,4 @@
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Web.Pipeline;

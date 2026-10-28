@@ -22,7 +22,7 @@ Accounting is a **shared module**: every system posts into it through its postin
 | Stage | Content | State |
 |---|---|---|
 | 1 | Design: `01_Restructuring_Design.md` | done; reviewed, owner decisions recorded in section k (28 Oct 2026) |
-| 2 | Shared + Platform split (behaviour unchanged) | in progress: session 1 (step 0 — every stored name pinned, golden tests in `tests/DirectService.Architecture.Tests`) and session 2 (project skeleton, SharedKernel, `tests/DirectService.Testing`, first layer rules) done 28 Oct 2026; sessions 3–8 planned in `BUILD_STATUS.md` |
+| 2 | Shared + Platform split (behaviour unchanged) | in progress: session 1 (step 0 — every stored name pinned, golden tests in `tests/DirectService.Architecture.Tests`) session 2 (project skeleton, SharedKernel, `tests/DirectService.Testing`, first layer rules) and session 3 (migrations in `src/Hosts/DirectService.Database`, composed `MasterDbContext` with `IModelContributor`s in Shared.Infrastructure) done 28 Oct 2026; sessions 4–8 planned in `BUILD_STATUS.md` |
 | 3 | Accounting module + posting contract | not started |
 | 4 | Transportation module, UI composition, host rename, menu by product | not started |
 | 5 | Products, subscriptions, per-product trials, manual activation, starter module, guides | not started |

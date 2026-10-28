@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.AuditLog")]
 [TokenLabel("AuditLog")]
-public class AuditLog : INullableTenantScoped, IAppendOnly
+public class AuditLog : INullableTenantScoped, IAppendOnly, IAuditRow
 {
     /// <summary>Internal key.</summary>
     public long Id { get; set; }

@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.UserSession")]
 [TokenLabel("UserSession")]
-public class UserSession : AuditableEntity, INullableTenantScoped
+public class UserSession : AuditableEntity, INullableTenantScoped, INotAudited
 {
     /// <summary>Owning tenant; NULL for provider staff.</summary>
     public long? TenantId { get; set; }

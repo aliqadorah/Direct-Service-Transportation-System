@@ -7,6 +7,7 @@ using DirectService.Transportation.Infrastructure.Files;
 using DirectService.Transportation.Infrastructure.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using DirectService.Transportation.Infrastructure.Printing;
 using DirectService.Transportation.Infrastructure.Security;
 using Microsoft.AspNetCore.Identity;
@@ -29,11 +30,12 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("MasterDb")
             ?? throw new InvalidOperationException("ConnectionStrings:MasterDb is not configured.");
 
+        services.AddSingleton<IModelContributor, TransportationModelContributor>();
         services.AddScoped<AuditSaveChangesInterceptor>();
         services.AddScoped<LiveChangeInterceptor>();
         services.AddScoped<IAfterCommit>(sp => sp.GetRequiredService<LiveChangeInterceptor>());
         services.AddDbContext<MasterDbContext>((sp, o) => o
-            .UseSqlServer(cs, sql => sql.CommandTimeout(60))
+            .UseMasterDatabase(cs, sql => sql.CommandTimeout(60))
             .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>(), sp.GetRequiredService<LiveChangeInterceptor>()));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<MasterDbContext>());
 

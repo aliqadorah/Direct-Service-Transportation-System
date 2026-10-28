@@ -1,7 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- EF Core migrations and the design-time factory, seeing every module (design d, decision K-08): filled in Stage 2 session 3 (migration
-       ids, history table and UserSecretsId unchanged). -->
+  <!-- EF Core migrations (the 20 migrations and the model snapshot) and the design-time factory, seeing every module (design d, decision K-08;
+       Stage 2 session 3). Migration ids, the history table dbo.__EFMigrationsHistory and the UserSecretsId are those of the former
+       Infrastructure project; MasterDatabase.MigrationsAssembly names this assembly. -->
   <PropertyGroup>
     <RootNamespace>DirectService.Database</RootNamespace>
+    <UserSecretsId>dst-infrastructure-designtime</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

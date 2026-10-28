@@ -585,7 +585,7 @@ Every value kept its byte-for-byte value; the golden files in `tests/DirectServi
 | E-26 | `ReplaySafeAuthenticatorTokenProvider.Name`, `StaffService.InvitationTokenProvider` / `InvitationPurpose` | already constants; `Default` is the framework's provider name |
 | E-27 | `Contracts/Collaboration/LiveHubNames.cs` (path, group prefix, hub methods, 4 events) | shared by `LiveHub` / `SignalRNotifier` and the browser's `LiveUpdates`; hub methods now carry `[HubMethodName]` with the same names |
 | E-28 | `Web.Client/Services/PrefKeys.cs` (`dst.`, `theme.`, `nav.`); `wwwroot/js/ui.js` (`"dst." + key`), `wwwroot/js/theme.js` (`dst.theme`) | test reads both scripts |
-| E-29 | `<UserSecretsId>` in `Web/…Web.csproj` and `Infrastructure/…Infrastructure.csproj` | golden |
+| E-29 | `<UserSecretsId>` in `Web/…Web.csproj` and `Hosts/DirectService.Database/DirectService.Database.csproj` (moved from Infrastructure in Stage 2 session 3, same value) | golden |
 | E-30 | not stored — configuration and environment names (`DST_` prefix in `DesignTimeDbContextFactory`, `DST_TEST_DB`, …) | unchanged; not data |
 | E-31 | `UrlTokenOptions.Section` (`UrlTokens`) + `Key` | unchanged |
 | E-32 | `EmailLogo.ResourceName` (`Infrastructure/Email/MimeMessageBuilder.cs`) = the csproj LogicalName `DST.Email.Logo.png`; fonts `fonts/<file>` (Application csproj) | golden: the manifest resources of the infrastructure assembly |

@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Core;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;

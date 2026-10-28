@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.Company")]
 [TokenLabel("Company")]
-public class Company : AuditableEntity, ITenantScoped
+public class Company : AuditableEntity, ITenantScoped, ICompanyRoot
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Identity;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

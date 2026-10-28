@@ -2,8 +2,10 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Domain.Common;
+using DirectService.Database;
+using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
-using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using DirectService.Transportation.Infrastructure.Security;
 using Microsoft.Extensions.Options;
 

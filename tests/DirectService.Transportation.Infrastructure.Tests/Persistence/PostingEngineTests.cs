@@ -7,8 +7,9 @@ using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
-using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using DirectService.Transportation.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -216,9 +217,9 @@ public sealed class PostingEngineTests(DatabaseFixture db)
         var failing = new FailJournalInserts();
         var scope = new DataScope();
         scope.Set(l.Tenant.TenantId, l.Tenant.CompanyId, l.Tenant.UserId);
-        var options = new DbContextOptionsBuilder<MasterDbContext>().UseSqlServer(db.ConnectionString)
+        var options = new DbContextOptionsBuilder<MasterDbContext>().UseMasterDatabase(db.ConnectionString)
             .AddInterceptors(new AuditSaveChangesInterceptor(scope, new ChangeContext(), TimeProvider.System), failing).Options;
-        await using var ctx = new MasterDbContext(options, scope);
+        await using var ctx = new MasterDbContext(options, scope, DirectService.Database.MasterModel.Contributors);
         var engine = Engine(ctx, scope, l.Tenant);
 
         await using (var tx = await ctx.Database.BeginTransactionAsync(Ct))

@@ -20,7 +20,9 @@ _Step 9, 11 Oct 2026. For developers and the people who will host the system. Ev
 | `src/DirectService.Transportation.Domain` | entities (66 tables of the design, revision 5) |
 | `src/DirectService.Transportation.Contracts` | request/response records shared by the API and the UI (identifiers are URL tokens) |
 | `src/DirectService.Transportation.Application` | business rules and services per module (B1–B12) |
-| `src/DirectService.Transportation.Infrastructure` | EF Core (`MasterDbContext`, configurations, migrations, interceptors), e-mail, PDF engine, e-invoicing connectors, payment gateway |
+| `src/DirectService.Transportation.Infrastructure` | EF Core entity configurations (through `TransportationModelContributor`), live-change interceptor, e-mail, PDF engine, e-invoicing connectors, payment gateway |
+| `src/Shared/DirectService.Shared.Infrastructure` | the composed `MasterDbContext` (each module adds its model through an `IModelContributor`), query filters, the audit interceptor, `MasterDatabase.UseMasterDatabase` (SQL Server, migrations assembly, history table) |
+| `src/Hosts/DirectService.Database` | the EF Core migrations (20 + the model snapshot) and the design-time factory (user secrets `dst-infrastructure-designtime`); every `dotnet ef` command names this project |
 | `src/DirectService.Transportation.Web` | ASP.NET Core host: minimal-API endpoints `/api/v1`, account pages (static SSR), workers, SignalR hub, hosts the UI |
 | `src/DirectService.Transportation.Web.Client` | Blazor WebAssembly UI: design system (`Ui/`, `Layout/`), screens (`Pages/`), AR/EN text (`Localization/`) |
 | `tests/*.Tests` | Domain, Application (unit), Infrastructure (database rules), Api (integration, isolation, security), UI (bUnit) |
@@ -34,10 +36,10 @@ _Step 9, 11 Oct 2026. For developers and the people who will host the system. Ev
    `sqlcmd -S <server> -E -I -i database/00_CreateDatabase.sql`
 2. Apply the schema and reference data (permissions, preset role keys, TRIAL plan, posting keys…):
    `sqlcmd -S <server> -E -I -d DirectServiceMaster -i database/MasterDatabase_Idempotent.sql`
-   (or, for development: `dotnet ef database update --project src/DirectService.Transportation.Infrastructure --startup-project src/DirectService.Transportation.Infrastructure`).
+   (or, for development: `dotnet ef database update --project src/Hosts/DirectService.Database --startup-project src/Hosts/DirectService.Database`; the host also applies missing migrations itself in Development, step 4).
 3. Production: create the application login and run `database/90_ApplicationUser.sql` (read/write, `DENY DELETE` on business schemas, `DENY UPDATE` on the audit, maintenance and rate-history logs, no DDL). The host connects as that user, never as an administrator.
 4. **Version check at start-up (DT-209):** the host compares the database with the migrations of its version. In Development it applies any missing migration itself and logs which ones; in every other environment it refuses to start and names the missing migrations — apply step 2's script after every update, then start the application.
-5. Regenerate the script after a model change: `dotnet ef migrations script --idempotent --project src/DirectService.Transportation.Infrastructure --startup-project src/DirectService.Transportation.Infrastructure --output database/MasterDatabase_Idempotent.sql`. Do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities).
+5. Regenerate the script after a model change: `dotnet ef migrations script --idempotent --project src/Hosts/DirectService.Database --startup-project src/Hosts/DirectService.Database --output database/MasterDatabase_Idempotent.sql`. A new migration: `dotnet ef migrations add <Name> --project src/Hosts/DirectService.Database --startup-project src/Hosts/DirectService.Database` (only with an approved design revision). Check that the model matches the snapshot: `dotnet ef migrations has-pending-model-changes --project src/Hosts/DirectService.Database --startup-project src/Hosts/DirectService.Database` (also an Architecture test). The history table stays `dbo.__EFMigrationsHistory` (named explicitly, schema left to the default so the script is unchanged). Do not re-run `tools/design/gen_efcore.py` (it would overwrite hand-maintained entities).
 
 ## 4. Configuration
 

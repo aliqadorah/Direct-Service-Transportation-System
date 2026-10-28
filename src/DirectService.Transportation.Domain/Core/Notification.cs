@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Domain.Core;
 /// </summary>
 [StoredName("CORE.Notification")]
 [TokenLabel("Notification")]
-public class Notification : AuditableEntity, ITenantScoped
+public class Notification : AuditableEntity, ITenantScoped, INotAudited
 {
     /// <summary>Owning tenant — tenant isolation filter on every query.</summary>
     public long TenantId { get; set; }

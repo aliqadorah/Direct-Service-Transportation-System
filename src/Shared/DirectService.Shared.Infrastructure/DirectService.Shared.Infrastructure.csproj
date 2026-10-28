@@ -1,10 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Shared technical infrastructure (design a.1): filled from Stage 2 session 3 (composed MasterDbContext, interceptors, numbering, record
-       locks, URL tokens, audit, files, printing, exports, report-builder engine …). References SharedKernel only among Shared/Platform/modules. -->
+  <!-- Shared technical infrastructure (design a.1): the composed MasterDbContext with its model contributors, query filters and the audit
+       interceptor (Stage 2 session 3); numbering, record locks, URL tokens, audit, files, printing, exports, report-builder engine … from
+       session 4. References SharedKernel only among Shared/Platform/modules. -->
   <PropertyGroup>
     <RootNamespace>DirectService.Shared.Infrastructure</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
   </ItemGroup>
 </Project>

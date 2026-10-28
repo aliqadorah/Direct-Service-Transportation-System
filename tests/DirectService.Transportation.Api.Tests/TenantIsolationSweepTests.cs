@@ -22,6 +22,7 @@ using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Transportation.Web.Workers;
 using Microsoft.AspNetCore.Http;

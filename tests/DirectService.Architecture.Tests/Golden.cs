@@ -1,7 +1,8 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Database;
+using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace DirectService.Architecture.Tests;
@@ -58,7 +59,8 @@ internal static class Golden
     public static IReadOnlyList<Assembly> AppAssemblies =>
     [
         typeof(EntityTypeMap).Assembly,     // Application
-        typeof(MasterDbContext).Assembly,
+        typeof(DirectService.Transportation.Infrastructure.DependencyInjection).Assembly,
+        typeof(MasterDbContext).Assembly,   // Shared.Infrastructure
         typeof(DirectService.Transportation.Web.Security.AuthSchemes).Assembly,
         typeof(DirectService.Transportation.Contracts.Security.PermissionKeys).Assembly,
         typeof(AuditableEntity).Assembly,   // SharedKernel
