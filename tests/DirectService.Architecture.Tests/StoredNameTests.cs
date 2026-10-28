@@ -7,6 +7,7 @@ using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using DirectService.Transportation.Infrastructure.Security;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace DirectService.Architecture.Tests;
@@ -104,13 +105,22 @@ public sealed class StoredNameTests
     [Fact]
     public void No_entity_property_is_renamed()
     {
-        // Audit JSON keys are property names (E-6): renaming one hides every old value from the history.
+        // Audit JSON keys are property names (E-6): renaming one hides every old value from the history. Navigation properties are no
+        // column and never in the audit JSON: they are left out (DT-304: a Shared entity keeps only the id of a Platform row). Which
+        // names are navigations comes from the model and from the migrations' snapshot (the model as at the restore tag), so every
+        // other property — every column — is still compared exactly.
+        var snapshot = Golden.SnapshotModel;
         var problems = new List<string>();
         foreach (var t in ModelTypes)
         {
             if (!GoldenByName.TryGetValue(StoredNames.Of(t), out var g)) continue;
-            var golden = Golden.Strings(g["properties"]);
-            var now = Golden.Sorted(t.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name));
+            var entity = Golden.Model.FindEntityType(t)!;
+            var table = (entity.GetTableName() ?? entity.GetViewName(), entity.GetSchema() ?? entity.GetViewSchema());
+            var before = snapshot.GetEntityTypes().Single(e => (e.GetTableName() ?? e.GetViewName(), e.GetSchema() ?? e.GetViewSchema()) == table);
+            var navigations = entity.GetNavigations().Select(n => n.Name).Concat(entity.GetSkipNavigations().Select(n => n.Name))
+                .Concat(before.GetNavigations().Select(n => n.Name)).Concat(before.GetSkipNavigations().Select(n => n.Name)).ToHashSet(StringComparer.Ordinal);
+            var golden = Golden.Strings(g["properties"]).Where(p => !navigations.Contains(p)).ToList();
+            var now = Golden.Sorted(t.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name).Where(p => !navigations.Contains(p)));
             if (!golden.SequenceEqual(now))
                 problems.Add($"{StoredNames.Of(t)}: missing {string.Join(", ", golden.Except(now))}; new {string.Join(", ", now.Except(golden))}");
         }

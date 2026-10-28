@@ -1,11 +1,11 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on. Names, types, defaults and constraints must match the design.
+// Shared since Stage 2 session 5; the foreign keys to core.Tenants / Companies / Users are in Transportation.Infrastructure
+// Persistence/CrossModuleRelationships.cs (design a.2), with the same names.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using DirectService.Transportation.Domain.Core;
-using DirectService.Transportation.Domain.Cfg;
 
-namespace DirectService.Transportation.Infrastructure.Persistence.Configurations.Cfg;
+namespace DirectService.Shared.Infrastructure.Persistence.Configurations;
 
 internal sealed class SavedReportConfiguration : IEntityTypeConfiguration<SavedReport>
 {
@@ -133,38 +133,5 @@ internal sealed class SavedReportConfiguration : IEntityTypeConfiguration<SavedR
         builder.HasIndex(new[] { "OwnerUserId" }, "IX_SavedReports_OwnerUserId");
         builder.HasIndex(new[] { "CompanyId" }, "IX_SavedReports_CompanyId")
             .HasFilter("[IsDeleted] = 0");
-
-        builder.HasOne(e => e.OwnerUser)
-            .WithMany()
-            .HasForeignKey(e => e.OwnerUserId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(true)
-            .HasConstraintName("FK_SavedReports_Users_OwnerUserId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne<Tenant>()
-            .WithMany()
-            .HasForeignKey(e => e.TenantId)
-            .HasConstraintName("FK_SavedReports_Tenants_TenantId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne<Company>()
-            .WithMany()
-            .HasForeignKey(e => e.CompanyId)
-            .HasConstraintName("FK_SavedReports_Companies_CompanyId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.CreatedBy)
-            .HasConstraintName("FK_SavedReports_Users_CreatedBy")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.UpdatedBy)
-            .HasConstraintName("FK_SavedReports_Users_UpdatedBy")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.DeletedBy)
-            .HasConstraintName("FK_SavedReports_Users_DeletedBy")
-            .OnDelete(DeleteBehavior.NoAction);
     }
 }

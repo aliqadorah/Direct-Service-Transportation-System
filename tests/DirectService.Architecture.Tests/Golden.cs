@@ -55,6 +55,16 @@ internal static class Golden
         return db.Model;
     });
 
+    /// <summary>The model of the migrations' snapshot (MasterDbContextModelSnapshot): the model as the last migration left it.</summary>
+    public static IModel SnapshotModel => SnapshotHolder.Value;
+
+    private static readonly Lazy<IModel> SnapshotHolder = new(() =>
+    {
+        using var db = new DesignTimeDbContextFactory().CreateDbContext([]);
+        return Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>(db)
+            .ModelSnapshot!.Model;
+    });
+
     /// <summary>Every application assembly (all modules), wherever a constant moves to.</summary>
     public static IReadOnlyList<Assembly> AppAssemblies =>
     [

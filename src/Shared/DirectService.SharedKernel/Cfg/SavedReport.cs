@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.SavedReports â€” Company-scoped.
@@ -23,5 +23,4 @@ public class SavedReport : AuditableEntity, ITenantScoped, ICompanyScoped
     public string Definition { get; set; } = string.Empty;
     /// <summary>Visible to other users with access to the source.</summary>
     public bool IsShared { get; set; }
-    public User OwnerUser { get; set; } = null!;
 }

@@ -77,7 +77,7 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         "loadingSite" => typeof(Trn.LoadingSite), "unloadingSite" => typeof(Trn.UnloadingSite), "material" => typeof(Trn.Material),
         "ownershipType" => typeof(Trn.OwnershipType), "partner" => typeof(Trn.Partner), "receipt" => typeof(Trn.Receipt), "settlement" => typeof(Trn.Settlement),
         "tariff" => typeof(Trn.Tariff), "trip" => typeof(Trn.Trip),
-        "field" => typeof(CustomFieldDefinition), "pin" => typeof(Cfg.DashboardPin), "lockId" => typeof(Cfg.RecordLock), "report" => typeof(Cfg.SavedReport),
+        "field" => typeof(CustomFieldDefinition), "pin" => typeof(DashboardPin), "lockId" => typeof(RecordLock), "report" => typeof(SavedReport),
         "sequence" => typeof(NumberSequence),
         "invitation" => typeof(Core.Invitation), "notification" => typeof(Core.Notification), "role" => typeof(Core.Role), "user" => typeof(Core.User),
         "session" => typeof(Core.UserSession), "grant" => typeof(Core.SupportAccessGrant),
@@ -242,7 +242,7 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
     /// </summary>
     private async Task<bool> ReleaseLeftBsLockAsync(string route, string method, Response r, long tenantB) =>
         method == "DELETE" && route.EndsWith("/locks/{lockId}", StringComparison.Ordinal) && r.Status == HttpStatusCode.NoContent
-        && await f.DbAsync(db => db.Set<Cfg.RecordLock>().IgnoreQueryFilters().AnyAsync(l => l.TenantId == tenantB && !l.IsDeleted));
+        && await f.DbAsync(db => db.Set<RecordLock>().IgnoreQueryFilters().AnyAsync(l => l.TenantId == tenantB && !l.IsDeleted));
 
     private sealed record Response(HttpStatusCode Status, string? Code, string ContentType, byte[] Body);
 

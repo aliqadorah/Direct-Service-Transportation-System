@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.DashboardPins â€” Company-scoped.
@@ -27,6 +27,5 @@ public class DashboardPin : AuditableEntity, ITenantScoped, ICompanyScoped
     public string WarnWhen { get; set; } = "Above";
     /// <summary>Display order (ascending).</summary>
     public int SortOrder { get; set; }
-    public User User { get; set; } = null!;
     public SavedReport SavedReport { get; set; } = null!;
 }

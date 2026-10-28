@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.RecordLocks â€” Company-scoped.
@@ -23,5 +23,4 @@ public class RecordLock : AuditableEntity, ITenantScoped, ICompanyScoped, INotAu
     public DateTime AcquiredAt { get; set; } = DateTime.UtcNow;
     /// <summary>Last activity; lock expires 90 s after it.</summary>
     public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
-    public User User { get; set; } = null!;
 }

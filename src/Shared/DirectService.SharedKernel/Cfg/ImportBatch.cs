@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.ImportBatches â€” Company-scoped.
@@ -29,5 +29,4 @@ public class ImportBatch : AuditableEntity, ITenantScoped, ICompanyScoped
     public long ImportedBy { get; set; }
     /// <summary>Time.</summary>
     public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
-    public User ImportedByUser { get; set; } = null!;
 }

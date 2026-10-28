@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.TableColumnViews â€” Company-scoped.
@@ -19,5 +19,4 @@ public class TableColumnView : AuditableEntity, ITenantScoped, ICompanyScoped
     public string ViewKey { get; set; } = string.Empty;
     /// <summary>Visible columns, order and widths (JSON).</summary>
     public string Columns { get; set; } = string.Empty;
-    public User? User { get; set; }
 }

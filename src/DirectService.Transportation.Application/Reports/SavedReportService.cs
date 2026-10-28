@@ -155,10 +155,11 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     private async Task<List<SavedReportResponse>> ResponsesAsync(IReadOnlyList<long> ids, CancellationToken ct)
     {
         var me = UserId;
+        // The owner by an inner join on the filtered users, as the former required navigation OwnerUser did (DT-306).
         var rows = await db.Set<SavedReport>().AsNoTracking().Where(r => ids.Contains(r.Id))
-            .Select(r => new
+            .Join(db.Set<User>(), r => r.OwnerUserId, u => u.Id, (r, u) => new
             {
-                R = r, OwnerPid = r.OwnerUser.PublicId, Owner = r.OwnerUser.FullName,
+                R = r, OwnerPid = u.PublicId, Owner = u.FullName,
                 Pinned = db.Set<DashboardPin>().Any(p => p.SavedReportId == r.Id && p.UserId == me),
                 LastRun = db.Set<AuditLog>().Where(a => a.EntityType == EntityType && a.EntityId == r.Id && a.Action == "Run").Max(a => (DateTime?)a.OccurredAt),
             }).ToListAsync(ct).ConfigureAwait(false);
