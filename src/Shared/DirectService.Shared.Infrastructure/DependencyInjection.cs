@@ -1,6 +1,7 @@
 using DirectService.Shared.Infrastructure.Collaboration;
 using DirectService.Shared.Infrastructure.Configuration;
 using DirectService.Shared.Infrastructure.Files;
+using DirectService.Shared.Infrastructure.Imports;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using DirectService.Shared.Infrastructure.Printing;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         services.AddScoped<ColumnViewService>();
         services.AddScoped<GlobalSearchService>();
+        services.AddScoped<ImportTemplateService>();
         services.AddScoped<RecordLockService>();
         services.AddScoped<IRecordLockGuard>(sp => sp.GetRequiredService<RecordLockService>());
         return services;

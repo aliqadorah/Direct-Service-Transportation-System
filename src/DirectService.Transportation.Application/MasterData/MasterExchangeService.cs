@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.MasterData;
 public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
     MasterDataSupport support, StandardFieldService fields, CustomFieldService customFields, Reports.ReportExporter exporter,
     DriverService drivers, CustomerService customers, PartnerService partners, MaterialService materials,
-    LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes)
+    LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, IErrorText errorText)
 {
     public static readonly IReadOnlyList<string> Kinds =
         ["drivers", "customers", "partners", "materials", "loading-sites", "unloading-sites", "ownership-types"];
@@ -314,7 +314,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
         var customIndex = customDefs.ToDictionary(d => d.FieldKey,
             d => columns.Find("custom." + d.FieldKey, new[] { d.FieldKey, d.LabelAr, d.LabelEn }.Where(a => a is not null).Select(a => a!)), StringComparer.Ordinal);
 
-        var problems = new ImportProblems(ctx.Language);
+        var problems = new ImportProblems(errorText, ctx.Language);
         var prepared = new List<Prepared>();
         var keys = new List<(int, string?)>();
         var seen = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);

@@ -125,4 +125,4 @@ public sealed record ImportColumns(IReadOnlyDictionary<string, string> Matched, 
 /// and the column matching used. Nothing is saved while any row has a problem (strict mode, DT-44).
 /// </summary>
 public sealed record MasterImportPreview(
-    int TotalRows, int ValidRows, int RejectedRows, IReadOnlyList<Accounting.ImportRowResult> Rows, ImportColumns Columns);
+    int TotalRows, int ValidRows, int RejectedRows, IReadOnlyList<ImportRowResult> Rows, ImportColumns Columns);

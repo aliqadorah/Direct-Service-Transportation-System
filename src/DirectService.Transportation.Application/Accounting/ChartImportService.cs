@@ -15,7 +15,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// are posted with the opening-balances action (FR-110).
 /// </summary>
 public sealed class ChartImportService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    ChartOfAccountsService accounts, PostingEngine engine)
+    ChartOfAccountsService accounts, PostingEngine engine, IErrorText errorText)
 {
     public const string EntityType = "ACC.Account";
 
@@ -123,7 +123,7 @@ public sealed class ChartImportService(IAppDbContext db, ISpreadsheetService she
 
         var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var existing = await db.Set<Account>().AsNoTracking().ToDictionaryAsync(a => a.Code, StringComparer.Ordinal, ct).ConfigureAwait(false);
-        var p = new ImportProblems(ctx.Language);
+        var p = new ImportProblems(errorText, ctx.Language);
         var rows = new List<Row>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var s in sheet.Rows)

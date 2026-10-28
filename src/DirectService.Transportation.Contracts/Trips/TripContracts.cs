@@ -98,7 +98,7 @@ public sealed record TripReviewRequest(string? RowVersion);
 /// </summary>
 public sealed record TripImportPreview(
     int TotalRows, int ValidRows, int RejectedRows, int DuplicateRows, int ReviewRows, string Mode,
-    IReadOnlyList<Accounting.ImportRowResult> Rows, ImportColumns Columns, IReadOnlyList<ImportField>? Fields = null, IReadOnlyList<string>? MissingColumns = null);
+    IReadOnlyList<ImportRowResult> Rows, ImportColumns Columns, IReadOnlyList<ImportField>? Fields = null, IReadOnlyList<string>? MissingColumns = null);
 
 /// <summary>A field an import can fill: key (mapping key), label in the user's language, and whether the file must have the column.</summary>
 public sealed record ImportField(string Key, string Label, bool Required);

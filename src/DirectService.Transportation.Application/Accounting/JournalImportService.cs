@@ -19,7 +19,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// tax and the entry must balance with the tax (DT-255).
 /// </summary>
 public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    PostingEngine engine)
+    PostingEngine engine, IErrorText errorText)
 {
     public const string EntityType = "ACC.JournalEntry";
 
@@ -99,7 +99,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         var apArRoles = await db.Set<ApArParty>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.PartyRole, ct).ConfigureAwait(false);
         var taxCodes = await db.Set<TaxCode>().AsNoTracking().ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
 
-        var p = new ImportProblems(ctx.Language);
+        var p = new ImportProblems(errorText, ctx.Language);
         var lines = new List<Line>();
         foreach (var s in sheet.Rows)
         {

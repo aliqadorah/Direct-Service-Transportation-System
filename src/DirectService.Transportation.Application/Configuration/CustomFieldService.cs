@@ -224,11 +224,11 @@ public sealed partial class CustomFieldService(IAppDbContext db, IUrlTokenServic
                 value = JsonSerializer.SerializeToElement(number);
                 return true;
             case CustomFieldTypes.Date:
-                if (!Accounting.ImportParse.TryDate(clean, out var date)) return false;
+                if (!ImportParse.TryDate(clean, out var date)) return false;
                 value = JsonSerializer.SerializeToElement(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                 return true;
             case CustomFieldTypes.Checkbox:
-                var b = Accounting.ImportParse.Bool(clean);
+                var b = ImportParse.Bool(clean);
                 if (b is null) return false;
                 value = JsonSerializer.SerializeToElement(b.Value);
                 return true;

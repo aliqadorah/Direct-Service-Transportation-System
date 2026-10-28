@@ -68,7 +68,7 @@ internal static class AccountingEndpoints
         // DT-256: VAT on sales / on purchases / VAT expenses for an existing chart (marked or added with the next free codes).
         g.MapPost("/default-tax-accounts", async (ChartOfAccountsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.AddDefaultTaxAccountsAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
-        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+        g.MapGet("/import/template", async (DirectService.Shared.Infrastructure.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync("accounts", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctSetup);
         g.MapPost("/import/preview", async (IFormFile file, ChartImportService svc, CancellationToken ct) =>
         {
@@ -190,7 +190,7 @@ internal static class AccountingEndpoints
             TypedResults.Ok(await svc.EditManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapPost("/{entry}/void", async (string entry, VoidRequest r, JournalService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.VoidManualAsync(entry, r, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
-        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+        g.MapGet("/import/template", async (DirectService.Shared.Infrastructure.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync("journal-entries", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctPost).RequirePermission(PermissionKeys.AcctPostEntry);
         g.MapPost("/import/preview", async (IFormFile file, JournalImportService svc, CancellationToken ct) =>
         {

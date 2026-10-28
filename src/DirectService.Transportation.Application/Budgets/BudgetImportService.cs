@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// Levantine and the Egyptian forms) or by number (1–12, M01–M12).
 /// </summary>
 public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, ISpreadsheetService sheets, MasterDataSupport support, PostingEngine engine,
-    BudgetService budgets, IUrlTokenService tokens)
+    BudgetService budgets, IUrlTokenService tokens, IErrorText errorText)
 {
     private static readonly string[] AccountAliases = ["Account code", "AccountCode", "Account", "رمز الحساب", "الحساب"];
     private static readonly string[] CentreAliases = ["Cost centre", "Cost center", "CostCentre", "Cost centre code", "مركز التكلفة", "مركز الكلفة", "رمز مركز التكلفة"];
@@ -120,7 +120,7 @@ public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, I
         var codeOf = accounts.ToDictionary(a => a.Id, a => a.Code);
         var centres = await db.Set<CostCentre>().AsNoTracking().Select(c => new { c.Id, c.Code }).ToListAsync(ct).ConfigureAwait(false);
         var centreByCode = centres.ToDictionary(c => c.Code, c => c.Id, StringComparer.OrdinalIgnoreCase);
-        var p = new ImportProblems(ctx.Language);
+        var p = new ImportProblems(errorText, ctx.Language);
         var rows = new List<Row>();
         var keys = new List<(int Row, string? Key)>();
         foreach (var s in sheet.Rows)

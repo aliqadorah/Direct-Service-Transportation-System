@@ -32,7 +32,7 @@ internal static class PricingEndpoints
             TypedResults.Ok(await svc.ListAsync(q, ct).ConfigureAwait(false))).RequireAnyPermission(Readers);
         g.MapGet("/export", async ([AsParameters] TariffListQuery q, string? format, PricingExchangeService svc, CancellationToken ct) =>
             File(await svc.ExportTariffsAsync(q, format, ct).ConfigureAwait(false))).RequireAnyPermission(Readers);
-        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+        g.MapGet("/import/template", async (DirectService.Shared.Infrastructure.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync("tariffs", ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.MastersManage);
         g.MapPost("/import/preview", async (IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] string? mapping, PricingExchangeService svc, CancellationToken ct) =>
         {

@@ -1,14 +1,13 @@
 using System.Globalization;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Shared.Contracts;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.SharedKernel;
 
-/// <summary>Shared parsing and problem collection for the accounting imports (strict mode: any rejected row blocks the import).</summary>
-internal sealed class ImportProblems(string language)
+/// <summary>
+/// Problem collection of every importer (strict mode: any rejected row blocks the import). Messages and fixes come through
+/// <see cref="IErrorText"/> (Stage 2 session 7, DT-316).
+/// </summary>
+public sealed class ImportProblems(IErrorText text, string language)
 {
     private readonly SortedDictionary<int, (string? Key, List<ImportProblem> Problems)> _rows = [];
 
@@ -16,7 +15,7 @@ internal sealed class ImportProblems(string language)
 
     /// <summary>
     /// A problem of a row in a column of the file (null = the whole row), with its fix: <paramref name="fix"/> when given (e.g.
-    /// <see cref="ImportFixCatalog.Date"/>), otherwise the fix of the code.
+    /// <c>ImportFixCatalog.Date</c>), otherwise the fix of the code.
     /// </summary>
     public void AddAt(int row, string? key, string? column, string code, string? fix, params object?[] args)
     {
@@ -25,7 +24,7 @@ internal sealed class ImportProblems(string language)
             entry = (key, []);
             _rows[row] = entry;
         }
-        entry.Problems.Add(new ImportProblem(code, column, ErrorCatalog.Format(code, language, args), ImportFixCatalog.For(fix ?? code, language)));
+        entry.Problems.Add(new ImportProblem(code, column, text.Format(code, language, args), text.Fix(fix ?? code, language)));
     }
 
     public bool Has(int row) => _rows.ContainsKey(row);
@@ -39,7 +38,8 @@ internal sealed class ImportProblems(string language)
                 : new ImportRowResult(r.Row, r.Key, [])).ToList());
 }
 
-internal static class ImportParse
+/// <summary>Cell parsing, batch rows and column checks of every importer.</summary>
+public static class ImportParse
 {
     /// <summary>Amount cell: empty = 0; Arabic digits and thousands separators accepted.</summary>
     public static bool TryAmount(string? text, int decimals, out decimal value)
@@ -80,7 +80,7 @@ internal static class ImportParse
     {
         foreach (var (index, name) in columns)
         {
-            if (index < 0) throw Fail.Rule(ErrorCodes.ImportMissingColumn, name);
+            if (index < 0) throw Fail.Rule(SharedErrorCodes.ImportMissingColumn, name);
         }
     }
 }

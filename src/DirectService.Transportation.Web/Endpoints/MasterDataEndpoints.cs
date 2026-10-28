@@ -185,7 +185,7 @@ internal static class MasterDataEndpoints
             File(await svc.ExportAsync(kind, q, format, ct).ConfigureAwait(false)));
         if (readers is null) export.RequireMember();
         else export.RequireAnyPermission(readers);
-        g.MapGet("/import/template", async (Application.Imports.ImportTemplateService svc, CancellationToken ct) =>
+        g.MapGet("/import/template", async (DirectService.Shared.Infrastructure.Imports.ImportTemplateService svc, CancellationToken ct) =>
             File(await svc.TemplateAsync(kind, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.MastersManage);
         g.MapPost("/import/preview", async (IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] string? mapping, MasterExchangeService svc, CancellationToken ct) =>
         {

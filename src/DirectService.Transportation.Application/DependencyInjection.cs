@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
         services.AddScoped<IUserNames, Identity.UserNames>();
+        services.AddSingleton<IErrorText, ErrorText>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
 
         // Accounting core and posting engine (B2)
@@ -98,7 +99,7 @@ public static class DependencyInjection
         // Trips (B5)
         services.AddScoped<TripService>();
         services.AddScoped<TripImportService>();
-        services.AddScoped<Imports.ImportTemplateService>();
+        services.AddScoped<IImportTemplateProvider, Imports.TransportationImportTemplates>();
         services.AddSingleton<Platform.ProviderSetupState>();
         services.AddScoped<Platform.ProviderSetupService>();
         services.AddScoped<Platform.StaffService>();

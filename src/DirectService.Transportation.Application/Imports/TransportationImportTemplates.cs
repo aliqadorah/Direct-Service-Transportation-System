@@ -8,29 +8,26 @@ using DirectService.Transportation.Contracts.Configuration;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
+using Col = DirectService.SharedKernel.ImportTemplateColumn;
 
 namespace DirectService.Transportation.Application.Imports;
 
 /// <summary>
-/// "Download template" of every importer (owner feedback 13 Oct 2026): an Excel file in the user's language whose first sheet has
-/// exactly the columns the import reads (headers it matches, the company's field labels and custom fields included), one sample row
-/// (a journal entry needs two lines), and a second sheet explaining each column: required or not, format, allowed values. Replacing the
-/// sample with real values gives a file that imports cleanly. Kinds: trips, the master-data lists, tariffs, chart of accounts (with
-/// opening balances) and journal entries.
+/// The import templates of this application (<see cref="IImportTemplateProvider"/>, DT-317): the columns, formats, allowed values and sample
+/// rows of trips, the master-data lists, tariffs, chart of accounts (with opening balances) and journal entries, in the reader's language.
+/// The shared <c>ImportTemplateService</c> lays out the file. The accounting kinds split off with the Accounting module (Stage 3).
 /// </summary>
-public sealed class ImportTemplateService(IAppDbContext db, IRequestContext ctx, ISpreadsheetService sheets, StandardFieldService fields,
-    CustomFieldService customFields, MasterDataSupport support)
+public sealed class TransportationImportTemplates(IAppDbContext db, IRequestContext ctx, StandardFieldService fields, CustomFieldService customFields,
+    MasterDataSupport support) : IImportTemplateProvider
 {
-    public static readonly IReadOnlyList<string> Kinds =
+    public IReadOnlyList<string> Kinds { get; } =
         ["trips", "drivers", "customers", "partners", "materials", "loading-sites", "unloading-sites", "ownership-types", "tariffs", "accounts", "journal-entries"];
-
-    private sealed record Col(string Header, bool Required, string Format, string Allowed, object? Sample);
 
     private bool En => ctx.Language == "en";
 
     private string T(string ar, string en) => En ? en : ar;
 
-    public async Task<GeneratedFile> TemplateAsync(string kind, CancellationToken ct)
+    public async Task<ImportTemplateContent> ContentAsync(string kind, CancellationToken ct)
     {
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         var (title, cols, extra) = kind switch
@@ -48,19 +45,12 @@ public sealed class ImportTemplateService(IAppDbContext db, IRequestContext ctx,
             "journal-entries" => (T("القيود", "Journal entries"), await JournalAsync(today, debitLine: true, ct).ConfigureAwait(false), await JournalAsync(today, debitLine: false, ct).ConfigureAwait(false)),
             _ => throw Fail.NotFound(),
         };
-        var samples = new List<IReadOnlyList<object?>> { cols.Select(c => c.Sample).ToList() };
-        if (extra is not null) samples.Add(extra.Select(c => c.Sample).ToList());
-        var template = new SpreadsheetTemplate(title, T("شرح الأعمدة", "Column notes"), !En, cols.Select(c => c.Header).ToList(), cols.Select(c => c.Required).ToList(),
-            samples, Intro(kind), [T("العمود", "Column"), T("مطلوب", "Required"), T("الصيغة", "Format"), T("القيم المسموحة / ملاحظات", "Allowed values / notes")],
-            cols.Select(c => (IReadOnlyList<string>)[c.Header, c.Required ? T("نعم", "Yes") : T("لا", "No"), c.Format, c.Allowed]).ToList());
-        return new GeneratedFile($"{kind}-template-{(En ? "en" : "ar")}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sheets.WriteTemplate(template));
+        // The journal sample is an entry of two rows; every other kind has one row per record.
+        var replace = kind == "journal-entries"
+            ? T("صفّي القيد المثال) بقيودك؛ كل قيد صفان أو أكثر بالرقم المرجعي نفسه.", " (the two lines of the sample entry) with your entries; each entry is two or more rows with the same reference.")
+            : null;
+        return new ImportTemplateContent(title, cols, extra, replace);
     }
-
-    private string Intro(string kind) =>
-        T("الصف الأول عناوين الأعمدة كما يقرؤها الاستيراد: لا تغيّرها. الأعمدة الملوّنة بالبرتقالي مطلوبة. استبدل الصف المثال (", "The first row holds the column headers the import reads: do not change them. Orange columns are required. Replace the sample row") +
-        (kind == "journal-entries" ? T("صفّي القيد المثال) بقيودك؛ كل قيد صفان أو أكثر بالرقم المرجعي نفسه.", " (the two lines of the sample entry) with your entries; each entry is two or more rows with the same reference.")
-            : T(") ببياناتك، صفاً لكل سجل.", " with your data, one row per record.")) +
-        T(" التواريخ yyyy-mm-dd والأرقام بنقطة عشرية. الحد 20,000 صف و10 ميغابايت؛ القيم فقط بلا معادلات.", " Dates as yyyy-mm-dd, numbers with a dot for decimals. Up to 20,000 rows and 10 MB; values only, no formulas.");
 
     // ------------------------------------------------------------ formats
 

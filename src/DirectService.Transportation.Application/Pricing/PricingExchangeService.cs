@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Pricing;
 /// one transaction with a history row per line and a cfg.ImportBatches row.
 /// </summary>
 public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    TariffService tariffs, MonthlyRateService rates, RateHistoryLog history, Reports.ReportExporter exporter)
+    TariffService tariffs, MonthlyRateService rates, RateHistoryLog history, Reports.ReportExporter exporter, IErrorText errorText)
 {
     private sealed record Column(string Key, string Ar, string En, params string[] Aliases);
 
@@ -133,7 +133,7 @@ public sealed class PricingExchangeService(IAppDbContext db, ISpreadsheetService
         }
         ImportParse.RequireColumns(sheet, (index["partyType"], En ? "Party type" : "نوع الطرف"), (index["price"], En ? "Price per ton" : "السعر للطن"));
 
-        var problems = new ImportProblems(ctx.Language);
+        var problems = new ImportProblems(errorText, ctx.Language);
         var prepared = new List<Prepared>();
         var keys = new List<(int, string?)>();
         var seen = new HashSet<string>(StringComparer.Ordinal);

@@ -25,7 +25,7 @@ namespace DirectService.Transportation.Application.Trips;
 /// defaults and the row is flagged Needs review; rejected rows are skipped and reported. Each import is logged in cfg.ImportBatches.
 /// </summary>
 public sealed class TripImportService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    TripService trips, StandardFieldService fields, CustomFieldService customFields, IMonthlyRateLock rateLock, IChangeContext changes)
+    TripService trips, StandardFieldService fields, CustomFieldService customFields, IMonthlyRateLock rateLock, IChangeContext changes, IErrorText errorText)
 {
     private sealed record Column(string Key, params string[] Aliases);
 
@@ -181,7 +181,7 @@ public sealed class TripImportService(IAppDbContext db, ISpreadsheetService shee
         var prices = await PricesAsync(months, locking, ct).ConfigureAwait(false);
         var s = await trips.SettingsAsync(ct).ConfigureAwait(false);
 
-        var problems = new ImportProblems(ctx.Language);
+        var problems = new ImportProblems(errorText, ctx.Language);
         var prepared = new List<Prepared>();
         var keys = new List<(int, string?)>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
