@@ -13,7 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DirectService.Transportation.Api.Tests;
+namespace DirectService.Testing;
 
 /// <summary>
 /// Hosts the real application against a dedicated test database (recreated once per run from the
@@ -51,7 +51,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public CapturingEmailSender Emails { get; } = new();
 
     /// <summary>Microsoft sign-in and Graph for the system email tests (DT-250).</summary>
-    public DirectService.Transportation.Tests.Email.FakeGraph Graph { get; } = new();
+    public FakeGraph Graph { get; } = new();
 
     /// <summary>Live messages the application published (record changes, locks, notifications), recorded instead of SignalR.</summary>
     public RecordingNotifier Live { get; } = new();
@@ -132,12 +132,6 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
         return await query(db);
     }
-}
-
-[CollectionDefinition(Name)]
-public sealed class ApiCollection : ICollectionFixture<ApiFactory>
-{
-    public const string Name = "Api";
 }
 
 /// <summary>Captures outgoing emails so tests can follow verification, reset and invitation links.</summary>
@@ -389,10 +383,4 @@ public sealed class SystemEmailFactory : ApiFactory
         builder.UseSetting("Email:DropFolder", DropFolder);
         builder.ConfigureServices(s => s.AddScoped<DirectService.Transportation.Infrastructure.Email.OutboxEmailSender>());
     }
-}
-
-[CollectionDefinition(Name)]
-public sealed class SystemEmailCollection : ICollectionFixture<SystemEmailFactory>
-{
-    public const string Name = "SystemEmail";
 }

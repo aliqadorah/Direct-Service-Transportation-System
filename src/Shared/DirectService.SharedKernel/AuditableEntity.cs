@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Domain.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// The standard columns every table carries (Database design §4), except the append-only logs.

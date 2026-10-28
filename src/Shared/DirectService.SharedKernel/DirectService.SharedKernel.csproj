@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Building blocks every project may use (platform design a.1/a.2): request context, data scopes, AppException, TextNormalizer, Money,
+       AuditableEntity and the scope interfaces, the stored-name pins. References no project of the solution (Architecture.Tests). -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.SharedKernel</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- IAppDbContext exposes EF Core types (DbSet, DatabaseFacade, IModel). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+</Project>

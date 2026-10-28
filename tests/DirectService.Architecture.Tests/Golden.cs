@@ -57,11 +57,12 @@ internal static class Golden
     /// <summary>Every application assembly (all modules), wherever a constant moves to.</summary>
     public static IReadOnlyList<Assembly> AppAssemblies =>
     [
-        typeof(IAppDbContext).Assembly,
+        typeof(EntityTypeMap).Assembly,     // Application
         typeof(MasterDbContext).Assembly,
         typeof(DirectService.Transportation.Web.Security.AuthSchemes).Assembly,
         typeof(DirectService.Transportation.Contracts.Security.PermissionKeys).Assembly,
-        typeof(DirectService.Transportation.Domain.Common.AuditableEntity).Assembly,
+        typeof(AuditableEntity).Assembly,   // SharedKernel
+        typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly,
     ];
 
     /// <summary>A type found by its simple name in the application assemblies (namespaces change in Stages 2–4, names do not).</summary>

@@ -11,6 +11,7 @@
     <InternalsVisibleTo Include="DirectService.Transportation.Infrastructure.Tests" />
     <InternalsVisibleTo Include="DirectService.Transportation.Api.Tests" />
     <InternalsVisibleTo Include="DirectService.Architecture.Tests" />
+    <InternalsVisibleTo Include="DirectService.Testing" />
   </ItemGroup>
   <ItemGroup>
     <!-- ASP.NET Core Identity token providers and Data Protection -->

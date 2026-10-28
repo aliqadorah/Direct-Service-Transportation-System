@@ -2,48 +2,6 @@ using DirectService.Transportation.Contracts.Errors;
 
 namespace DirectService.Transportation.Application.Abstractions;
 
-/// <summary>
-/// An expected failure returned to the client as problem details (API-06): the code, HTTP status,
-/// optional field and message arguments. The message text is produced from
-/// <see cref="ErrorCatalog"/> in the user's language by the API layer.
-/// </summary>
-public class AppException : Exception
-{
-    public AppException(string code, int status, string? field = null, params object?[] args)
-        : base(code)
-    {
-        Code = code;
-        Status = status;
-        Field = field;
-        Args = args;
-    }
-
-    public AppException() : this(ErrorCodes.ValidationFailed, 400) { }
-
-    public AppException(string message) : this(message, 400) { }
-
-    public AppException(string message, Exception innerException) : base(message, innerException)
-    {
-        Code = message;
-        Status = 500;
-        Args = [];
-    }
-
-    public string Code { get; } = ErrorCodes.ValidationFailed;
-    public int Status { get; }
-    public string? Field { get; }
-    public object?[] Args { get; } = [];
-
-    /// <summary>More values for the client, written as problem fields (e.g. DT-230: the amount and payment behind <c>trip.partnerPaid</c>).</summary>
-    public IReadOnlyDictionary<string, object?>? Extra { get; init; }
-
-    /// <summary>Field-level errors for a 400 validation failure.</summary>
-    public IReadOnlyList<FieldError> Errors { get; init; } = [];
-}
-
-/// <summary>One field error (field name, code, arguments; an argument naming a field is a <see cref="FieldRef"/>, DT-245).</summary>
-public sealed record FieldError(string Field, string Code, object?[] Args);
-
 /// <summary>Factory helpers for the common failures.</summary>
 public static class Fail
 {

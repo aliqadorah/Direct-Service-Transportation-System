@@ -43,7 +43,7 @@ public sealed class TripPerformanceTests(ApiFactory f, ITestOutputHelper output)
         var sw = Stopwatch.StartNew();
         await f.DbAsync(async db =>
         {
-            async Task<long> Id<T>(string token) where T : Domain.Common.AuditableEntity
+            async Task<long> Id<T>(string token) where T : AuditableEntity
             {
                 var g = tokens.Decode<T>(token)!.Value;
                 return await db.Set<T>().IgnoreQueryFilters().Where(x => x.PublicId == g).Select(x => x.Id).SingleAsync();

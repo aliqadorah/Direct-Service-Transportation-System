@@ -447,7 +447,7 @@ public sealed class PricingTests(ApiFactory f)
             var tokens = f.Services.GetRequiredService<IUrlTokenService>();
             var companyPid = tokens.Decode<Company>(o.CompanyId)!.Value;
             var company = await db.Set<Company>().IgnoreQueryFilters().SingleAsync(c => c.PublicId == companyPid);
-            async Task<long> Id<T>(string token) where T : DirectService.Transportation.Domain.Common.AuditableEntity
+            async Task<long> Id<T>(string token) where T : AuditableEntity
             {
                 var g = tokens.Decode<T>(token)!.Value;
                 return await db.Set<T>().IgnoreQueryFilters().Where(x => x.PublicId == g).Select(x => x.Id).SingleAsync();

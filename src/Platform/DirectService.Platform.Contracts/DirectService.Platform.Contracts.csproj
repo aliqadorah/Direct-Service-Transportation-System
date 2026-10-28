@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform DTOs and contribution interfaces used by modules and the browser (design a.2, a.3), filled in Stage 2 session 6. Browser-safe:
+       no EF Core, so no reference to SharedKernel while SharedKernel carries IAppDbContext (DT-288). -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Platform.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- Platform pages (console, tenant, company settings, users, audit log, profile, setup checklist), filled in Stage 2 session 7. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Platform.UI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\DirectService.Shared.UI\DirectService.Shared.UI.csproj" />
+  </ItemGroup>
+</Project>

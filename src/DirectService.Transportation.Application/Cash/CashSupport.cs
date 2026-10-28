@@ -51,7 +51,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
     }
 
     /// <summary>A party chosen on a cash document: any status (archived parties settle and pay their open items, DT-97).</summary>
-    public async Task<T> PartyAsync<T>(string field, string? token, CancellationToken ct) where T : Domain.Common.AuditableEntity
+    public async Task<T> PartyAsync<T>(string field, string? token, CancellationToken ct) where T : AuditableEntity
     {
         var pid = support.Decode<T>(token) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));
         return await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.Field(field, ErrorCodes.ValidationFormat, new FieldRef(field));

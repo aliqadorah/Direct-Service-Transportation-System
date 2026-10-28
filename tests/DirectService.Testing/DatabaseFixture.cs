@@ -4,7 +4,7 @@ using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Infrastructure.Tests;
+namespace DirectService.Testing;
 
 /// <summary>
 /// Creates the integration-test database from the migrations once per test run. Tests isolate
@@ -84,9 +84,3 @@ public sealed class DatabaseFixture : IAsyncLifetime
 }
 
 public sealed record TestTenant(long TenantId, long CompanyId, long UserId);
-
-[CollectionDefinition(Name)]
-public sealed class DatabaseCollection : ICollectionFixture<DatabaseFixture>
-{
-    public const string Name = "Database";
-}

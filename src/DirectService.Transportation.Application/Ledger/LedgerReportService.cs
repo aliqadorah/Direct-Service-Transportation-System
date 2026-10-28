@@ -183,7 +183,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
 
     /// <summary>DT-254: only the lines whose line reference or entry reference contains the text (like the cost-centre filter, also for the opening).</summary>
     private static IQueryable<EntryLine> ByReference(IQueryable<EntryLine> lines, string? reference) =>
-        Common.TextNormalizer.CleanText(reference) is { } r
+        TextNormalizer.CleanText(reference) is { } r
             ? lines.Where(l => (l.Reference != null && l.Reference.Contains(r)) || (l.JournalEntry.Reference != null && l.JournalEntry.Reference.Contains(r)))
             : lines;
 
@@ -253,8 +253,8 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         }
         else if (q.AllAccounts == true || !string.IsNullOrWhiteSpace(q.CodeFrom) || !string.IsNullOrWhiteSpace(q.CodeTo))
         {
-            var lo = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeFrom);
-            var hi = q.AllAccounts == true ? null : Common.TextNormalizer.CleanCode(q.CodeTo);
+            var lo = q.AllAccounts == true ? null : TextNormalizer.CleanCode(q.CodeFrom);
+            var hi = q.AllAccounts == true ? null : TextNormalizer.CleanCode(q.CodeTo);
             if (lo is not null && hi is not null && string.CompareOrdinal(lo, hi) > 0) throw Fail.Field("codeFrom", ErrorCodes.ValidationRange, new FieldRef("codeFrom"));
             chosen = tree.Values.Where(n => n.Children.Count == 0
                     && (lo is null || string.CompareOrdinal(n.Account.Code, lo) >= 0)

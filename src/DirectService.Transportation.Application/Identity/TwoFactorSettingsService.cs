@@ -92,7 +92,7 @@ public sealed partial class TwoFactorSettingsService(
         if (!cache.TryGetValue<PendingChange>(PendingKey(user.Id), out var pending) || pending is null
             || !string.Equals(pending.Stamp, user.SecurityStamp, StringComparison.Ordinal) || pending.SessionId != ctx.SessionId)
             throw Fail.Rule(ErrorCodes.TwoFactorChangeExpired);
-        var step = TotpCode.MatchStep(pending.Key, Common.TextNormalizer.DigitsOnly(code), clock.GetUtcNow());
+        var step = TotpCode.MatchStep(pending.Key, TextNormalizer.DigitsOnly(code), clock.GetUtcNow());
         if (step is null)
         {
             if (Interlocked.Increment(ref pending.WrongCodes) >= MaxWrongCodes) cache.Remove(PendingKey(user.Id));

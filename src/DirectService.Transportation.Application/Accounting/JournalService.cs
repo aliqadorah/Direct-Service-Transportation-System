@@ -115,7 +115,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         return new PostingRequest(r.EntryDate!.Value, r.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true, posting, r.Reference);
     }
 
-    private async Task<Dictionary<string, long>> IdsAsync<T>(IEnumerable<string?> tokenList, CancellationToken ct) where T : Domain.Common.AuditableEntity
+    private async Task<Dictionary<string, long>> IdsAsync<T>(IEnumerable<string?> tokenList, CancellationToken ct) where T : AuditableEntity
     {
         var map = new Dictionary<Guid, string>();
         foreach (var t in tokenList.Where(t => !string.IsNullOrEmpty(t)).Distinct())

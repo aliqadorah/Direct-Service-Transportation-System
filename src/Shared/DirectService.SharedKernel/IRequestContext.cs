@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Who is calling and in which tenant/company, resolved by the server on every request (ADR-04, SEC-05).

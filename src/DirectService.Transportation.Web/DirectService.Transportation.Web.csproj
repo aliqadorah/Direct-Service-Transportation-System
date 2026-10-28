@@ -4,6 +4,9 @@
     <RootNamespace>DirectService.Transportation.Web</RootNamespace>
     <UserSecretsId>dst-web-7f3e2a1c</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
@@ -20,6 +23,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DirectService.Transportation.Api.Tests" />
     <InternalsVisibleTo Include="DirectService.Architecture.Tests" />
+    <InternalsVisibleTo Include="DirectService.Testing" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- Design system, shell and client services shared by every module UI (design a.1, a.10): filled in Stage 2 session 7. Browser-safe: it
+       references no EF Core, so not SharedKernel. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Shared.UI</RootNamespace>
+  </PropertyGroup>
+</Project>

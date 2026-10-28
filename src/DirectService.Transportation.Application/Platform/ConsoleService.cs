@@ -52,7 +52,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var nameEn = TextNormalizer.CleanText(r.NameEn);
         var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", ErrorCodes.ValidationFormat, new FieldRef("billingCycle"));
         new Validator().Require("code", code).MaxLength("code", code, 30).Require("nameAr", nameAr).MaxLength("nameAr", nameAr, 100).Require("nameEn", nameEn).MaxLength("nameEn", nameEn, 100)
-            .Check(r.Price is >= 0 && Accounting.Money.IsValidAmount(r.Price.Value), "price", ErrorCodes.ValidationRange)
+            .Check(r.Price is >= 0 && Money.IsValidAmount(r.Price.Value), "price", ErrorCodes.ValidationRange)
             .Check(r.MaxCompanies is > 0, "maxCompanies", ErrorCodes.ValidationRange).Check(r.MaxActiveUsers is > 0, "maxActiveUsers", ErrorCodes.ValidationRange)
             .Check(r.MaxTripsPerMonth is > 0, "maxTripsPerMonth", ErrorCodes.ValidationRange).Check(r.MaxStorageMb is > 0, "maxStorageMb", ErrorCodes.ValidationRange)
             .ThrowIfInvalid();
@@ -134,7 +134,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
                      .Where(i => !i.IsDeleted && (i.Number.Contains(text) || i.GatewayReference == text))
                      .Join(tenants, i => i.TenantId, t => t.Id, (i, t) => new { i.Number, i.Total, i.Status, t.PublicId, t.Name }).OrderByDescending(x => x.Number).Take(max)
                      .ToListAsync(ct).ConfigureAwait(false))
-            hits.Add(new(ConsoleSearchKinds.Invoice, support.Token<Tenant>(i.PublicId), i.Number, $"{i.Name} · {Accounting.Money.Format(i.Total)} · {i.Status}"));
+            hits.Add(new(ConsoleSearchKinds.Invoice, support.Token<Tenant>(i.PublicId), i.Number, $"{i.Name} · {Money.Format(i.Total)} · {i.Status}"));
         foreach (var u in await db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => u.IsPlatformStaff && !u.IsDeleted && (u.FullName.Contains(text) || u.Email!.Contains(text)))
                      .OrderBy(u => u.FullName).Take(max).Select(u => new { u.PublicId, u.FullName, u.Email }).ToListAsync(ct).ConfigureAwait(false))
             hits.Add(new(ConsoleSearchKinds.Staff, support.Token<User>(u.PublicId), u.FullName, u.Email));
@@ -313,7 +313,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
         if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) throw Fail.Rule(ErrorCodes.SubscriptionInvoiceNotDue, invoice.Number);
         var decimals = options.Value.CurrencyDecimals;
-        if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Accounting.Money.IsValidAmount(credit, decimals))
+        if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Money.IsValidAmount(credit, decimals))
             throw Fail.Field("amount", ErrorCodes.ValidationRange, new FieldRef("amount"));
         return await ApplyCreditAsync(invoice, credit, why, ct).ConfigureAwait(false);
     }
@@ -350,7 +350,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             (invoice.Amount, invoice.Tax) = BillingService.Split(total, options.Value.TaxRate, decimals);
             invoice.Total = total;
         }
-        changes.SetAction(invoice, "Credit", why + " · " + Accounting.Money.Format(credit));
+        changes.SetAction(invoice, "Credit", why + " · " + Money.Format(credit));
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return subscriptions.Invoice(invoice);
     }

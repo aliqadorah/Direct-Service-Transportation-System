@@ -95,8 +95,8 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         ArgumentNullException.ThrowIfNull(request);
         RequireTransaction();
         var decimals = await CurrencyDecimalsAsync(ct).ConfigureAwait(false);
-        var description = Common.TextNormalizer.CleanText(request.Description);
-        var reference = Common.TextNormalizer.CleanText(request.Reference);
+        var description = TextNormalizer.CleanText(request.Description);
+        var reference = TextNormalizer.CleanText(request.Reference);
         new Validator().Require("description", description).MaxLength("description", description, DescriptionMax)
             .MaxLength("reference", reference, ReferenceMax).ThrowIfInvalid();
         if (request.Lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
@@ -157,7 +157,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                     throw Fail.Rule(ErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
             }
             if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", ErrorCodes.ValidationRange, new FieldRef("note"));
-            if (Common.TextNormalizer.CleanText(l.Reference) is { Length: > ReferenceMax })
+            if (TextNormalizer.CleanText(l.Reference) is { Length: > ReferenceMax })
                 throw Fail.Field($"lines[{i}].reference", ErrorCodes.ValidationRange, new FieldRef($"lines[{i}].reference"));
             totalDebit += l.Debit;
             totalCredit += l.Credit;
@@ -190,7 +190,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             EntryDate = request.EntryDate,
             PeriodMonth = AccountingCodes.Month(request.EntryDate),
             Description = description!,
-            Reference = Common.TextNormalizer.CleanText(request.Reference),
+            Reference = TextNormalizer.CleanText(request.Reference),
             SourceModule = request.SourceModule,
             SourceType = request.SourceType,
             SourceId = request.SourceId,
@@ -215,8 +215,8 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 PartyModule = l.Party?.Module,
                 PartyType = l.Party?.Type,
                 PartyId = l.Party?.Id,
-                Note = Common.TextNormalizer.CleanText(l.Note),
-                Reference = Common.TextNormalizer.CleanText(l.Reference) ?? reference,
+                Note = TextNormalizer.CleanText(l.Note),
+                Reference = TextNormalizer.CleanText(l.Reference) ?? reference,
                 TaxCodeId = tax?.Code.Id,
                 TaxRate = tax?.Code.Rate,
                 TaxAmount = tax?.Amount,

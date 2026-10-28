@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform entities (core.* tenants, companies, users, roles, plans …), filled in Stage 2 session 5. A Domain project references SharedKernel only. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Platform.Domain</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

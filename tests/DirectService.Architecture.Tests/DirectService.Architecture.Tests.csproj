@@ -3,6 +3,9 @@
     <RootNamespace>DirectService.Architecture.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The host references every project (composition root), so every stored name and key is reachable from here. -->
     <ProjectReference Include="..\..\src\DirectService.Transportation.Web\DirectService.Transportation.Web.csproj" />
   </ItemGroup>

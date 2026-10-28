@@ -257,7 +257,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     /// </summary>
     private Task<bool> RedeemRecoveryCodeAsync(User user, string recoveryCode, CancellationToken ct) =>
         ((IUserTwoFactorRecoveryCodeStore<User>)store).RedeemCodeAsync(user,
-            Common.TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim(), ct);
+            TextNormalizer.ToAsciiDigits(recoveryCode).Replace(" ", string.Empty, StringComparison.Ordinal).Trim(), ct);
 
     /// <summary>A wrong code in a 2FA management step (e.g. confirming a new authenticator app) counts like any failed attempt (DT-204).</summary>
     public Task RecordStepUpFailureAsync(User user, CancellationToken ct)
@@ -400,5 +400,5 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         }
     }
 
-    private static string Clean(string? code) => Common.TextNormalizer.DigitsOnly(code);
+    private static string Clean(string? code) => TextNormalizer.DigitsOnly(code);
 }

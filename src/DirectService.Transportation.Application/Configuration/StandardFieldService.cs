@@ -43,7 +43,7 @@ public sealed class StandardFieldService(IAppDbContext db, IRequestContext ctx, 
                 errors.Add(new FieldError("fields", ErrorCodes.FieldUnknown, [c.FieldKey]));
                 continue;
             }
-            var label = Common.TextNormalizer.CleanText(c.Label);
+            var label = TextNormalizer.CleanText(c.Label);
             if (label is { Length: > 100 }) errors.Add(new FieldError(f.Key, ErrorCodes.ValidationRange, [new FieldRef(f.Key)]));
             // An always-required field stays required whatever IsRequired says; only hiding it is refused.
             if (c.IsHidden && f.IsCore) throw Fail.RuleOn(f.Key, ErrorCodes.FieldCore, label ?? DefaultLabel(f));
@@ -65,7 +65,7 @@ public sealed class StandardFieldService(IAppDbContext db, IRequestContext ctx, 
                 o = new StandardFieldConfig { EntityType = entityType, FieldKey = f.Key };
                 db.Set<StandardFieldConfig>().Add(o);
             }
-            o.Label = Common.TextNormalizer.CleanText(c.Label);
+            o.Label = TextNormalizer.CleanText(c.Label);
             o.IsHidden = c.IsHidden;
             o.IsRequired = f.AlwaysRequired || c.IsRequired;
             o.SortOrder = c.SortOrder ?? o.SortOrder;

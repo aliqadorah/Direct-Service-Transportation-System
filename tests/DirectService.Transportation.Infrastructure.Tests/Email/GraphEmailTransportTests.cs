@@ -3,7 +3,6 @@ using System.Text;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Infrastructure.Email;
-using DirectService.Transportation.Tests.Email;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

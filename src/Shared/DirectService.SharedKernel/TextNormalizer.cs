@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>Text normalisation shared by validation, uniqueness keys and search.</summary>
 public static class TextNormalizer

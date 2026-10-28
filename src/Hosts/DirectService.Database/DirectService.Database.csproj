@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- EF Core migrations and the design-time factory, seeing every module (design d, decision K-08): filled in Stage 2 session 3 (migration
+       ids, history table and UserSecretsId unchanged). -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Database</RootNamespace>
+  </PropertyGroup>
+</Project>

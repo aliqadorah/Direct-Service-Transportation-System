@@ -3,6 +3,9 @@
     <RootNamespace>DirectService.Transportation.Domain.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Domain\DirectService.Transportation.Domain.csproj" />
   </ItemGroup>
 </Project>

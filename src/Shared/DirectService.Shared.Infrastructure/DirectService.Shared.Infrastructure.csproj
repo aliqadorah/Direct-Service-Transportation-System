@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared technical infrastructure (design a.1): filled from Stage 2 session 3 (composed MasterDbContext, interceptors, numbering, record
+       locks, URL tokens, audit, files, printing, exports, report-builder engine …). References SharedKernel only among Shared/Platform/modules. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Shared.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

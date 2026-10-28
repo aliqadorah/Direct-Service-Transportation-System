@@ -65,8 +65,8 @@ public sealed class VoucherPrintService(IAppDbContext db, IRequestContext ctx, M
             [
                 // Revision 6: every invoice the receipt is applied to with its amount, and the part left on account.
                 Field(L("عن", "For"), r.Allocations is not { Count: > 0 } list ? E(L("دفعة على الحساب", "On account"))
-                    : string.Join(" · ", list.Select(a => $"{L("الفاتورة", "Invoice")} {N(a.Invoice.Number)}: {N(Accounting.Money.Format(a.Amount))}"))
-                      + (r.Unallocated > 0 ? $" · {E(L("على الحساب", "On account"))}: {N(Accounting.Money.Format(r.Unallocated))}" : string.Empty)),
+                    : string.Join(" · ", list.Select(a => $"{L("الفاتورة", "Invoice")} {N(a.Invoice.Number)}: {N(Money.Format(a.Amount))}"))
+                      + (r.Unallocated > 0 ? $" · {E(L("على الحساب", "On account"))}: {N(Money.Format(r.Unallocated))}" : string.Empty)),
                 Field(L("عدد المرفقات", "Attachments"), N(r.AttachmentsCount.ToString(CultureInfo.InvariantCulture))),
                 r.Notes is null ? string.Empty : Field(L("ملاحظات", "Notes"), E(r.Notes)),
             ],

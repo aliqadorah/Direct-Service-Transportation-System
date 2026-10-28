@@ -134,7 +134,7 @@ internal static class MasterDataEndpoints
         MapExchange(g, "materials", null);
     }
 
-    private static void MapSites<TSite>(RouteGroupBuilder g, string kind) where TSite : Domain.Common.AuditableEntity, Domain.Common.ISite, new()
+    private static void MapSites<TSite>(RouteGroupBuilder g, string kind) where TSite : AuditableEntity, Domain.Common.ISite, new()
     {
         g.MapGet("/", async ([AsParameters] MasterListQuery q, SiteService<TSite> svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.ListAsync(q, ct).ConfigureAwait(false))).RequireMember();

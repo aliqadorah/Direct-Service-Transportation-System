@@ -3,6 +3,12 @@
     <RootNamespace>DirectService.Transportation.Infrastructure.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Testing" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
+    <!-- Shared helpers: DatabaseFixture, the Microsoft Graph stand-in. -->
+    <ProjectReference Include="..\DirectService.Testing\DirectService.Testing.csproj" />
   </ItemGroup>
 </Project>

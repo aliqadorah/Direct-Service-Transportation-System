@@ -38,6 +38,9 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
     <!-- Tests -->
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <!-- The shared test helper library (tests/DirectService.Testing) is not a test project: only the parts of xunit.v3 it uses, same version. -->
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3.assert" Version="4.0.1" />
     <!-- Source guard of the tenant filters (DT-217): syntax trees only. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Include="bunit" Version="2.11.3" />

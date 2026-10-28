@@ -62,7 +62,7 @@ public sealed class UserAdminService(
     public async Task<UserListItem> CreateWithPasswordAsync(CreateUserRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var fullName = Common.TextNormalizer.CleanText(r.FullName);
+        var fullName = TextNormalizer.CleanText(r.FullName);
         var userName = r.UserName?.Trim();
         var mail = string.IsNullOrWhiteSpace(r.Email) ? null : r.Email.Trim();
         new Validator()
@@ -145,7 +145,7 @@ public sealed class UserAdminService(
     {
         ArgumentNullException.ThrowIfNull(r);
         var user = await AccountTargetAsync(userToken, ct).ConfigureAwait(false);
-        var fullName = Common.TextNormalizer.CleanText(r.FullName);
+        var fullName = TextNormalizer.CleanText(r.FullName);
         var userName = string.IsNullOrWhiteSpace(r.UserName) ? null : r.UserName.Trim();
         new Validator()
             .Require("fullName", fullName).MaxLength("fullName", fullName, 150)

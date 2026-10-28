@@ -32,7 +32,7 @@ public sealed class StoredNameTests
         Assert.True(missing.Count == 0, "Entities without [StoredName] / [TokenLabel] (design §e, E-1/E-3): " + string.Join(", ", missing));
 
         // Every entity class of the domain is in the EF model, so the model-driven maps miss none.
-        var domainEntities = typeof(AuditableEntity).Assembly.GetTypes().Where(t => t is { IsClass: true, IsAbstract: false } && StoredNames.IsPinned(t));
+        var domainEntities = Golden.AppAssemblies.SelectMany(a => a.GetTypes()).Where(t => t is { IsClass: true, IsAbstract: false } && StoredNames.IsPinned(t));
         Assert.Empty(domainEntities.Except(ModelTypes).Select(t => t.FullName));
 
         foreach (var (what, of) in new (string, Func<Type, string>)[] { ("stored name", StoredNames.Of), ("token label", StoredNames.TokenLabelOf) })

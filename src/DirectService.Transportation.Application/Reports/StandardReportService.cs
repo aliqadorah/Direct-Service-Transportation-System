@@ -262,7 +262,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
                 To = t.UnloadingSite.Name, t.CustomerPrice, Tariff = t.TariffPrice!.Value, t.BillingQty })
             .Take(SheetData.MaxRows + 1).ToListAsync(ct).ConfigureAwait(false);
         var decimals = await ledger_Decimals(ct).ConfigureAwait(false);
-        var items = rows.Take(SheetData.MaxRows).Select(x => (x, Amount: Accounting.Money.Round((x.CustomerPrice - x.Tariff) * x.BillingQty, decimals))).ToList();
+        var items = rows.Take(SheetData.MaxRows).Select(x => (x, Amount: Money.Round((x.CustomerPrice - x.Tariff) * x.BillingQty, decimals))).ToList();
         var loss = items.Where(i => i.Amount < 0).Sum(i => i.Amount);
         var excess = items.Where(i => i.Amount > 0).Sum(i => i.Amount);
         var filters = PeriodFilters(f);
@@ -274,7 +274,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             items.Select(i => new ResultRow([i.x.ReceiptNo, i.x.TripDate, side == "partner" ? i.x.Partner : i.x.Customer, i.x.From + " → " + i.x.To, i.x.CustomerPrice, i.x.Tariff,
                 i.x.BillingQty, i.Amount], new DrillLink("trip", support.Token<Trip>(i.x.PublicId), null))).ToList(),
             [L("الصافي", "Net"), null, null, null, null, null, null, loss + excess],
-            L("الخسارة ", "Loss ") + Accounting.Money.Format(loss) + " · " + L("الزيادة ", "Excess ") + Accounting.Money.Format(excess), rows.Count > SheetData.MaxRows);
+            L("الخسارة ", "Loss ") + Money.Format(loss) + " · " + L("الزيادة ", "Excess ") + Money.Format(excess), rows.Count > SheetData.MaxRows);
     }
 
     private async Task<int> ledger_Decimals(CancellationToken ct) =>
@@ -511,7 +511,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
             [C("date", "التاريخ", "Date", "date"), C("document", "المستند", "Document"), C("description", "البيان", "Description"), C("debit", "مدين", "Debit", "money"),
              C("credit", "دائن", "Credit", "money"), C("balance", "الرصيد", "Balance", "money")],
             rows, [null, null, L("الإجمالي والرصيد الختامي", "Totals and closing balance"), events.Sum(e => e.Debit), events.Sum(e => e.Credit), running],
-            L("مقبوضات غير مخصصة حتى نهاية الفترة: ", "Unapplied receipts up to the period end: ") + Accounting.Money.Format(unapplied), false);
+            L("مقبوضات غير مخصصة حتى نهاية الفترة: ", "Unapplied receipts up to the period end: ") + Money.Format(unapplied), false);
     }
 
     // ============================================================ RPT-24 supplier statement (owner decision 17 Oct 2026)

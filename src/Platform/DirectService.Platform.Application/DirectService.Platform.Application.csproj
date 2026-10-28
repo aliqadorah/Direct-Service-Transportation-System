@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform services (identity, tenants, subscriptions, console, system email), filled in Stage 2 session 6. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Platform.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.Platform.Domain\DirectService.Platform.Domain.csproj" />
+    <ProjectReference Include="..\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

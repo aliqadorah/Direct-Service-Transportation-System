@@ -146,7 +146,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
         var name = MasterDataSupport.Name(r.Name);
         var tax = MasterDataSupport.Compact(r.TaxNumber);
         var phone = MasterDataSupport.Compact(r.Phone);
-        var address = Common.TextNormalizer.CleanText(r.Address);
+        var address = TextNormalizer.CleanText(r.Address);
         var v = new Validator().Require("name", name).MaxLength("name", name, 200).MaxLength("taxNumber", tax, 30).MaxLength("address", address, 300)
             .Check(tax is null || tax.All(char.IsAsciiDigit), "taxNumber", ErrorCodes.ValidationFormat)
             .Check(r.PaymentTermsDays is null or (>= 0 and <= 3650), "paymentTermsDays", ErrorCodes.ValidationRange)

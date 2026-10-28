@@ -7,8 +7,24 @@
     <Project Path="src/DirectService.Transportation.Web/DirectService.Transportation.Web.csproj" />
     <Project Path="src/DirectService.Transportation.Web.Client/DirectService.Transportation.Web.Client.csproj" />
   </Folder>
+  <Folder Name="/src/Hosts/">
+    <Project Path="src/Hosts/DirectService.Database/DirectService.Database.csproj" />
+  </Folder>
+  <Folder Name="/src/Platform/">
+    <Project Path="src/Platform/DirectService.Platform.Application/DirectService.Platform.Application.csproj" />
+    <Project Path="src/Platform/DirectService.Platform.Contracts/DirectService.Platform.Contracts.csproj" />
+    <Project Path="src/Platform/DirectService.Platform.Domain/DirectService.Platform.Domain.csproj" />
+    <Project Path="src/Platform/DirectService.Platform.Infrastructure/DirectService.Platform.Infrastructure.csproj" />
+    <Project Path="src/Platform/DirectService.Platform.UI/DirectService.Platform.UI.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/DirectService.Shared.Infrastructure/DirectService.Shared.Infrastructure.csproj" />
+    <Project Path="src/Shared/DirectService.Shared.UI/DirectService.Shared.UI.csproj" />
+    <Project Path="src/Shared/DirectService.SharedKernel/DirectService.SharedKernel.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DirectService.Architecture.Tests/DirectService.Architecture.Tests.csproj" />
+    <Project Path="tests/DirectService.Testing/DirectService.Testing.csproj" />
     <Project Path="tests/DirectService.Transportation.Api.Tests/DirectService.Transportation.Api.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Application.Tests/DirectService.Transportation.Application.Tests.csproj" />
     <Project Path="tests/DirectService.Transportation.Domain.Tests/DirectService.Transportation.Domain.Tests.csproj" />

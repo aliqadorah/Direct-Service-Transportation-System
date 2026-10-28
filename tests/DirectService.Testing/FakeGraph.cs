@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace DirectService.Transportation.Tests.Email;
+namespace DirectService.Testing;
 
 /// <summary>
 /// Stands in for Microsoft sign-in and Microsoft Graph in the tests (owner rule: never a real credential, never a real email). Answers the

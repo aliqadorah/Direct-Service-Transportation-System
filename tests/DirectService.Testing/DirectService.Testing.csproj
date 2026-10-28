@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Shared test helpers (platform design i.2): DatabaseFixture, ApiFactory and its variants, captured e-mails, the Microsoft Graph stand-in,
+    TOTP and API helpers. A plain library, not a test project: its name does not end in ".Tests", so tests/Directory.Build.props gives it no
+    test runner and no test command runs it (DT-287, DT-289). The xUnit collection definitions stay in the test projects.
+  -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Testing</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DirectService.Transportation.Web\DirectService.Transportation.Web.csproj" />
+  </ItemGroup>
+</Project>

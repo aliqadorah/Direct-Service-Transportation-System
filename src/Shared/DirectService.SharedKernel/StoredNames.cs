@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 
-namespace DirectService.Transportation.Domain.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// The entity's name as stored in data (platform restructuring design §e, E-1): <c>core.AuditLogs.EntityType</c>, record locks, live

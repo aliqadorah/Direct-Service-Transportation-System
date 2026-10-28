@@ -277,7 +277,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         return account;
     }
 
-    private async Task<T> FindAsync<T>(string token, CancellationToken ct) where T : Domain.Common.AuditableEntity
+    private async Task<T> FindAsync<T>(string token, CancellationToken ct) where T : AuditableEntity
     {
         var publicId = tokens.Decode<T>(token) ?? throw Fail.NotFound();
         return await db.Set<T>().SingleOrDefaultAsync(x => x.PublicId == publicId, ct).ConfigureAwait(false) ?? throw Fail.NotFound();

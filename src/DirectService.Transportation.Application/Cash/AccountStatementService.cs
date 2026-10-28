@@ -83,9 +83,9 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
     /// <summary>DT-230: the statement text of a trip voided or made cheaper after payment, by the choice made.</summary>
     private string OverpaidText(string handling, decimal amount, string? payment) => handling switch
     {
-        CashCodes.Return => cash.En ? $"Voided / cheaper after payment: {Accounting.Money.Format(amount)} paid — the partner will return it" : $"أُلغيت أو خُفّضت بعد الدفع: {Accounting.Money.Format(amount)} مدفوع — سيعيده الشريك",
-        CashCodes.Deduct => cash.En ? $"Voided / cheaper after payment: {Accounting.Money.Format(amount)} paid — deducted from the next payment(s)" : $"أُلغيت أو خُفّضت بعد الدفع: {Accounting.Money.Format(amount)} مدفوع — يُخصم من الدفعة التالية",
-        _ => cash.En ? $"Payment {payment} was not actually made: voided ({Accounting.Money.Format(amount)})" : $"الدفعة {payment} لم تُصرف فعلاً: أُلغيت ({Accounting.Money.Format(amount)})",
+        CashCodes.Return => cash.En ? $"Voided / cheaper after payment: {Money.Format(amount)} paid — the partner will return it" : $"أُلغيت أو خُفّضت بعد الدفع: {Money.Format(amount)} مدفوع — سيعيده الشريك",
+        CashCodes.Deduct => cash.En ? $"Voided / cheaper after payment: {Money.Format(amount)} paid — deducted from the next payment(s)" : $"أُلغيت أو خُفّضت بعد الدفع: {Money.Format(amount)} مدفوع — يُخصم من الدفعة التالية",
+        _ => cash.En ? $"Payment {payment} was not actually made: voided ({Money.Format(amount)})" : $"الدفعة {payment} لم تُصرف فعلاً: أُلغيت ({Money.Format(amount)})",
     };
 
     // ============================================================ partner (FR-084, FR-088)
@@ -127,7 +127,7 @@ public sealed class AccountStatementService(IAppDbContext db, MasterDataSupport 
                     cash.En ? "Repaid by the partner" : "سداد من الشريك", p.Amount, 0)
                 : new Event(p.PaymentDate, KindPayment, p.Id, "Payment", new DocRef(support.Token<PartnerPayment>(p.PublicId), p.Number),
                     (cash.En ? "Payment" : "دفعة") + (p.DeductedAmount > 0
-                        ? (cash.En ? $" · deducted {Accounting.Money.Format(p.DeductedAmount)} paid earlier for voided / changed trips" : $" · خُصم {Accounting.Money.Format(p.DeductedAmount)} مدفوع سابقاً عن رحلات ملغاة أو معدّلة")
+                        ? (cash.En ? $" · deducted {Money.Format(p.DeductedAmount)} paid earlier for voided / changed trips" : $" · خُصم {Money.Format(p.DeductedAmount)} مدفوع سابقاً عن رحلات ملغاة أو معدّلة")
                         : string.Empty), 0, p.Amount)))
             .ToList();
         events.AddRange(await JournalEventsAsync(AccountingCodes.PartyPartner, partner.Id, t, ct).ConfigureAwait(false));

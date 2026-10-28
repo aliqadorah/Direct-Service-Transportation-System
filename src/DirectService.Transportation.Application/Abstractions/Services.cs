@@ -4,16 +4,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace DirectService.Transportation.Application.Abstractions;
 
-/// <summary>The Master Database as seen by the application layer (implemented by MasterDbContext).</summary>
-public interface IAppDbContext
-{
-    DbSet<TEntity> Set<TEntity>() where TEntity : class;
-    DatabaseFacade Database { get; }
-    ChangeTracker ChangeTracker { get; }
-    Microsoft.EntityFrameworkCore.Metadata.IModel Model { get; }
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
-}
-
 /// <summary>Hashed, entity-scoped opaque identifiers for URLs (SEC-22, ADR-07).</summary>
 public interface IUrlTokenService
 {

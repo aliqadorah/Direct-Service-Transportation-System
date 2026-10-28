@@ -70,7 +70,7 @@ public sealed class PlatformTests(ApiFactory f)
         // A sign-up user's e-mail can never be turned into a staff account by the command.
         var owner = await f.SignUpOwnerAsync();
         using var again = f.Services.CreateScope();
-        await Assert.ThrowsAsync<DirectService.Transportation.Application.Abstractions.AppException>(() => again.ServiceProvider.GetRequiredService<StaffAccountService>().CreateAsync(owner.Email, "X", CancellationToken.None));
+        await Assert.ThrowsAsync<AppException>(() => again.ServiceProvider.GetRequiredService<StaffAccountService>().CreateAsync(owner.Email, "X", CancellationToken.None));
     }
 
     private static PlanRequest Plan(string code, decimal price, int users = 10, bool active = true) => new(code, "باقة " + code, "Plan " + code, price, "Monthly", 3, users, 5000, 1024, active, null);

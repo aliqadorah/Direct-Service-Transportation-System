@@ -75,7 +75,7 @@ public sealed class PartyResolver(IAppDbContext db, IUrlTokenService tokens)
     }
 
     private async Task<(long Id, string Status)?> FindAsync<T>(string? token, Func<T, string> status, CancellationToken ct)
-        where T : Domain.Common.AuditableEntity
+        where T : AuditableEntity
     {
         var publicId = tokens.Decode<T>(token);
         if (publicId is null) return null;

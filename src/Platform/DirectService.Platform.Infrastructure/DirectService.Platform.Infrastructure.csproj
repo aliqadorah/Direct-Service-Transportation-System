@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Platform persistence configurations, identity stores, e-mail transports, billing, filled in Stage 2 session 5. -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Platform.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.Platform.Application\DirectService.Platform.Application.csproj" />
+    <ProjectReference Include="..\..\Shared\DirectService.Shared.Infrastructure\DirectService.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

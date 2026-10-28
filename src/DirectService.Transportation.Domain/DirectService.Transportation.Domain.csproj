@@ -2,4 +2,8 @@
   <PropertyGroup>
     <RootNamespace>DirectService.Transportation.Domain</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- A Domain project references SharedKernel only (platform design a.2, Architecture.Tests). -->
+    <ProjectReference Include="..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+  </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Who is acting and in which tenant/company. Drives the EF Core query filters and the
@@ -24,23 +24,4 @@ public interface IDataScope
     /// background job processing a company's queue). Dispose to restore the previous scope.
     /// </summary>
     IDisposable Use(long? tenantId, long? companyId, long? userId);
-}
-
-/// <summary>
-/// Per-operation information the audit interceptor cannot infer: the business action name
-/// (Void, Approve, Archive…) and the reason for a soft delete.
-/// </summary>
-public interface IChangeContext
-{
-    /// <summary>Records the audit action (and optional reason) for an entity changed in the current unit of work.</summary>
-    void SetAction(object entity, string action, string? reason = null);
-
-    /// <summary>The action previously set for the entity, if any.</summary>
-    string? GetAction(object entity);
-
-    /// <summary>The reason recorded with the action, if any (written to the audit log).</summary>
-    string? GetReason(object entity);
-
-    /// <summary>Clears per-save state after a successful save.</summary>
-    void Reset();
 }

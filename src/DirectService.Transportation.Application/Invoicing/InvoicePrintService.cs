@@ -93,7 +93,7 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var customer = new Customer { Name = En ? "Sample customer" : "عميل للمعاينة", TaxNumber = "000000000" };
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         InvoiceLineResponse Line(int n, string site, decimal qty) => new($"s{n}", n, new Contracts.Common.Ref($"t{n}", $"TRP-{10480 + n}"), null, qty, 6.000m,
-            Accounting.Money.Round(qty * 6.000m), 0, today, today, "10-11111", En ? "Sample driver" : "سائق", site, En ? "Port" : "الميناء", En ? "Potash" : "بوتاس", qty + 0.15m, qty);
+            Money.Round(qty * 6.000m), 0, today, today, "10-11111", En ? "Sample driver" : "سائق", site, En ? "Port" : "الميناء", En ? "Potash" : "بوتاس", qty + 0.15m, qty);
         var lines = new[] { Line(1, En ? "Site A" : "الموقع أ", 31.850m), Line(2, En ? "Site A" : "الموقع أ", 32.000m), Line(3, En ? "Site B" : "الموقع ب", 30.900m) };
         var subtotal = lines.Sum(l => l.Amount);
         var totals = InvoiceCalculator.Invoice(subtotal, 0, 0, company.TaxRate, company.TaxInclusive);

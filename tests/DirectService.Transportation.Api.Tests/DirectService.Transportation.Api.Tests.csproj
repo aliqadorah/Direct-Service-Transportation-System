@@ -3,13 +3,15 @@
     <RootNamespace>DirectService.Transportation.Api.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Testing" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Web\DirectService.Transportation.Web.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- The stand-in for Microsoft sign-in and Graph (system email, DT-250): no test ever reaches Microsoft. -->
-    <Compile Include="..\DirectService.Transportation.Infrastructure.Tests\Email\FakeGraph.cs" Link="FakeGraph.cs" />
+    <!-- Shared helpers: ApiFactory and its variants, captured e-mails, the Microsoft Graph stand-in (DT-250), TOTP, API helpers. -->
+    <ProjectReference Include="..\DirectService.Testing\DirectService.Testing.csproj" />
   </ItemGroup>
 </Project>

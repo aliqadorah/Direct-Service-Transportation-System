@@ -3,6 +3,9 @@
     <RootNamespace>DirectService.Transportation.Application.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="DirectService.SharedKernel" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
