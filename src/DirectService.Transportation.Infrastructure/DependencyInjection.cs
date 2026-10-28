@@ -79,7 +79,6 @@ public static class DependencyInjection
         services.AddSingleton<EInvoiceSignal>();
         services.AddSingleton<Application.Collaboration.IExportQueue, Files.ChannelExportQueue>();
         services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
-        services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         // System email (DT-250…DT-253): every email into the outbox; the worker sends it with the active mode's transport.
         services.AddOptions<Application.Platform.SystemEmailOptions>().Bind(configuration.GetSection(Application.Platform.SystemEmailOptions.Section));
         services.AddScoped<IEmailSender, OutboxEmailSender>();

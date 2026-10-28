@@ -89,3 +89,13 @@ public interface IFileStore
     /// <summary>Total bytes of the files under the prefix (storage usage, P-07).</summary>
     Task<long> SizeAsync(string prefix, CancellationToken ct);
 }
+
+/// <summary>
+/// Display names of users by id, for the shared engines that show who did something (the holder of a record lock). Users are Platform rows,
+/// so Shared reads them only through this interface (Stage 2 session 6, DT-312).
+/// </summary>
+public interface IUserNames
+{
+    /// <summary>The user's full name, whatever their tenant or state (the same lookup the lock service made before).</summary>
+    Task<string> FullNameAsync(long userId, CancellationToken ct);
+}

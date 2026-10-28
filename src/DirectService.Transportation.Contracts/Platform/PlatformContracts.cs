@@ -43,8 +43,3 @@ public sealed record NumberSequenceRequest(string Prefix, int Digits, long NextN
 
 /// <summary>FR-171: irreversible; <see cref="Confirm"/> must be true.</summary>
 public sealed record MigrationCompleteRequest(bool Confirm);
-
-// ---- record locks (FR-186)
-
-public sealed record AcquireLockRequest(string EntityType, string Id);
-public sealed record LockResponse(string Id, string HolderName, bool HeldByMe, DateTime AcquiredAt);

@@ -1,16 +1,13 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Configuration;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Cfg;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Configuration;
+namespace DirectService.Shared.Infrastructure.Configuration;
 
 /// <summary>
 /// Saved column layouts of list screens (FR-183, FR-165): the company default (UserId NULL, settings.manage) and each user's
-/// personal view (any member). The effective view is the personal one, else the company default.
+/// personal view (any member). The effective view is the personal one, else the company default. A shared engine: the view keys belong to
+/// the modules (<c>TRN.Trips</c>, E-15) and are stored as they are (Stage 2 session 6, DT-311).
 /// </summary>
 public sealed partial class ColumnViewService(IAppDbContext db, IRequestContext ctx)
 {
@@ -60,9 +57,9 @@ public sealed partial class ColumnViewService(IAppDbContext db, IRequestContext 
         EnsureKey(viewKey);
         var columns = r.Columns ?? [];
         new Validator()
-            .Check(columns.Count is > 0 and <= MaxColumns, "columns", ErrorCodes.ValidationRange)
+            .Check(columns.Count is > 0 and <= MaxColumns, "columns", SharedErrorCodes.ValidationRange)
             .Check(columns.All(c => c.Key is not null && ColumnKeyPattern().IsMatch(c.Key)), "columns")
-            .Check(columns.All(c => c.Width is null or (>= 40 and <= 1000)), "columns", ErrorCodes.ValidationRange)
+            .Check(columns.All(c => c.Width is null or (>= 40 and <= 1000)), "columns", SharedErrorCodes.ValidationRange)
             .Check(columns.Select(c => c.Key).Distinct(StringComparer.Ordinal).Count() == columns.Count, "columns")
             .ThrowIfInvalid();
         var json = JsonSerializer.Serialize(columns.Select(c => new ColumnSetting(c.Key, c.Width)).ToList(), Json);
@@ -70,7 +67,7 @@ public sealed partial class ColumnViewService(IAppDbContext db, IRequestContext 
         if (view is null)
         {
             if (userId is not null && await db.Set<TableColumnView>().CountAsync(v => v.UserId == userId, ct).ConfigureAwait(false) >= MaxViewsPerUser)
-                throw Fail.Field("viewKey", ErrorCodes.ValidationRange, new FieldRef("viewKey"));
+                throw Fail.Field("viewKey", SharedErrorCodes.ValidationRange, new FieldRef("viewKey"));
             view = new TableColumnView { ViewKey = viewKey, UserId = userId, Columns = json };
             db.Set<TableColumnView>().Add(view);
         }

@@ -3,10 +3,8 @@ using System.Text;
 using ClosedXML.Excel;
 using CsvHelper;
 using CsvHelper.Configuration;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
 
-namespace DirectService.Transportation.Infrastructure.Files;
+namespace DirectService.Shared.Infrastructure.Files;
 
 /// <summary>ClosedXML (.xlsx) and CsvHelper (CSV) implementation of <see cref="ISpreadsheetService"/> (ADR-13).</summary>
 public sealed class SpreadsheetService : ISpreadsheetService
@@ -14,17 +12,17 @@ public sealed class SpreadsheetService : ISpreadsheetService
     public SheetData Read(Stream content, string fileName, long length)
     {
         ArgumentNullException.ThrowIfNull(content);
-        if (length > SheetData.MaxBytes) throw new AppException(ErrorCodes.ImportTooLarge, 400, "file", "10 MB");
+        if (length > SheetData.MaxBytes) throw new AppException(SharedErrorCodes.ImportTooLarge, 400, "file", "10 MB");
         var extension = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
         var data = extension switch
         {
             ".xlsx" => ReadXlsx(content),
             ".csv" or ".txt" or ".tsv" => ReadCsv(content),
-            _ => throw new AppException(ErrorCodes.ImportFileType, 400, "file"),
+            _ => throw new AppException(SharedErrorCodes.ImportFileType, 400, "file"),
         };
-        if (data.Rows.Count == 0) throw new AppException(ErrorCodes.ImportEmpty, 422, "file");
+        if (data.Rows.Count == 0) throw new AppException(SharedErrorCodes.ImportEmpty, 422, "file");
         if (data.Rows.Count > SheetData.MaxRows)
-            throw new AppException(ErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
+            throw new AppException(SharedErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
         return data;
     }
 
@@ -45,18 +43,18 @@ public sealed class SpreadsheetService : ISpreadsheetService
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            throw new AppException(ErrorCodes.ImportFileType, 400, "file");
+            throw new AppException(SharedErrorCodes.ImportFileType, 400, "file");
         }
         using (workbook)
         {
-            var sheet = workbook.Worksheets.FirstOrDefault() ?? throw new AppException(ErrorCodes.ImportEmpty, 422, "file");
+            var sheet = workbook.Worksheets.FirstOrDefault() ?? throw new AppException(SharedErrorCodes.ImportEmpty, 422, "file");
             var used = sheet.RangeUsed();
-            if (used is null) throw new AppException(ErrorCodes.ImportEmpty, 422, "file");
+            if (used is null) throw new AppException(SharedErrorCodes.ImportEmpty, 422, "file");
             var lastColumn = used.LastColumn().ColumnNumber();
-            if (lastColumn > MaxColumns) throw new AppException(ErrorCodes.ImportTooLarge, 422, "file", $"{MaxColumns} columns");
+            if (lastColumn > MaxColumns) throw new AppException(SharedErrorCodes.ImportTooLarge, 422, "file", $"{MaxColumns} columns");
             var lastRow = used.LastRow().RowNumber();
             if (lastRow - 1 > SheetData.MaxRows)
-                throw new AppException(ErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
+                throw new AppException(SharedErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
             var headers = Enumerable.Range(1, lastColumn).Select(c => Text(sheet.Cell(1, c)) ?? string.Empty).ToList();
             var rows = new List<SheetRow>();
             for (var r = 2; r <= lastRow; r++)
@@ -65,7 +63,7 @@ public sealed class SpreadsheetService : ISpreadsheetService
                 for (var c = 1; c <= lastColumn; c++)
                 {
                     var cell = sheet.Cell(r, c);
-                    if (cell.HasFormula) throw new AppException(ErrorCodes.ImportFormula, 422, "file", cell.Address.ToString());
+                    if (cell.HasFormula) throw new AppException(SharedErrorCodes.ImportFormula, 422, "file", cell.Address.ToString());
                     cells.Add(Text(cell));
                 }
                 if (cells.Any(v => !string.IsNullOrWhiteSpace(v))) rows.Add(new SheetRow(r, cells));
@@ -87,12 +85,12 @@ public sealed class SpreadsheetService : ISpreadsheetService
                 total += entry.Length;
                 var ratio = entry.CompressedLength == 0 ? 0 : entry.Length / entry.CompressedLength;
                 if (total > MaxUnpackedBytes || (entry.Length > 1024 * 1024 && ratio > 200))
-                    throw new AppException(ErrorCodes.ImportTooLarge, 422, "file", "10 MB");
+                    throw new AppException(SharedErrorCodes.ImportTooLarge, 422, "file", "10 MB");
             }
         }
         catch (InvalidDataException)
         {
-            throw new AppException(ErrorCodes.ImportFileType, 400, "file");
+            throw new AppException(SharedErrorCodes.ImportFileType, 400, "file");
         }
     }
 
@@ -112,7 +110,7 @@ public sealed class SpreadsheetService : ISpreadsheetService
         using var reader = new StreamReader(content, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var config = new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, DetectDelimiter = true, BadDataFound = null };
         using var csv = new CsvReader(reader, config);
-        if (!csv.Read() || !csv.ReadHeader()) throw new AppException(ErrorCodes.ImportEmpty, 422, "file");
+        if (!csv.Read() || !csv.ReadHeader()) throw new AppException(SharedErrorCodes.ImportEmpty, 422, "file");
         var headers = csv.HeaderRecord?.Select(h => h.Trim()).ToList() ?? [];
         var rows = new List<SheetRow>();
         var rowNumber = 1;
@@ -120,7 +118,7 @@ public sealed class SpreadsheetService : ISpreadsheetService
         {
             rowNumber++;
             if (rows.Count >= SheetData.MaxRows)
-                throw new AppException(ErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
+                throw new AppException(SharedErrorCodes.ImportTooLarge, 422, "file", SheetData.MaxRows.ToString("N0", CultureInfo.InvariantCulture));
             var cells = Enumerable.Range(0, headers.Count).Select(i =>
             {
                 var v = csv.GetField(i)?.Trim();
@@ -128,7 +126,7 @@ public sealed class SpreadsheetService : ISpreadsheetService
             }).ToList();
             // Values only (SEC-13): a leading = or @, or + / - not followed by a number, is a formula in spreadsheet programs.
             var formula = cells.FindIndex(IsFormula);
-            if (formula >= 0) throw new AppException(ErrorCodes.ImportFormula, 422, "file", $"{headers[formula]}{rowNumber}");
+            if (formula >= 0) throw new AppException(SharedErrorCodes.ImportFormula, 422, "file", $"{headers[formula]}{rowNumber}");
             if (cells.Any(v => v is not null)) rows.Add(new SheetRow(rowNumber, cells));
         }
         return new SheetData(headers, rows);

@@ -1,3 +1,5 @@
+using DirectService.Shared.Infrastructure.Collaboration;
+using DirectService.Shared.Infrastructure.Configuration;
 using DirectService.Shared.Infrastructure.Files;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
@@ -13,7 +15,8 @@ public static class DependencyInjection
 {
     /// <summary>
     /// The shared building blocks every module uses: the Shared part of the model (cfg tables), the save interceptors (audit, live
-    /// changes), URL tokens, numbering, the entity resolver, PDF and QR rendering and the file store. The host registers the DbContext.
+    /// changes), URL tokens, numbering, the entity resolver, PDF and QR rendering, the file store, spreadsheets, column views and record
+    /// locks (the holder's name through a module's <see cref="IUserNames"/>). The host registers the DbContext.
     /// </summary>
     public static IServiceCollection AddSharedInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
@@ -30,6 +33,10 @@ public static class DependencyInjection
         services.AddSingleton<IPdfRenderer, ChromiumPdfRenderer>();
         services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
         services.AddSingleton<IFileStore, LocalFileStore>();
+        services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
+        services.AddScoped<ColumnViewService>();
+        services.AddScoped<RecordLockService>();
+        services.AddScoped<IRecordLockGuard>(sp => sp.GetRequiredService<RecordLockService>());
         return services;
     }
 }

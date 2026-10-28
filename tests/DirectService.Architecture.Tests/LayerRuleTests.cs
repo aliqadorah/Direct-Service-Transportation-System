@@ -4,13 +4,14 @@ using System.Xml.Linq;
 namespace DirectService.Architecture.Tests;
 
 /// <summary>
-/// Layer and module rules of the platform design (a.2), first set (Stage 2 session 2, DT-290): SharedKernel references nothing of the
-/// solution; Shared.* references no Platform or module project; a Domain project references SharedKernel only. Checked on the project files
+/// Layer and module rules of the platform design (a.2), first set (Stage 2 session 2, DT-290): SharedKernel references only the browser-safe
+/// Shared.Contracts (DT-309); Shared.* references no Platform or module project; a Domain project references SharedKernel only. Checked on the project files
 /// (every project under src/, empty ones included) and on the compiled assemblies.
 /// </summary>
 public sealed class LayerRuleTests
 {
     private const string Kernel = "DirectService.SharedKernel";
+    private const string SharedContracts = "DirectService.Shared.Contracts";
 
     /// <summary>Every project under src/ with the names of the projects it references.</summary>
     private static readonly Dictionary<string, List<string>> Projects =
@@ -32,7 +33,7 @@ public sealed class LayerRuleTests
     {
         string[] expected =
         [
-            Kernel, "DirectService.Shared.Infrastructure", "DirectService.Shared.UI",
+            Kernel, SharedContracts, "DirectService.Shared.Infrastructure", "DirectService.Shared.UI",
             "DirectService.Platform.Domain", "DirectService.Platform.Application", "DirectService.Platform.Infrastructure",
             "DirectService.Platform.Contracts", "DirectService.Platform.UI", "DirectService.Database",
         ];
@@ -49,11 +50,35 @@ public sealed class LayerRuleTests
     }
 
     [Fact]
-    public void SharedKernel_references_no_project_of_the_solution()
+    public void SharedKernel_references_only_the_shared_contracts()
     {
-        Only(Kernel, _ => false, "SharedKernel references nothing of the solution");
+        // DT-309: the browser-safe Shared.Contracts (FieldRef for Validator) is the one project SharedKernel may use.
+        Only(Kernel, r => r == SharedContracts, "SharedKernel references only Shared.Contracts");
         var compiled = typeof(StoredNames).Assembly.GetReferencedAssemblies().Select(a => a.Name!).Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
-        Assert.True(compiled.Count == 0, "The compiled SharedKernel references " + string.Join(", ", compiled));
+        Assert.True(compiled.All(n => n == SharedContracts), "The compiled SharedKernel references " + string.Join(", ", compiled));
+    }
+
+    [Fact]
+    public void Shared_contracts_are_browser_safe()
+    {
+        // No project and no package: the browser app loads it (DT-309).
+        Only(SharedContracts, _ => false, "Shared.Contracts references nothing of the solution");
+        var file = Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "src", "Shared", SharedContracts), "*.csproj").Single();
+        Assert.Empty(XDocument.Load(file).Descendants("PackageReference"));
+        var compiled = typeof(FieldRef).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => !n.StartsWith("System", StringComparison.Ordinal) && n != "netstandard" && n != "mscorlib").ToList();
+        Assert.True(compiled.Count == 0, "The compiled Shared.Contracts references " + string.Join(", ", compiled));
+    }
+
+    [Fact]
+    public void The_browser_app_does_not_receive_SharedKernel_through_the_contracts()
+    {
+        // Transportation.Contracts uses only the constants of SharedErrorCodes; its reference is private (DT-310).
+        var contracts = XDocument.Load(Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "src", "DirectService.Transportation.Contracts"), "*.csproj").Single());
+        var kernel = contracts.Descendants("ProjectReference").Single(r => r.Attribute("Include")!.Value.Contains(Kernel, StringComparison.Ordinal));
+        Assert.Equal("all", kernel.Attribute("PrivateAssets")?.Value);
+        var compiled = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes).Assembly.GetReferencedAssemblies().Select(a => a.Name!);
+        Assert.DoesNotContain(Kernel, compiled);
     }
 
     [Fact]
@@ -83,5 +108,18 @@ public sealed class LayerRuleTests
         // AppException moved to SharedKernel without the error catalog of Contracts; its default code must stay the catalog's.
         Assert.Equal(DirectService.Transportation.Contracts.Errors.ErrorCodes.ValidationFailed, AppException.ValidationFailedCode);
         Assert.Equal(AppException.ValidationFailedCode, new AppException().Code);
+    }
+
+    [Fact]
+    public void Every_shared_error_code_is_in_the_error_catalog_under_the_same_name()
+    {
+        // DT-310: each shared code is defined once (SharedErrorCodes) and ErrorCodes names it; the catalogue holds both messages.
+        var catalog = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes);
+        foreach (var f in typeof(SharedErrorCodes).GetFields().Where(f => f.IsLiteral))
+        {
+            var value = (string)f.GetValue(null)!;
+            Assert.Equal(value, (string?)catalog.GetField(f.Name)?.GetValue(null));
+            Assert.True(DirectService.Transportation.Contracts.Errors.ErrorCatalog.IsKnown(value), $"{value} has no messages");
+        }
     }
 }

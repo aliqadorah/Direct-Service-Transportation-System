@@ -1,9 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Building blocks every project may use (platform design a.1/a.2): request context, data scopes, AppException, TextNormalizer, Money,
-       AuditableEntity and the scope interfaces, the stored-name pins. References no project of the solution (Architecture.Tests). -->
+  <!-- Building blocks every project may use (platform design a.1/a.2): request context, data scopes, AppException, Fail / Validator, the
+       shared error codes, TextNormalizer, Money, AuditableEntity and the scope interfaces, the stored-name pins. References only the
+       browser-safe Shared.Contracts (FieldRef; DT-309, Architecture.Tests). -->
   <PropertyGroup>
     <RootNamespace>DirectService.SharedKernel</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.Shared.Contracts\DirectService.Shared.Contracts.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <!-- IAppDbContext exposes EF Core types (DbSet, DatabaseFacade, IModel). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />

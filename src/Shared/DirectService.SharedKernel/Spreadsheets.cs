@@ -1,6 +1,4 @@
-using DirectService.Transportation.Application.Common;
-
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Reads and writes tabular files (ADR-13): .xlsx (first worksheet) and CSV. Reading takes cell values only and

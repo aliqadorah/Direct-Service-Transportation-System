@@ -19,8 +19,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <PackageReference Include="ClosedXML" />
-    <PackageReference Include="CsvHelper" />
     <!-- System email, Microsoft 365 (DT-250): the Entra client-secret token for Microsoft Graph (already in the graph through Microsoft.Data.SqlClient). -->
     <PackageReference Include="Azure.Identity" />
   </ItemGroup>

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Request and response types of the shared engines (column views, record locks, field references …) used by the server and the browser
+       app (Stage 2 session 6, owner decision of 28 Oct 2026, DT-309). Browser-safe: no project or package reference (Architecture.Tests). -->
+  <PropertyGroup>
+    <RootNamespace>DirectService.Shared.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

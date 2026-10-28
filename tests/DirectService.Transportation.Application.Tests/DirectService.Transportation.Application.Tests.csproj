@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Shared.Contracts" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />

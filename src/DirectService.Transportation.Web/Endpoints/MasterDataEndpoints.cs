@@ -1,3 +1,4 @@
+using DirectService.Shared.Infrastructure.Configuration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;

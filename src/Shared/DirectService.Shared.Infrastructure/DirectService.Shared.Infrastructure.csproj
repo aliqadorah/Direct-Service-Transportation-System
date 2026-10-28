@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Shared.Contracts" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
@@ -19,6 +20,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="PuppeteerSharp" />
     <PackageReference Include="QRCoder" />
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="CsvHelper" />
   </ItemGroup>
   <ItemGroup>
     <!-- The PDF engine's test hook (a browser that dies during a print, DT-222). -->

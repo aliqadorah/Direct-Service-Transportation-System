@@ -36,16 +36,6 @@ public sealed record FormField(
 
 public sealed record FormConfigResponse(string EntityType, IReadOnlyList<FormField> Fields);
 
-// ---------------------------------------------------------------- column views (FR-183)
-
-/// <summary>One visible column of a list, in order, with an optional width in pixels.</summary>
-public sealed record ColumnSetting(string? Key, int? Width);
-
-public sealed record ColumnViewRequest(IReadOnlyList<ColumnSetting>? Columns);
-
-/// <summary>The columns a user sees: personal view, else the company default, else none (the app's built-in default).</summary>
-public sealed record ColumnViewResponse(string ViewKey, string Source, IReadOnlyList<ColumnSetting> Columns, IReadOnlyList<ColumnSetting>? CompanyDefault);
-
 /// <summary>Custom field types (cfg.CustomFieldDefinitions.FieldType, CHECK constraint values).</summary>
 public static class CustomFieldTypes
 {

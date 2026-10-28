@@ -47,8 +47,7 @@ public static class DependencyInjection
         services.AddScoped<CompanyProvisioningService>();
         services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
-        services.AddScoped<RecordLockService>();
-        services.AddScoped<IRecordLockGuard>(sp => sp.GetRequiredService<RecordLockService>());
+        services.AddScoped<IUserNames, Identity.UserNames>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
 
         // Accounting core and posting engine (B2)
@@ -76,7 +75,6 @@ public static class DependencyInjection
         // Master data and field configuration (B3)
         services.AddScoped<CustomFieldService>();
         services.AddScoped<StandardFieldService>();
-        services.AddScoped<ColumnViewService>();
         services.AddScoped<MasterDataSupport>();
         services.AddScoped<Audit.AuditDescriber>();
         services.AddScoped<DriverService>();

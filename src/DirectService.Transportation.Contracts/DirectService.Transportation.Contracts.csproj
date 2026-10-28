@@ -2,4 +2,13 @@
   <PropertyGroup>
     <RootNamespace>DirectService.Transportation.Contracts</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Using Include="DirectService.Shared.Contracts" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\DirectService.Shared.Contracts\DirectService.Shared.Contracts.csproj" />
+    <!-- Only the constants of SharedErrorCodes (compiled into this assembly as values). Private, so the browser app never receives
+         SharedKernel or EF Core through the contracts (DT-288, DT-310). -->
+    <ProjectReference Include="..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

@@ -9,6 +9,10 @@
     <NoWarn>$(NoWarn);CS8669</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Using Include="DirectService.Shared.Contracts" />
+  </ItemGroup>
+
   <!-- The UI references only the contracts, so it can reach the data through the REST API alone (ADR-02, step 2 §4). -->
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Contracts\DirectService.Transportation.Contracts.csproj" />

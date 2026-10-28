@@ -1,3 +1,4 @@
+using DirectService.Shared.Infrastructure.Collaboration;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Domain.Cfg;

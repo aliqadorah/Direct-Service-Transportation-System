@@ -1,4 +1,5 @@
 using System.Globalization;
+using DirectService.SharedKernel;
 
 namespace DirectService.Transportation.Contracts.Errors;
 
@@ -325,25 +326,28 @@ public static class ErrorCatalog
     public static IEnumerable<string> Codes => Messages.Keys;
 }
 
-/// <summary>Problem codes returned in the problem-details "code" field.</summary>
+/// <summary>
+/// Problem codes returned in the problem-details "code" field. The codes of the shared building blocks are defined once in
+/// <see cref="SharedErrorCodes"/> (SharedKernel) and named here under the same names (DT-310).
+/// </summary>
 public static class ErrorCodes
 {
-    public const string ValidationRequired = "validation.required";
-    public const string ValidationFormat = "validation.format";
-    public const string ValidationRange = "validation.range";
-    public const string ValidationFailed = "validation.failed";
-    public const string Unauthenticated = "auth.unauthenticated";
-    public const string Forbidden = "auth.forbidden";
-    public const string NotFound = "notFound";
+    public const string ValidationRequired = SharedErrorCodes.ValidationRequired;
+    public const string ValidationFormat = SharedErrorCodes.ValidationFormat;
+    public const string ValidationRange = SharedErrorCodes.ValidationRange;
+    public const string ValidationFailed = SharedErrorCodes.ValidationFailed;
+    public const string Unauthenticated = SharedErrorCodes.Unauthenticated;
+    public const string Forbidden = SharedErrorCodes.Forbidden;
+    public const string NotFound = SharedErrorCodes.NotFound;
     public const string TenantReadOnly = "tenant.readOnly";
     public const string CompanyArchived = "company.archived";
     public const string SupportReadOnly = "support.readOnly";
-    public const string ConcurrencyConflict = "concurrency.conflict";
-    public const string DuplicateKey = "duplicate.key";
+    public const string ConcurrencyConflict = SharedErrorCodes.ConcurrencyConflict;
+    public const string DuplicateKey = SharedErrorCodes.DuplicateKey;
     public const string PlanLimitReached = "plan.limitReached";
-    public const string LockHeld = "lock.held";
+    public const string LockHeld = SharedErrorCodes.LockHeld;
     public const string PeriodClosed = "period.closed";
-    public const string RateLimited = "rateLimited";
+    public const string RateLimited = SharedErrorCodes.RateLimited;
     public const string SignInFailed = "auth.signInFailed";
     public const string SignInLocked = "auth.locked";
     public const string EmailNotConfirmed = "auth.emailNotConfirmed";
@@ -449,13 +453,13 @@ public static class ErrorCodes
     public const string PeriodAlreadyClosed = "period.alreadyClosed";
     public const string PeriodNotClosed = "period.notClosed";
     public const string PeriodChecksPending = "period.checksPending";
-    public const string ImportFileType = "import.fileType";
-    public const string ImportTooLarge = "import.tooLarge";
+    public const string ImportFileType = SharedErrorCodes.ImportFileType;
+    public const string ImportTooLarge = SharedErrorCodes.ImportTooLarge;
     public const string PrintoutTooLarge = "export.printoutTooLarge";
-    public const string ImportEmpty = "import.empty";
-    public const string ImportMissingColumn = "import.missingColumn";
+    public const string ImportEmpty = SharedErrorCodes.ImportEmpty;
+    public const string ImportMissingColumn = SharedErrorCodes.ImportMissingColumn;
     public const string ImportHasErrors = "import.hasErrors";
-    public const string ImportFormula = "import.formula";
+    public const string ImportFormula = SharedErrorCodes.ImportFormula;
     public const string ImportDuplicate = "import.duplicate";
     public const string ImportUnknown = "import.unknown";
     public const string ImportInvalid = "import.invalid";

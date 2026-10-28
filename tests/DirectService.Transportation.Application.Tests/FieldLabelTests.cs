@@ -22,6 +22,13 @@ public sealed partial class FieldLabelTests
     [GeneratedRegex(@"\{[^}]+\}")]
     private static partial Regex Hole();
 
+    // The server code that names fields; the Shared projects hold the engines moved out of Application (Stage 2 session 6, DT-311).
+    private static readonly string[] ServerProjects =
+    [
+        "DirectService.Transportation.Application", "DirectService.Transportation.Web",
+        Path.Combine("Shared", "DirectService.SharedKernel"), Path.Combine("Shared", "DirectService.Shared.Infrastructure"),
+    ];
+
     private static string Root()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -32,7 +39,7 @@ public sealed partial class FieldLabelTests
     public static TheoryData<string> UsedFields()
     {
         var found = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (var project in new[] { "DirectService.Transportation.Application", "DirectService.Transportation.Web" })
+        foreach (var project in ServerProjects)
         {
             foreach (var file in Directory.EnumerateFiles(Path.Combine(Root(), project), "*.cs", SearchOption.AllDirectories))
             {
@@ -127,7 +134,7 @@ public sealed partial class FieldLabelTests
     public void No_service_passes_its_field_name_as_a_plain_string_argument()
     {
         var found = new List<string>();
-        foreach (var project in new[] { "DirectService.Transportation.Application", "DirectService.Transportation.Web" })
+        foreach (var project in ServerProjects)
             foreach (var file in Directory.EnumerateFiles(Path.Combine(Root(), project), "*.cs", SearchOption.AllDirectories))
             {
                 if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)) continue;

@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Bunit" />
+    <Using Include="DirectService.Shared.Contracts" />
   </ItemGroup>
 </Project>

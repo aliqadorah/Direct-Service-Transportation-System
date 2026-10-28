@@ -18,6 +18,7 @@
     <Project Path="src/Platform/DirectService.Platform.UI/DirectService.Platform.UI.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/DirectService.Shared.Contracts/DirectService.Shared.Contracts.csproj" />
     <Project Path="src/Shared/DirectService.Shared.Infrastructure/DirectService.Shared.Infrastructure.csproj" />
     <Project Path="src/Shared/DirectService.Shared.UI/DirectService.Shared.UI.csproj" />
     <Project Path="src/Shared/DirectService.SharedKernel/DirectService.SharedKernel.csproj" />
