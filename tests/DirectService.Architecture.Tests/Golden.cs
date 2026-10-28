@@ -58,7 +58,7 @@ internal static class Golden
     /// <summary>Every application assembly (all modules), wherever a constant moves to.</summary>
     public static IReadOnlyList<Assembly> AppAssemblies =>
     [
-        typeof(EntityTypeMap).Assembly,     // Application
+        typeof(DataScope).Assembly,         // Application
         typeof(DirectService.Transportation.Infrastructure.DependencyInjection).Assembly,
         typeof(MasterDbContext).Assembly,   // Shared.Infrastructure
         typeof(DirectService.Transportation.Web.Security.AuthSchemes).Assembly,

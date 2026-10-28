@@ -8,22 +8,6 @@ using DirectService.Transportation.Contracts.Security;
 
 namespace DirectService.Transportation.Application.Collaboration;
 
-/// <summary>Stores generated files (exports) — provider-neutral; the development implementation writes to a local folder (DEF-01).</summary>
-public interface IFileStore
-{
-    Task SaveAsync(string key, byte[] content, CancellationToken ct);
-
-    Task<IReadOnlyList<string>> ListAsync(string prefix, CancellationToken ct);
-
-    Task<byte[]?> ReadAsync(string key, CancellationToken ct);
-
-    /// <summary>Removes files under the prefix older than the age; returns how many.</summary>
-    Task<int> PurgeAsync(string prefix, TimeSpan age, CancellationToken ct);
-
-    /// <summary>Total bytes of the files under the prefix (storage usage, P-07).</summary>
-    Task<long> SizeAsync(string prefix, CancellationToken ct);
-}
-
 /// <summary>What a background export produces: report builder, saved report, standard report or audit log, in a format.</summary>
 public sealed record ExportRequest(string? Kind, string? Source, ReportDefinition? Definition, string? Report, string? Key, StandardReportQuery? Query, AuditLogQuery? Audit,
     DateOnly? From, DateOnly? To, string? Format);

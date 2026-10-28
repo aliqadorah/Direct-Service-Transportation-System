@@ -2,10 +2,9 @@ using System.Buffers.Text;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
-using DirectService.Transportation.Application.Abstractions;
 using Microsoft.Extensions.Options;
 
-namespace DirectService.Transportation.Infrastructure.Security;
+namespace DirectService.Shared.Infrastructure.Security;
 
 /// <summary>Configuration of URL tokens. <see cref="Key"/> is a base64 256-bit secret (user-secrets / secret store).</summary>
 public sealed class UrlTokenOptions

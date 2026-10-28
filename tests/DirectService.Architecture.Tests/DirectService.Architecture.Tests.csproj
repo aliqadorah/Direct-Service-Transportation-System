@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Shared.Infrastructure.Security" />
+    <Using Include="DirectService.Shared.Infrastructure.Persistence" />
   </ItemGroup>
   <ItemGroup>
     <!-- The host references every project (composition root), so every stored name and key is reachable from here. -->

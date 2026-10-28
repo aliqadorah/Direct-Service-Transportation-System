@@ -366,9 +366,9 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
     private async Task NoteDeductionAttemptAsync(CancellationToken ct)
     {
         var today = (await support.TodayAsync(ct).ConfigureAwait(false)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        var setting = await db.Set<Domain.Cfg.CompanySetting>().SingleOrDefaultAsync(s => s.SettingKey == Configuration.SettingKeys.SupplierDeductionAttempted, ct).ConfigureAwait(false);
+        var setting = await db.Set<CompanySetting>().SingleOrDefaultAsync(s => s.SettingKey == Configuration.SettingKeys.SupplierDeductionAttempted, ct).ConfigureAwait(false);
         if (setting?.SettingValue == today) return;
-        if (setting is null) db.Set<Domain.Cfg.CompanySetting>().Add(new Domain.Cfg.CompanySetting { SettingKey = Configuration.SettingKeys.SupplierDeductionAttempted, SettingValue = today });
+        if (setting is null) db.Set<CompanySetting>().Add(new CompanySetting { SettingKey = Configuration.SettingKeys.SupplierDeductionAttempted, SettingValue = today });
         else setting.SettingValue = today;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }

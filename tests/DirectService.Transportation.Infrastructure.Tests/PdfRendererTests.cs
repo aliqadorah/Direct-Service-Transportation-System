@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text;
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Infrastructure.Printing;
+using DirectService.Shared.Infrastructure.Printing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PuppeteerSharp;

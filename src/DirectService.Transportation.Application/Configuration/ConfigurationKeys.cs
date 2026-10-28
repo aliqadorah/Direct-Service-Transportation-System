@@ -76,6 +76,5 @@ public static class DocumentTypes
     public const byte DefaultDigits = 5;
 
     /// <summary>Formats a number: prefix + zero-padded counter, e.g. INV-00045.</summary>
-    public static string Format(string prefix, byte digits, long number) =>
-        prefix + number.ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(digits, '0');
+    public static string Format(string prefix, byte digits, long number) => DocumentNumbers.Format(prefix, digits, number);
 }

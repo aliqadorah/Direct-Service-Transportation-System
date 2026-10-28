@@ -1,8 +1,7 @@
 using System.Collections.Frozen;
-using DirectService.Transportation.Domain.Common;
 using Microsoft.EntityFrameworkCore.Metadata;
 
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Stored entity names (e.g. <c>TRN.Trip</c>) → entity types, built from the EF model and the pinned <see cref="StoredNameAttribute"/>

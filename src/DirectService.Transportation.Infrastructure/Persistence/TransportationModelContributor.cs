@@ -5,7 +5,8 @@ namespace DirectService.Transportation.Infrastructure.Persistence;
 
 /// <summary>
 /// This assembly's part of the composed <see cref="MasterDbContext"/> (platform design d): every entity configuration under
-/// Configurations (core / acc / cfg / trn, until they move to their modules), the reference data seed and the SQL functions of the reports.
+/// Configurations (core / acc / cfg / trn, until they move to their modules), the foreign keys of Shared tables to the core anchors
+/// (<see cref="CrossModuleRelationships"/>), the reference data seed and the SQL functions of the reports.
 /// </summary>
 public sealed class TransportationModelContributor : IModelContributor
 {
@@ -13,6 +14,7 @@ public sealed class TransportationModelContributor : IModelContributor
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TransportationModelContributor).Assembly);
+        CrossModuleRelationships.Apply(modelBuilder);
         ReferenceDataSeed.Apply(modelBuilder);
         MapJsonFunctions(modelBuilder);
     }

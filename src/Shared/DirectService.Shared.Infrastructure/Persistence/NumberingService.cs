@@ -1,8 +1,6 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Configuration;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Infrastructure.Persistence;
+namespace DirectService.Shared.Infrastructure.Persistence;
 
 /// <summary>
 /// Gap-free document numbers (BR-037, BR-038, cfg.NumberSequences business rule): the sequence row is
@@ -27,12 +25,12 @@ public sealed class NumberingService(MasterDbContext db, IDataScope scope) : INu
             """).SingleOrDefaultAsync(ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Number sequence {documentType} is missing for company {companyId}.");
 
-        await db.Set<Domain.Cfg.NumberSequence>().IgnoreQueryFilters()
+        await db.Set<NumberSequence>().IgnoreQueryFilters()
             .Where(s => s.Id == row.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.NextNumber, x => x.NextNumber + 1), ct)
             .ConfigureAwait(false);
 
-        return DocumentTypes.Format(row.Prefix, row.Digits, row.NextNumber);
+        return DocumentNumbers.Format(row.Prefix, row.Digits, row.NextNumber);
     }
 
     public async Task LockAsync(string documentType, CancellationToken ct)

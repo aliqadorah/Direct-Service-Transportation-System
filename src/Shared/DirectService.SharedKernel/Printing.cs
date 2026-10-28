@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>Page footer text of a printed document (page X of Y is added by the renderer, UX-22).</summary>
 public sealed record PdfFooter(string LeftText, string PageWord, string OfWord, bool RightToLeft);

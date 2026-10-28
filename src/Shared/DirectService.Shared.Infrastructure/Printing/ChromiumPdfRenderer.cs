@@ -1,10 +1,9 @@
-using DirectService.Transportation.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using PuppeteerSharp.Media;
 
-namespace DirectService.Transportation.Infrastructure.Printing;
+namespace DirectService.Shared.Infrastructure.Printing;
 
 /// <summary>
 /// HTML → PDF with headless Chromium (Q-08) through PuppeteerSharp. One browser per process, started on first use and restarted if

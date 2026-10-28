@@ -1,7 +1,6 @@
-using DirectService.Transportation.Application.Abstractions;
 using QRCoder;
 
-namespace DirectService.Transportation.Infrastructure.Printing;
+namespace DirectService.Shared.Infrastructure.Printing;
 
 /// <summary>QR codes as inline SVG (QRCoder), error correction M — the e-invoice QR printed on invoices and credit notes (FR-057, FR-062).</summary>
 public sealed class QrCodeRenderer : IQrCodeRenderer

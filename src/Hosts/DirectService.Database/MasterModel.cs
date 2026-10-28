@@ -9,5 +9,5 @@ namespace DirectService.Database;
 /// </summary>
 public static class MasterModel
 {
-    public static IReadOnlyList<IModelContributor> Contributors { get; } = [new TransportationModelContributor()];
+    public static IReadOnlyList<IModelContributor> Contributors { get; } = [new SharedModelContributor(), new TransportationModelContributor()];
 }

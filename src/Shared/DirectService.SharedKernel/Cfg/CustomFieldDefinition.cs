@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Cfg;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// cfg.CustomFieldDefinitions â€” Company-scoped.

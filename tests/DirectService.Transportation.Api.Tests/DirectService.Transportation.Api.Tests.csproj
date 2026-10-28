@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="DirectService.SharedKernel" />
+    <Using Include="DirectService.Shared.Infrastructure.Security" />
+    <Using Include="DirectService.Shared.Infrastructure.Persistence" />
     <Using Include="DirectService.Testing" />
   </ItemGroup>
   <ItemGroup>

@@ -6,10 +6,8 @@ using DirectService.Transportation.Infrastructure.Email;
 using DirectService.Transportation.Infrastructure.Files;
 using DirectService.Transportation.Infrastructure.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
-using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+using DirectService.Shared.Infrastructure;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
-using DirectService.Transportation.Infrastructure.Printing;
-using DirectService.Transportation.Infrastructure.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -30,10 +28,8 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("MasterDb")
             ?? throw new InvalidOperationException("ConnectionStrings:MasterDb is not configured.");
 
+        services.AddSharedInfrastructure(configuration);
         services.AddSingleton<IModelContributor, TransportationModelContributor>();
-        services.AddScoped<AuditSaveChangesInterceptor>();
-        services.AddScoped<LiveChangeInterceptor>();
-        services.AddScoped<IAfterCommit>(sp => sp.GetRequiredService<LiveChangeInterceptor>());
         services.AddDbContext<MasterDbContext>((sp, o) => o
             .UseMasterDatabase(cs, sql => sql.CommandTimeout(60))
             .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>(), sp.GetRequiredService<LiveChangeInterceptor>()));
@@ -67,13 +63,7 @@ public static class DependencyInjection
         services.AddOptions<StaffInvitationTokenProviderOptions>();   // 48-hour staff invitation links (owner feedback 13 Oct 2026)
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(24)); // SEC-04
 
-        services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section)).ValidateOnStart();
-        services.AddSingleton<IValidateOptions<UrlTokenOptions>, UrlTokenOptionsValidator>();
-        services.AddSingleton<IUrlTokenService, UrlTokenService>();
-        services.AddScoped<INumberingService, NumberingService>();
         services.AddScoped<IMonthlyRateLock, MonthlyRateLock>();
-        services.AddSingleton<IPdfRenderer, ChromiumPdfRenderer>();
-        services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
         // E-invoicing (B7): connectors, credentials, locks, worker signal.
         services.AddOptions<EInvoicingOptions>().Bind(configuration.GetSection(EInvoicingOptions.Section));
         services.AddOptions<Application.Platform.PlatformOptions>().Bind(configuration.GetSection(Application.Platform.PlatformOptions.Section));
@@ -87,10 +77,8 @@ public static class DependencyInjection
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<IEInvoiceStore, EInvoiceStore>();
         services.AddSingleton<EInvoiceSignal>();
-        services.AddSingleton<Application.Collaboration.IFileStore, Files.LocalFileStore>();
         services.AddSingleton<Application.Collaboration.IExportQueue, Files.ChannelExportQueue>();
         services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
-        services.AddScoped<IEntityResolver, EntityResolver>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
         // System email (DT-250…DT-253): every email into the outbox; the worker sends it with the active mode's transport.
         services.AddOptions<Application.Platform.SystemEmailOptions>().Bind(configuration.GetSection(Application.Platform.SystemEmailOptions.Section));

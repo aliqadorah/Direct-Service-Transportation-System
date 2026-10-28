@@ -1,14 +1,9 @@
 using System.Data.Common;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Common;
-using DirectService.Transportation.Domain.Core;
-using DirectService.Shared.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DirectService.Transportation.Infrastructure.Persistence.Interceptors;
+namespace DirectService.Shared.Infrastructure.Persistence.Interceptors;
 
 /// <summary>
 /// Live updates of every list (FR-185, RT-01): business records of a company changed by a save are announced to that company's connected
@@ -47,7 +42,7 @@ public sealed class LiveChangeInterceptor(IServiceProvider services, IUrlTokenSe
         }
     }
 
-    private static bool Announced(object entity) => entity is AuditableEntity and ICompanyScoped and not RecordLock and not UserSession and not Notification;
+    private static bool Announced(object entity) => entity is AuditableEntity and ICompanyScoped and not INotAudited;   // not locks, sessions, notifications
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {

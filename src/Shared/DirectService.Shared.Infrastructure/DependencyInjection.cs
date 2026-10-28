@@ -1,0 +1,35 @@
+using DirectService.Shared.Infrastructure.Files;
+using DirectService.Shared.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Persistence.Interceptors;
+using DirectService.Shared.Infrastructure.Printing;
+using DirectService.Shared.Infrastructure.Security;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace DirectService.Shared.Infrastructure;
+
+public static class DependencyInjection
+{
+    /// <summary>
+    /// The shared building blocks every module uses: the Shared part of the model (cfg tables), the save interceptors (audit, live
+    /// changes), URL tokens, numbering, the entity resolver, PDF and QR rendering and the file store. The host registers the DbContext.
+    /// </summary>
+    public static IServiceCollection AddSharedInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton<IModelContributor, SharedModelContributor>();
+        services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddScoped<LiveChangeInterceptor>();
+        services.AddScoped<IAfterCommit>(sp => sp.GetRequiredService<LiveChangeInterceptor>());
+
+        services.AddOptions<UrlTokenOptions>().Bind(configuration.GetSection(UrlTokenOptions.Section)).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<UrlTokenOptions>, UrlTokenOptionsValidator>();
+        services.AddSingleton<IUrlTokenService, UrlTokenService>();
+        services.AddScoped<INumberingService, NumberingService>();
+        services.AddScoped<IEntityResolver, EntityResolver>();
+        services.AddSingleton<IPdfRenderer, ChromiumPdfRenderer>();
+        services.AddSingleton<IQrCodeRenderer, QrCodeRenderer>();
+        services.AddSingleton<IFileStore, LocalFileStore>();
+        return services;
+    }
+}

@@ -1,10 +1,8 @@
 using System.Collections.Frozen;
 using System.Reflection;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Infrastructure.Persistence;
+namespace DirectService.Shared.Infrastructure.Persistence;
 
 /// <summary>
 /// Maps namespaced entity names (the audit/lock naming, e.g. TRN.Trip — the pinned stored names, platform design §e, E-1/E-2) to entity types and resolves URL tokens
