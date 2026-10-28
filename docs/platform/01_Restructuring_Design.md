@@ -85,6 +85,7 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 | `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09) |
 | `*.UI` | its own Contracts, `Platform.Contracts`, Shared.UI |
 | Shared.* | nothing from Platform or the modules |
+| `Shared.Contracts` (added in Stage 2 session 6, owner decision DT-309) | nothing at all — browser-safe DTOs of the shared engines; SharedKernel may reference it, and the module Contracts and UI use it |
 | Web.Client | the UI projects, Shared.UI, Contracts |
 | Web | everything (composition root) |
 

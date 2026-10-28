@@ -22,7 +22,7 @@ Accounting is a **shared module**: every system posts into it through its postin
 | Stage | Content | State |
 |---|---|---|
 | 1 | Design: `01_Restructuring_Design.md` | done; reviewed, owner decisions recorded in section k (28 Oct 2026) |
-| 2 | Shared + Platform split (behaviour unchanged) | in progress: session 1 (step 0 — every stored name pinned, golden tests in `tests/DirectService.Architecture.Tests`) session 2 (project skeleton, SharedKernel, `tests/DirectService.Testing`, first layer rules) session 3 (migrations in `src/Hosts/DirectService.Database`, composed `MasterDbContext` with `IModelContributor`s in Shared.Infrastructure) session 4 (shared building blocks, part 1) and session 5 part 1 (every cfg entity except `EInvoiceSettings` in SharedKernel, ids only) done 28 Oct 2026; the rest of session 5 and sessions 6–8 planned in `BUILD_STATUS.md` |
+| 2 | Shared + Platform split (behaviour unchanged) | in progress: session 1 (step 0 — every stored name pinned, golden tests in `tests/DirectService.Architecture.Tests`) session 2 (project skeleton, SharedKernel, `tests/DirectService.Testing`, first layer rules) session 3 (migrations in `src/Hosts/DirectService.Database`, composed `MasterDbContext` with `IModelContributor`s in Shared.Infrastructure) session 4 (shared building blocks, part 1) session 5 part 1 (every cfg entity except `EInvoiceSettings` in SharedKernel, ids only) and session 6 (browser-safe `DirectService.Shared.Contracts`, shared error codes, spreadsheets, column views, record locks, global search engine with `ISearchProvider`) done 28 Oct 2026; sessions 7–11 planned in `BUILD_STATUS.md` |
 | 3 | Accounting module + posting contract | not started |
 | 4 | Transportation module, UI composition, host rename, menu by product | not started |
 | 5 | Products, subscriptions, per-product trials, manual activation, starter module, guides | not started |
@@ -33,7 +33,7 @@ Until Stage 4 is done the code still lives in `src/DirectService.Transportation.
 
 ## Layout (target)
 ```
-src/Shared/     DirectService.SharedKernel · DirectService.Shared.Infrastructure · DirectService.Shared.UI
+src/Shared/     DirectService.SharedKernel · DirectService.Shared.Contracts (browser-safe DTOs, DT-309) · DirectService.Shared.Infrastructure · DirectService.Shared.UI
 src/Platform/   DirectService.Platform.{Domain,Application,Infrastructure,Contracts,UI}
 src/Modules/Accounting/      DirectService.Accounting.{Domain,Application,Infrastructure,Contracts,UI}
 src/Modules/Transportation/  DirectService.Transportation.{Domain,Application,Infrastructure,Contracts,UI}
