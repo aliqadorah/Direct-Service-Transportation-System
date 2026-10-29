@@ -120,6 +120,7 @@ Defined in SharedKernel (for Shared), Platform.Contracts or Accounting.Contracts
 | `ISettingsSection` | SharedKernel | `CompanySettingsService` operations keys (TRN.*) | T |
 | `IFieldCatalogProvider` | SharedKernel | `FieldCatalog` (TRN.Trip/Driver/Customer) | T |
 | `IImportTemplateProvider` | SharedKernel | `ImportTemplateService` | A, T |
+| `IExportJobProvider` / `IExportNotifier` (added Stage 2 session 10, DT-334) | SharedKernel | `ExportService` kinds standard / audit-log / company and its notifications | T (P for the notifications later) |
 | `INavContributor`, `IHelpTopicProvider`, `ILinkResolver` (UI) | Shared.UI | `NavModel`, `HelpTopics`, `Layout/Links` | P, A, T |
 
 ### a.4 Tables (by schema) and entities
@@ -590,7 +591,7 @@ Every value kept its byte-for-byte value; the golden files in `tests/DirectServi
 | E-30 | not stored — configuration and environment names (`DST_` prefix in `DesignTimeDbContextFactory`, `DST_TEST_DB`, …) | unchanged; not data |
 | E-31 | `UrlTokenOptions.Section` (`UrlTokens`) + `Key` | unchanged |
 | E-32 | `EmailLogo.ResourceName` (`Infrastructure/Email/MimeMessageBuilder.cs`) = the csproj LogicalName `DST.Email.Logo.png`; fonts `fonts/<file>` (Application csproj) | golden: the manifest resources of the infrastructure assembly |
-| E-33 | `ExportService.Root` = `exports/` (`Application/Collaboration/ExportService.cs`, used by the folder format, `Billing` storage usage and `ExportWorker`); `LocalFileStore.DefaultRoot` = `App_Data/files` | golden: the folder of a sample export |
+| E-33 | `ExportService.Root` = `exports/` (since Stage 2 session 10: `Shared.Infrastructure/Collaboration/ExportService.cs`, value and folder format defined in SharedKernel `ExportFiles`, DT-334; before: `Application/Collaboration/ExportService.cs`, used by the folder format, `Billing` storage usage and `ExportWorker`); `LocalFileStore.DefaultRoot` = `App_Data/files` | golden: the folder of a sample export |
 | E-34 | `SystemEmailOptions.DefaultDropFolder` = `.local/mail` (`Application/Platform/SystemEmail.cs`) | golden |
 | E-35 | not stored — the launch profile name (`Properties/launchSettings.json`, `.claude/launch.json`) | renamed in Stage 4 |
 | E-36 | routes — golden OpenAPI (449 paths, 521 operations) | |
