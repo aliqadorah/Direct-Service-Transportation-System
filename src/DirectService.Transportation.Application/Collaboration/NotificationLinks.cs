@@ -87,7 +87,7 @@ public sealed class NotificationLinks(IAppDbContext db, IRequestContext ctx, IUr
     {
         if (!Guid.TryParseExact(id, "N", out var g) || ctx.TenantId is not long tenant || ctx.CompanyId is not long company || ctx.UserPublicId is not Guid user)
             return new(null, Missing);
-        var found = await files.ListAsync(ExportService.Folder(tenant, company, user) + g.ToString("N") + "/", ct).ConfigureAwait(false);
+        var found = await files.ListAsync(ExportFiles.Folder(tenant, company, user) + g.ToString("N") + "/", ct).ConfigureAwait(false);
         return found.Count > 0 ? new("exports/" + g.ToString("N"), null) : new(null, Missing);
     }
 }

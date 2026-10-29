@@ -58,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<AuditTrail>();
         services.AddScoped<SavedReportService>();
         services.AddScoped<ISavedReportService>(sp => sp.GetRequiredService<SavedReportService>());
+        services.AddSingleton<IExportQueue, ChannelExportQueue>();
+        services.AddScoped<ExportService>();
         return services;
     }
 }

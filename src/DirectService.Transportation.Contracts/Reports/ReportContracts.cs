@@ -15,16 +15,11 @@ namespace DirectService.Transportation.Contracts.Reports;
 /// the screen first); a one-line <paramref name="Description"/> in the caller's language; the value each filter takes when left empty
 /// (<paramref name="Defaults"/>: from, to, asOf as yyyy-MM-dd, side, groupBy), so the screen shows the value in use (DT-249).
 /// </summary>
+// StandardReportQuery: Shared.Contracts (it travels in an ExportRequest, Stage 2 session 10, DT-334).
+
 public sealed record ReportCatalogEntry(string Key, string Code, string Group, string Title, string? Path, IReadOnlyList<string> Parameters, IReadOnlyList<string>? Required = null,
     string? Description = null, IReadOnlyDictionary<string, string>? Defaults = null);
 
-/// <summary>
-/// Filters of the standard reports (each report uses the ones it lists): period, as-of date, customer, driver, partner, loading and
-/// unloading sites, material, grouping (margin analysis: customer / route / driver / month), party side (breach: customer / partner).
-/// </summary>
-public sealed record StandardReportQuery(
-    DateOnly? From, DateOnly? To, DateOnly? AsOf, string? Customer, string? Driver, string? Partner, string? LoadingSite, string? UnloadingSite, string? Material,
-    string? GroupBy, string? Side, string? Supplier = null);
 
 // ------------------------------------------------------------------ dashboard (FR-137 … FR-141)
 

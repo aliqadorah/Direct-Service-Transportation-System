@@ -176,7 +176,9 @@ public static class DependencyInjection
         services.AddScoped<NotificationLinks>();
         services.AddScoped<ISearchProvider, TransportationSearch>();
         services.AddScoped<AuditLogService>();
-        services.AddScoped<ExportService>();
+        services.AddScoped<IExportJobProvider, TransportationExportJobs>();
+        services.AddScoped<IExportNotifier, ExportNotifications>();
+        services.AddSingleton(new ExportOptions { ReportPermission = Contracts.Security.PermissionKeys.ReportsView });
         services.AddScoped<SupplierBillPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());
         services.AddScoped<ReceivablePostingHandler>();

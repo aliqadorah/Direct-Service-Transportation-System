@@ -14,9 +14,8 @@ public sealed record NotificationPage(IReadOnlyList<NotificationResponse> Items,
 
 // ------------------------------------------------------------------ audit log (FR-188, FR-189)
 
-/// <param name="Technical">Adds the stored values as they are (administrators with settings.manage only, DT-188).</param>
-public sealed record AuditLogQuery(string? User, string? Action, string? EntityType, DateOnly? From, DateOnly? To, string? Q, int Page = 1, int PageSize = 50,
-    bool Technical = false);
+// AuditLogQuery: Shared.Contracts (it travels in an ExportRequest, Stage 2 session 10, DT-334).
+
 
 /// <summary>A field change old → new.</summary>
 public sealed record AuditChange(string Field, string? Old, string? New);
@@ -32,5 +31,5 @@ public sealed record AuditLogEntry(DateTime OccurredAt, string? User, string Act
 
 // ------------------------------------------------------------------ background exports (FR-151)
 
-/// <summary>A queued export: the token of the file once ready (sent with the notification).</summary>
-public sealed record ExportJobResponse(string Id, string Status);
+// ExportRequest and ExportJobResponse: Shared.Contracts (Stage 2 session 10, DT-334).
+

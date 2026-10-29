@@ -3,7 +3,6 @@ using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Infrastructure.EInvoicing;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Infrastructure.Email;
-using DirectService.Transportation.Infrastructure.Files;
 using DirectService.Transportation.Infrastructure.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure;
@@ -77,7 +76,6 @@ public static class DependencyInjection
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<IEInvoiceStore, EInvoiceStore>();
         services.AddSingleton<EInvoiceSignal>();
-        services.AddSingleton<Application.Collaboration.IExportQueue, Files.ChannelExportQueue>();
         services.AddSingleton<IEInvoiceSignal>(sp => sp.GetRequiredService<EInvoiceSignal>());
         // System email (DT-250…DT-253): every email into the outbox; the worker sends it with the active mode's transport.
         services.AddOptions<Application.Platform.SystemEmailOptions>().Bind(configuration.GetSection(Application.Platform.SystemEmailOptions.Section));

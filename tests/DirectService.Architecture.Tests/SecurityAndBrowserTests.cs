@@ -106,8 +106,8 @@ public sealed class SecurityAndBrowserTests
     [Fact]
     public void File_paths_resources_user_secrets_and_the_js_initializer_are_unchanged()
     {
-        var export = typeof(DirectService.Transportation.Application.Collaboration.ExportService);
-        Same(Value("files", "exportsRoot"), DirectService.Transportation.Application.Collaboration.ExportService.Root);
+        var export = typeof(DirectService.Shared.Infrastructure.Collaboration.ExportService);
+        Same(Value("files", "exportsRoot"), DirectService.Shared.Infrastructure.Collaboration.ExportService.Root);
         var folder = (string)export.GetMethod("Folder", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [7L, 9L, Guid.Parse(Golden.Entities["tokenGuid"]!.GetValue<string>())])!;
         Same(Value("files", "exportFolderOfSample"), folder);
         Same(Value("files", "fileStoreDefaultRoot"), DirectService.Shared.Infrastructure.Files.LocalFileStore.DefaultRoot);

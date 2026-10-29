@@ -1,7 +1,6 @@
 using System.Threading.Channels;
-using DirectService.Transportation.Application.Collaboration;
 
-namespace DirectService.Transportation.Infrastructure.Files;
+namespace DirectService.Shared.Infrastructure.Files;
 
 /// <summary>Bounded in-process queue of export jobs (1,000 waiting at most; a full queue refuses with 429).</summary>
 public sealed class ChannelExportQueue : IExportQueue
