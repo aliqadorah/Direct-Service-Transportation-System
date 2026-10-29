@@ -82,7 +82,7 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 | `*.Domain` | SharedKernel only |
 | `*.Contracts` | SharedKernel only (WASM-safe: no EF, no ASP.NET) |
 | `*.Application` | its own Domain and Contracts, SharedKernel, `Platform.Contracts`, **other modules' Contracts** |
-| `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09) |
+| `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09); a module's Domain may hold them as foreign-key navigation properties (a.4, DT-338). Test: `LayerRuleTests.Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1` |
 | `*.UI` | its own Contracts, `Platform.Contracts`, Shared.UI |
 | Shared.* | nothing from Platform or the modules |
 | `Shared.Contracts` (added in Stage 2 session 6, owner decision DT-309) | nothing at all — browser-safe DTOs of the shared engines; SharedKernel may reference it, and the module Contracts and UI use it |
@@ -559,7 +559,7 @@ Every value kept its byte-for-byte value; the golden files in `tests/DirectServi
 
 | # | Pinned in | Notes |
 |---|---|---|
-| E-1 | `[StoredName("TRN.Trip")]` on all 78 entities (`DirectService.Transportation.Domain/{Acc,Cfg,Core,Trn}/*.cs`), read by `Domain/Common/StoredNames.cs` | used by `AuditSaveChangesInterceptor.EntityTypeName` (audit log, append-only / delete messages, `LiveChangeInterceptor` live refresh), `EntityResolver` (record locks), `AuditDescriber`, `CompanyExportService`, tenant deletion. A type without its pin throws; it never falls back to the code name |
+| E-1 | `[StoredName("TRN.Trip")]` on all 78 entities (`DirectService.Transportation.Domain/{Acc,Cfg,Core,Trn}/*.cs`; since Stage 2 the cfg entities and `AuditLog` are in `Shared/DirectService.SharedKernel`, the core entities except `MaintenanceLog` in `Platform/DirectService.Platform.Domain` — session 11, DT-336), read by `Domain/Common/StoredNames.cs` | used by `AuditSaveChangesInterceptor.EntityTypeName` (audit log, append-only / delete messages, `LiveChangeInterceptor` live refresh), `EntityResolver` (record locks), `AuditDescriber`, `CompanyExportService`, tenant deletion. A type without its pin throws; it never falls back to the code name |
 | E-2 | `Application/Abstractions/EntityTypeMap.cs` | stored name → type from the **EF model** (all modules) + the pins; replaces the assembly scans in `EntityResolver`, `AuditDescriber` and `TenantLifecycleService.DeleteTenantAsync`. Golden: the same 73 / 76 / 68 types as at the tag |
 | E-3 | `[TokenLabel("Trip")]` on all 78 entities; prefix `UrlTokenService.InfoPrefix` = `DST-URL:` (`Infrastructure/Security/UrlTokenService.cs`) | golden: a fixed key + GUID gives the tag's token for every type |
 | E-4 | `Application/Notifications/EmailTemplateNames.cs` (14 constants) | `nameof` removed from `EmailTemplates`, `SystemEmailService`, `EmailOutbox`. Golden: each template method still stores its name (`VerifyAddedEmail` stores `VerifyEmail`) |
@@ -578,19 +578,19 @@ Every value kept its byte-for-byte value; the golden files in `tests/DirectServi
 | E-17 | not stored as type names (pins hold ids and measures; standard report keys appear in URLs only) | nothing to pin |
 | E-18 | `Application/Collaboration/NotificationService.cs` constants + `NotificationTexts` catalogue; link paths in `NotificationLinks.cs` | golden (8 types) |
 | E-19 | `Application/Accounting/PostingKeys.cs` (`AccountingCodes`: modules, source and party codes, CHECK lists) and the `SourceType` constants of the document services | golden; `TRN` / `ACC` are data codes, never namespaces |
-| E-20 | `Contracts/Security/PermissionKeys.cs` (`PermissionKeys`, `PresetRoles`); seed rows `Infrastructure/Persistence/Seed/ReferenceDataSeed.cs` | golden: 26 keys with seed Ids, PublicIds and groups; plan `TRIAL`; preset grants |
+| E-20 | `Contracts/Security/PermissionKeys.cs` (`PermissionKeys`, `PresetRoles`); seed rows `Infrastructure/Persistence/Seed/ReferenceDataSeed.cs` (since Stage 2 session 11 split by owner, DT-337: `core.*` keys and the TRIAL plan in `Platform/DirectService.Platform.Infrastructure/Persistence/Seed/PlatformReferenceDataSeed.cs`, the module's keys in its `ReferenceDataSeed` through `IPermissionSeedProvider`; one `HasData` with the same values) | golden: 26 keys with seed Ids, PublicIds and groups; plan `TRIAL`; preset grants |
 | E-21 | the file name `Web.Client/wwwroot/DirectService.Transportation.Web.Client.lib.module.js` (= assembly name, cannot be a constant) | test: the file exists under the browser app's assembly name; renamed with the assembly in Stage 4 |
 | E-22 | `DataProtectionSetup.ApplicationName` (`Web/Security/DataProtectionSetup.cs`) | golden |
-| E-23 | `Infrastructure/Security/DataProtectionPurposes.cs` (4 purposes) | used by `UserStore`, `EInvoiceStore`, `EmailOutbox`; test forbids an inline `CreateProtector("…")` |
+| E-23 | `Infrastructure/Security/DataProtectionPurposes.cs` (4 purposes; since Stage 2 session 11 `Shared/DirectService.Shared.Infrastructure/Security/DataProtectionPurposes.cs`, DT-340) | used by `UserStore`, `EInvoiceStore`, `EmailOutbox`; test forbids an inline `CreateProtector("…")` |
 | E-24 | `DataProtectionSetup.DefaultKeysPath` = `.local/keys` | the folder itself untouched (read only) |
 | E-25 | `AuthSchemes`, `AppClaims`, new `AuthCookies` (`Web/Security/AuthSetup.cs`) | cookies, antiforgery cookie and header; used by `AuthSetup`, `Program.cs`, `OpenApiSetup`; golden reads the cookie names from the real authentication set-up |
-| E-26 | `ReplaySafeAuthenticatorTokenProvider.Name`, `StaffService.InvitationTokenProvider` / `InvitationPurpose` | already constants; `Default` is the framework's provider name |
+| E-26 | `ReplaySafeAuthenticatorTokenProvider.Name` (since Stage 2 session 11 in `Platform.Infrastructure/Identity`), `StaffService.InvitationTokenProvider` / `InvitationPurpose` | already constants; `Default` is the framework's provider name |
 | E-27 | `Contracts/Collaboration/LiveHubNames.cs` (path, group prefix, hub methods, 4 events) | shared by `LiveHub` / `SignalRNotifier` and the browser's `LiveUpdates`; hub methods now carry `[HubMethodName]` with the same names |
 | E-28 | `Web.Client/Services/PrefKeys.cs` (`dst.`, `theme.`, `nav.`); `wwwroot/js/ui.js` (`"dst." + key`), `wwwroot/js/theme.js` (`dst.theme`) | test reads both scripts |
 | E-29 | `<UserSecretsId>` in `Web/…Web.csproj` and `Hosts/DirectService.Database/DirectService.Database.csproj` (moved from Infrastructure in Stage 2 session 3, same value) | golden |
 | E-30 | not stored — configuration and environment names (`DST_` prefix in `DesignTimeDbContextFactory`, `DST_TEST_DB`, …) | unchanged; not data |
 | E-31 | `UrlTokenOptions.Section` (`UrlTokens`) + `Key` | unchanged |
-| E-32 | `EmailLogo.ResourceName` (`Infrastructure/Email/MimeMessageBuilder.cs`) = the csproj LogicalName `DST.Email.Logo.png`; fonts `fonts/<file>` (Application csproj) | golden: the manifest resources of the infrastructure assembly |
+| E-32 | `EmailLogo.ResourceName` (`Infrastructure/Email/MimeMessageBuilder.cs`; since Stage 2 session 11 `Platform/DirectService.Platform.Infrastructure/Email/MimeMessageBuilder.cs` with the resource, DT-340) = the csproj LogicalName `DST.Email.Logo.png`; fonts `fonts/<file>` (Application csproj) | golden: the manifest resources of the infrastructure assembly |
 | E-33 | `ExportService.Root` = `exports/` (since Stage 2 session 10: `Shared.Infrastructure/Collaboration/ExportService.cs`, value and folder format defined in SharedKernel `ExportFiles`, DT-334; before: `Application/Collaboration/ExportService.cs`, used by the folder format, `Billing` storage usage and `ExportWorker`); `LocalFileStore.DefaultRoot` = `App_Data/files` | golden: the folder of a sample export |
 | E-34 | `SystemEmailOptions.DefaultDropFolder` = `.local/mail` (`Application/Platform/SystemEmail.cs`) | golden |
 | E-35 | not stored — the launch profile name (`Properties/launchSettings.json`, `.claude/launch.json`) | renamed in Stage 4 |

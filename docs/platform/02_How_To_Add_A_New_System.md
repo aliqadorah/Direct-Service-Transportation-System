@@ -77,7 +77,7 @@ Never rename or move an existing table, column or row; a new system only adds.
    - group names (AR/EN);
    - descriptions;
    - which preset roles get them (Owner, Administrator, Accountant, Dispatcher, Viewer).
-3. Seed them with fixed Ids and PublicIds (`HasData`) in the module's `Permission` seed contributor. Never change these Ids later.
+3. Seed them with fixed Ids and PublicIds: a class implementing `IPermissionSeedProvider` (`DirectService.Platform.Contracts.Security`, one `PermissionSeed` row per key), registered in DI and passed to `PlatformModelContributor` in `MasterModel`; the Platform contributor writes every module's rows with `HasData` (Stage 2 session 11, DT-337; Transportation's is `Persistence/Seed/ReferenceDataSeed.cs`). Never change these Ids later.
 4. Every POS route group calls `.RequirePermission(...)` per endpoint and `.RequireProduct("POS")` on the group. Architecture.Tests fail on a POS endpoint without either.
 5. The product row itself (`core.Products`: code, names, status `ComingSoon` → `Available`, `IncludesProductCodes` = `ACC` if POS needs the accounting features) is added by a data step in the POS migration. Its trial offer row starts **off**.
 
