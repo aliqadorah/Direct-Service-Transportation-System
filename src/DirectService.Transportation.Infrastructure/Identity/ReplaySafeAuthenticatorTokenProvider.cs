@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

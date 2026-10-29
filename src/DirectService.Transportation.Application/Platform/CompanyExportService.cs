@@ -4,7 +4,7 @@ using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Domain.Common;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 

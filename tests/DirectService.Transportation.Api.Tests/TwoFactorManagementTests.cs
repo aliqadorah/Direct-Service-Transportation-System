@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Api.Tests;

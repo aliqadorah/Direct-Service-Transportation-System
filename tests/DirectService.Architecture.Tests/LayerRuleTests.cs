@@ -6,7 +6,8 @@ namespace DirectService.Architecture.Tests;
 /// <summary>
 /// Layer and module rules of the platform design (a.2), first set (Stage 2 session 2, DT-290): SharedKernel references only the browser-safe
 /// Shared.Contracts (DT-309); Shared.* references no Platform or module project; a Domain project references SharedKernel only. Checked on the project files
-/// (every project under src/, empty ones included) and on the compiled assemblies.
+/// (every project under src/, empty ones included) and on the compiled assemblies. Exception E-1 (Stage 2 session 11): modules use the Platform
+/// anchor types Tenant, Company and User for foreign keys only.
 /// </summary>
 public sealed class LayerRuleTests
 {
@@ -91,15 +92,71 @@ public sealed class LayerRuleTests
     [Fact]
     public void Domain_projects_reference_only_SharedKernel()
     {
+        // A module's Domain may also reference Platform.Domain, for the anchor types only (exception E-1, checked below).
         var domains = Projects.Keys.Where(p => p.EndsWith(".Domain", StringComparison.Ordinal)).ToList();
         Assert.Contains("DirectService.Transportation.Domain", domains);
-        Assert.Contains("DirectService.Platform.Domain", domains);
-        foreach (var p in domains) Only(p, r => r == Kernel, "a Domain project references SharedKernel only");
+        Assert.Contains(PlatformDomain, domains);
+        foreach (var p in domains)
+            Only(p, r => r == Kernel || (r == PlatformDomain && p != PlatformDomain), "a Domain project references SharedKernel only (a module's also Platform.Domain, E-1)");
 
-        // The compiled Transportation domain as well (Platform.Domain is still empty).
         var compiled = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
             .Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
-        Assert.True(compiled.All(n => n == Kernel), "The compiled Transportation domain references " + string.Join(", ", compiled));
+        Assert.True(compiled.All(n => n is Kernel or PlatformDomain), "The compiled Transportation domain references " + string.Join(", ", compiled));
+        compiled = typeof(DirectService.Platform.Domain.User).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
+        Assert.True(compiled.All(n => n == Kernel), "The compiled Platform domain references " + string.Join(", ", compiled));
+    }
+
+    private const string PlatformDomain = "DirectService.Platform.Domain";
+
+    /// <summary>The Platform types a module may use: the anchors of exception E-1 (K-09), for foreign-key mapping only.</summary>
+    private static readonly string[] Anchors = ["Tenant", "Company", "User"];
+
+    /// <summary>Every Platform.Domain type the compiled assembly refers to (its type references into that assembly).</summary>
+    private static List<string> PlatformTypesUsedBy(Assembly assembly)
+    {
+        using var stream = File.OpenRead(assembly.Location);
+        using var pe = new System.Reflection.PortableExecutable.PEReader(stream);
+        var md = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+        return md.TypeReferences.Select(md.GetTypeReference)
+            .Where(t => t.ResolutionScope.Kind == System.Reflection.Metadata.HandleKind.AssemblyReference
+                && md.GetString(md.GetAssemblyReference((System.Reflection.Metadata.AssemblyReferenceHandle)t.ResolutionScope).Name) == PlatformDomain)
+            .Select(t => md.GetString(t.Namespace) + "." + md.GetString(t.Name)).Distinct().Order(StringComparer.Ordinal).ToList();
+    }
+
+    [Fact]
+    public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
+    {
+        // Exception E-1 (design a.2, owner decision K-09): a module's Domain and Infrastructure may use Tenant, Company and User of
+        // Platform.Domain, and only to map foreign keys. Transportation.Application still holds the Platform services until Stage 2
+        // session 12 (identity, platform and notification services → Platform.Application), so it is checked from then on.
+        var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
+        var used = PlatformTypesUsedBy(domain);
+        Assert.NotEmpty(used);   // the reader works: the domain's User navigations
+        var others = used.Except(Anchors.Select(a => PlatformDomain + "." + a)).ToList();
+        Assert.True(others.Count == 0, "The Transportation domain uses Platform types other than the anchors (E-1): " + string.Join(", ", others));
+
+        // In a module's Domain an anchor appears only as a navigation property of an entity, mapped to a foreign key in the model.
+        var model = Golden.Model;
+        foreach (var type in domain.GetTypes())
+        {
+            foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(p => p.PropertyType.Assembly.GetName().Name == PlatformDomain))
+            {
+                var navigation = model.FindEntityType(type)?.FindNavigation(p.Name);
+                Assert.True(navigation is { IsCollection: false } && navigation.ForeignKey.PrincipalEntityType.ClrType == p.PropertyType,
+                    $"{type.Name}.{p.Name} uses a Platform type but is not a foreign-key navigation (E-1)");
+            }
+            foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(m => !m.IsSpecialName))
+            {
+                var platform = m.GetParameters().Select(x => x.ParameterType).Append(m.ReturnType).Where(t => t.Assembly.GetName().Name == PlatformDomain).ToList();
+                Assert.True(platform.Count == 0, $"{type.Name}.{m.Name} uses the Platform type {platform.FirstOrDefault()?.Name} (E-1 allows foreign-key navigations only)");
+            }
+            var fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(f => f.FieldType.Assembly.GetName().Name == PlatformDomain && !f.Name.Contains("k__BackingField", StringComparison.Ordinal)).ToList();
+            Assert.True(fields.Count == 0, $"{type.Name} has a field of a Platform type (E-1 allows foreign-key navigations only)");
+        }
     }
 
     [Fact]

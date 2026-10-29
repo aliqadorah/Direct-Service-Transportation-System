@@ -97,7 +97,7 @@ public sealed class CodeReuseTests(ApiFactory f)
                 new TwoFactorCodeRequest(null, i == 0 ? o.RecoveryCodes[0] : "WRONG-" + i.ToString("D5", System.Globalization.CultureInfo.InvariantCulture)))));
             Assert.Equal(HttpStatusCode.OK, answers[0].StatusCode);
             Assert.All(answers.Skip(1), r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
-            var failed = await f.DbAsync(db => db.Set<DirectService.Transportation.Domain.Core.User>().IgnoreQueryFilters()
+            var failed = await f.DbAsync(db => db.Set<DirectService.Platform.Domain.User>().IgnoreQueryFilters()
                 .Where(u => u.Email == o.Email).Select(u => new { u.FailedSignInCount, u.LastSignInAt }).SingleAsync());
             // The success may land before or after the failures: either it reset the count and later failures counted, or all six counted
             // before; never fewer than the failures after the success, and with all failures before it, zero.
@@ -113,7 +113,7 @@ public sealed class CodeReuseTests(ApiFactory f)
         var clients = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => PasswordStepAsync(o, $"10.223.0.{i + 1}")));
         var answers = await Task.WhenAll(clients.Select((c, i) => c.PostAsJsonAsync("/api/v1/auth/2fa/verify", new TwoFactorCodeRequest(null, "WRONG-0000" + i))));
         Assert.All(answers, r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
-        Assert.Equal(8, await f.DbAsync(db => db.Set<DirectService.Transportation.Domain.Core.User>().IgnoreQueryFilters()
+        Assert.Equal(8, await f.DbAsync(db => db.Set<DirectService.Platform.Domain.User>().IgnoreQueryFilters()
             .Where(u => u.Email == o.Email).Select(u => u.FailedSignInCount).SingleAsync()));
     }
 }

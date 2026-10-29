@@ -1,7 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

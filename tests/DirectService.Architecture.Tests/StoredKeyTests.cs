@@ -56,8 +56,8 @@ public sealed class StoredKeyTests
 
         using var db = new DesignTimeDbContextFactory().CreateDbContext([]);
         var model = db.GetService<IDesignTimeModel>().Model;
-        Golden.SameSet("Permission seed rows (Id, PublicId, key, group)", Rows(Keys["permissionSeed"]), Seed(model, typeof(DirectService.Transportation.Domain.Core.Permission), "Id", "PublicId", "PermissionKey", "GroupName"));
-        Golden.SameSet("Plan seed rows (Id, PublicId, code)", Rows(Keys["planSeed"]), Seed(model, typeof(DirectService.Transportation.Domain.Core.Plan), "Id", "PublicId", "Code"));
+        Golden.SameSet("Permission seed rows (Id, PublicId, key, group)", Rows(Keys["permissionSeed"]), Seed(model, typeof(DirectService.Platform.Domain.Permission), "Id", "PublicId", "PermissionKey", "GroupName"));
+        Golden.SameSet("Plan seed rows (Id, PublicId, code)", Rows(Keys["planSeed"]), Seed(model, typeof(DirectService.Platform.Domain.Plan), "Id", "PublicId", "Code"));
     }
 
     private static IEnumerable<string> Rows(System.Text.Json.Nodes.JsonNode? rows) =>

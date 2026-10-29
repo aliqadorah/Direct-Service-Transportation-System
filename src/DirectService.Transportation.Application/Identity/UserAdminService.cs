@@ -2,7 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

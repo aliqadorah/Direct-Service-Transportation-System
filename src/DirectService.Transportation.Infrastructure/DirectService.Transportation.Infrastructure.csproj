@@ -5,6 +5,8 @@
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Application\DirectService.Transportation.Application.csproj" />
     <ProjectReference Include="..\Shared\DirectService.Shared.Infrastructure\DirectService.Shared.Infrastructure.csproj" />
+    <!-- The permission rows this module owns (IPermissionSeedProvider), seeded by the Platform model contributor. -->
+    <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The PDF engine's test hook (a browser that dies during a print, DT-222). -->

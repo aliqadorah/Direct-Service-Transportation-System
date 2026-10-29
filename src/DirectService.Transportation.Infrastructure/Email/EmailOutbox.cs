@@ -2,7 +2,7 @@ using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;

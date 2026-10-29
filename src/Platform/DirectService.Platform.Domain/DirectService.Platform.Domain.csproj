@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Platform entities (core.* tenants, companies, users, roles, plans …), filled in Stage 2 session 5. A Domain project references SharedKernel only. -->
+  <!-- Platform entities (core.* tenants, companies, users, roles, plans, notifications, system email …; Stage 2 session 11). The namespace is
+       DirectService.Platform.Domain; every pin ([StoredName] / [TokenLabel]) and property is unchanged. A Domain project references SharedKernel
+       only. Tenant, Company and User are the anchor types modules may use for foreign keys (exception E-1, K-09). -->
   <PropertyGroup>
     <RootNamespace>DirectService.Platform.Domain</RootNamespace>
   </PropertyGroup>

@@ -14,7 +14,7 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 

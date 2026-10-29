@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Web.Endpoints;
 using DirectService.Transportation.Web.Pipeline;
 using Microsoft.AspNetCore.Authorization;

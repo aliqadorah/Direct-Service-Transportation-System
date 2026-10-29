@@ -97,7 +97,7 @@ public sealed class StoredNameTests
         Golden.SameSet("Company export record types (E-5)", goldenExport, export);
 
         var deleted = EntityTypeMap.Records(Golden.Model).Values
-            .Where(t => t != typeof(DirectService.Transportation.Domain.Core.Tenant) && (typeof(ITenantScoped).IsAssignableFrom(t) || typeof(INullableTenantScoped).IsAssignableFrom(t)))
+            .Where(t => t != typeof(DirectService.Platform.Domain.Tenant) && (typeof(ITenantScoped).IsAssignableFrom(t) || typeof(INullableTenantScoped).IsAssignableFrom(t)))
             .Select(StoredNames.Of);
         Golden.SameSet("Types soft-deleted with a tenant (E-2)", GoldenWhere("tenantDeletion"), deleted);
     }

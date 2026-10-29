@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

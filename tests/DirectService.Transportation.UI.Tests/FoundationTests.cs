@@ -185,7 +185,9 @@ public sealed class FoundationTests
     public void Every_permission_group_of_the_seed_has_its_heading_in_both_languages()
     {
         // Role editor (owner feedback SCR-76): the stored English group codes (DT-09) are shown through usr.grp.<code>.
-        var seed = File.ReadAllText(Path.Combine(FindRepoRoot(), "src", "DirectService.Transportation.Infrastructure", "Persistence", "Seed", "ReferenceDataSeed.cs"));
+        // The rows are seeded by the module that owns the key (Stage 2 session 11): the platform's own and this module's.
+        var seed = File.ReadAllText(Path.Combine(FindRepoRoot(), "src", "Platform", "DirectService.Platform.Infrastructure", "Persistence", "Seed", "PlatformReferenceDataSeed.cs"))
+            + File.ReadAllText(Path.Combine(FindRepoRoot(), "src", "DirectService.Transportation.Infrastructure", "Persistence", "Seed", "ReferenceDataSeed.cs"));
         var groups = System.Text.RegularExpressions.Regex.Matches(seed, "\"[a-z]+\\.[a-z]+(?:\\.[a-z]+)?\", \"([^\"]+)\",").Select(m => m.Groups[1].Value).Distinct().ToList();
         Assert.Equal(9, groups.Count);
         Assert.All(groups, g => Assert.True(UiText.All.ContainsKey("usr.grp." + g), g));

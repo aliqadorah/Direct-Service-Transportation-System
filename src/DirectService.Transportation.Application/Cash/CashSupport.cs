@@ -31,7 +31,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
     /// <summary>The company's currency and its decimals.</summary>
     public async Task<(string Currency, int Decimals)> CurrencyAsync(CancellationToken ct)
     {
-        var c = await db.Set<Domain.Core.Company>().AsNoTracking().Where(x => x.Id == ctx.CompanyId).Select(x => new { x.CurrencyCode, x.CurrencyDecimals }).SingleAsync(ct).ConfigureAwait(false);
+        var c = await db.Set<DirectService.Platform.Domain.Company>().AsNoTracking().Where(x => x.Id == ctx.CompanyId).Select(x => new { x.CurrencyCode, x.CurrencyDecimals }).SingleAsync(ct).ConfigureAwait(false);
         return (c.CurrencyCode, c.CurrencyDecimals);
     }
 

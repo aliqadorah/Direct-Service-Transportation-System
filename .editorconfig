@@ -17,7 +17,7 @@ dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1062.severity = none
 
 # Model configuration runs once at start-up; constant index-column arrays are fine there.
-[{src/DirectService.Transportation.Infrastructure/Persistence/Configurations/**.cs,src/Shared/DirectService.Shared.Infrastructure/Persistence/Configurations/**.cs}]
+[{src/DirectService.Transportation.Infrastructure/Persistence/Configurations/**.cs,src/Shared/DirectService.Shared.Infrastructure/Persistence/Configurations/**.cs,src/Platform/DirectService.Platform.Infrastructure/Persistence/Configurations/**.cs}]
 dotnet_diagnostic.CA1861.severity = none
 
 # Test method names use underscores for readability (Given_When_Then style).

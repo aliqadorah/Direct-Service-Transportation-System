@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Database;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;

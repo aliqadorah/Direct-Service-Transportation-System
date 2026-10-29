@@ -5,5 +5,7 @@
   <ItemGroup>
     <!-- A Domain project references SharedKernel only (platform design a.2, Architecture.Tests). -->
     <ProjectReference Include="..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
+    <!-- Exception E-1 (K-09): the Platform anchor types Tenant, Company and User, for foreign-key navigations only (Architecture.Tests). -->
+    <ProjectReference Include="..\Platform\DirectService.Platform.Domain\DirectService.Platform.Domain.csproj" />
   </ItemGroup>
 </Project>

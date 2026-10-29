@@ -83,6 +83,7 @@ public sealed class MigrationContinuityTests
             ["ConnectionStrings:MasterDb"] = DesignTimeDbContextFactory.LocalDevelopment,
         }).Build();
         DirectService.Transportation.Infrastructure.DependencyInjection.AddInfrastructure(services, config);
+        DirectService.Platform.Infrastructure.DependencyInjection.AddPlatformInfrastructure(services, config);
         var registered = services.Where(d => d.ServiceType == typeof(IModelContributor)).Select(d => d.ImplementationType).ToList();
         Assert.Equal(MasterModel.Contributors.Select(c => c.GetType()), registered);
     }

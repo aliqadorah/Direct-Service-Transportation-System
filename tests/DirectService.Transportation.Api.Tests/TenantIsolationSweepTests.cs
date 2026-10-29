@@ -32,7 +32,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Acc = DirectService.Transportation.Domain.Acc;
 using Cfg = DirectService.Transportation.Domain.Cfg;
-using Core = DirectService.Transportation.Domain.Core;
+using PlatformDomain = DirectService.Platform.Domain;
 using Trn = DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Api.Tests;
@@ -64,7 +64,7 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
     /// <summary>The entity a route or query parameter names (its URL token type); null = not a record.</summary>
     internal static Type? EntityOf(string param, string route) => param switch
     {
-        "companyId" => typeof(Core.Company),
+        "companyId" => typeof(PlatformDomain.Company),
         "account" => typeof(Acc.Account), "bankAccount" => typeof(Acc.BankAccount), "budget" => typeof(Acc.Budget), "cashBox" => typeof(Acc.CashBox),
         "costCentre" => typeof(Acc.CostCentre), "draft" => typeof(Acc.JournalDraft), "entry" => typeof(Acc.JournalEntry), "template" => typeof(Acc.JournalTemplate),
         "document" => typeof(Acc.ApArDocument), "party" or "supplier" => typeof(Acc.ApArParty), "return" => typeof(Acc.ApArReturn),
@@ -72,15 +72,15 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         "submission" => route.Contains("/apar/", StringComparison.Ordinal) ? typeof(Acc.ApArEInvoiceSubmission) : typeof(Trn.EInvoiceSubmission),
         "payment" => route.Contains("/apar/", StringComparison.Ordinal) ? typeof(Acc.ApArPayment) : typeof(Trn.PartnerPayment),
         "advance" => typeof(Trn.Advance), "creditNote" => typeof(Trn.CreditNote), "customer" => typeof(Trn.Customer), "driver" => typeof(Trn.Driver),
-        "invoice" => route.Contains("/subscription/", StringComparison.Ordinal) ? typeof(Core.SubscriptionInvoice) : typeof(Trn.Invoice),
+        "invoice" => route.Contains("/subscription/", StringComparison.Ordinal) ? typeof(PlatformDomain.SubscriptionInvoice) : typeof(Trn.Invoice),
         "site" => route.Contains("/unloading-sites/", StringComparison.Ordinal) ? typeof(Trn.UnloadingSite) : typeof(Trn.LoadingSite),
         "loadingSite" => typeof(Trn.LoadingSite), "unloadingSite" => typeof(Trn.UnloadingSite), "material" => typeof(Trn.Material),
         "ownershipType" => typeof(Trn.OwnershipType), "partner" => typeof(Trn.Partner), "receipt" => typeof(Trn.Receipt), "settlement" => typeof(Trn.Settlement),
         "tariff" => typeof(Trn.Tariff), "trip" => typeof(Trn.Trip),
         "field" => typeof(CustomFieldDefinition), "pin" => typeof(DashboardPin), "lockId" => typeof(RecordLock), "report" => typeof(SavedReport),
         "sequence" => typeof(NumberSequence),
-        "invitation" => typeof(Core.Invitation), "notification" => typeof(Core.Notification), "role" => typeof(Core.Role), "user" => typeof(Core.User),
-        "session" => typeof(Core.UserSession), "grant" => typeof(Core.SupportAccessGrant),
+        "invitation" => typeof(PlatformDomain.Invitation), "notification" => typeof(PlatformDomain.Notification), "role" => typeof(PlatformDomain.Role), "user" => typeof(PlatformDomain.User),
+        "session" => typeof(PlatformDomain.UserSession), "grant" => typeof(PlatformDomain.SupportAccessGrant),
         _ => null,
     };
 
@@ -111,11 +111,11 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         var theirs = await IndexAsync(b.TenantId);
         var tokenTypes = theirs.ToDictionary(kv => kv.Key, kv => kv.Value);
         var foreignTokens = theirs.Values.SelectMany(v => v).Select(r => r.Token).ToHashSet(StringComparer.Ordinal);
-        foreignTokens.Add(Token(typeof(Core.Tenant), await f.DbAsync(db => db.Set<Core.Tenant>().IgnoreQueryFilters().Where(t => t.Id == b.TenantId).Select(t => t.PublicId).SingleAsync())));
+        foreignTokens.Add(Token(typeof(PlatformDomain.Tenant), await f.DbAsync(db => db.Set<PlatformDomain.Tenant>().IgnoreQueryFilters().Where(t => t.Id == b.TenantId).Select(t => t.PublicId).SingleAsync())));
         string[] markers = ["LEAKB" + tag, b.Owner.Email];
-        var companyIds = await f.DbAsync(db => db.Set<Core.Company>().IgnoreQueryFilters().Where(c => c.TenantId == a.TenantId)
+        var companyIds = await f.DbAsync(db => db.Set<PlatformDomain.Company>().IgnoreQueryFilters().Where(c => c.TenantId == a.TenantId)
             .Select(c => new { c.Id, c.PublicId }).ToListAsync());
-        var companyOf = companyIds.ToDictionary(c => Token(typeof(Core.Company), c.PublicId), c => c.Id, StringComparer.Ordinal);
+        var companyOf = companyIds.ToDictionary(c => Token(typeof(PlatformDomain.Company), c.PublicId), c => c.Id, StringComparer.Ordinal);
         Values["key"] = (await JsonAsync(await a.Owner.Client.GetAsync($"/api/v1/companies/{a.Companies[0]}/reports/catalog")))
             .EnumerateArray().Select(e => e.GetProperty("key").GetString()!).ToArray();
 
@@ -444,8 +444,8 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         await (await c.PostAsJsonAsync(U("/accounting/journal-templates"), new JournalTemplateRequest(marker + " template", null, null,
             [new JournalTemplateLineRequest(acc["5203"].Id, 50m, 0m, null, null), new JournalTemplateLineRequest(acc["110101"].Id, 0m, 50m, null, null)]))).EnsureOkAsync();
         await (await c.PostAsJsonAsync(U("/accounting/budgets"), new CreateBudgetRequest(Today.Year, marker + " plan"))).EnsureOkAsync();
-        var ids = await f.DbAsync(db => db.Set<Core.User>().IgnoreQueryFilters().Where(u => u.Email == o.Email).Select(u => new { T = u.TenantId!.Value }).SingleAsync());
-        var companyId = await f.DbAsync(db => db.Set<Core.Company>().IgnoreQueryFilters().Where(x => x.TenantId == ids.T).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync());
+        var ids = await f.DbAsync(db => db.Set<PlatformDomain.User>().IgnoreQueryFilters().Where(u => u.Email == o.Email).Select(u => new { T = u.TenantId!.Value }).SingleAsync());
+        var companyId = await f.DbAsync(db => db.Set<PlatformDomain.Company>().IgnoreQueryFilters().Where(x => x.TenantId == ids.T).OrderBy(x => x.Id).Select(x => x.Id).FirstAsync());
         await f.DbAsync(db => db.Database.ExecuteSqlRawAsync("INSERT INTO [acc].[PendingPostings] ([TenantId], [CompanyId], [SourceModule], [SourceType], [SourceId], [Reason], [Attempts]) " +
             "VALUES ({0}, {1}, 'ACC', 'Manual', 0, 'sweep', 1)", ids.T, companyId));
 

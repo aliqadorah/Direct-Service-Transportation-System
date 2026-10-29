@@ -1,7 +1,7 @@
 // Revision 6 (owner decision 21 Oct 2026 on DT-228, DT-230): docs/design/Database_Design_Revision6.md §B9.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Infrastructure.Persistence.Configurations.Trn;

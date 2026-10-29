@@ -348,7 +348,7 @@ public sealed class ApArTests(ApiFactory f)
         var email = o.Email;
         await f.DbAsync(async db =>
         {
-            var companyId = await db.Set<Domain.Core.UserCompanyRole>().IgnoreQueryFilters().Where(r => r.User.Email == email).Select(r => r.CompanyId).FirstAsync();
+            var companyId = await db.Set<DirectService.Platform.Domain.UserCompanyRole>().IgnoreQueryFilters().Where(r => r.User.Email == email).Select(r => r.CompanyId).FirstAsync();
             return await db.Set<PostingKeyMapping>().IgnoreQueryFilters().Where(m => m.PostingKey == "ACC.SupplierDeductions" && m.CompanyId == companyId).ExecuteDeleteAsync();
         });
         var missing = await o.Client.PostAsJsonAsync(U(o, "/apar/bills"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,

@@ -1,21 +1,19 @@
-using DirectService.Transportation.Domain.Core;
-using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Contracts.Security;
 
 namespace DirectService.Transportation.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Platform-wide reference data defined by the PRD, seeded through EF Core migration seed data:
-/// the 22 permission keys (PRD 3.4, namespaced per owner decision D-01), the three budget keys (revision 6 part B), the journal posting key (DT-201) and the TRIAL plan
-/// (owner decision D-12; limits are placeholders the provider edits in the console).
-/// Per-tenant and per-company reference data (preset roles, built-in ownership type, settings,
-/// number sequences, invoice layouts) is created by the application when a tenant/company is created.
+/// The permission keys this module owns (trn.* and, until Stage 3, acc.*), seeded as core.Permissions rows by the Platform model contributor
+/// (split by owner in Stage 2 session 11, design a.6; same Ids, PublicIds and values): the transport and accounting keys of PRD 3.4
+/// (namespaced per owner decision D-01), the three budget keys (revision 6 part B) and the journal posting key (DT-201). The platform keys
+/// (core.*) and the TRIAL plan are seeded by Platform.Infrastructure (PlatformReferenceDataSeed).
 /// </summary>
-internal static class ReferenceDataSeed
+public sealed class ReferenceDataSeed : IPermissionSeedProvider
 {
-    private static readonly DateTime SeededAt = new(2026, 10, 8, 0, 0, 0, DateTimeKind.Utc);
+    public IReadOnlyList<PermissionSeed> Permissions { get; } = Rows.Select(p => new PermissionSeed(p.Id, p.PublicId, p.Key, p.Group, p.Ar, p.En)).ToList();
 
     /// <summary>(Id, PublicId, key, group, Arabic, English) — English text from PRD 3.4.</summary>
-    internal static readonly (long Id, string PublicId, string Key, string Group, string Ar, string En)[] Permissions =
+    private static readonly (long Id, string PublicId, string Key, string Group, string Ar, string En)[] Rows =
     [
         (1, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a01", "trn.trips.view", "Trips",
             "عرض الرحلات وسجلّ تغييراتها", "View trips and trip history"),
@@ -61,15 +59,6 @@ internal static class ReferenceDataSeed
         (19, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a19", "trn.masters.manage", "Reports & master data",
             "إدارة البيانات الأساسية والتعرفات وأسعار المواقع الشهرية والشركاء، وإدخال أسعار السائقين يدوياً",
             "Manage master data, tariffs, monthly site prices and partners; enter manual driver-rate overrides"),
-        (20, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a20", "core.settings.manage", "Administration",
-            "إعدادات الشركة وربط الحسابات والضريبة والفترات والترقيم وتهيئة الحقول والنماذج",
-            "Company settings, account mapping, tax, periods, numbering, configuration of fields and layouts"),
-        (21, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a21", "core.users.manage", "Administration",
-            "دعوة المستخدمين وتعديلهم وتعطيلهم وفكّ قفلهم وأرشفتهم وتعيين الأدوار",
-            "Invite, edit, disable, unlock and archive users; assign roles"),
-        (22, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a22", "core.tenant.manage", "Tenant",
-            "الاشتراك والخطة والفوترة، وإنشاء الشركات وأرشفتها، وإعدادات المشترك العامة",
-            "Subscription, plan and billing; create and archive companies; tenant-wide settings"),
         // Revision 6 part B (owner change request 15 Oct 2026): budgets.
         (23, "7c1f4a2e-0b51-4f0e-9a0d-1d4b5d0c6a23", "acc.budget.view", "Accounting",
             "عرض الموازنات وتقرير الموازنة مقابل الفعلي", "View budgets and the budget vs actual report"),
@@ -83,35 +72,4 @@ internal static class ReferenceDataSeed
             "ترحيل القيود اليومية: ترحيل القيود اليدوية والمسودات، وتعديل القيود المرحّلة وإلغاؤها، واستيراد القيود",
             "Post journal entries: post manual entries and drafts, edit and void posted entries, import entries"),
     ];
-
-    internal static void Apply(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Permission>().HasData(Permissions.Select(p => new Permission
-        {
-            Id = p.Id,
-            PublicId = Guid.Parse(p.PublicId),
-            PermissionKey = p.Key,
-            GroupName = p.Group,
-            DescriptionAr = p.Ar,
-            DescriptionEn = p.En,
-            CreatedAt = SeededAt,
-        }));
-
-        modelBuilder.Entity<Plan>().HasData(new Plan
-        {
-            Id = 1,
-            PublicId = Guid.Parse("3f9a1c7e-2d44-4b8e-8f1a-6c0b9e2d7a01"),
-            Code = "TRIAL",
-            NameAr = "تجريبية",
-            NameEn = "Trial",
-            Price = 0m,
-            BillingCycle = "Monthly",
-            MaxCompanies = 2,
-            MaxActiveUsers = 5,
-            MaxTripsPerMonth = 2000,
-            MaxStorageMb = 1024,
-            IsActive = false,
-            CreatedAt = SeededAt,
-        });
-    }
 }

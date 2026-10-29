@@ -13,7 +13,7 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
 using DirectService.Transportation.Web.Workers;
 using Microsoft.Extensions.DependencyInjection;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 

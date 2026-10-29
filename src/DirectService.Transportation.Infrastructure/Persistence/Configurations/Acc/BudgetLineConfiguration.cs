@@ -1,7 +1,7 @@
 // Revision 6 part B (owner change request 15 Oct 2026): budget lines. Hand-written in the style of the generated configurations.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Acc;
 
 namespace DirectService.Transportation.Infrastructure.Persistence.Configurations.Acc;

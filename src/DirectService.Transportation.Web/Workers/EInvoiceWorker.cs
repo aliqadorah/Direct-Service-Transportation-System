@@ -2,7 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using DirectService.Transportation.Infrastructure.EInvoicing;
 using DirectService.Shared.Infrastructure.Persistence;

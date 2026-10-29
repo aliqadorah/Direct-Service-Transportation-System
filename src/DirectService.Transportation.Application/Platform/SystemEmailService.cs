@@ -7,7 +7,7 @@ using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

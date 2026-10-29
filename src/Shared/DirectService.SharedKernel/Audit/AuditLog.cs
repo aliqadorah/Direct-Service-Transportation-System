@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-// Shared since Stage 2 session 8 (DT-323): ids only; the foreign keys to core.Tenants / Companies / Users are in Transportation.Infrastructure
+// Shared since Stage 2 session 8 (DT-323): ids only; the foreign keys to core.Tenants / Companies / Users are in Platform.Infrastructure
 // Persistence/CrossModuleRelationships.cs (design a.2), with the same names.
 namespace DirectService.SharedKernel;
 

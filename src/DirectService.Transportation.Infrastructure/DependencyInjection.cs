@@ -29,6 +29,7 @@ public static class DependencyInjection
 
         services.AddSharedInfrastructure(configuration);
         services.AddSingleton<IModelContributor, TransportationModelContributor>();
+        services.AddSingleton<DirectService.Platform.Contracts.Security.IPermissionSeedProvider, Persistence.Seed.ReferenceDataSeed>();
         services.AddDbContext<MasterDbContext>((sp, o) => o
             .UseMasterDatabase(cs, sql => sql.CommandTimeout(60))
             .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>(), sp.GetRequiredService<LiveChangeInterceptor>()));

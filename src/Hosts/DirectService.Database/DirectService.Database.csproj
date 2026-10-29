@@ -10,6 +10,7 @@
     <Using Include="DirectService.SharedKernel" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Platform\DirectService.Platform.Infrastructure\DirectService.Platform.Infrastructure.csproj" />
     <ProjectReference Include="..\..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>

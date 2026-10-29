@@ -1,12 +1,11 @@
-using DirectService.Transportation.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Infrastructure.Persistence;
 
 /// <summary>
 /// This assembly's part of the composed <see cref="MasterDbContext"/> (platform design d): every entity configuration under
-/// Configurations (core / acc / cfg / trn, until they move to their modules), the foreign keys of Shared tables to the core anchors
-/// (<see cref="CrossModuleRelationships"/>), the reference data seed and the SQL functions of the reports.
+/// Configurations (acc / trn, cfg.EInvoiceSettings and core.MaintenanceLogs, until they move to their modules) and the SQL functions of the
+/// reports. Its permission rows are seeded by the Platform contributor from <see cref="Seed.ReferenceDataSeed"/> (Stage 2 session 11).
 /// </summary>
 public sealed class TransportationModelContributor : IModelContributor
 {
@@ -14,8 +13,6 @@ public sealed class TransportationModelContributor : IModelContributor
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TransportationModelContributor).Assembly);
-        CrossModuleRelationships.Apply(modelBuilder);
-        ReferenceDataSeed.Apply(modelBuilder);
         MapJsonFunctions(modelBuilder);
     }
 

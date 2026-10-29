@@ -120,8 +120,8 @@ public sealed class EInvoiceTests(ApiFactory f)
         Assert.Equal(16m, (await ReadAsync<InvoiceDetails>(await o.Client.GetAsync(U(o, $"/invoices/{draft.Invoice.Id}")))).Invoice.TaxRate);
         var audit = await f.DbAsync(async db =>
         {
-            var pid = f.Services.GetRequiredService<IUrlTokenService>().Decode<Domain.Core.Company>(o.CompanyId)!.Value;
-            var id = await db.Set<Domain.Core.Company>().IgnoreQueryFilters().Where(x => x.PublicId == pid).Select(x => x.Id).SingleAsync();
+            var pid = f.Services.GetRequiredService<IUrlTokenService>().Decode<DirectService.Platform.Domain.Company>(o.CompanyId)!.Value;
+            var id = await db.Set<DirectService.Platform.Domain.Company>().IgnoreQueryFilters().Where(x => x.PublicId == pid).Select(x => x.Id).SingleAsync();
             return await db.Set<AuditLog>().IgnoreQueryFilters()
                 .Where(a => a.EntityType == "CORE.Company" && a.EntityId == id && a.Action == "SettingChange").Select(a => new { a.OldValues, a.NewValues }).ToListAsync();
         });

@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 

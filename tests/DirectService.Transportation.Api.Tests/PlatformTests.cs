@@ -8,7 +8,7 @@ using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using DirectService.Transportation.Infrastructure.Billing;
 using Microsoft.EntityFrameworkCore;
@@ -99,7 +99,7 @@ public sealed class PlatformTests(ApiFactory f)
     {
         var metadata = new Dictionary<string, string> { ["kind"] = kind };
         if (plan is not null)
-            metadata["plan"] = (await f.DbAsync(db => db.Set<Domain.Core.Plan>().Where(p => p.Code == plan).Select(p => p.PublicId).SingleAsync())).ToString("N");
+            metadata["plan"] = (await f.DbAsync(db => db.Set<DirectService.Platform.Domain.Plan>().Where(p => p.Code == plan).Select(p => p.PublicId).SingleAsync())).ToString("N");
         var body = JsonSerializer.Serialize(new { reference = invoice.GatewayReference, status, metadata, amount = amount ?? invoice.Total, currency = "JOD" });
         using var anonymous = f.CreateClient();
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
@@ -349,7 +349,7 @@ public sealed class PlatformTests(ApiFactory f)
         var code = oneUser.Code;
         await f.DbAsync(async db =>
         {
-            var plan = await db.Set<Domain.Core.Plan>().SingleAsync(p => p.Code == code);
+            var plan = await db.Set<DirectService.Platform.Domain.Plan>().SingleAsync(p => p.Code == code);
             var t = await db.Set<Tenant>().IgnoreQueryFilters().SingleAsync(t => db.Set<User>().IgnoreQueryFilters().Any(u => u.Email == owner.Email && u.TenantId == t.Id));
             t.PlanId = plan.Id;
             await db.SaveChangesAsync();

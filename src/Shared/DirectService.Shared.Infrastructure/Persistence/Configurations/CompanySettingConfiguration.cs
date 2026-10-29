@@ -1,6 +1,6 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on. Names, types, defaults and constraints must match the design.
-// Shared since Stage 2 session 4; the foreign keys to core.Tenants / Companies / Users are in Transportation.Infrastructure
+// Shared since Stage 2 session 4; the foreign keys to core.Tenants / Companies / Users are in Platform.Infrastructure
 // Persistence/CrossModuleRelationships.cs (design a.2), with the same names.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

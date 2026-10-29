@@ -1,0 +1,65 @@
+// Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
+// Hand-maintained from here on.
+namespace DirectService.Platform.Domain;
+
+/// <summary>
+/// core.Users â€” Tenant-scoped (TenantId NULL for provider staff).
+/// </summary>
+[StoredName("CORE.User")]
+[TokenLabel("User")]
+public class User : AuditableEntity, INullableTenantScoped
+{
+    /// <summary>Owning tenant; NULL for provider staff.</summary>
+    public long? TenantId { get; set; }
+    /// <summary>User's full name.</summary>
+    public string FullName { get; set; } = string.Empty;
+    /// <summary>Sign-in email; NULL for a user created by an administrator with a username and no email (revision 6).</summary>
+    public string? Email { get; set; }
+    /// <summary>Upper-cased email used for look-ups (Identity).</summary>
+    public string? NormalizedEmail { get; set; }
+    /// <summary>Sign-in username set by an administrator (revision 6): letters, digits and . _ - only, unique platform-wide.</summary>
+    public string? UserName { get; set; }
+    /// <summary>Upper-cased username used for look-ups (Identity).</summary>
+    public string? NormalizedUserName { get; set; }
+    /// <summary>The user must choose a new password at the next sign-in (revision 6; set by the administrator).</summary>
+    public bool MustChangePassword { get; set; }
+    /// <summary>When the user verified their email address (sign-up link or accepted invitation).</summary>
+    public DateTime? EmailConfirmedAt { get; set; }
+    /// <summary>Salted password hash (Identity). Never shown or emailed.</summary>
+    public string PasswordHash { get; set; } = string.Empty;
+    /// <summary>Identity security stamp; changed on password/2FA change to invalidate sessions.</summary>
+    public string SecurityStamp { get; set; } = string.Empty;
+    /// <summary>1 for provider staff (no tenant).</summary>
+    public bool IsPlatformStaff { get; set; }
+    /// <summary>Encrypted authenticator-app key.</summary>
+    public byte[]? TwoFactorSecret { get; set; }
+    /// <summary>When mandatory 2FA was set up (first sign-in).</summary>
+    public DateTime? TwoFactorEnabledAt { get; set; }
+    /// <summary>Interface language.</summary>
+    public string LanguageCode { get; set; } = "ar";
+    /// <summary>Company opened after sign-in.</summary>
+    public long? DefaultCompanyId { get; set; }
+    /// <summary>Preferred date format.</summary>
+    public string DateFormat { get; set; } = "dd/MM/yyyy";
+    /// <summary>Account state.</summary>
+    public string Status { get; set; } = "Active";
+    /// <summary>Consecutive failed sign-ins.</summary>
+    public int FailedSignInCount { get; set; }
+    /// <summary>Sign-in blocked until this UTC time.</summary>
+    public DateTime? LockedUntil { get; set; }
+    /// <summary>
+    /// The 30-second time step of the last authenticator code accepted (Unix seconds / 30). A code is accepted only for a later step, so
+    /// one code can never be used twice (owner decision 19 Oct 2026, DT-212). Claimed by one conditional update in the token provider.
+    /// </summary>
+    public long? TwoFactorLastStep { get; set; }
+    /// <summary>
+    /// Revision 6 (owner testing 21 Oct 2026, DT-229): a requested new email address, waiting for its owner to confirm the link sent to it
+    /// (asked by the user, or started by an Owner / Administrator). Sign-in and password reset keep using <see cref="Email"/> until then.
+    /// </summary>
+    public string? PendingEmail { get; set; }
+    /// <summary>When the pending change was asked (UTC); part of the link's purpose, so a new request makes earlier links useless.</summary>
+    public DateTime? PendingEmailAt { get; set; }
+    /// <summary>Last successful sign-in.</summary>
+    public DateTime? LastSignInAt { get; set; }
+    public Company? DefaultCompany { get; set; }
+}

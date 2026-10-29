@@ -268,7 +268,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
     }
 
     private async Task<int> ledger_Decimals(CancellationToken ct) =>
-        await db.Set<Domain.Core.Company>().AsNoTracking().Where(c => c.Id == ctx.CompanyId).Select(c => (int)c.CurrencyDecimals).SingleAsync(ct).ConfigureAwait(false);
+        await db.Set<DirectService.Platform.Domain.Company>().AsNoTracking().Where(c => c.Id == ctx.CompanyId).Select(c => (int)c.CurrencyDecimals).SingleAsync(ct).ConfigureAwait(false);
 
     // ============================================================ RPT-05 … RPT-10 groupings of trips
 

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using DirectService.Platform.Infrastructure;
 using DirectService.Transportation.Application;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Errors;
@@ -21,6 +22,7 @@ var config = builder.Configuration;
 // ---------------------------------------------------------------- services
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(config);
+builder.Services.AddPlatformInfrastructure(config);
 builder.Services.AddOptions<AppOptions>().Bind(config.GetSection(AppOptions.Section));
 
 // Key ring of the auth cookies, antiforgery tokens and stored credentials (DT-221): see DataProtectionSetup.

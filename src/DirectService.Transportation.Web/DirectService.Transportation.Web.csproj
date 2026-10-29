@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Platform\DirectService.Platform.Infrastructure\DirectService.Platform.Infrastructure.csproj" />
     <ProjectReference Include="..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
     <!-- The migrations assembly (MasterDatabase.MigrationsAssembly): the start-up check applies / counts its migrations (DT-209). -->
     <ProjectReference Include="..\Hosts\DirectService.Database\DirectService.Database.csproj" />

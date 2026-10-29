@@ -3,7 +3,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Identity;

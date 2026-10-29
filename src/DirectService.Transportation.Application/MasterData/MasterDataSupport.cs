@@ -10,7 +10,7 @@ using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 

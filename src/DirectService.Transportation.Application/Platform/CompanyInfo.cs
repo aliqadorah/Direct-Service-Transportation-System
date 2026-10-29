@@ -1,4 +1,4 @@
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Platform;

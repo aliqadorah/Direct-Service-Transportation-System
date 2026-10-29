@@ -4,7 +4,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Application.Platform;

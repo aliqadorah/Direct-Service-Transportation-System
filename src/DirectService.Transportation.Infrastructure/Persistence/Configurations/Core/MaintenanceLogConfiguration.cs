@@ -2,6 +2,7 @@
 // Hand-maintained from here on. Names, types, defaults and constraints must match the design.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Core;
 
 

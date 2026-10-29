@@ -187,9 +187,9 @@ public sealed class CollaborationTests(ApiFactory f)
     /// <summary>Adds a notification as an earlier version stored it (text fixed at creation, API-style link).</summary>
     private Task<int> InsertOldAsync(SignedInUser o, string type, string message, string? link, bool company = true) => f.DbAsync(async db =>
     {
-        var u = await db.Set<Domain.Core.User>().IgnoreQueryFilters().Where(x => x.Email == o.Email).Select(x => new { x.Id, x.TenantId }).SingleAsync();
+        var u = await db.Set<DirectService.Platform.Domain.User>().IgnoreQueryFilters().Where(x => x.Email == o.Email).Select(x => new { x.Id, x.TenantId }).SingleAsync();
         long? companyId = company
-            ? await db.Set<Domain.Core.UserCompanyRole>().IgnoreQueryFilters().Where(r => r.UserId == u.Id).Select(r => r.CompanyId).FirstAsync()
+            ? await db.Set<DirectService.Platform.Domain.UserCompanyRole>().IgnoreQueryFilters().Where(r => r.UserId == u.Id).Select(r => r.CompanyId).FirstAsync()
             : null;
         return await db.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO core.Notifications (PublicId, TenantId, UserId, CompanyId, NotificationType, Message, Link, CreatedAt, IsDeleted) VALUES (NEWID(), {u.TenantId}, {u.Id}, {companyId}, {type}, {message}, {link}, SYSUTCDATETIME(), 0)");
@@ -245,7 +245,7 @@ public sealed class CollaborationTests(ApiFactory f)
         var setup = Assert.Single(items, n => n.Type == NotificationService.EInvoiceSetupError);
         Assert.Null(setup.ReadAt);
         Assert.Equal("settings/e-invoicing", setup.Link);
-        Assert.Equal(0, await f.DbAsync(db => db.Set<Domain.Core.Notification>().IgnoreQueryFilters()
+        Assert.Equal(0, await f.DbAsync(db => db.Set<DirectService.Platform.Domain.Notification>().IgnoreQueryFilters()
             .CountAsync(n => n.NotificationType == "EINV.Rejected" && n.Message.Contains("refused the credentials"))));
 
         // A Dispatcher may open neither tenant screens nor e-invoicing settings: the reason is given instead of a link.
