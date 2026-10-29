@@ -1,4 +1,4 @@
-using DirectService.Transportation.Infrastructure.Email;
+using DirectService.Platform.Infrastructure.Email;
 
 namespace DirectService.Transportation.Web.Workers;
 

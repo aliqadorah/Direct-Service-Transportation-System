@@ -125,16 +125,36 @@ public sealed class LayerRuleTests
     }
 
     [Fact]
+    public void Platform_infrastructure_references_its_application_and_shared_infrastructure()
+    {
+        // Design a.2. The one temporary exception (DT-339): Transportation.Application, which still holds the identity, system e-mail and
+        // billing services these classes serve; it goes in Stage 2 session 12 with those services, and this rule then has no exception.
+        Only("DirectService.Platform.Infrastructure",
+            r => r is "DirectService.Platform.Application" or "DirectService.Shared.Infrastructure" or "DirectService.Transportation.Application",
+            "Platform.Infrastructure references its own Application and Shared.Infrastructure");
+        Only("DirectService.Platform.Application", r => r is PlatformDomain or "DirectService.Platform.Contracts" or Kernel,
+            "Platform.Application references its own Domain and Contracts and SharedKernel");
+    }
+
+    [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
     {
         // Exception E-1 (design a.2, owner decision K-09): a module's Domain and Infrastructure may use Tenant, Company and User of
         // Platform.Domain, and only to map foreign keys. Transportation.Application still holds the Platform services until Stage 2
         // session 12 (identity, platform and notification services → Platform.Application), so it is checked from then on.
         var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
-        var used = PlatformTypesUsedBy(domain);
-        Assert.NotEmpty(used);   // the reader works: the domain's User navigations
-        var others = used.Except(Anchors.Select(a => PlatformDomain + "." + a)).ToList();
-        Assert.True(others.Count == 0, "The Transportation domain uses Platform types other than the anchors (E-1): " + string.Join(", ", others));
+        var infrastructure = typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly;
+        foreach (var assembly in new[] { domain, infrastructure })
+        {
+            var used = PlatformTypesUsedBy(assembly);
+            Assert.NotEmpty(used);   // the reader works: the User navigations and their mapping
+            var others = used.Except(Anchors.Select(a => PlatformDomain + "." + a)).ToList();
+            Assert.True(others.Count == 0, $"{assembly.GetName().Name} uses Platform types other than the anchors (E-1): " + string.Join(", ", others));
+        }
+        // Nor any other Platform project but the contracts (the permission rows it seeds).
+        var platformProjects = infrastructure.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => n.StartsWith("DirectService.Platform.", StringComparison.Ordinal) && n is not PlatformDomain and not "DirectService.Platform.Contracts").ToList();
+        Assert.True(platformProjects.Count == 0, "Transportation.Infrastructure references " + string.Join(", ", platformProjects));
 
         // In a module's Domain an anchor appears only as a navigation property of an entity, mapped to a foreign key in the model.
         var model = Golden.Model;

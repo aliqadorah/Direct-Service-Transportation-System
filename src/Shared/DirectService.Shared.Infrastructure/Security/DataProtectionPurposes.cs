@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Infrastructure.Security;
+namespace DirectService.Shared.Infrastructure.Security;
 
 /// <summary>
 /// Data Protection purposes of the values stored encrypted (platform design §e, E-23). A purpose is part of the key derivation: changing one

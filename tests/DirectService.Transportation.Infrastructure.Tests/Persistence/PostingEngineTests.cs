@@ -10,7 +10,7 @@ using DirectService.Transportation.Domain.Cfg;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
-using DirectService.Transportation.Infrastructure.Security;
+using DirectService.Shared.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;

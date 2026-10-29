@@ -12,7 +12,7 @@ using DirectService.Transportation.Application.Platform;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DirectService.Transportation.Infrastructure.Email;
+namespace DirectService.Platform.Infrastructure.Email;
 
 /// <summary>
 /// Development mode: each email is written as an .eml file (the same MIME message Microsoft 365 would get, with readable 8-bit text) to the

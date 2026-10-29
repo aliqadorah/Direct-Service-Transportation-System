@@ -3,20 +3,20 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Security;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DirectService.Transportation.Infrastructure.Email;
+namespace DirectService.Platform.Infrastructure.Email;
 
 /// <summary>The client secret and the queued messages, each under its own Data Protection purpose (SEC-09).</summary>
 public sealed class DataProtectionEmailProtector(IDataProtectionProvider provider) : IEmailProtector
 {
-    private readonly IDataProtector _secret = provider.CreateProtector(Security.DataProtectionPurposes.SystemEmailClientSecret);
-    private readonly IDataProtector _payload = provider.CreateProtector(Security.DataProtectionPurposes.SystemEmailOutbox);
+    private readonly IDataProtector _secret = provider.CreateProtector(DataProtectionPurposes.SystemEmailClientSecret);
+    private readonly IDataProtector _payload = provider.CreateProtector(DataProtectionPurposes.SystemEmailOutbox);
 
     public byte[] ProtectSecret(string secret) => _secret.Protect(System.Text.Encoding.UTF8.GetBytes(secret));
 

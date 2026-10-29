@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DirectService.Transportation.Infrastructure.Identity;
+namespace DirectService.Platform.Infrastructure.Identity;
 
 /// <summary>Options of the staff invitation tokens: valid for 48 hours (owner feedback 13 Oct 2026, item 8b).</summary>
 public sealed class StaffInvitationTokenProviderOptions : DataProtectionTokenProviderOptions

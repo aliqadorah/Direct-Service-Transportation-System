@@ -3,11 +3,10 @@ using System.Text;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
-namespace DirectService.Transportation.Infrastructure.Billing;
+namespace DirectService.Platform.Infrastructure.Billing;
 
 /// <summary>
 /// Development payment gateway (DEF-02 — the real gateway is chosen later behind <see cref="IPaymentGateway"/>): a payment page URL per

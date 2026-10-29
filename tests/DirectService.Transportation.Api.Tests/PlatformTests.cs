@@ -10,7 +10,7 @@ using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
-using DirectService.Transportation.Infrastructure.Billing;
+using DirectService.Platform.Infrastructure.Billing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using DirectService.Transportation.Application.Platform;
 
-namespace DirectService.Transportation.Infrastructure.Email;
+namespace DirectService.Platform.Infrastructure.Email;
 
 /// <summary>
 /// The email as one MIME message (RFC 5322 / 2045–2047), the same for every mode: multipart/alternative with the plain text and, related to it,
@@ -53,7 +53,7 @@ internal static class MimeMessageBuilder
             .Append("--").Append(rel).Append(Crlf)
             .Append("Content-Type: image/png; name=\"logo.png\"").Append(Crlf)
             .Append("Content-Transfer-Encoding: base64").Append(Crlf)
-            .Append("Content-ID: <").Append(Application.Notifications.EmailLayout.LogoContentId).Append('>').Append(Crlf)
+            .Append("Content-ID: <").Append(DirectService.Transportation.Application.Notifications.EmailLayout.LogoContentId).Append('>').Append(Crlf)
             .Append("Content-Disposition: inline; filename=\"logo.png\"").Append(Crlf).Append(Crlf)
             .Append(Base64Lines(logo)).Append(Crlf)
             .Append("--").Append(rel).Append("--").Append(Crlf)

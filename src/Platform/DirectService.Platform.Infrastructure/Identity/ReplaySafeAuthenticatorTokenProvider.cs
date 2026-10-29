@@ -1,10 +1,9 @@
 using DirectService.Transportation.Application.Identity;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Infrastructure.Identity;
+namespace DirectService.Platform.Infrastructure.Identity;
 
 /// <summary>
 /// Authenticator codes that work once (owner decision 19 Oct 2026, DT-212). Identity's own provider accepts the same code again for as

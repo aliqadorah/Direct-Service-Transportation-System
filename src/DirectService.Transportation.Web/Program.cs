@@ -189,7 +189,7 @@ if (args is ["create-staff", var staffEmail, .. var staffName])
         .CreateAsync(staffEmail, string.Join(' ', staffName), CancellationToken.None).ConfigureAwait(false);
     // The email went into the outbox (DT-251); the command sends it now rather than leave it to the next start of the host.
     using (var sendScope = app.Services.CreateScope())
-        await sendScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Infrastructure.Email.EmailDispatcher>().RunOnceAsync(CancellationToken.None).ConfigureAwait(false);
+        await sendScope.ServiceProvider.GetRequiredService<DirectService.Platform.Infrastructure.Email.EmailDispatcher>().RunOnceAsync(CancellationToken.None).ConfigureAwait(false);
     Console.WriteLine(outcome);
     return;
 }

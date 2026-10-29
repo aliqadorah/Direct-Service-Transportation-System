@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using DirectService.Transportation.Infrastructure.Security;
+using DirectService.Shared.Infrastructure.Security;
 
 namespace DirectService.Transportation.Infrastructure.Tests.Security;
 

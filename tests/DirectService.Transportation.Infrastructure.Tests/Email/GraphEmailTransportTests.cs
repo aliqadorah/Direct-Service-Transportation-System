@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Infrastructure.Email;
+using DirectService.Platform.Infrastructure.Email;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 

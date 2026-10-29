@@ -1,10 +1,10 @@
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Infrastructure.Persistence;
+using DirectService.Shared.Infrastructure.Security;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Infrastructure.Identity;
+namespace DirectService.Platform.Infrastructure.Identity;
 
 /// <summary>
 /// ASP.NET Core Identity store over the design's own tables (build prompt: no AspNet* tables):
@@ -24,7 +24,7 @@ public sealed class UserStore(MasterDbContext db, IDataProtectionProvider protec
     IUserAuthenticatorKeyStore<User>,
     IUserTwoFactorRecoveryCodeStore<User>
 {
-    private readonly IDataProtector _secretProtector = protection.CreateProtector(Security.DataProtectionPurposes.TwoFactorSecret);
+    private readonly IDataProtector _secretProtector = protection.CreateProtector(DataProtectionPurposes.TwoFactorSecret);
     private static readonly string[] TenantFilter = [QueryFilters.Tenant];
 
     private IQueryable<User> Users => db.Set<User>().IgnoreQueryFilters(TenantFilter);

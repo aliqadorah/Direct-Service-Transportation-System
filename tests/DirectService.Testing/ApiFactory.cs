@@ -78,7 +78,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             s.RemoveAll<IEmailSender>();
             s.AddSingleton<IEmailSender>(Emails);
             // System email (DT-250): Microsoft sign-in and Graph are the test double in every API test — never a real credential or email.
-            s.AddHttpClient(DirectService.Transportation.Infrastructure.Email.GraphEmailTransport.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Graph);
+            s.AddHttpClient(DirectService.Platform.Infrastructure.Email.GraphEmailTransport.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Graph);
             s.RemoveAll<IRealtimeNotifier>();
             s.AddSingleton<IRealtimeNotifier>(Live);
             s.AddTransient<IStartupFilter, TestClientIpFilter>();
@@ -381,6 +381,6 @@ public sealed class SystemEmailFactory : ApiFactory
     {
         base.ConfigureWebHost(builder);
         builder.UseSetting("Email:DropFolder", DropFolder);
-        builder.ConfigureServices(s => s.AddScoped<DirectService.Transportation.Infrastructure.Email.OutboxEmailSender>());
+        builder.ConfigureServices(s => s.AddScoped<DirectService.Platform.Infrastructure.Email.OutboxEmailSender>());
     }
 }

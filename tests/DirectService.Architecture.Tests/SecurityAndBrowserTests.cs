@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Contracts.Collaboration;
-using DirectService.Transportation.Infrastructure.Security;
+using DirectService.Shared.Infrastructure.Security;
 using DirectService.Transportation.Web.Realtime;
 using DirectService.Transportation.Web.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -67,7 +67,7 @@ public sealed class SecurityAndBrowserTests
     [Fact]
     public void Identity_token_providers_and_the_url_token_prefix_are_unchanged()
     {
-        Same(Value("identityTokenProviders", "replaySafe"), DirectService.Transportation.Infrastructure.Identity.ReplaySafeAuthenticatorTokenProvider.Name);
+        Same(Value("identityTokenProviders", "replaySafe"), DirectService.Platform.Infrastructure.Identity.ReplaySafeAuthenticatorTokenProvider.Name);
         Same(Value("identityTokenProviders", "staffInvitationProvider"), DirectService.Transportation.Application.Platform.StaffService.InvitationTokenProvider);
         Same(Value("identityTokenProviders", "staffInvitationPurpose"), DirectService.Transportation.Application.Platform.StaffService.InvitationPurpose);
         Same(Value("urlTokenInfoPrefix"), UrlTokenService.InfoPrefix);
@@ -113,9 +113,9 @@ public sealed class SecurityAndBrowserTests
         Same(Value("files", "fileStoreDefaultRoot"), DirectService.Shared.Infrastructure.Files.LocalFileStore.DefaultRoot);
         Same(Value("files", "mailDropFolder"), new DirectService.Transportation.Application.Platform.SystemEmailOptions().DropFolder);
         Golden.SameSet("Embedded resources of the infrastructure (E-32)", Golden.Strings(G["files"]!["embeddedResources"]),
-            typeof(DataProtectionPurposes).Assembly.GetManifestResourceNames());
-        Same(Golden.Strings(G["files"]!["embeddedResources"]).Single(), DirectService.Transportation.Infrastructure.Email.EmailLogo.ResourceName);
-        Assert.NotEmpty(DirectService.Transportation.Infrastructure.Email.EmailLogo.Png);
+            typeof(DirectService.Platform.Infrastructure.Email.EmailLogo).Assembly.GetManifestResourceNames());   // moved with EmailLogo (Stage 2 session 11)
+        Same(Golden.Strings(G["files"]!["embeddedResources"]).Single(), DirectService.Platform.Infrastructure.Email.EmailLogo.ResourceName);
+        Assert.NotEmpty(DirectService.Platform.Infrastructure.Email.EmailLogo.Png);
 
         string UserSecrets(string csproj) => Regex.Match(Source(csproj), "<UserSecretsId>([^<]+)</UserSecretsId>").Groups[1].Value;
         Same(Value("userSecretsIds", "web"), UserSecrets("src/DirectService.Transportation.Web/DirectService.Transportation.Web.csproj"));

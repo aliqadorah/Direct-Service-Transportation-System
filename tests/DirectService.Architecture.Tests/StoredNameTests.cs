@@ -6,7 +6,7 @@ using DirectService.Database;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Shared.Infrastructure.Persistence.Interceptors;
-using DirectService.Transportation.Infrastructure.Security;
+using DirectService.Shared.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

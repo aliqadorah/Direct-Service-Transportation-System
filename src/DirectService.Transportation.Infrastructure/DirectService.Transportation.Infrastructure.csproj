@@ -16,16 +16,11 @@
     <InternalsVisibleTo Include="DirectService.Testing" />
   </ItemGroup>
   <ItemGroup>
-    <!-- ASP.NET Core Identity token providers and Data Protection -->
+    <!-- Data Protection (e-invoicing credentials), options and HTTP clients of the host framework. Identity, e-mail and billing are in
+         Platform.Infrastructure (Stage 2 session 11). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <!-- System email, Microsoft 365 (DT-250): the Entra client-secret token for Microsoft Graph (already in the graph through Microsoft.Data.SqlClient). -->
-    <PackageReference Include="Azure.Identity" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- The logo of every email (inline image "cid:logo", DT-253). -->
-    <EmbeddedResource Include="..\..\assets\logo.png" LogicalName="DST.Email.Logo.png" />
   </ItemGroup>
 </Project>
