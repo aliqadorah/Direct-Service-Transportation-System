@@ -41,7 +41,7 @@ public sealed record DescribeOptions(bool CreateValues = false, bool LinkRecord 
 /// users — soft-deleted records by their name, records no longer found by the last name the log recorded. Only records of the reader's
 /// tenant and company are read (the query filters stay on). Presentation only: nothing stored is changed.
 /// </summary>
-public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens)
+public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IUserNames users, ICompanyInfo companies)
 {
     private const string Dash = "—";
     private const string JournalEntry = "ACC.JournalEntry";
@@ -55,6 +55,10 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
     private IRequestContext Ctx => ctx;
 
     private IUrlTokenService Tokens => tokens;
+
+    private IUserNames Users => users;
+
+    private ICompanyInfo Companies => companies;
 
     private string W(Words w) => w.In(En);
 
@@ -204,9 +208,8 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             if (userIds.Count > 0)
             {
                 // Names of the users who acted (platform support staff have no tenant, hence no filter; only ids found in this log).
-                foreach (var u in await d.Db.Set<User>().IgnoreQueryFilters().AsNoTracking().Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.FullName })
-                             .ToListAsync(ct).ConfigureAwait(false))
-                    _users[u.Id] = u.FullName;
+                foreach (var (id, name) in await d.Users.FullNamesAsync(userIds, ct).ConfigureAwait(false))
+                    _users[id] = name;
             }
 
             var types = rows.Select(r => r.Row.EntityType).Where(t => t is not null).Select(t => t!).Distinct().ToList();
@@ -224,7 +227,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                 .Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct).ConfigureAwait(false);
             if (rows.Any(r => r.Old.Concat(r.New).Any(kv => d.KindOf(r.Row.EntityType, kv.Key) == Kind.DateTime)))
             {
-                var zone = await d.Db.Set<Company>().AsNoTracking().Where(c => c.Id == d.Ctx.CompanyId).Select(c => c.TimeZone).SingleOrDefaultAsync(ct).ConfigureAwait(false);
+                var zone = await d.Companies.TimeZoneAsync(ct).ConfigureAwait(false);
                 if (zone is not null && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var tz)) _zone = tz;
             }
         }

@@ -62,8 +62,8 @@ public sealed class TenantFilterGuardTests
         // Notification holders and names of the people who acted.
         ["NotificationService.HoldersAsync|NotifyAsync|PushAsync|ReportSetupErrorAsync|ClearSetupErrorAsync"] = "Notification holders/recipients by explicit company or user ids (users of the company; staff have no tenant).",
         ["RecordLockService.AcquireAsync"] = "Record locks: scope set to the lock's own tenant/company.",
-        ["UserNames.FullNameAsync"] = "A user's display name by user id (the holder of a record lock, DT-312).",
-        ["AuditDescriber.LoadAsync|PrepareAsync"] = "Names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only.",
+        ["UserNames.FullNameAsync|FullNamesAsync"] = "A user's display name by user id (the holder of a record lock, DT-312); names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only (DT-322).",
+        ["AuditDescriber.LoadAsync"] = "Names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only.",
         ["AuditLogService.FacetsAsync"] = "Users who have a row in this company's log: explicit CompanyId condition, names only.",
         ["RateHistoryLog.ReadAsync"] = "Names of the users who changed this company's rates (ids from the company's own rows), names only.",
         ["SupportAccessService.ListAsync|RefusalReasonsAsync|TellStaffAsync|EndsAsync|AnnounceEndAsync|WhyClosedAsync|ExpireDueAsync"] = "Names of staff/Owners by ids from this tenant's own grants; audit rows by explicit TenantId (DT-213); a staff member's own window by explicit tenant/staff ids; the window job closes each grant in a scope set to its own tenant (DT-220).",

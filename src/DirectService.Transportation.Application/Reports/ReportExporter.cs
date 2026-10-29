@@ -4,8 +4,6 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Core;
-using Microsoft.EntityFrameworkCore;
 using static DirectService.Transportation.Application.Common.DocumentPrinter;
 
 namespace DirectService.Transportation.Application.Reports;
@@ -36,7 +34,7 @@ public sealed record ReportTable(string Title, IReadOnlyList<(string Label, stri
 /// the company header, title, filters, print date and user, page X of Y, in the reader's direction (RTL for Arabic). Used by the
 /// financial reports (B9) and the report engine (B10).
 /// </summary>
-public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, DocumentPrinter printer, ISpreadsheetService sheets, TimeProvider clock)
+public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, DocumentPrinter printer, ISpreadsheetService sheets, TimeProvider clock)
 {
     public bool En => ctx.Language == "en";
 
@@ -99,7 +97,7 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
             case "csv":
                 return new GeneratedFile(Safe(fileName) + ".csv", "text/csv", sheets.WriteCsv(headers, rows.Select(r => (IReadOnlyList<object?>)r.Select(Cell).ToList())));
             case "pdf" or "html":
-                var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
+                var company = await companies.CurrentAsync(ct).ConfigureAwait(false);
                 return await printer.OutputAsync(Html(table, company), f, Safe(fileName), ct).ConfigureAwait(false);
             default:
                 throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
@@ -121,7 +119,7 @@ public sealed class ReportExporter(IAppDbContext db, IRequestContext ctx, Docume
 
     private static string Safe(string name) => new(name.Select(ch => char.IsAsciiLetterOrDigit(ch) || ch is '-' or '_' ? ch : '_').ToArray());
 
-    private string Html(ReportTable t, Company company)
+    private string Html(ReportTable t, CompanyHeader company)
     {
         var printed = clock.GetUtcNow().UtcDateTime;
         var tz = TimeZoneInfo.FindSystemTimeZoneById(company.TimeZone);

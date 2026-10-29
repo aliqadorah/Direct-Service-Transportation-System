@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// total and its state normal / warning / exceeded.
 /// </summary>
 public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, ReportBuilderService builder, ReportExporter exporter,
-    AuditTrail audit, IChangeContext changes)
+    AuditTrail audit, IChangeContext changes, IUserNames users)
 {
     public const string EntityType = "CFG.SavedReport";
 
@@ -155,17 +155,18 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     private async Task<List<SavedReportResponse>> ResponsesAsync(IReadOnlyList<long> ids, CancellationToken ct)
     {
         var me = UserId;
-        // The owner by an inner join on the filtered users, as the former required navigation OwnerUser did (DT-306).
         var rows = await db.Set<SavedReport>().AsNoTracking().Where(r => ids.Contains(r.Id))
-            .Join(db.Set<User>(), r => r.OwnerUserId, u => u.Id, (r, u) => new
+            .Select(r => new
             {
-                R = r, OwnerPid = u.PublicId, Owner = u.FullName,
+                R = r,
                 Pinned = db.Set<DashboardPin>().Any(p => p.SavedReportId == r.Id && p.UserId == me),
                 LastRun = db.Set<AuditLog>().Where(a => a.EntityType == EntityType && a.EntityId == r.Id && a.Action == "Run").Max(a => (DateTime?)a.OccurredAt),
             }).ToListAsync(ct).ConfigureAwait(false);
-        var byId = rows.ToDictionary(x => x.R.Id);
+        // The owner among the users the request may see, as the former inner join on the filtered users did (DT-306, DT-322).
+        var owners = await users.VisibleAsync(rows.Select(x => x.R.OwnerUserId).ToList(), ct).ConfigureAwait(false);
+        var byId = rows.Where(x => owners.ContainsKey(x.R.OwnerUserId)).ToDictionary(x => x.R.Id);
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).Select(x => new SavedReportResponse(support.Token<SavedReport>(x.R.PublicId), x.R.Name, x.R.Source,
-            Parse(x.R.Definition), x.R.IsShared, new Ref(support.Token<User>(x.OwnerPid), x.Owner), x.R.OwnerUserId == me || (x.R.IsShared && IsAdministrator), x.Pinned,
+            Parse(x.R.Definition), x.R.IsShared, new Ref(owners[x.R.OwnerUserId].Token, owners[x.R.OwnerUserId].FullName), x.R.OwnerUserId == me || (x.R.IsShared && IsAdministrator), x.Pinned,
             x.LastRun is DateTime t ? DateTime.SpecifyKind(t, DateTimeKind.Utc) : null, DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc),
             Convert.ToBase64String(x.R.RowVersion))).ToList();
     }

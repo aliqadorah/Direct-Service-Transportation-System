@@ -98,4 +98,13 @@ public interface IUserNames
 {
     /// <summary>The user's full name, whatever their tenant or state (the same lookup the lock service made before).</summary>
     Task<string> FullNameAsync(long userId, CancellationToken ct);
+
+    /// <summary>Full names of several users (who acted, in the audit history), whatever their tenant or state; unknown ids are absent.</summary>
+    Task<IReadOnlyDictionary<long, string>> FullNamesAsync(IReadOnlyCollection<long> userIds, CancellationToken ct);
+
+    /// <summary>
+    /// The users among the ids that the current request may see (the users set with its filters, as an inner join on it gives), with
+    /// their URL tokens and names — e.g. the owners of saved reports (DT-322).
+    /// </summary>
+    Task<IReadOnlyDictionary<long, NamedUser>> VisibleAsync(IReadOnlyCollection<long> userIds, CancellationToken ct);
 }

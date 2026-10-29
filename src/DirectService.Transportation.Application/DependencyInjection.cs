@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
         services.AddScoped<IUserNames, Identity.UserNames>();
+        services.AddScoped<ICompanyInfo, Platform.CompanyInfo>();
         services.AddSingleton<IErrorText, ErrorText>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
 

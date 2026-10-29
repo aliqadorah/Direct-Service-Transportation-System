@@ -32,12 +32,16 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
         public Guid? Decode(Type entityType, string? token) => null;
     }
 
-    private static AuditDescriber Describer(MasterDbContext ctx, TestTenant t, string language) =>
-        new(ctx, new RequestContext
+    private static AuditDescriber Describer(MasterDbContext ctx, TestTenant t, string language)
+    {
+        var request = new RequestContext
         {
             Language = language, TenantId = t.TenantId, CompanyId = t.CompanyId, UserId = t.UserId,
             Permissions = Contracts.Security.PermissionKeys.All.ToHashSet(),
-        }, new Tokens());
+        };
+        var tokens = new Tokens();
+        return new(ctx, request, tokens, new Application.Identity.UserNames(ctx, tokens), new Application.Platform.CompanyInfo(ctx, request));
+    }
 
     private static string Json(object values) => JsonSerializer.Serialize(values);
 

@@ -4,7 +4,6 @@ using System.Text;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Core;
 
 namespace DirectService.Transportation.Application.Common;
 
@@ -67,7 +66,7 @@ public sealed class DocumentPrinter(IAppDbContext db, IRequestContext ctx, IPdfR
         + (mark is null ? string.Empty : "<div class=\"copy\">" + E(mark) + "</div>") + body + "</body></html>";
 
     /// <summary>Company name, tax and registration numbers, address, phone, logo, optional header band.</summary>
-    public string Header(Company company, bool showLogo = true, string? band = null)
+    public string Header(CompanyHeader company, bool showLogo = true, string? band = null)
     {
         ArgumentNullException.ThrowIfNull(company);
         var logo = showLogo && company.LogoFile is { Length: > 0 } bytes ? $"<img src=\"data:{ImageType(bytes)};base64,{Convert.ToBase64String(bytes)}\" alt=\"\">" : string.Empty;
