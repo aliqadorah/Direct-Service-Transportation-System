@@ -4,7 +4,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using static DirectService.Transportation.Application.Common.DocumentPrinter;
+using static DirectService.SharedKernel.DocumentPrinter;
 
 namespace DirectService.Transportation.Application.Reports;
 

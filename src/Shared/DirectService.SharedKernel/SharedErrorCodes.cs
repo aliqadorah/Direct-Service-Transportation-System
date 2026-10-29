@@ -34,4 +34,6 @@ public static class SharedErrorCodes
     public const string CustomFieldTypeFixed = "customField.typeFixed";
     public const string CustomFieldOptions = "customField.options";
     public const string CustomFieldOptionInUse = "customField.optionInUse";
+    public const string PrintUnavailable = "print.unavailable";
+    public const string PrintoutTooLarge = "export.printoutTooLarge";
 }

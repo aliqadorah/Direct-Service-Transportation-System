@@ -1,10 +1,7 @@
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// FR-163: an issued document keeps the names it was issued with. Master data is renamed by id (the cascade is immediate everywhere else),

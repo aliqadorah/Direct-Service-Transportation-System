@@ -130,4 +130,20 @@ public sealed class SecurityAndBrowserTests
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), "ViewKey=\"([^\"]+)\"").Select(m => m.Groups[1].Value));
         Golden.SameSet("Column view keys (cfg.TableColumnViews.ViewKey, E-15)", Golden.Strings(G["viewKeys"]), views);
     }
+
+    [Fact]
+    public void Brand_fonts_are_embedded_with_their_logical_names_where_BrandFonts_reads_them()
+    {
+        // E-32: the fonts moved with BrandFonts from the Application assembly to SharedKernel (Stage 2 session 8, DT-325); these are the
+        // LogicalNames the Application assembly had before the move, read with typeof(BrandFonts).Assembly.
+        string[] files =
+        [
+            "ibm-plex-sans-arabic-arabic-400-normal.woff2", "ibm-plex-sans-arabic-arabic-600-normal.woff2", "ibm-plex-sans-arabic-arabic-700-normal.woff2",
+            "ibm-plex-sans-arabic-latin-400-normal.woff2", "ibm-plex-sans-arabic-latin-600-normal.woff2", "ibm-plex-sans-arabic-latin-700-normal.woff2",
+            "inter-latin-400-normal.woff2", "inter-latin-600-normal.woff2", "inter-latin-700-normal.woff2",
+        ];
+        Golden.SameSet("Embedded brand fonts (E-32)", files.Select(f => "fonts/" + f),
+            typeof(BrandFonts).Assembly.GetManifestResourceNames().Where(n => n.StartsWith("fonts/", StringComparison.Ordinal)));
+        Assert.Equal(files.Length, BrandFonts.Css.Split("data:font/woff2;base64,").Length - 1);
+    }
 }

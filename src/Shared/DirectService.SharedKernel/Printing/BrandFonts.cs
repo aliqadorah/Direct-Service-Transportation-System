@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// The brand fonts (IBM Plex Sans Arabic, Inter — SIL OFL) as <c>@font-face</c> rules with embedded data: URIs, so printouts and PDFs

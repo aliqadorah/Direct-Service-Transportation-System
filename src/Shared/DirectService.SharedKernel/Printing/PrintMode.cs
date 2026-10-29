@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Whether the current request renders a document for the on-screen print preview (SCR-09, <c>?preview=true</c> on a print endpoint):

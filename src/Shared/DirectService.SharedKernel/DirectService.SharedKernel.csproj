@@ -12,4 +12,9 @@
     <!-- IAppDbContext exposes EF Core types (DbSet, DatabaseFacade, IModel). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
+  <!-- Brand fonts embedded in printed documents (UX-07, UX-23): the same files the UI serves (assets/fonts), as data: URIs. They moved
+       here with BrandFonts in Stage 2 session 8 with the same LogicalNames fonts/<file> (E-32, DT-325). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\assets\fonts\ibm-plex-sans-arabic-*-400-normal.woff2;..\..\..\assets\fonts\ibm-plex-sans-arabic-*-600-normal.woff2;..\..\..\assets\fonts\ibm-plex-sans-arabic-*-700-normal.woff2;..\..\..\assets\fonts\inter-latin-400-normal.woff2;..\..\..\assets\fonts\inter-latin-600-normal.woff2;..\..\..\assets\fonts\inter-latin-700-normal.woff2" LogicalName="fonts/%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

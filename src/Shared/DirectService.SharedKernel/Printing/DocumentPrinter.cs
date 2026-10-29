@@ -1,16 +1,14 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Shared.Contracts;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Shared chrome of every printed document (invoices, credit notes, vouchers, statements — UX-22, UX-23): A4 HTML shell in the reader's
 /// direction with the brand fonts, company header with logo and tax numbers, encoding helpers, and the output as HTML or as the same
-/// HTML rendered to PDF with page X of Y. Callers log the print (<see cref="AuditTrail"/>); it is saved only once the file exists.
+/// HTML rendered to PDF with page X of Y. Callers log the print (the module's <c>AuditTrail</c>); it is saved only once the file exists.
 /// </summary>
 public sealed class DocumentPrinter(IAppDbContext db, IRequestContext ctx, IPdfRenderer pdf)
 {
@@ -105,12 +103,12 @@ public sealed class DocumentPrinter(IAppDbContext db, IRequestContext ctx, IPdfR
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException and not AppException)
                 {
-                    throw new AppException(ErrorCodes.PrintUnavailable, 503);
+                    throw new AppException(SharedErrorCodes.PrintUnavailable, 503);
                 }
                 await db.SaveChangesAsync(ct).ConfigureAwait(false);
                 return new GeneratedFile(safe + ".pdf", "application/pdf", bytes);
             default:
-                throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
+                throw Fail.Field("format", SharedErrorCodes.ValidationFormat, new FieldRef("format"));
         }
     }
 }

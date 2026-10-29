@@ -7,7 +7,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
-using static DirectService.Transportation.Application.Common.DocumentPrinter;
+using static DirectService.SharedKernel.DocumentPrinter;
 
 namespace DirectService.Transportation.Application.Cash;
 

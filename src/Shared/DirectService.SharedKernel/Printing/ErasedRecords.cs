@@ -1,8 +1,6 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Records whose personal data was erased on request (SEC-19). The record itself is cleared in place; the audit log is append-only and the

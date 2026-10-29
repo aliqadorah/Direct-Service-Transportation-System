@@ -455,7 +455,7 @@ public static class ErrorCodes
     public const string PeriodChecksPending = "period.checksPending";
     public const string ImportFileType = SharedErrorCodes.ImportFileType;
     public const string ImportTooLarge = SharedErrorCodes.ImportTooLarge;
-    public const string PrintoutTooLarge = "export.printoutTooLarge";
+    public const string PrintoutTooLarge = SharedErrorCodes.PrintoutTooLarge;
     public const string ImportEmpty = SharedErrorCodes.ImportEmpty;
     public const string ImportMissingColumn = SharedErrorCodes.ImportMissingColumn;
     public const string ImportHasErrors = "import.hasErrors";
@@ -549,7 +549,7 @@ public static class ErrorCodes
     public const string PartnerPaymentIsVoid = "partnerPayment.void";
     public const string PartnerPaymentExceedsBalance = "partnerPayment.exceedsBalance";
     public const string TripPartnerOverpaid = "trip.partnerOverpaid";
-    public const string PrintUnavailable = "print.unavailable";
+    public const string PrintUnavailable = SharedErrorCodes.PrintUnavailable;
     public const string ApArControlAccount = "apar.controlAccount";
     public const string ApArPartyRole = "apar.partyRole";
     public const string ApArLineAccount = "apar.lineAccount";

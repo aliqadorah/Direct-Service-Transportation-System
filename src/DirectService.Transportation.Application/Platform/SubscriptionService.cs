@@ -7,7 +7,7 @@ using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using static DirectService.Transportation.Application.Common.DocumentPrinter;
+using static DirectService.SharedKernel.DocumentPrinter;
 
 namespace DirectService.Transportation.Application.Platform;
 

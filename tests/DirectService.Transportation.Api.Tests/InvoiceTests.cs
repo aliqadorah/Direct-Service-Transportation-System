@@ -378,6 +378,35 @@ public sealed class InvoiceTests(ApiFactory f)
     }
 
     [Fact]
+    public async Task Printed_invoice_and_statement_embed_the_brand_fonts_UX23()
+    {
+        // Stage 2 session 8 (DT-325): the printing helpers and the embedded fonts moved to SharedKernel; a printed invoice and a printed
+        // statement still embed IBM Plex Sans Arabic and Inter in the PDF (the engine loads only the data: fonts of the printout).
+        var w = await WorldAsync();
+        var o = w.Owner;
+        var inv = await ReadAsync<InvoiceDetails>(await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Take(2), approve: true)));
+        foreach (var language in new[] { "ar", "en" })
+        {
+            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
+            foreach (var path in new[] { $"/invoices/{inv.Invoice.Id}/print", $"/drivers/{w.Trips[0].Driver.Id}/statement/export?format=pdf" })
+            {
+                var r = await o.Client.GetAsync(U(o, path));
+                await r.EnsureOkAsync();
+                Assert.Equal("application/pdf", r.Content.Headers.ContentType!.MediaType);
+                var text = Encoding.Latin1.GetString(await r.Content.ReadAsByteArrayAsync());
+                // Embedded fonts are subsets named "ABCDEF+Family-Style"; the families and styles are what the printout asked for.
+                var fonts = System.Text.RegularExpressions.Regex.Matches(text, @"/BaseFont\s*/(?:[A-Z]{6}\+)?([^\s/<>\[\]()]+)").Select(m => m.Groups[1].Value)
+                    .Distinct().Order(StringComparer.Ordinal).ToList();
+                var found = $"{language} {path.Split('/')[1]}: {string.Join(", ", fonts)}";
+                TestContext.Current.TestOutputHelper?.WriteLine(found);
+                Assert.Contains(fonts, n => n.StartsWith("Inter-", StringComparison.Ordinal));
+                if (language == "ar") Assert.True(fonts.Any(n => n.StartsWith("IBMPlexSansArabic-", StringComparison.Ordinal)), found);
+                Assert.Contains("/FontFile", text, StringComparison.Ordinal);   // embedded, not referenced
+            }
+        }
+    }
+
+    [Fact]
     public async Task Review_fixes_trip_changed_after_credit_versions_layout_kept_and_html_encoded()
     {
         var w = await WorldAsync();

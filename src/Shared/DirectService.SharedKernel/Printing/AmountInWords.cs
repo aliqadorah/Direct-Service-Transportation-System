@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Amount in words for printed vouchers (BR-024): Arabic with the currency's main and fractional units and the usual
