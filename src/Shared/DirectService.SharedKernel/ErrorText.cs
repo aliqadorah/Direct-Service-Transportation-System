@@ -17,3 +17,22 @@ public interface IErrorText
     /// <summary>How to fix a rejected import row: the fix of the code or fix key, else the default fix.</summary>
     string Fix(string codeOrFixKey, string language);
 }
+
+/// <summary>
+/// The messages and import fixes a module contributes to <see cref="IErrorText"/> (Stage 2 session 12, DT-342). The Platform implementation asks
+/// the provider that knows the code; with one provider (today the application's error catalogue) every answer is that provider's.
+/// </summary>
+public interface IErrorTextProvider
+{
+    /// <summary>True when the code has messages here.</summary>
+    bool IsKnown(string code);
+
+    /// <summary>The message of a code this provider knows, in the language ("ar" or "en").</summary>
+    string Format(string code, string language, params object?[] args);
+
+    /// <summary>True when the code or fix key has its own import fix here.</summary>
+    bool HasFix(string codeOrFixKey);
+
+    /// <summary>The import fix of the code or fix key, else this provider's default fix.</summary>
+    string Fix(string codeOrFixKey, string language);
+}

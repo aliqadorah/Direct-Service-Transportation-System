@@ -47,9 +47,7 @@ public static class DependencyInjection
         services.AddScoped<CompanyProvisioningService>();
         services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
-        services.AddScoped<IUserNames, Identity.UserNames>();
-        services.AddScoped<ICompanyInfo, Platform.CompanyInfo>();
-        services.AddSingleton<IErrorText, ErrorText>();
+        services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
 
         // Accounting core and posting engine (B2)

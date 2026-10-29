@@ -1,9 +1,9 @@
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Companies;
 
-/// <summary>The current company for the shared engines (<see cref="ICompanyInfo"/>, DT-321); moves to Platform with the company services.</summary>
+/// <summary>The current company for the shared engines (<see cref="ICompanyInfo"/>, DT-321; Platform since Stage 2 session 12).</summary>
 public sealed class CompanyInfo(IAppDbContext db, IRequestContext ctx) : ICompanyInfo
 {
     public Task<CompanyHeader> CurrentAsync(CancellationToken ct) =>

@@ -43,7 +43,7 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
             Permissions = Contracts.Security.PermissionKeys.All.ToHashSet(),
         };
         var tokens = new Tokens();
-        return new(ctx, request, tokens, new Application.Identity.UserNames(ctx, tokens), new Application.Platform.CompanyInfo(ctx, request),
+        return new(ctx, request, tokens, new DirectService.Platform.Application.Identity.UserNames(ctx, tokens), new DirectService.Platform.Application.Companies.CompanyInfo(ctx, request),
             [new TransportationAuditVocabulary(request)], new FieldCatalogs([new Application.Configuration.TransportationFieldCatalog(ctx)]));
     }
 

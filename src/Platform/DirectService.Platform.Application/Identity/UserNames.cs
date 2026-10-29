@@ -1,9 +1,9 @@
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
-/// <summary>Display names of users for the shared engines (<see cref="IUserNames"/>, DT-312, DT-322); moves to Platform with the identity services.</summary>
+/// <summary>Display names of users for the shared engines (<see cref="IUserNames"/>, DT-312, DT-322; Platform since Stage 2 session 12).</summary>
 public sealed class UserNames(IAppDbContext db, IUrlTokenService tokens) : IUserNames
 {
     public Task<string> FullNameAsync(long userId, CancellationToken ct) =>

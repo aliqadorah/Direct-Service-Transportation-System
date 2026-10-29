@@ -1,4 +1,4 @@
-using DirectService.Transportation.Application.Platform;
+using DirectService.Platform.Application.Companies;
 using DirectService.Platform.Domain;
 
 namespace DirectService.Transportation.Application.Common;
