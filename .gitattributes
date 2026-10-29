@@ -1,0 +1,2 @@
+# Git hooks run under sh, also on Windows (Visual Studio, Git for Windows): keep them LF.
+.githooks/* text eol=lf

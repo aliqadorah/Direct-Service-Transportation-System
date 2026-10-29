@@ -13,6 +13,16 @@ _Step 9, 11 Oct 2026. For developers and the people who will host the system. Ev
 | Chrome or Edge | current | PDF printing (headless Chromium, Q-08) and the E2E tests |
 | Node.js | 24 LTS (npm 11) | E2E tests (`tests/e2e`), OpenAPI lint |
 
+### After cloning: enable the commit guard (DT-328)
+
+Run once in every new clone, from the repository folder:
+
+```
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-commit` then refuses any commit that contains `src/DirectService.Transportation.Web/appsettings.json` (your local copy holds the real `UrlTokens:Key` and connection string; keep secrets there or in user secrets, never in git), anything under `docs/feedback/`, or any other `appsettings*.json` that sets a key, secret, password or token to a non-empty value (it names the line numbers, never the value). Visual Studio, the git command line and other git tools all run it; Visual Studio shows the refusal text in the Git Changes window. Stage files by explicit path, never a whole folder, and check `git diff --cached --name-only` before committing. Check it is on with `git config --get core.hooksPath` (prints `.githooks`).
+
 ## 2. Solution layout
 
 | Project | Role |

@@ -1,0 +1,51 @@
+#!/bin/sh
+# Commit guard (DT-328). Refuses a commit that contains:
+#   - src/DirectService.Transportation.Web/appsettings.json (the owner's local copy holds real keys);
+#   - anything under docs/feedback/;
+#   - any other appsettings*.json whose staged text sets a secret (a key, secret, password, token or
+#     a connection string with a password) to a non-empty value.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Visual Studio, the git command line and other tools all run it (they read core.hooksPath).
+
+blocked=""
+nl='
+'
+
+staged=$(git diff --cached --name-only --diff-filter=ACMRD -z | tr '\0' '\n')
+
+old_ifs=$IFS
+IFS=$nl
+for path in $staged; do
+  case "$path" in
+    src/DirectService.Transportation.Web/appsettings.json)
+      blocked="$blocked$nl  $path  (never committed: the local copy holds real keys)"
+      ;;
+    docs/feedback/*)
+      blocked="$blocked$nl  $path  (docs/feedback is never committed)"
+      ;;
+    *appsettings*.json)
+      # Deleted files have no staged text to check.
+      if git cat-file -e ":$path" 2>/dev/null; then
+        hits=$(git show ":$path" | grep -n -i -E \
+          '"[A-Za-z]*(Key|Secret|Password|Pwd|Token|ApiKey|ClientSecret)"[[:space:]]*:[[:space:]]*"[^"]+"|(Password|Pwd)[[:space:]]*=[^;"]+' \
+          | grep -v -i -E '"(KeysPath|TokenLifetime[A-Za-z]*)"' | cut -d: -f1 | tr '\n' ' ')
+        if [ -n "$hits" ]; then
+          # Line numbers only: the secret itself is never printed.
+          blocked="$blocked$nl  $path  (sets a secret value on line(s) $hits)"
+        fi
+      fi
+      ;;
+  esac
+done
+IFS=$old_ifs
+
+if [ -n "$blocked" ]; then
+  echo "COMMIT REFUSED by .githooks/pre-commit:$blocked" >&2
+  echo "" >&2
+  echo "Unstage these files and commit again, for example:" >&2
+  echo "  git restore --staged -- <file>" >&2
+  echo "Stage files by explicit path, never a whole folder, and check 'git diff --cached --name-only' first." >&2
+  exit 1
+fi
+
+exit 0
