@@ -2,13 +2,16 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Platform;
 
@@ -23,9 +26,9 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
     SessionService sessions, IEmailSender email, IUrlTokenService urlTokens, IOptions<AppOptions> options, IPlatformLock locks, TimeProvider clock)
 {
     /// <summary>Identity token provider of staff invitations (registered with a 48-hour lifespan).</summary>
-    public const string InvitationTokenProvider = "StaffInvitation";
-    public const string InvitationPurpose = "StaffInvitation";
-    public const int InvitationHours = 48;
+    public const string InvitationTokenProvider = StaffInvitations.TokenProvider;
+    public const string InvitationPurpose = StaffInvitations.Purpose;
+    public const int InvitationHours = StaffInvitations.Hours;
 
     private long StaffId => ctx.IsPlatformStaff && ctx.UserId is long id ? id : throw Fail.NotFound();
 

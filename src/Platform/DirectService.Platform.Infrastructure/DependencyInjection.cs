@@ -1,12 +1,13 @@
 using DirectService.Platform.Infrastructure.Email;
 using DirectService.Platform.Infrastructure.Identity;
 using DirectService.Platform.Infrastructure.Persistence;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Application.Platform;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
+using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Platform.Infrastructure;
 
@@ -46,7 +47,7 @@ public static class DependencyInjection
             .AddUserStore<UserStore>()
             .AddPasswordValidator<TenantPasswordValidator>()
             .AddDefaultTokenProviders()
-            .AddTokenProvider<StaffInvitationTokenProvider>(StaffService.InvitationTokenProvider)
+            .AddTokenProvider<StaffInvitationTokenProvider>(StaffInvitations.TokenProvider)
             .AddTokenProvider<ReplaySafeAuthenticatorTokenProvider>(ReplaySafeAuthenticatorTokenProvider.Name);
         services.AddOptions<StaffInvitationTokenProviderOptions>();   // 48-hour staff invitation links (owner feedback 13 Oct 2026)
         services.Configure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromHours(24)); // SEC-04

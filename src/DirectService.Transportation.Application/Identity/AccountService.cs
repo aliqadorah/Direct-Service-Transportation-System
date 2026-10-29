@@ -1,7 +1,6 @@
 using System.Net.Mail;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
@@ -10,6 +9,9 @@ using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Identity;
 

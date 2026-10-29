@@ -2,13 +2,14 @@ using DirectService.Transportation.Application.Abstractions;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Domain;
 using DirectService.Platform.Infrastructure.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Transportation.Api.Tests;
 

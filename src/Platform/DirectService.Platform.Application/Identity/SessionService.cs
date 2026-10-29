@@ -1,12 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>Result of validating a session on a request.</summary>
 public sealed record SessionPrincipal(

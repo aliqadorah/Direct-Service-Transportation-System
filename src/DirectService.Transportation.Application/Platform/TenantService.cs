@@ -8,6 +8,7 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Platform;
 

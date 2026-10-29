@@ -6,6 +6,7 @@ using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Web.Realtime;
 

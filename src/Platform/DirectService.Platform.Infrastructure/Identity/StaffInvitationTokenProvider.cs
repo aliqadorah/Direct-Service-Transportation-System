@@ -1,9 +1,9 @@
-using DirectService.Transportation.Application.Platform;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Platform.Infrastructure.Identity;
 
@@ -12,8 +12,8 @@ public sealed class StaffInvitationTokenProviderOptions : DataProtectionTokenPro
 {
     public StaffInvitationTokenProviderOptions()
     {
-        Name = StaffService.InvitationTokenProvider;
-        TokenLifespan = TimeSpan.FromHours(StaffService.InvitationHours);
+        Name = StaffInvitations.TokenProvider;
+        TokenLifespan = TimeSpan.FromHours(StaffInvitations.Hours);
     }
 }
 

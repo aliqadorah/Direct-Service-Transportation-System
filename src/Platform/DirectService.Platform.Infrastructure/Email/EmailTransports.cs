@@ -8,9 +8,9 @@ using System.Text.RegularExpressions;
 using Azure.Core;
 using Azure.Core.Pipeline;
 using Azure.Identity;
-using DirectService.Transportation.Application.Platform;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Platform.Infrastructure.Email;
 

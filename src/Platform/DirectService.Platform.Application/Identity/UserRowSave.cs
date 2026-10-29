@@ -1,8 +1,7 @@
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Saves a sign-in change of a user row (DT-222). Simultaneous sign-in attempts on one account change the same row (row version): a correct
@@ -10,7 +9,7 @@ namespace DirectService.Transportation.Application.Identity;
 /// the same moment were not all counted towards the lockout. On a conflict the row is read again and the change applied to its current values;
 /// other pending changes of the save (a new session row) and the pending audit action are kept (a failed save keeps both).
 /// </summary>
-internal static class UserRowSave
+public static class UserRowSave
 {
     private const int MaxAttempts = 10;
 

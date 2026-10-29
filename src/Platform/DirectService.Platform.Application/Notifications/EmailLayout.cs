@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 
-namespace DirectService.Transportation.Application.Notifications;
+namespace DirectService.Platform.Application.Notifications;
 
 /// <summary>One language of an email: its paragraphs (HTML, user text already encoded; "&lt;br&gt;" breaks a line) and the button's text.</summary>
 public sealed record EmailSection(string BodyHtml, string? Button);

@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using DirectService.Transportation.Application.Platform;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Platform.Infrastructure.Email;
 
@@ -53,7 +53,7 @@ internal static class MimeMessageBuilder
             .Append("--").Append(rel).Append(Crlf)
             .Append("Content-Type: image/png; name=\"logo.png\"").Append(Crlf)
             .Append("Content-Transfer-Encoding: base64").Append(Crlf)
-            .Append("Content-ID: <").Append(DirectService.Transportation.Application.Notifications.EmailLayout.LogoContentId).Append('>').Append(Crlf)
+            .Append("Content-ID: <").Append(DirectService.Platform.Application.Notifications.EmailLayout.LogoContentId).Append('>').Append(Crlf)
             .Append("Content-Disposition: inline; filename=\"logo.png\"").Append(Crlf).Append(Crlf)
             .Append(Base64Lines(logo)).Append(Crlf)
             .Append("--").Append(rel).Append("--").Append(Crlf)
@@ -65,7 +65,7 @@ internal static class MimeMessageBuilder
     internal static string Address(string value)
     {
         var a = value.Trim();
-        if (!SystemEmailService.IsAddress(a)) throw new ArgumentException("Not a single plain email address.", nameof(value));
+        if (!SystemEmailSettings.IsAddress(a)) throw new ArgumentException("Not a single plain email address.", nameof(value));
         return a;
     }
 

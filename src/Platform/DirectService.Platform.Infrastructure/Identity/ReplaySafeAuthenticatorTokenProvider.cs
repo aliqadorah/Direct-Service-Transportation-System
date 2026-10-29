@@ -1,7 +1,7 @@
-using DirectService.Transportation.Application.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Platform.Infrastructure.Identity;
 

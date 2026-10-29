@@ -3,7 +3,6 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
@@ -13,6 +12,10 @@ using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
+using DirectService.Platform.Application.Billing;
 
 namespace DirectService.Transportation.Application.Platform;
 

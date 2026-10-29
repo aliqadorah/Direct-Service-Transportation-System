@@ -4,12 +4,14 @@ using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Transportation.Application.Platform;
 
@@ -30,31 +32,13 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
 
     // ================================================================= settings
 
-    /// <summary>The settings in use: the Active row, or — never configured — the development folder.</summary>
-    public static async Task<SystemEmailSetting> ActiveAsync(IAppDbContext db, SystemEmailOptions o, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(db);
-        ArgumentNullException.ThrowIfNull(o);
-        return await db.Set<SystemEmailSetting>().AsNoTracking().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Active, ct).ConfigureAwait(false)
-            ?? Default(o);
-    }
+    /// <summary>The settings in use (<see cref="SystemEmailSettings.ActiveAsync"/>).</summary>
+    public static Task<SystemEmailSetting> ActiveAsync(IAppDbContext db, SystemEmailOptions o, CancellationToken ct) => SystemEmailSettings.ActiveAsync(db, o, ct);
 
-    private static SystemEmailSetting Default(SystemEmailOptions o) => new()
-    {
-        Id = 0, State = EmailSettingStates.Active, Mode = EmailModes.Development, SenderMailbox = o.From, DisplayName = EmailLayout.ProductEn,
-    };
+    private static SystemEmailSetting Default(SystemEmailOptions o) => SystemEmailSettings.Default(o);
 
-    /// <summary>A settings row as the transport needs it (the secret decrypted, in memory only for the call).</summary>
-    public static EmailTransportSettings ToTransport(SystemEmailSetting s, IEmailProtector protector, SystemEmailOptions o)
-    {
-        ArgumentNullException.ThrowIfNull(s);
-        ArgumentNullException.ThrowIfNull(protector);
-        ArgumentNullException.ThrowIfNull(o);
-        return s.Mode == EmailModes.Microsoft365
-            ? new EmailTransportSettings(s.Mode, s.SenderMailbox!, s.DisplayName, s.ReplyTo, s.EntraTenantId, s.EntraClientId,
-                s.ClientSecretEncrypted is { } secret ? protector.UnprotectSecret(secret) : null)
-            : new EmailTransportSettings(s.Mode, o.From, s.DisplayName, s.ReplyTo);
-    }
+    /// <summary>A settings row as the transport needs it (<see cref="SystemEmailSettings.ToTransport"/>).</summary>
+    public static EmailTransportSettings ToTransport(SystemEmailSetting s, IEmailProtector protector, SystemEmailOptions o) => SystemEmailSettings.ToTransport(s, protector, o);
 
     public async Task<SystemEmailResponse> GetAsync(CancellationToken ct)
     {
@@ -375,12 +359,10 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     /// <summary>Line breaks and other control characters are refused in anything that becomes a mail header (header injection).</summary>
-    public static bool HasControl(string s) => s.Any(char.IsControl);
+    public static bool HasControl(string s) => SystemEmailSettings.HasControl(s);
 
     /// <summary>One plain address ("name@example.com"), no display name, no control characters.</summary>
-    public static bool IsAddress(string s) =>
-        !HasControl(s) && !s.Contains(' ', StringComparison.Ordinal) && MailAddress.TryCreate(s, out var a) && string.Equals(a.Address, s, StringComparison.OrdinalIgnoreCase)
-        && a.Host.Contains('.', StringComparison.Ordinal);
+    public static bool IsAddress(string s) => SystemEmailSettings.IsAddress(s);
 
     /// <summary>A directory ID (GUID) or a verified domain name of the Microsoft 365 tenant (contoso.onmicrosoft.com).</summary>
     [GeneratedRegex(@"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+)$")]

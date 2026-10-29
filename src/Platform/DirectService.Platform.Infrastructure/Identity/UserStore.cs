@@ -1,4 +1,3 @@
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Shared.Infrastructure.Security;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;

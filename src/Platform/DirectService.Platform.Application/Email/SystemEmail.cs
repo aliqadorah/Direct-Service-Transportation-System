@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Email;
 
 /// <summary>
 /// System email (owner decision 22 Oct 2026, option A, closes DEF-02 for email; DT-250…DT-253). Every email goes into the outbox

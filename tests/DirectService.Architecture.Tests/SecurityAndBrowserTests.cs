@@ -111,7 +111,7 @@ public sealed class SecurityAndBrowserTests
         var folder = (string)export.GetMethod("Folder", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [7L, 9L, Guid.Parse(Golden.Entities["tokenGuid"]!.GetValue<string>())])!;
         Same(Value("files", "exportFolderOfSample"), folder);
         Same(Value("files", "fileStoreDefaultRoot"), DirectService.Shared.Infrastructure.Files.LocalFileStore.DefaultRoot);
-        Same(Value("files", "mailDropFolder"), new DirectService.Transportation.Application.Platform.SystemEmailOptions().DropFolder);
+        Same(Value("files", "mailDropFolder"), new DirectService.Platform.Application.Email.SystemEmailOptions().DropFolder);
         Golden.SameSet("Embedded resources of the infrastructure (E-32)", Golden.Strings(G["files"]!["embeddedResources"]),
             typeof(DirectService.Platform.Infrastructure.Email.EmailLogo).Assembly.GetManifestResourceNames());   // moved with EmailLogo (Stage 2 session 11)
         Same(Golden.Strings(G["files"]!["embeddedResources"]).Single(), DirectService.Platform.Infrastructure.Email.EmailLogo.ResourceName);

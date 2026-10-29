@@ -5,6 +5,7 @@ using DirectService.Transportation.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Collaboration;
 

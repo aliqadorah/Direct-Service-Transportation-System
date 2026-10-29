@@ -1,10 +1,11 @@
 using System.Net;
 using System.Text;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Platform.Infrastructure.Email;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Transportation.Infrastructure.Tests.Email;
 

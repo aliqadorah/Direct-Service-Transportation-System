@@ -1,7 +1,4 @@
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Notifications;
-using DirectService.Transportation.Application.Platform;
 using DirectService.Platform.Domain;
 using DirectService.Shared.Infrastructure.Security;
 using Microsoft.AspNetCore.DataProtection;
@@ -9,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application;
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Application.Email;
 
 namespace DirectService.Platform.Infrastructure.Email;
 
@@ -68,7 +68,7 @@ public sealed class OutboxEmailSender(IServiceScopeFactory scopes, IRequestConte
             CreatedAt = now, NextAttemptAt = now, HasSecretLink = message.HasSecretLink || EmailTemplates.SecretLinkTemplates.Contains(message.Template),
         };
         var hourAgo = now.AddHours(-1);
-        if (!SystemEmailService.IsAddress(to))
+        if (!SystemEmailSettings.IsAddress(to))
         {
             (row.Status, row.FailedAt, row.ErrorKind, row.LastError) = (EmailStatus.Failed, now, EmailErrorKinds.InvalidAddress, "The address is not a valid email address.");
         }
@@ -80,7 +80,7 @@ public sealed class OutboxEmailSender(IServiceScopeFactory scopes, IRequestConte
         }
         else
         {
-            var active = await SystemEmailService.ActiveAsync(db, o, ct).ConfigureAwait(false);
+            var active = await SystemEmailSettings.ActiveAsync(db, o, ct).ConfigureAwait(false);
             var (html, text) = message.Content is { } content
                 ? EmailLayout.Render(content, new EmailBrand(active.DisplayName, active.ReplyTo))
                 : (message.HtmlBody, message.TextBody);
@@ -126,9 +126,9 @@ public sealed partial class EmailDispatcher(MasterDbContext db, IEnumerable<IEma
         var sent = 0;
         if (state.PausedUntil <= now)
         {
-            var active = await SystemEmailService.ActiveAsync(db, O, ct).ConfigureAwait(false);
+            var active = await SystemEmailSettings.ActiveAsync(db, O, ct).ConfigureAwait(false);
             var transport = transports.Single(t => t.Mode == active.Mode);
-            var settings = SystemEmailService.ToTransport(active, protector, O);
+            var settings = SystemEmailSettings.ToTransport(active, protector, O);
             var minuteAgo = now.AddMinutes(-1);
             var used = await db.Set<EmailOutbox>().CountAsync(e => e.SentAt >= minuteAgo || e.Status == EmailStatus.Sending, ct).ConfigureAwait(false);
             var room = Math.Min(O.PerMinute - used, 10);

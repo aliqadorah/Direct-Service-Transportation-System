@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// RFC 6238 time-based codes (6 digits, 30-second steps, HMAC-SHA1 — what authenticator apps and ASP.NET Core Identity use) for a key that

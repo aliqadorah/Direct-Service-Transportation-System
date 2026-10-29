@@ -12,4 +12,9 @@
     <ProjectReference Include="..\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+  </ItemGroup>
 </Project>

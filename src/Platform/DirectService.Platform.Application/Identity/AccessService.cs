@@ -1,9 +1,8 @@
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>A user's role and permission keys in one company.</summary>
 public sealed record CompanyGrant(long CompanyId, Guid CompanyPublicId, string CompanyName, string? CompanyNameEn, string CompanyStatus,

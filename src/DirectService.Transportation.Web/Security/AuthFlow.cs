@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Web.Security;
 

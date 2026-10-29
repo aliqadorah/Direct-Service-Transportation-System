@@ -127,21 +127,36 @@ public sealed class LayerRuleTests
     [Fact]
     public void Platform_infrastructure_references_its_application_and_shared_infrastructure()
     {
-        // Design a.2. The one temporary exception (DT-339): Transportation.Application, which still holds the identity, system e-mail and
-        // billing services these classes serve; it goes in Stage 2 session 12 with those services, and this rule then has no exception.
+        // Design a.2, without exception since Stage 2 session 12 (the temporary Transportation.Application reference of DT-339 is gone).
         Only("DirectService.Platform.Infrastructure",
-            r => r is "DirectService.Platform.Application" or "DirectService.Shared.Infrastructure" or "DirectService.Transportation.Application",
+            r => r is "DirectService.Platform.Application" or "DirectService.Shared.Infrastructure",
             "Platform.Infrastructure references its own Application and Shared.Infrastructure");
         Only("DirectService.Platform.Application", r => r is PlatformDomain or "DirectService.Platform.Contracts" or Kernel,
             "Platform.Application references its own Domain and Contracts and SharedKernel");
+        foreach (var assembly in new[] { typeof(DirectService.Platform.Infrastructure.DependencyInjection).Assembly, typeof(DirectService.Platform.Application.DependencyInjection).Assembly })
+        {
+            var modules = assembly.GetReferencedAssemblies().Select(a => a.Name!).Where(n => n.StartsWith("DirectService.Transportation.", StringComparison.Ordinal)).ToList();
+            Assert.True(modules.Count == 0, $"The compiled {assembly.GetName().Name} references " + string.Join(", ", modules));
+        }
+    }
+
+    [Fact]
+    public void Module_application_references_its_domain_and_contracts_and_the_platform_contracts()
+    {
+        // Design a.2. The one temporary exception (Stage 2 session 12, DT-343): Platform.Application, used by the Platform services still in
+        // Transportation.Application (console, tenants, subscriptions, account and user services); it goes when they have moved.
+        Only("DirectService.Transportation.Application",
+            r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
+                or "DirectService.Platform.Application",
+            "a module's Application references its own Domain and Contracts, SharedKernel and Platform.Contracts");
     }
 
     [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
     {
         // Exception E-1 (design a.2, owner decision K-09): a module's Domain and Infrastructure may use Tenant, Company and User of
-        // Platform.Domain, and only to map foreign keys. Transportation.Application still holds the Platform services until Stage 2
-        // session 12 (identity, platform and notification services → Platform.Application), so it is checked from then on.
+        // Platform.Domain, and only to map foreign keys. Transportation.Application still holds Platform services (console, tenants,
+        // subscriptions, account and user services; DT-343), so it is checked once they have moved to Platform.Application.
         var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
         var infrastructure = typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly;
         foreach (var assembly in new[] { domain, infrastructure })

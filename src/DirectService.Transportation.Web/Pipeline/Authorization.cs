@@ -2,6 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Web.Pipeline;
 

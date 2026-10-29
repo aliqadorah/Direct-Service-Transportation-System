@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Notifications;
+using DirectService.Platform.Application.Notifications;
 
 namespace DirectService.Transportation.Application.Tests;
 

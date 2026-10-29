@@ -1,9 +1,8 @@
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>Password rules of a tenant (FR-175, revision 5 columns on core.Tenants).</summary>
 public sealed record PasswordPolicy(int MinLength, bool RequireLetter, bool RequireDigit)

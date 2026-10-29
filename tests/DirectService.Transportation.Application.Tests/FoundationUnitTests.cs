@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Security;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Tests;
 
@@ -99,16 +100,16 @@ public sealed class FoundationUnitTests
     [Fact]
     public void Email_templates_encode_names_in_html_and_keep_them_readable_in_text()
     {
-        var m = Notifications.EmailTemplates.StaffInvitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "Rana & Co", 48,
+        var m = DirectService.Platform.Application.Notifications.EmailTemplates.StaffInvitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "Rana & Co", 48,
             "https://app.test/accept-staff-invitation?u=a&t=b");
         Assert.DoesNotContain("<a href=\"https://evil.test\">", m.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("&lt;a href=", m.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("Rana &amp; Co", m.HtmlBody, StringComparison.Ordinal);
         Assert.Contains("Rana & Co", m.TextBody, StringComparison.Ordinal);
         Assert.Contains("48", m.TextBody, StringComparison.Ordinal);
-        Assert.Contains("<a href=\"https://evil.test\">Click</a>", Notifications.EmailTemplates.Invitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "R", 7, "https://app.test/x").TextBody,
+        Assert.Contains("<a href=\"https://evil.test\">Click</a>", DirectService.Platform.Application.Notifications.EmailTemplates.Invitation("x@example.test", "<a href=\"https://evil.test\">Click</a>", "R", 7, "https://app.test/x").TextBody,
             StringComparison.Ordinal);
-        Assert.DoesNotContain("<a href=\"https://evil.test\">", Notifications.EmailTemplates.VerifyEmail("x@example.test", "<a href=\"https://evil.test\">", "https://app.test/v").HtmlBody,
+        Assert.DoesNotContain("<a href=\"https://evil.test\">", DirectService.Platform.Application.Notifications.EmailTemplates.VerifyEmail("x@example.test", "<a href=\"https://evil.test\">", "https://app.test/v").HtmlBody,
             StringComparison.Ordinal);
     }
 

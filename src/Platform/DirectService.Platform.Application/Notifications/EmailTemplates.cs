@@ -1,7 +1,6 @@
 using System.Net;
-using DirectService.Transportation.Application.Abstractions;
 
-namespace DirectService.Transportation.Application.Notifications;
+namespace DirectService.Platform.Application.Notifications;
 
 /// <summary>
 /// Arabic and English email templates (INT-03, REL-09), all drawn by the one shared layout (<see cref="EmailLayout"/>, DT-253): the text in the

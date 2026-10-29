@@ -2,6 +2,7 @@ using System.Security.Claims;
 using DirectService.Transportation.Application.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Web.Security;
 

@@ -8,6 +8,7 @@ using DirectService.Platform.Domain;
 using DirectService.Transportation.Web.Pipeline;
 using DirectService.Transportation.Web.Security;
 using Microsoft.AspNetCore.Identity;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Web.Endpoints;
 

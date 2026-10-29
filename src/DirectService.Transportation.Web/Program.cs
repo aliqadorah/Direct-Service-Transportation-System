@@ -67,8 +67,8 @@ builder.Services.AddRateLimiter(o =>
         PartitionedRateLimiter.Create<HttpContext, string>(http => RateLimitPartition.GetTokenBucketLimiter(
             http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new TokenBucketRateLimiterOptions { TokenLimit = apiLimit, TokensPerPeriod = apiLimit, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true })),
-        PartitionedRateLimiter.Create<HttpContext, string>(http => http.Items[typeof(DirectService.Transportation.Application.Identity.SessionPrincipal)]
-                is DirectService.Transportation.Application.Identity.SessionPrincipal { TenantId: long tenant }
+        PartitionedRateLimiter.Create<HttpContext, string>(http => http.Items[typeof(DirectService.Platform.Application.Identity.SessionPrincipal)]
+                is DirectService.Platform.Application.Identity.SessionPrincipal { TenantId: long tenant }
             ? RateLimitPartition.GetTokenBucketLimiter("t:" + tenant.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _ => new TokenBucketRateLimiterOptions { TokenLimit = tenantLimit, TokensPerPeriod = tenantLimit, ReplenishmentPeriod = TimeSpan.FromMinutes(1), AutoReplenishment = true })
             : RateLimitPartition.GetNoLimiter("no-tenant")));

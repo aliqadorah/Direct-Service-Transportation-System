@@ -2,6 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Identity;
 

@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Application.Notifications;
+namespace DirectService.Platform.Application.Notifications;
 
 /// <summary>
 /// The template names stored in <c>core.EmailOutbox.Template</c> (resend, per-recipient and test-mail throttles, the console filter). Pinned

@@ -1,10 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using DirectService.Platform.Application.Billing;
 
 namespace DirectService.Platform.Infrastructure.Billing;
 

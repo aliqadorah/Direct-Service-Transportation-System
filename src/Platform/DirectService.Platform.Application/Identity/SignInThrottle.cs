@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Failed sign-ins counted per account and IP address (owner decision 18 Oct 2026, DT-204): <see cref="PerSourceLimit"/> failures from one

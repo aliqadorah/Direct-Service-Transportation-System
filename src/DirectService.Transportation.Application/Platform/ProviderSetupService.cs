@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application.Platform;
 

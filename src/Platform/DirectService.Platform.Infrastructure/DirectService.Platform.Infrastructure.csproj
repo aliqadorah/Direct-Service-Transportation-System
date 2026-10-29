@@ -7,9 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Platform.Application\DirectService.Platform.Application.csproj" />
     <ProjectReference Include="..\..\Shared\DirectService.Shared.Infrastructure\DirectService.Shared.Infrastructure.csproj" />
-    <!-- Temporary (DT-339): the services these classes serve (identity, system email, e-mail templates, billing) are still in
-         Transportation.Application; they move to Platform.Application in Stage 2 session 12, and this reference goes with them. -->
-    <ProjectReference Include="..\..\DirectService.Transportation.Application\DirectService.Transportation.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- MimeMessageBuilder / EmailLogo are internal; the tests that read them. -->

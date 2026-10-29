@@ -5,6 +5,7 @@ using DirectService.Transportation.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Api.Tests;
 

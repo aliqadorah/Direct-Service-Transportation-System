@@ -15,6 +15,7 @@ using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Identity;
 
 namespace DirectService.Transportation.Application;
 

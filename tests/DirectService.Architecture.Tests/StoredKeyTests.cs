@@ -1,10 +1,10 @@
 using System.Reflection;
-using DirectService.Transportation.Application.Notifications;
 using DirectService.Database;
 using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using DirectService.Platform.Application.Notifications;
 
 namespace DirectService.Architecture.Tests;
 
@@ -21,8 +21,8 @@ public sealed class StoredKeyTests
     {
         // Each template method is called and the name it stores is compared (VerifyAddedEmail stores "VerifyEmail").
         var actual = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var m in typeof(EmailTemplates).GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.ReturnType == typeof(DirectService.Transportation.Application.Abstractions.EmailMessage)))
-            actual[m.Name] = ((DirectService.Transportation.Application.Abstractions.EmailMessage)m.Invoke(null, m.GetParameters().Select(Dummy).ToArray())!).Template;
+        foreach (var m in typeof(EmailTemplates).GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.ReturnType == typeof(DirectService.Platform.Application.Notifications.EmailMessage)))
+            actual[m.Name] = ((DirectService.Platform.Application.Notifications.EmailMessage)m.Invoke(null, m.GetParameters().Select(Dummy).ToArray())!).Template;
         Golden.SameMap("Email templates (core.EmailOutbox.Template, E-4)", Golden.Map(Keys["emailTemplates"]), actual);
         Golden.SameSet("Email template names", Golden.Map(Keys["emailTemplates"]).Values, Golden.Constants(typeof(EmailTemplateNames)).Values);
         Golden.SameSet("Single-use link templates", Golden.Strings(Keys["emailSecretLinkTemplates"]), EmailTemplates.SecretLinkTemplates);
