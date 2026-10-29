@@ -10,6 +10,7 @@ using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Contracts.Modules;
 
 namespace DirectService.Transportation.Application.Platform;
 
@@ -17,7 +18,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// Usage against plan limits (5.3, P-07, BR-013): active non-demo companies (Q-06, G-11), active users, trips saved this calendar month,
 /// storage of exports. Creating beyond a limit is refused with an upgrade message; viewing, printing and exporting never are.
 /// </summary>
-public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider clock)
+public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider clock, IEnumerable<IUsageMeter> meters)
 {
     private static readonly string[] AllFilters = ["Tenant", "Company"];
 
@@ -44,17 +45,13 @@ public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider 
         return CountTripsAsync(tenantId, start, ct);
     }
 
-    /// <summary>
-    /// Trips of the demo company count only beyond its sample trips (G-11): practising is free, running real work in it is not (review R7).
-    /// </summary>
+    /// <summary>The trips of the modules' meters (<see cref="UsageMeasures.Trips"/>; Transportation's: <c>TripUsageMeter</c>, DT-346).</summary>
     private async Task<int> CountTripsAsync(long tenantId, DateTime start, CancellationToken ct)
     {
-        var demo = db.Set<CompanySetting>().AsNoTracking().IgnoreQueryFilters(AllFilters)
-            .Where(s => s.TenantId == tenantId && s.SettingKey == SettingKeys.IsDemo && s.SettingValue == "true").Select(s => s.CompanyId);
-        var trips = db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(AllFilters).Where(t => t.TenantId == tenantId && !t.IsDeleted && t.CreatedAt >= start);
-        var real = await trips.CountAsync(t => !demo.Contains(t.CompanyId), ct).ConfigureAwait(false);
-        var practice = await trips.CountAsync(t => demo.Contains(t.CompanyId), ct).ConfigureAwait(false);
-        return real + Math.Max(0, practice - DemoCompanyService.SampleTrips);
+        var count = 0;
+        foreach (var meter in meters.Where(m => m.Measure == UsageMeasures.Trips))
+            count += await meter.CountAsync(tenantId, start, ct).ConfigureAwait(false);
+        return count;
     }
 
     /// <summary>One more active user (invitation accepted, user enabled) must fit MaxActiveUsers.</summary>

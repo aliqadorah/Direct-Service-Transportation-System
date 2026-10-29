@@ -19,6 +19,7 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -32,9 +33,13 @@ namespace DirectService.Transportation.Application.Platform;
 /// account (done at sign-up), company profile, market settings, chart of accounts, account mapping, master data, prices (tariffs and the current
 /// month's rates), users — with explicit "Done" marks kept in cfg.CompanySettings (CORE.Setup.&lt;step&gt;) for steps the data cannot prove.
 /// </summary>
-public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx, PostingEngine posting, MasterDataSupport support, IChangeContext changes)
+public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx, IChangeContext changes, IEnumerable<ISetupStepProvider> stepProviders)
 {
-    public static readonly IReadOnlyList<string> Steps = ["account", "profile", "market", "chart", "mapping", "masters", "prices", "users"];
+    private static readonly string[] First = ["account", "profile"];
+    private static readonly string[] Last = ["users"];
+
+    /// <summary>Step keys in the order shown: the platform's first ones, the modules' (<see cref="ISetupStepProvider"/>, DT-346), the platform's last one.</summary>
+    public IReadOnlyList<string> Steps => [.. First, .. stepProviders.SelectMany(p => p.Steps), .. Last];
 
     private const string Done = "Done";
     private const string InProgress = "InProgress";
@@ -58,42 +63,9 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
         Add("profile", "ملف الشركة", "Company profile", profile == 4 ? Done : profile > 0 ? InProgress : NotStarted,
             profile == 4 ? null : En ? "Tax number, address, phone and logo" : "الرقم الضريبي والعنوان والهاتف والشعار", "/settings/profile");
 
-        var einv = await db.Set<EInvoiceSettings>().AsNoTracking().Select(e => e.IsEnabled).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        Add("market", "إعدادات السوق", "Market settings", einv ? Done : InProgress,
-            einv ? null : En ? "Currency and tax are set; e-invoicing credentials are optional at this stage" : "العملة والضريبة مضبوطتان؛ بيانات الفوترة الإلكترونية اختيارية الآن", "/settings/e-invoicing");
-
-        var accounts = await db.Set<Account>().AsNoTracking().CountAsync(ct).ConfigureAwait(false);
-        Add("chart", "دليل الحسابات", "Chart of accounts", accounts > 0 ? Done : NotStarted, null, "/accounting/accounts");
-
-        var missing = await posting.MissingKeysAsync(ct).ConfigureAwait(false);
-        var mapped = await db.Set<PostingKeyMapping>().AsNoTracking().CountAsync(ct).ConfigureAwait(false);
-        Add("mapping", "ربط الحسابات", "Account mapping", missing.Count == 0 ? Done : mapped > 0 ? InProgress : NotStarted,
-            // DT-224: a count in words and the Account mapping page's names, never the internal posting-key codes.
-            missing.Count == 0 ? null
-                : En ? (missing.Count == 1 ? "1 posting account still needs to be linked to your chart of accounts" : $"{missing.Count} posting accounts still need to be linked to your chart of accounts")
-                : missing.Count == 1 ? "حساب ترحيل واحد لم يُربط بعد بدليل الحسابات" : $"{missing.Count} من حسابات الترحيل لم تُربط بعد بدليل الحسابات",
-            "/accounting/posting-keys", missing.Count == 0 ? null : PostingKeys.Names(missing, ctx.Language));
-
-        var masters = new (string Ar, string En, bool Has)[]
-        {
-            ("السائقون", "drivers", await db.Set<Driver>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false)),
-            ("العملاء", "customers", await db.Set<Customer>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false)),
-            ("المواد", "materials", await db.Set<Material>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false)),
-            ("مواقع التحميل", "loading sites", await db.Set<LoadingSite>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false)),
-            ("مواقع التنزيل", "unloading sites", await db.Set<UnloadingSite>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false)),
-        };
-        var lacking = masters.Where(m => !m.Has).Select(m => En ? m.En : m.Ar).ToList();
-        Add("masters", "البيانات الرئيسية", "Master data", lacking.Count == 0 ? Done : lacking.Count < masters.Length ? InProgress : NotStarted,
-            lacking.Count == 0 ? null : string.Join("، ", lacking), "/drivers");
-
-        var tariffs = await db.Set<Tariff>().AsNoTracking().AnyAsync(t => t.PartyType == "Customer", ct).ConfigureAwait(false);
-        var month = (await support.TodayAsync(ct).ConfigureAwait(false)).ToString("yyyy-MM", CultureInfo.InvariantCulture);
-        var activeSites = await db.Set<LoadingSite>().AsNoTracking().Where(s => s.Status == MasterCodes.Active).Select(s => s.Id).ToListAsync(ct).ConfigureAwait(false);
-        var rated = await db.Set<MonthlySiteRate>().AsNoTracking().Where(r => r.RateMonth == month).Select(r => r.LoadingSiteId).Distinct().ToListAsync(ct).ConfigureAwait(false);
-        var ratesComplete = activeSites.Count > 0 && activeSites.All(rated.Contains);
-        Add("prices", "الأسعار", "Prices", tariffs && ratesComplete ? Done : tariffs || rated.Count > 0 ? InProgress : NotStarted,
-            tariffs && ratesComplete ? null : En ? "Customer tariffs and this month's driver rates for every loading site" : "تعرفة العملاء وأسعار السائقين لهذا الشهر لكل موقع تحميل",
-            "/monthly-rates");
+        foreach (var provider in stepProviders)
+            foreach (var s in await provider.StatesAsync(ctx.Language, ct).ConfigureAwait(false))
+                Add(s.Key, s.TitleAr, s.TitleEn, s.Status, s.Detail, s.Link, s.Items);
 
         var users = await db.Set<UserCompanyRole>().AsNoTracking().CountAsync(r => r.CompanyId == ctx.CompanyId, ct).ConfigureAwait(false);
         var invitations = await db.Set<Invitation>().AsNoTracking().AnyAsync(ct).ConfigureAwait(false);
@@ -129,10 +101,8 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
 /// plan's companies, and filled through the normal services with sample data — the approved chart and mapping, customers, a partner, materials,
 /// sites, own-fleet and partner drivers, tariffs, this month's driver rates, trips, an approved invoice and a receipt — without touching real data.
 /// </summary>
-public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, DataScope scope, AccessService access, IUrlTokenService tokens, CompanyProvisioningService provisioning,
-    ChartOfAccountsService chart, CustomerService customers, PartnerService partners, MaterialService materials, LoadingSiteService loadingSites,
-    UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, DriverService drivers, TariffService tariffs, MonthlyRateService rates, TripService trips,
-    InvoiceService invoices, ReceiptService receipts, MasterDataSupport support, IPlatformLock? locks = null)
+public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, DataScope scope, AccessService access, IUrlTokenService tokens, IEnumerable<ICompanyProvisioner> provisioning,
+    IEnumerable<IDemoDataContributor> demoData, IEnumerable<IPermissionCatalog> catalogs, IPlatformLock? locks = null)
 {
     public const string DemoName = "شركة تجريبية (للتدريب)";
 
@@ -164,7 +134,7 @@ public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, Dat
             var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PresetRoles.Owner, c).ConfigureAwait(false);
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = userId, CompanyId = co.Id, RoleId = ownerRole.Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            await provisioning.ProvisionAsync(co, userId, c).ConfigureAwait(false);
+            foreach (var p in provisioning) await p.ProvisionAsync(co.TenantId, co.Id, userId, c).ConfigureAwait(false);
             using (scope.Use(tenantId, co.Id, userId))
             {
                 db.Set<CompanySetting>().Add(new CompanySetting { TenantId = tenantId, CompanyId = co.Id, SettingKey = SettingKeys.IsDemo, SettingValue = "true" });
@@ -188,48 +158,8 @@ public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, Dat
             ctx.CompanyId = company.Id;
             ctx.CompanyPublicId = company.PublicId;
             ctx.CompanyStatus = "Active";
-            ctx.Permissions = new HashSet<string>(PermissionKeys.All, StringComparer.Ordinal);
-            await chart.ApplyTemplateAsync(ct).ConfigureAwait(false);
-            var today = await support.TodayAsync(ct).ConfigureAwait(false);
-            var potash = (await customers.CreateAsync(new CustomerRequest("شركة البوتاس (تجريبي)", "100200300", null, "0781234567", null, "العقبة", "العقبة", null, 30, null, null, null, null, null), ct)
-                .ConfigureAwait(false)).Value;
-            var phosphate = (await customers.CreateAsync(new CustomerRequest("مناجم الفوسفات (تجريبي)", "100200301", null, "0781234568", null, "عمّان", "عمّان", null, 45, null, null, null, null, null), ct)
-                .ConfigureAwait(false)).Value;
-            var partner = (await partners.CreateAsync(new PartnerRequest("شركة النور للنقل (تجريبي)", null, null, "0791234567", null, null, null, null, null, null, null), ct).ConfigureAwait(false)).Value;
-            var material = (await materials.CreateAsync(new MaterialRequest("بوتاس", "Potash", null, null), ct).ConfigureAwait(false)).Value;
-            var loading = (await loadingSites.CreateAsync(new SiteRequest("غور الصافي", "الأغوار", null, null), ct).ConfigureAwait(false)).Value;
-            var unloading = (await unloadingSites.CreateAsync(new SiteRequest("ميناء العقبة", "العقبة", null, null), ct).ConfigureAwait(false)).Value;
-            var types = await ownershipTypes.ListAsync(ct).ConfigureAwait(false);
-            var rented = (await ownershipTypes.CreateAsync(new OwnershipTypeRequest("مستأجرة", "External", null, null), ct).ConfigureAwait(false)).Value;
-            DriverRequest Driver(string name, string nid, string plate, string type, string? partnerId) =>
-                new(name, nid, "0791234567", null, null, "L-" + nid[^3..], "C", today.AddYears(1), "Cash", null, null, null, plate, "Volvo", null, 32m, type, partnerId,
-                    today.AddYears(1), today.AddYears(1), today.AddYears(1), null, null, null, null);
-            var own1 = (await drivers.CreateAsync(Driver("أحمد صالح (تجريبي)", "9000000001", "10-90001", types.Single(t => t.IsBuiltIn).Id, null), ct).ConfigureAwait(false)).Value;
-            var own2 = (await drivers.CreateAsync(Driver("محمود الحويطات (تجريبي)", "9000000002", "10-90002", types.Single(t => t.IsBuiltIn).Id, null), ct).ConfigureAwait(false)).Value;
-            var ext = (await drivers.CreateAsync(Driver("سامي العبادي (تجريبي)", "9000000003", "10-90003", rented.Id, partner.Id), ct).ConfigureAwait(false)).Value;
-            await tariffs.CreateAsync(new TariffRequest("Customer", potash.Id, material.Id, null, null, 6.000m, null, null, null, null, null), ct).ConfigureAwait(false);
-            await tariffs.CreateAsync(new TariffRequest("Customer", phosphate.Id, null, null, null, 5.250m, null, null, null, null, null), ct).ConfigureAwait(false);
-            await tariffs.CreateAsync(new TariffRequest("Partner", partner.Id, null, null, null, 2.750m, null, null, null, null, null), ct).ConfigureAwait(false);
-            await rates.SaveAsync(today.ToString("yyyy-MM", CultureInfo.InvariantCulture), new MonthRatesRequest([new SiteRateRequest(loading.Id, 3.500m, 4.250m, null)]), ct)
-                .ConfigureAwait(false);
-            var tripIds = new List<string>();
-            var plan = new (DriverResponse Driver, string? Partner, CustomerResponse Customer, decimal Loaded, decimal Unloaded)[]
-            {
-                (own1, null, potash, 32.000m, 31.850m), (own2, null, potash, 31.500m, 31.400m), (ext, partner.Id, potash, 32.000m, 31.900m),
-                (own1, null, phosphate, 30.000m, 29.950m), (own2, null, phosphate, 30.500m, 30.100m), (ext, partner.Id, phosphate, 31.000m, 31.000m),
-            };
-            var n = 0;
-            foreach (var (driver, partnerId, customer, loaded, unloaded) in plan)
-            {
-                var saved = await trips.CreateAsync(new TripRequest("DEMO-" + (++n).ToString("D3", CultureInfo.InvariantCulture), today, null, null, driver.Id, customer.Id, loading.Id,
-                    unloading.Id, material.Id, partnerId, loaded, unloaded, null, null, null, null, null, null, null), ct).ConfigureAwait(false);
-                if (customer.Id == potash.Id) tripIds.Add(saved.Value.Trip.Id);
-            }
-            var invoice = (await invoices.CreateAsync(new InvoiceRequest(potash.Id, "Trip", today, null, tripIds, null, 0, 0, null, null, null, true, null, null), ct)
-                .ConfigureAwait(false)).Value;
-            var box = await db.Set<CashBox>().AsNoTracking().Select(b => b.PublicId).FirstAsync(ct).ConfigureAwait(false);
-            await receipts.CreateAsync(new ReceiptRequest(potash.Id, today, invoice.Invoice.Id, Math.Round(invoice.Invoice.Total / 2, 3), "Cash", tokens.Encode<CashBox>(box), null, null, 0,
-                null, null), ct).ConfigureAwait(false);
+            ctx.Permissions = new HashSet<string>(catalogs.SelectMany(c => c.Keys), StringComparer.Ordinal);
+            foreach (var contributor in demoData) await contributor.AddDemoDataAsync(ct).ConfigureAwait(false);
         }
         finally
         {

@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using DirectService.Platform.Application.Identity;
@@ -18,7 +19,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// archive and restore (D-09). Every change is audited with its reason.
 /// </summary>
 public sealed class TenantService(
-    IAppDbContext db, IRequestContext ctx, IChangeContext changes, CompanyProvisioningService provisioning,
+    IAppDbContext db, IRequestContext ctx, IChangeContext changes, IEnumerable<ICompanyProvisioner> provisioning,
     AccessService access, IUrlTokenService tokens, SessionService? sessions = null)
 {
     public async Task<TenantResponse> GetAsync(CancellationToken ct)
@@ -86,7 +87,7 @@ public sealed class TenantService(
             var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PresetRoles.Owner, c).ConfigureAwait(false);
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = ctx.UserId!.Value, CompanyId = co.Id, RoleId = ownerRole.Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            await provisioning.ProvisionAsync(co, ctx.UserId, c).ConfigureAwait(false);
+            foreach (var p in provisioning) await p.ProvisionAsync(co.TenantId, co.Id, ctx.UserId, c).ConfigureAwait(false);
             return co;
         }, ct).ConfigureAwait(false);
         access.Invalidate(ctx.UserId!.Value);

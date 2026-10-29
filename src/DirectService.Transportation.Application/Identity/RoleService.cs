@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using DirectService.Platform.Application.Identity;
@@ -14,7 +15,8 @@ namespace DirectService.Transportation.Application.Identity;
 /// any combination of keys; a custom role in use cannot be deleted until its users are reassigned.
 /// Every grant/revoke is audited (3.3) by the interceptor.
 /// </summary>
-public sealed class RoleService(IAppDbContext db, IChangeContext changes, AccessService access, IUrlTokenService tokens, GrantGuard guard)
+public sealed class RoleService(IAppDbContext db, IChangeContext changes, AccessService access, IUrlTokenService tokens, GrantGuard guard,
+    IEnumerable<IPermissionCatalog> catalogs)
 {
     public async Task<IReadOnlyList<PermissionItem>> PermissionsAsync(CancellationToken ct) =>
         (await db.Set<Permission>().AsNoTracking().OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false))
@@ -95,11 +97,11 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    private static string Validate(RoleRequest r)
+    private string Validate(RoleRequest r)
     {
         var name = TextNormalizer.CleanText(r.Name);
         new Validator().Require("name", name).MaxLength("name", name, 100)
-            .Check(r.Permissions is not null && r.Permissions.All(k => PermissionKeys.All.Contains(k)), "permissions")
+            .Check(r.Permissions is not null && r.Permissions.All(k => catalogs.Any(c => c.Keys.Contains(k))), "permissions")
             .Check(!PresetRoles.All.Contains(name ?? string.Empty, StringComparer.OrdinalIgnoreCase), "name", ErrorCodes.DuplicateKey)
             .ThrowIfInvalid();
         return name!;

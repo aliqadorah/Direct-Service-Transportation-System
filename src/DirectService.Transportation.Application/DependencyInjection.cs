@@ -14,6 +14,7 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
+using DirectService.Platform.Contracts.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using DirectService.Platform.Application.Identity;
 
@@ -46,6 +47,12 @@ public static class DependencyInjection
         services.AddScoped<RoleService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<CompanyProvisioningService>();
+        services.AddScoped<ICompanyProvisioner>(sp => sp.GetRequiredService<CompanyProvisioningService>());
+        // What the module gives the Platform services (platform design a.3, DT-346).
+        services.AddScoped<IUsageMeter, Modules.TripUsageMeter>();
+        services.AddScoped<ITenantDataEraser, Modules.TransportationDataEraser>();
+        services.AddSingleton<IPermissionCatalog, Modules.TransportationPermissions>();
+        services.AddSingleton<INotificationTypeProvider, Modules.TransportationNotificationTypes>();
         services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
         services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
@@ -166,6 +173,8 @@ public static class DependencyInjection
         services.AddScoped<StaffAccountService>();
         services.AddScoped<SetupChecklistService>();
         services.AddScoped<DemoCompanyService>();
+        services.AddScoped<IDemoDataContributor, Modules.TransportationDemoData>();
+        services.AddScoped<ISetupStepProvider, Modules.TransportationSetupSteps>();
         services.AddScoped<CompanyExportService>();
         services.AddScoped<PersonalDataService>();
         services.AddScoped<SystemEmailService>();   // DT-250

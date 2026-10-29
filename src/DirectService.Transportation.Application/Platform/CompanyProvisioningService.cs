@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Domain.Cfg;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 
@@ -17,7 +18,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// row (disabled, FR-059), the two invoice layouts (FR-054) and the default tax codes of journal lines (DT-257). The chart of accounts is created
 /// only when chosen in onboarding (template awaiting approval, D-10).
 /// </summary>
-public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scope)
+public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scope) : ICompanyProvisioner
 {
     /// <summary>Name of the built-in ownership type. Fixed (cannot be renamed, C-08); the UI translates it.</summary>
     public const string BuiltInOwnershipType = "Company";
@@ -29,13 +30,19 @@ public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scop
         ["receiptNo", "truckPlate", "loadingDate", "unloadedWeight", "billingQty", "unitPrice", "amount"];
 
     /// <summary>Adds and saves the reference rows for an already saved <paramref name="company"/> (inside the caller's transaction).</summary>
-    public async Task ProvisionAsync(Company company, long? actingUserId, CancellationToken ct)
+    public Task ProvisionAsync(Company company, long? actingUserId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(company);
+        return ProvisionAsync(company.TenantId, company.Id, actingUserId, ct);
+    }
+
+    /// <summary>The Transportation (and, until Stage 3, accounting) rows of a saved company (<see cref="ICompanyProvisioner"/>, DT-346).</summary>
+    public async Task ProvisionAsync(long tenantId, long companyId, long? actingUserId, CancellationToken ct)
+    {
         // Saved inside the company's own scope so the interceptor stamps and checks the right tenant/company.
-        using var _ = scope.Use(company.TenantId, company.Id, actingUserId);
-        var t = company.TenantId;
-        var c = company.Id;
+        using var _ = scope.Use(tenantId, companyId, actingUserId);
+        var t = tenantId;
+        var c = companyId;
 
         db.Set<OwnershipType>().Add(new OwnershipType
         {

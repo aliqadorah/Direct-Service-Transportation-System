@@ -16,6 +16,7 @@ using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
 using DirectService.Platform.Application.Email;
 using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Contracts.Modules;
 
 namespace DirectService.Transportation.Application.Platform;
 
@@ -267,7 +268,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
 /// Owner receives a confirmation. The suspension date is kept in GraceEndsAt (DT-125).
 /// </summary>
 public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope scope, BillingService billing, IPaymentGateway gateway, NotificationService notifications,
-    IEmailSender email, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, IPlatformLock? locks = null,
+    IEmailSender email, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, IEnumerable<ITenantDataEraser> erasers, IPlatformLock? locks = null,
     Microsoft.Extensions.Logging.ILogger<TenantLifecycleService>? log = null)
 {
     public const string SystemEmail = "system@platform.invalid";
@@ -463,22 +464,7 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         // System email (DT-251): the delivery log keeps no address (nor message) of the deleted tenant's emails.
         await db.Set<EmailOutbox>().Where(e => e.TenantId == tenantId && e.Status != EmailStatus.Pending && e.Status != EmailStatus.Sending)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.Recipient, "(removed)").SetProperty(x => x.PayloadEncrypted, (byte[]?)null), ct).ConfigureAwait(false);
-        await db.Set<Driver>().IgnoreQueryFilters(none).Where(d => d.TenantId == tenantId)
-            // Placeholders from the public id: internal ids never become data (review R11).
-            .ExecuteUpdateAsync(u => u.SetProperty(x => x.FullName, "Deleted driver").SetProperty(x => x.NationalId, x => ("X" + x.PublicId.ToString()).Substring(0, 9))
-                .SetProperty(x => x.LicenceNo, x => ("X" + x.PublicId.ToString()).Substring(0, 9)).SetProperty(x => x.Notes, (string?)null).SetProperty(x => x.CustomValues, (string?)null)
-                .SetProperty(x => x.Phone1, "0000000000").SetProperty(x => x.Phone2, (string?)null).SetProperty(x => x.Address, (string?)null)
-                .SetProperty(x => x.Iban, (string?)null).SetProperty(x => x.CliqAlias, (string?)null).SetProperty(x => x.BankName, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
-            .ConfigureAwait(false);
-        await db.Set<Customer>().IgnoreQueryFilters(none).Where(c => c.TenantId == tenantId)
-            .ExecuteUpdateAsync(u => u.SetProperty(x => x.ContactPerson, (string?)null).SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.Email, (string?)null)
-                .SetProperty(x => x.UpdatedAt, now), ct).ConfigureAwait(false);
-        await db.Set<Partner>().IgnoreQueryFilters(none).Where(p => p.TenantId == tenantId)
-            .ExecuteUpdateAsync(u => u.SetProperty(x => x.ContactPerson, (string?)null).SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
-            .ConfigureAwait(false);
-        await db.Set<Domain.Acc.ApArParty>().IgnoreQueryFilters(none).Where(p => p.TenantId == tenantId)
-            .ExecuteUpdateAsync(u => u.SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.Address, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
-            .ConfigureAwait(false);
+        foreach (var eraser in erasers) await eraser.AnonymiseAsync(tenantId, now, ct).ConfigureAwait(false);   // the modules: drivers, customers, partners, AP/AR parties
         await db.Set<Company>().IgnoreQueryFilters(none).Where(c => c.TenantId == tenantId)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.Email, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
             .ConfigureAwait(false);

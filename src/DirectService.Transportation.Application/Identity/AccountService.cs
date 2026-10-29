@@ -5,6 +5,7 @@ using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ public sealed class AccountService(
     UserManager<User> users,
     IDataScope scope,
     IChangeContext changes,
-    CompanyProvisioningService provisioning,
+    IEnumerable<ICompanyProvisioner> provisioning,
     SessionService sessions,
     IUrlTokenService urlTokens,
     IEmailSender email,
@@ -87,7 +88,7 @@ public sealed class AccountService(
             db.Set<TermsAcceptance>().Add(new TermsAcceptance { UserId = user.Id, DocumentType = "Privacy", DocumentVersion = options.Value.TermsVersion, AcceptedAt = now });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
 
-            await provisioning.ProvisionAsync(company, user.Id, c).ConfigureAwait(false);
+            foreach (var p in provisioning) await p.ProvisionAsync(company.TenantId, company.Id, user.Id, c).ConfigureAwait(false);
             return (tenant, company, user);
         }, ct).ConfigureAwait(false);
 
