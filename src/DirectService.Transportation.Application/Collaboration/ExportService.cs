@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 
@@ -25,18 +26,12 @@ public interface IExportQueue
     bool TryRead(out ExportJob? job);
 }
 
-/// <summary>Limits of the current operation: background exports may return more rows than screens (FR-151).</summary>
-public sealed class ExportLimits
-{
-    public bool Background { get; set; }
-}
-
 /// <summary>
 /// Large exports in the background (FR-151): the request is checked with the caller's permissions, queued and answered at once (202); the
 /// worker generates the file with the requester's permissions and the larger background limits, stores it under the requester's folder for
 /// seven days and sends a notification with the download link; only that user can download it, in that company.
 /// </summary>
-public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, ReportBuilderService builder, SavedReportService saved,
+public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, IReportBuilder builder, SavedReportService saved,
     StandardReportService standard, AuditLogService audit, IReportExporter exporter, NotificationService notifications, Platform.CompanyExportService company)
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);

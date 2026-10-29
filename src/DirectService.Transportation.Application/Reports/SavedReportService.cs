@@ -5,6 +5,7 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
@@ -20,7 +21,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// see, a measure of its definition, warning and critical thresholds (value ≥ threshold), an order; the card shows the measure's grand
 /// total and its state normal / warning / exceeded.
 /// </summary>
-public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, ReportBuilderService builder, IReportExporter exporter,
+public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportBuilder builder, IReportExporter exporter,
     AuditTrail audit, IChangeContext changes, IUserNames users)
 {
     public const string EntityType = "CFG.SavedReport";

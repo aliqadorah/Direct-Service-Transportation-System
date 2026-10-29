@@ -52,6 +52,9 @@ public static class DependencyInjection
         services.AddScoped<IssuedNames>();
         services.AddScoped<IReportExporter, ReportExporter>();
         services.AddScoped<IAuditDescriber, Audit.AuditDescriber>();
+        services.AddScoped<ExportLimits>();
+        services.AddScoped<ReportBuilderService>();
+        services.AddScoped<IReportBuilder>(sp => sp.GetRequiredService<ReportBuilderService>());
         return services;
     }
 }

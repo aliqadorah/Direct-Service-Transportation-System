@@ -7,36 +7,7 @@ using DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Application.Reports;
 
-/// <summary>Field types of the report builder.</summary>
-public static class FieldTypes
-{
-    public const string Text = "text";
-    public const string Number = "number";
-    public const string Money = "money";
-    public const string Quantity = "quantity";
-    public const string Date = "date";
-    public const string Bool = "bool";
-    public const string Ref = "ref";
-
-    public static bool IsNumeric(string type) => type is Number or Money or Quantity;
-}
-
-/// <summary>
-/// A field of a data source: key, labels, type, the value expression over the source row (for refs: the name) and, for refs, the public id
-/// and the entity type of its token.
-/// </summary>
-public sealed record FieldDef(string Key, string Ar, string En, string Type, LambdaExpression Value, LambdaExpression? Pid = null, Type? Entity = null,
-    bool Groupable = true, bool Custom = false, bool Nullable = false)
-{
-    public bool Measurable => FieldTypes.IsNumeric(Type);
-}
-
-/// <summary>
-/// A data source of the report builder (FR-143): key, labels, the permissions that open it (any of them, FR-147), the queryable rows, the
-/// fields, the main date (period override), the custom-field entity and JSON column, the default status filter and the row link.
-/// </summary>
-public sealed record SourceDef(string Key, string Ar, string En, string[] Permissions, Type Row, Func<IAppDbContext, IQueryable> Query, IReadOnlyList<FieldDef> Fields,
-    string? DateField, string? CustomEntity, LambdaExpression? CustomJson, LambdaExpression? DefaultFilter, LambdaExpression RowPid, string RowLink);
+// FieldTypes, FieldDef and SourceDef: SharedKernel (the report builder is a shared engine, Stage 2 session 9, DT-330).
 
 /// <summary>Typed helper to declare the fields of a source.</summary>
 internal sealed class Fields<T>
@@ -89,6 +60,30 @@ internal sealed class Fields<T>
     {
         All.Add(new FieldDef(key, ar, en, FieldTypes.Ref, name, pid, typeof(TEntity)));
         return this;
+    }
+}
+
+/// <summary>
+/// The data sources of this application for the shared report builder (<see cref="IReportSourceProvider"/>, Stage 2 session 9, DT-330): the
+/// ten sources of <see cref="ReportSources"/> (keys unchanged, E-16), the period defaults of the ledger reports, the names of the built-in
+/// ownership types and the journal entry behind a journal line.
+/// </summary>
+public sealed class TransportationReportSources(Ledger.LedgerReportService ledger) : IReportSourceProvider
+{
+    public IReadOnlyList<SourceDef> Sources => ReportSources.All;
+
+    public Task<(DateOnly From, DateOnly To)> PeriodAsync(DateOnly? from, DateOnly? to, CancellationToken ct) => ledger.PeriodAsync(from, to, ct);
+
+    public string? Display(FieldDef field, string value, string language)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        return field.Entity == typeof(OwnershipType) ? MasterData.OwnershipTypeNames.Display(value, language) : null;
+    }
+
+    public Type LinkEntity(SourceDef source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return source.RowLink == "journal-entry" ? typeof(JournalEntry) : source.Row;
     }
 }
 

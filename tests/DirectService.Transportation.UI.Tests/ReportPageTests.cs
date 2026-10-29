@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Web.Client.Pages.Reports;
 using DirectService.Transportation.Web.Client.Ui;

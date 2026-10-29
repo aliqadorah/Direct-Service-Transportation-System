@@ -1,6 +1,7 @@
 @* A pinned report as the dashboard shows it (FR-140) — also the preview in the pin dialog (DT-275): report · measure, the value in its kind
    (rows as a count, money, quantity), a bar towards the critical threshold when warning above it, and the state normal / warning / exceeded
    in the chosen direction. *@
+@using DirectService.Shared.Contracts
 @using DirectService.Transportation.Contracts.Reports
 @inject Loc L
 <div class="pin-card" style="padding:5px 0;border-bottom:1px solid var(--border)" data-state="@State">

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using DirectService.Transportation.Contracts.Cash;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Trips;
 

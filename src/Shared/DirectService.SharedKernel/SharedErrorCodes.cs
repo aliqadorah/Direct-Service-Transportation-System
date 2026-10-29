@@ -36,4 +36,24 @@ public static class SharedErrorCodes
     public const string CustomFieldOptionInUse = "customField.optionInUse";
     public const string PrintUnavailable = "print.unavailable";
     public const string PrintoutTooLarge = "export.printoutTooLarge";
+
+    // The report builder (Stage 2 session 9, DT-330).
+    public const string ReportSource = "report.source";
+    public const string ReportDefinition = "report.definition";
+    public const string ReportRowsNone = "report.rowsNone";
+    public const string ReportRowsTooMany = "report.rowsTooMany";
+    public const string ReportMeasuresCount = "report.measuresCount";
+    public const string ReportColumnsCount = "report.columnsCount";
+    public const string ReportTop = "report.top";
+    public const string ReportFiltersCount = "report.filtersCount";
+    public const string ReportItemEmpty = "report.itemEmpty";
+    public const string ReportFieldMissing = "report.fieldMissing";
+    public const string ReportNotGroupable = "report.notGroupable";
+    public const string ReportNotMeasurable = "report.notMeasurable";
+    public const string ReportFunction = "report.function";
+    public const string ReportDateUnit = "report.dateUnit";
+    public const string ReportFilterOperator = "report.filterOperator";
+    public const string ReportFilterValueRequired = "report.filterValueRequired";
+    public const string ReportFilterValueFormat = "report.filterValueFormat";
+    public const string ReportMeasure = "report.measure";
 }

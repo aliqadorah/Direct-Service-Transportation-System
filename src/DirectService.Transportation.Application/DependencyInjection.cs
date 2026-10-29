@@ -154,7 +154,7 @@ public static class DependencyInjection
 
         // Reports and dashboard (B10)
         services.AddScoped<StandardReportService>();
-        services.AddScoped<ReportBuilderService>();
+        services.AddScoped<IReportSourceProvider, TransportationReportSources>();
         services.AddScoped<SavedReportService>();
         services.AddScoped<DashboardService>();
 
@@ -177,7 +177,6 @@ public static class DependencyInjection
         services.AddScoped<NotificationLinks>();
         services.AddScoped<ISearchProvider, TransportationSearch>();
         services.AddScoped<AuditLogService>();
-        services.AddScoped<ExportLimits>();
         services.AddScoped<ExportService>();
         services.AddScoped<SupplierBillPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());

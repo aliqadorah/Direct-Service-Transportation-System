@@ -2,6 +2,7 @@ using DirectService.Transportation.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Web.Client.Layout;
 using DirectService.Transportation.Web.Client.Pages;

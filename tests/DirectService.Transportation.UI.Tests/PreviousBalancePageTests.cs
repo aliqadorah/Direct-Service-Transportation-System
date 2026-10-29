@@ -108,9 +108,9 @@ public sealed class PreviousBalancePageTests : PageTestBase
     [Fact]
     public void Driver_accounts_list_opens_on_the_side_in_the_address_and_asks_for_it()
     {
-        Respond("reports/standard/driver-balances", new Contracts.Reports.ReportResult("driver-balances", "أرصدة السائقين", [],
+        Respond("reports/standard/driver-balances", new DirectService.Shared.Contracts.ReportResult("driver-balances", "أرصدة السائقين", [],
             [new("driver", "السائق", "text"), new("owed", "المستحق للسائق", "money"), new("owes", "على السائق للشركة", "money")],
-            [new Contracts.Reports.ResultRow(["سامي العبادي", 0m, 100m], null)], null, null, false));
+            [new DirectService.Shared.Contracts.ResultRow(["سامي العبادي", 0m, 100m], null)], null, null, false));
         Services.GetRequiredService<NavigationManager>().NavigateTo($"/c/{Company}/driver-accounts?side=owes");
         var cut = Render<DriverAccounts>(p => p.Add(x => x.Company, Company));
         cut.WaitForAssertion(() => Assert.Contains("سامي العبادي", cut.Markup));

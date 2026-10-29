@@ -414,7 +414,7 @@ public sealed class ApArTests(ApiFactory f)
         await (await o.Client.PostAsJsonAsync(U(o, "/apar/payments"), new ApArPaymentRequest(bill.Id, Today, 200m, "Cash", w.CashBox, null, null, 0, null))).EnsureOkAsync();
 
         var q = $"supplier={Uri.EscapeDataString(supplier.Id)}&from={Today:yyyy-MM-dd}&to={Today:yyyy-MM-dd}";
-        var r = await ReadAsync<Contracts.Reports.ReportResult>(await o.Client.GetAsync(U(o, $"/reports/standard/supplier-statement?{q}")));
+        var r = await ReadAsync<DirectService.Shared.Contracts.ReportResult>(await o.Client.GetAsync(U(o, $"/reports/standard/supplier-statement?{q}")));
         Assert.Equal(["date", "document", "description", "amount", "tax", "deduction", "net", "balance"], r.Columns.Select(c => c.Key));
         Assert.Equal(4, r.Rows.Count);   // opening, bill, return, payment
         decimal V(int row, int col) => ((System.Text.Json.JsonElement)r.Rows[row].Values[col]!).GetDecimal();

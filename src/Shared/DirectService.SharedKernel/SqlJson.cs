@@ -1,7 +1,7 @@
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
 /// <summary>
-/// SQL Server JSON functions used in queries on the custom values of trips, drivers and customers (report builder, FR-143). Mapped in the
+/// SQL Server JSON functions used in queries on the custom values of trips, drivers and customers (report builder, FR-143; SharedKernel since Stage 2 session 9). Mapped in the
 /// database context; calling them outside a query is an error.
 /// </summary>
 public static class SqlJson

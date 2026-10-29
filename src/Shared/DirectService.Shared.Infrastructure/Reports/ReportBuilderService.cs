@@ -1,15 +1,10 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Ledger;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Reports;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Reports;
+namespace DirectService.Shared.Infrastructure.Reports;
 
 /// <summary>Composite grouping key built in SQL: per slot a text, a number (dates, flags) and a public id (refs).</summary>
 public sealed class GroupKey(string? s1, long? n1, Guid? g1, string? s2, long? n2, Guid? g2, string? s3, long? n3, Guid? g3)
@@ -52,10 +47,17 @@ public sealed class GroupRow(string? s1, long? n1, Guid? g1, string? s2, long? n
 /// The report builder (FR-143 … FR-147): ten data sources with custom fields, each open only with its view permission; row grouping (up to
 /// two) and an optional column grouping, dates by day / month / quarter / year; measures sum, count, average, min, max; filters; sort;
 /// top-N; detail mode. Grouping and aggregation run in SQL (expression trees over the source query, NFR-01); the column grouping is pivoted
-/// from the SQL result. Sources with a status show active documents unless the definition filters on status (DT-115).
+/// from the SQL result. Sources with a status show active documents unless the definition filters on status (DT-115). A shared engine: the
+/// data sources and their rules come from the modules (<see cref="IReportSourceProvider"/>, Stage 2 session 9, DT-330).
 /// </summary>
-public sealed partial class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, LedgerReportService ledger, Collaboration.ExportLimits limits)
+public sealed partial class ReportBuilderService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IEnumerable<IReportSourceProvider> providers,
+    ExportLimits limits) : IReportBuilder
 {
+    private readonly IReadOnlyList<IReportSourceProvider> _providers = providers.ToList();
+
+    /// <summary>The module of a source (its period, value names and row links).</summary>
+    private IReportSourceProvider ProviderOf(SourceDef s) => _providers.First(p => p.Sources.Contains(s));
+
     public const int MaxGroups = 5000;
     public const int MaxDetailRows = 5000;
     public const int MaxBackgroundRows = 100_000;
@@ -101,7 +103,7 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
     public async Task<IReadOnlyList<DataSourceInfo>> SourcesAsync(CancellationToken ct)
     {
         var result = new List<DataSourceInfo>();
-        foreach (var s in ReportSources.All.Where(CanUse))
+        foreach (var s in _providers.SelectMany(p => p.Sources).Where(CanUse))
         {
             var fields = await FieldsAsync(s, ct).ConfigureAwait(false);
             result.Add(new DataSourceInfo(s.Key, En ? s.En : s.Ar, fields.Select(f => new SourceField(f.Key, En ? f.En : f.Ar, f.Type, f.Groupable, f.Measurable, f.Custom)).ToList()));
@@ -135,7 +137,8 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
 
     public SourceDef Source(string? key)
     {
-        var s = ReportSources.Find(key?.Trim().ToLowerInvariant()) ?? throw Fail.Field("source", ErrorCodes.ReportSource);
+        var wanted = key?.Trim().ToLowerInvariant();
+        var s = _providers.SelectMany(p => p.Sources).FirstOrDefault(x => x.Key == wanted) ?? throw Fail.Field("source", SharedErrorCodes.ReportSource);
         if (!CanUse(s)) throw Fail.Forbidden();
         return s;
     }
@@ -152,18 +155,18 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
         void NoEmpty<TItem>(IReadOnlyList<TItem>? items, string at)
         {
             var i = items?.ToList().FindIndex(it => it is null) ?? -1;
-            if (i >= 0) throw Bad($"{at}[{i}]", ErrorCodes.ReportItemEmpty);
+            if (i >= 0) throw Bad($"{at}[{i}]", SharedErrorCodes.ReportItemEmpty);
         }
         NoEmpty(d.Rows, "definition.rows");
         NoEmpty(d.Measures, "definition.measures");
         NoEmpty(d.Filters, "definition.filters");
         NoEmpty(d.Columns, "definition.columns");
         var fields = await FieldsAsync(s, ct).ConfigureAwait(false);
-        FieldDef Field(string? key, string at) => fields.FirstOrDefault(f => f.Key == key) ?? throw Bad(at, ErrorCodes.ReportFieldMissing);
+        FieldDef Field(string? key, string at) => fields.FirstOrDefault(f => f.Key == key) ?? throw Bad(at, SharedErrorCodes.ReportFieldMissing);
         (FieldDef, string?) Grouping(ReportGrouping g, string at)
         {
             var f = Field(g.Field, at + ".field");
-            if (!f.Groupable) throw Bad(at + ".field", ErrorCodes.ReportNotGroupable);
+            if (!f.Groupable) throw Bad(at + ".field", SharedErrorCodes.ReportNotGroupable);
             string? unit = null;
             if (f.Type == FieldTypes.Date)
             {
@@ -173,7 +176,7 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
                     "day" => "day",
                     "quarter" => "quarter",
                     "year" => "year",
-                    _ => throw Bad(at + ".dateUnit", ErrorCodes.ReportDateUnit),
+                    _ => throw Bad(at + ".dateUnit", SharedErrorCodes.ReportDateUnit),
                 };
             }
             return (f, unit);
@@ -185,33 +188,33 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
         if (!d.Detail)
         {
             // Summary mode needs a row grouping; a column grouping alone is refused with what to change (owner feedback 13 Oct 2026).
-            if (rows.Count < 1) throw Fail.Field("definition.rows", ErrorCodes.ReportRowsNone);
-            if (rows.Count > 2) throw Bad("definition.rows", ErrorCodes.ReportRowsTooMany, 2);
-            if ((d.Measures?.Count ?? 0) is < 1 or > MaxMeasures) throw Bad("definition.measures", ErrorCodes.ReportMeasuresCount, MaxMeasures);
+            if (rows.Count < 1) throw Fail.Field("definition.rows", SharedErrorCodes.ReportRowsNone);
+            if (rows.Count > 2) throw Bad("definition.rows", SharedErrorCodes.ReportRowsTooMany, 2);
+            if ((d.Measures?.Count ?? 0) is < 1 or > MaxMeasures) throw Bad("definition.measures", SharedErrorCodes.ReportMeasuresCount, MaxMeasures);
             for (var i = 0; i < d.Measures!.Count; i++)
             {
                 var m = d.Measures[i];
                 var fn = (m.Function?.Trim().ToLowerInvariant()) switch
                 {
                     "sum" or "count" or "avg" or "min" or "max" => m.Function!.Trim().ToLowerInvariant(),
-                    _ => throw Bad($"definition.measures[{i}].function", ErrorCodes.ReportFunction),
+                    _ => throw Bad($"definition.measures[{i}].function", SharedErrorCodes.ReportFunction),
                 };
                 FieldDef? f = null;
                 if (fn != "count" || !string.IsNullOrWhiteSpace(m.Field))
                 {
                     f = Field(m.Field, $"definition.measures[{i}].field");
-                    if (fn != "count" && !f.Measurable) throw Bad($"definition.measures[{i}].field", ErrorCodes.ReportNotMeasurable);
+                    if (fn != "count" && !f.Measurable) throw Bad($"definition.measures[{i}].field", SharedErrorCodes.ReportNotMeasurable);
                 }
                 measures.Add((fn, f));
             }
         }
         else
         {
-            if ((d.Columns?.Count ?? 0) is < 1 or > MaxColumns) throw Bad("definition.columns", ErrorCodes.ReportColumnsCount, MaxColumns);
+            if ((d.Columns?.Count ?? 0) is < 1 or > MaxColumns) throw Bad("definition.columns", SharedErrorCodes.ReportColumnsCount, MaxColumns);
             foreach (var (c, i) in d.Columns!.Select((c, i) => (c, i))) Field(c, $"definition.columns[{i}]");
         }
-        if (d.Top is < 1 or > MaxGroups) throw Bad("definition.top", ErrorCodes.ReportTop, MaxGroups);
-        if ((d.Filters?.Count ?? 0) > MaxFilters) throw Bad("definition.filters", ErrorCodes.ReportFiltersCount, MaxFilters);
+        if (d.Top is < 1 or > MaxGroups) throw Bad("definition.top", SharedErrorCodes.ReportTop, MaxGroups);
+        if ((d.Filters?.Count ?? 0) > MaxFilters) throw Bad("definition.filters", SharedErrorCodes.ReportFiltersCount, MaxFilters);
 
         var x = Expression.Parameter(s.Row, "x");
         Expression? where = null;
@@ -237,8 +240,8 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
     public async Task<ReportResult> RunAsync(string? sourceKey, ReportDefinition? definition, DateOnly? from, DateOnly? to, string? title, CancellationToken ct)
     {
         var s = Source(sourceKey);
-        var d = definition ?? throw Fail.Field("definition", ErrorCodes.ReportDefinition);
-        if (from is not null || to is not null) (from, to) = await ledger.PeriodAsync(from, to, ct).ConfigureAwait(false);
+        var d = definition ?? throw Fail.Field("definition", SharedErrorCodes.ReportDefinition);
+        if (from is not null || to is not null) (from, to) = await ProviderOf(s).PeriodAsync(from, to, ct).ConfigureAwait(false);
         var plan = await PlanAsync(s, d, from, to, ct).ConfigureAwait(false);
         var method = (d.Detail ? DetailMethod : GroupedMethod).MakeGenericMethod(s.Row);
         var result = await ((Task<ReportResult>)method.Invoke(this, [plan, ct])!).ConfigureAwait(false);
@@ -288,7 +291,7 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
     {
         ArgumentNullException.ThrowIfNull(d);
         var plan = await PlanAsync(Source(sourceKey), d, null, null, ct).ConfigureAwait(false);
-        var option = PinOption(plan, key) ?? throw Fail.Field("measureKey", ErrorCodes.ReportMeasure);
+        var option = PinOption(plan, key) ?? throw Fail.Field("measureKey", SharedErrorCodes.ReportMeasure);
         var value = (await PinTotalsAsync(plan, [(option.Fn, option.Field)], ct).ConfigureAwait(false))[0];
         return (value, PinLabel(option.Key, option.Fn, option.Field), MeasureKind(option.Fn, option.Field));
     }
@@ -438,7 +441,7 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
             };
         }
         if (f.Type == FieldTypes.Bool) return n == 1 ? L("نعم", "Yes") : L("لا", "No");
-        if (f.Entity == typeof(Domain.Trn.OwnershipType) && s is not null) return MasterData.OwnershipTypeNames.Display(s, ctx.Language);
+        if (s is not null && Display(f, s) is { } shown) return shown;
         return s ?? L("(فارغ)", "(empty)");
     }
 
@@ -662,12 +665,20 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
     private object? Cell(FieldDef f, object? v) => v switch
     {
         bool b => b ? L("نعم", "Yes") : L("لا", "No"),
-        string s when f.Entity == typeof(Domain.Trn.OwnershipType) => MasterData.OwnershipTypeNames.Display(s, ctx.Language),
+        string s when Display(f, s) is { } shown => shown,
         _ => v,
     };
 
+    /// <summary>A stored text value in the reader's language when a module names it (e.g. built-in ownership types).</summary>
+    private string? Display(FieldDef f, string value)
+    {
+        foreach (var p in _providers)
+            if (p.Display(f, value, ctx.Language) is { } shown) return shown;
+        return null;
+    }
+
     /// <summary>The entity whose token links a detail row (the row's own type, or the journal entry of a journal line).</summary>
-    private static Type Entity(SourceDef s) => s.RowLink == "journal-entry" ? typeof(Domain.Acc.JournalEntry) : s.Row;
+    private Type Entity(SourceDef s) => ProviderOf(s).LinkEntity(s);
 
     // ------------------------------------------------------------ filters
 
@@ -676,10 +687,10 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
         var op = r.Operator?.Trim().ToLowerInvariant() ?? string.Empty;
         var values = r.Values ?? [];
         var setting = Setting(at);
-        Exception Value() => Fail.Field(at + ".values", ErrorCodes.ReportFilterValueFormat, setting);
-        string V(int i) => i < values.Count && !string.IsNullOrWhiteSpace(values[i]) ? values[i] : throw Fail.Field(at + ".values", ErrorCodes.ReportFilterValueRequired, setting);
+        Exception Value() => Fail.Field(at + ".values", SharedErrorCodes.ReportFilterValueFormat, setting);
+        string V(int i) => i < values.Count && !string.IsNullOrWhiteSpace(values[i]) ? values[i] : throw Fail.Field(at + ".values", SharedErrorCodes.ReportFilterValueRequired, setting);
         var body = Replace(f.Value, x);
-        Exception Bad() => Fail.Field(at + ".operator", ErrorCodes.ReportFilterOperator, setting);
+        Exception Bad() => Fail.Field(at + ".operator", SharedErrorCodes.ReportFilterOperator, setting);
 
         if (op is "empty" or "notempty")
         {
@@ -695,7 +706,7 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
                 var pid = Expression.Convert(Replace(f.Pid!, x), typeof(Guid?));
                 if (op == "contains") return Contains(body, V(0));
                 var ids = values.Select(v => tokens.Decode(f.Entity!, v) ?? throw Value()).Select(g => (Guid?)g).ToList();
-                if (ids.Count == 0) throw Fail.Field(at + ".values", ErrorCodes.ReportFilterValueRequired, setting);
+                if (ids.Count == 0) throw Fail.Field(at + ".values", SharedErrorCodes.ReportFilterValueRequired, setting);
                 Expression inList = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(Guid?)], Expression.Constant(ids), pid);
                 return op switch { "eq" or "in" => inList, "ne" => Expression.Not(inList), _ => throw Bad() };
             }
@@ -756,7 +767,4 @@ public sealed partial class ReportBuilderService(IAppDbContext db, IRequestConte
     {
         protected override Expression VisitParameter(ParameterExpression node) => node == from ? to : base.VisitParameter(node);
     }
-
-    /// <summary>Permission of the builder itself (PRD 3.4: reports.view covers the report builder and saved reports).</summary>
-    public const string Permission = PermissionKeys.ReportsView;
 }

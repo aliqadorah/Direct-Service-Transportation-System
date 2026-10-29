@@ -1,5 +1,6 @@
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Pipeline;
@@ -41,11 +42,11 @@ internal static class ReportEndpoints
             File(await svc.ExportAsync(key, q, format, ct).ConfigureAwait(false))).RequireMember();
 
         var b = r.MapGroup("/builder").WithTags("Report builder");
-        b.MapGet("/sources", async (ReportBuilderService svc, CancellationToken ct) =>
+        b.MapGet("/sources", async (IReportBuilder svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.SourcesAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
-        b.MapPost("/run", async (ReportRunRequest req, ReportBuilderService svc, CancellationToken ct) =>
+        b.MapPost("/run", async (ReportRunRequest req, IReportBuilder svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.RunAsync(req.Source, req.Definition, req.From, req.To, null, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
-        b.MapPost("/export", async (ReportRunRequest req, string? format, ReportBuilderService svc, IReportExporter exporter, CancellationToken ct) =>
+        b.MapPost("/export", async (ReportRunRequest req, string? format, IReportBuilder svc, IReportExporter exporter, CancellationToken ct) =>
         {
             var result = await svc.RunAsync(req.Source, req.Definition, req.From, req.To, null, ct).ConfigureAwait(false);
             return File(await exporter.ExportAsync(StandardReportService.ToTable(result), format, "report", ct).ConfigureAwait(false));

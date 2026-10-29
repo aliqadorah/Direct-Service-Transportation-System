@@ -189,9 +189,9 @@ public sealed class AccountingDashboardTests(ApiFactory f)
             new ApArDocumentRequest(supplier.Id, null, Today.AddDays(-1), null, null, [new ApArLineRequest("Diesel", a["5103"].Id, 400m, 0m, null)], null)));
 
         // DT-278: the "owed" column (what the company must pay); the last column is what they owe the company.
-        decimal Total(Contracts.Reports.ReportResult r) => ((System.Text.Json.JsonElement)r.Totals![^2]!).GetDecimal();
-        var drivers = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/driver-balances?asOf={D(Today)}")))!);
-        var partners = Total((await o.Client.GetFromJsonAsync<Contracts.Reports.ReportResult>(U(o, $"/reports/standard/partner-balances?asOf={D(Today)}")))!);
+        decimal Total(DirectService.Shared.Contracts.ReportResult r) => ((System.Text.Json.JsonElement)r.Totals![^2]!).GetDecimal();
+        var drivers = Total((await o.Client.GetFromJsonAsync<DirectService.Shared.Contracts.ReportResult>(U(o, $"/reports/standard/driver-balances?asOf={D(Today)}")))!);
+        var partners = Total((await o.Client.GetFromJsonAsync<DirectService.Shared.Contracts.ReportResult>(U(o, $"/reports/standard/partner-balances?asOf={D(Today)}")))!);
         Assert.True(drivers > 0 && partners > 0);
 
         var p = (await DashboardAsync(o.Client, o)).Figures!.Payables!;

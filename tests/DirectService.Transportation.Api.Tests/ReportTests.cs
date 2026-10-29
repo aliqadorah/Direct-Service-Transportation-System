@@ -8,6 +8,7 @@ using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Pricing;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;

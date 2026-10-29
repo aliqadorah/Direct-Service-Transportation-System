@@ -1,6 +1,7 @@
 @page "/c/{Company}"
 @* SCR-07 dashboard (FR-137…141): today / month-to-date figures, alert cards that open the filtered lists, cash and bank balances, pinned
    reports with their threshold state (icon + text). Each part appears only with its permission (the API leaves the rest out). *@
+@using DirectService.Shared.Contracts
 @using DirectService.Transportation.Contracts.Reports
 @using DirectService.Transportation.Web.Client.Pages.Reports
 @inject Api Api

@@ -82,8 +82,8 @@ public sealed class MasterDataTests(ApiFactory f)
         var csv = await (await o.Client.GetAsync(U(o, "/drivers/export?format=csv"))).Content.ReadAsStringAsync();
         Assert.Contains("الشركة", csv, StringComparison.Ordinal);
         Assert.DoesNotContain(",Company,", csv, StringComparison.Ordinal);
-        var report = await ReadAsync<Contracts.Reports.ReportResult>(await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"),
-            new Contracts.Reports.ReportRunRequest("drivers", new Contracts.Reports.ReportDefinition(null, null, null, null, null, null, true, ["name", "ownershipType"]), null, null)));
+        var report = await ReadAsync<DirectService.Shared.Contracts.ReportResult>(await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"),
+            new DirectService.Shared.Contracts.ReportRunRequest("drivers", new DirectService.Shared.Contracts.ReportDefinition(null, null, null, null, null, null, true, ["name", "ownershipType"]), null, null)));
         Assert.Contains(report.Rows, r => r.Values.Any(v => v is JsonElement { ValueKind: JsonValueKind.String } s && s.GetString() == "الشركة"));
         // An import naming the type in Arabic links the built-in type.
         var file = "الاسم الكامل,الرقم الوطني,الهاتف 1,رقم الرخصة,فئة الرخصة,تاريخ انتهاء الرخصة,طريقة الدفع,رقم اللوحة,الحمولة (طن),نوع الملكية,تاريخ انتهاء الترخيص,تاريخ انتهاء التأمين,تاريخ انتهاء الفحص\n" +

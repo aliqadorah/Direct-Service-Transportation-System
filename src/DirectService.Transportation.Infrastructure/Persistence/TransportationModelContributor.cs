@@ -19,11 +19,11 @@ public sealed class TransportationModelContributor : IModelContributor
         MapJsonFunctions(modelBuilder);
     }
 
-    /// <summary>JSON_VALUE and a numeric TRY_CONVERT over it, for custom values in reports (<see cref="Application.Abstractions.SqlJson"/>).</summary>
+    /// <summary>JSON_VALUE and a numeric TRY_CONVERT over it, for custom values in reports (<see cref="SqlJson"/>).</summary>
     private static void MapJsonFunctions(ModelBuilder modelBuilder)
     {
-        var value = typeof(Application.Abstractions.SqlJson).GetMethod(nameof(Application.Abstractions.SqlJson.Value))!;
-        var number = typeof(Application.Abstractions.SqlJson).GetMethod(nameof(Application.Abstractions.SqlJson.Number))!;
+        var value = typeof(SqlJson).GetMethod(nameof(SqlJson.Value))!;
+        var number = typeof(SqlJson).GetMethod(nameof(SqlJson.Number))!;
         modelBuilder.HasDbFunction(value).HasName("JSON_VALUE").IsBuiltIn();
         modelBuilder.HasDbFunction(number).HasTranslation(args =>
             new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("TRY_CONVERT",
@@ -32,7 +32,7 @@ public sealed class TransportationModelContributor : IModelContributor
                     new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("JSON_VALUE", args, true, [true, false], typeof(string), args[0].TypeMapping),
                 ],
                 true, [false, true], typeof(decimal), null));
-        var date = typeof(Application.Abstractions.SqlJson).GetMethod(nameof(Application.Abstractions.SqlJson.Date))!;
+        var date = typeof(SqlJson).GetMethod(nameof(SqlJson.Date))!;
         modelBuilder.HasDbFunction(date).HasTranslation(args =>
             new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("TRY_CONVERT",
                 [

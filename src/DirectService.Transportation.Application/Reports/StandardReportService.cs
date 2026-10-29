@@ -8,6 +8,7 @@ using DirectService.Transportation.Domain.Acc;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Trn;
