@@ -118,7 +118,7 @@ POS never touches `acc` tables. It uses `Accounting.Contracts` (§c):
    - `IRequestContext`;
    - `IChangeContext.SetAction` for audited actions;
    - `ExpectRowVersion`;
-   - `Fail.*` with codes and AR/EN messages in the module's error catalogue (unit-tested);
+   - `Fail.*` with codes and AR/EN messages in the module's error catalogue (unit-tested), given to the shared engines through an `IErrorTextProvider` (SharedKernel; Transportation's: `TransportationErrorTexts`);
    - idempotent creates with `clientId`;
    - URL tokens only.
 2. Endpoints in `Infrastructure/Http/PosEndpoints.cs` under `/api/v1/companies/{company}/pos/…`. Add every route to the module's API summaries (test-enforced).
@@ -131,8 +131,11 @@ POS never touches `acc` tables. It uses `Accounting.Contracts` (§c):
    - `ICompanyProvisioner` (number sequences, defaults for a new company);
    - `IDemoDataContributor`;
    - `ISetupStepProvider`;
-   - `IUsageMeter` / `ILimitCheck` (plan limits such as `POS.Registers`);
-   - `ITenantDataEraser` (personal-data columns).
+   - `IUsageMeter` (plan limits such as `POS.Registers`; a new measure in `UsageMeasures`);
+   - `ITenantDataEraser` (personal-data columns);
+   - `IPermissionCatalog` (the module's permission keys and preset-role keys; the rows themselves through `IPermissionSeedProvider`, section 3).
+
+   The Platform interfaces are in `DirectService.Platform.Contracts.Modules` (added in Stage 2 session 12, DT-346); Transportation's implementations are in `Transportation.Application/Modules` and `CompanyProvisioningService` — copy their shape.
 4. Background work: a worker in `Infrastructure/Workers`, claiming rows with `UPDLOCK, READPAST`, switched by `Jobs:Enabled`.
 
 ---
