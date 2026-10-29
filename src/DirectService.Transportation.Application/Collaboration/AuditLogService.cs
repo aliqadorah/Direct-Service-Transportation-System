@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Collaboration;
 /// and record type in words, the event as a sentence, labelled and formatted changes, a journal entry with its lines as one event; the
 /// stored values as they are ("technical details") only for settings.manage and only when asked.
 /// </summary>
-public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, ReportExporter exporter, AuditDescriber describer)
+public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportExporter exporter, AuditDescriber describer)
 {
     public const int MaxExportRows = 20_000;
 

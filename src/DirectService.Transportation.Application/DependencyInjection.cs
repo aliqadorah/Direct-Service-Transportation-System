@@ -148,7 +148,6 @@ public static class DependencyInjection
         services.AddScoped<ApArReturnService>();
         services.AddScoped<ApArPrintService>();
         services.AddScoped<AgeingService>();
-        services.AddScoped<ReportExporter>();
         services.AddScoped<LedgerReportService>();
         services.AddScoped<LedgerReportExports>();
         services.AddScoped<MaintenanceService>();

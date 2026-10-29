@@ -37,7 +37,7 @@ public sealed class ExportLimits
 /// seven days and sends a notification with the download link; only that user can download it, in that company.
 /// </summary>
 public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, ReportBuilderService builder, SavedReportService saved,
-    StandardReportService standard, AuditLogService audit, ReportExporter exporter, NotificationService notifications, Platform.CompanyExportService company)
+    StandardReportService standard, AuditLogService audit, IReportExporter exporter, NotificationService notifications, Platform.CompanyExportService company)
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);
 

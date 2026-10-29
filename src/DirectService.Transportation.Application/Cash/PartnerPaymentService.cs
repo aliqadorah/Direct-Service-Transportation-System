@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// only the rest of a payment / repayment counts for the partner's trips (<see cref="TripPart"/>, DT-271 coverage).
 /// </summary>
 public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter, AuditTrail audit, PreviousBalances previous)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter, AuditTrail audit, PreviousBalances previous)
 {
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";

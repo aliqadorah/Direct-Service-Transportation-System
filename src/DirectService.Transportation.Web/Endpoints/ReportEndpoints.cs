@@ -45,7 +45,7 @@ internal static class ReportEndpoints
             TypedResults.Ok(await svc.SourcesAsync(ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
         b.MapPost("/run", async (ReportRunRequest req, ReportBuilderService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.RunAsync(req.Source, req.Definition, req.From, req.To, null, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.ReportsView);
-        b.MapPost("/export", async (ReportRunRequest req, string? format, ReportBuilderService svc, ReportExporter exporter, CancellationToken ct) =>
+        b.MapPost("/export", async (ReportRunRequest req, string? format, ReportBuilderService svc, IReportExporter exporter, CancellationToken ct) =>
         {
             var result = await svc.RunAsync(req.Source, req.Definition, req.From, req.To, null, ct).ConfigureAwait(false);
             return File(await exporter.ExportAsync(StandardReportService.ToTable(result), format, "report", ct).ConfigureAwait(false));

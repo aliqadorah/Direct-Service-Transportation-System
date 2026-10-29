@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// old → new; void with reason (reversal, number kept), refused once settled (BR-032).
 /// </summary>
 public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "TRN.Advance";
     public const string SourceType = "Advance";

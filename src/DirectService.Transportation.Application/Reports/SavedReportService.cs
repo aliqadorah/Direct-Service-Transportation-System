@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// see, a measure of its definition, warning and critical thresholds (value ≥ threshold), an order; the card shows the measure's grand
 /// total and its state normal / warning / exceeded.
 /// </summary>
-public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, ReportBuilderService builder, ReportExporter exporter,
+public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, ReportBuilderService builder, IReportExporter exporter,
     AuditTrail audit, IChangeContext changes, IUserNames users)
 {
     public const string EntityType = "CFG.SavedReport";

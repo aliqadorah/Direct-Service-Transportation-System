@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// reason restores the balance (FR-127).
 /// </summary>
 public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArPayment";
     public const string SourceType = "ApArPayment";

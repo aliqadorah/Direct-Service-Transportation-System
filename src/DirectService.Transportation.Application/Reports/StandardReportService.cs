@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// statement, driver and partner balances. Trips count when active, by trip date; tonnage = loaded weight (DT-114). Every row links to its
 /// record or a filtered list (FR-149); every report exports to Excel/CSV/PDF (FR-150).
 /// </summary>
-public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, ReportExporter exporter,
+public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, IReportExporter exporter,
     Cash.AccountStatementService statements)
 {
     private const string Active = "Active";

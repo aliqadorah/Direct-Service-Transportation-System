@@ -19,7 +19,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// financial reports, in the natural direction of the account. Variance = Actual − Budget; favourable / unfavourable per
 /// <see cref="BudgetMath.Status"/>. Excel / PDF through the report exporter.
 /// </summary>
-public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport support, LedgerReportService ledger, ChartOfAccountsService chart, ReportExporter exporter)
+public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport support, LedgerReportService ledger, ChartOfAccountsService chart, IReportExporter exporter)
 {
     public static readonly IReadOnlyList<string> Modes = ["month", "ytd", "year"];
 
@@ -130,7 +130,7 @@ public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport supp
         var rows = new List<IReadOnlyList<object?>>();
         foreach (var (type, title) in new[] { (BudgetService.Revenue, L("الإيرادات", "Revenue")), (BudgetService.Expense, L("المصروفات", "Expenses")) })
         {
-            rows.Add(ReportExporter.Group(title));
+            rows.Add(IReportExporter.Group(title));
             rows.AddRange(r.Rows.Where(x => x.AccountType == type).Select(x => (IReadOnlyList<object?>)
                 [new string(' ', (x.Level - 1) * 2) + Name(x.Account), x.Budget, x.Actual, x.Variance, Pct(x.VariancePercent), Status(x.Status)]));
             rows.Add(Line(type == BudgetService.Revenue ? L("إجمالي الإيرادات", "Total revenue") : L("إجمالي المصروفات", "Total expenses"),

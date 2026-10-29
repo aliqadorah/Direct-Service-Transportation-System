@@ -32,7 +32,7 @@ public interface IEInvoiceSignal
 /// </summary>
 public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
     EInvoiceSettingsService settings, EInvoiceDocumentBuilder builder, ISpreadsheetService sheets, IEInvoiceSignal signal, IOptions<EInvoicingOptions> options,
-    TimeProvider clock, Collaboration.NotificationService notifications, Reports.ReportExporter exporter)
+    TimeProvider clock, Collaboration.NotificationService notifications, IReportExporter exporter)
 {
     public const string EntityType = "TRN.EInvoiceSubmission";
     private const string ValidationPrefix = "validation:";
@@ -429,7 +429,7 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
         var data = rows.Select(r => (IReadOnlyList<object?>)[
             r.S.DocumentType, r.Number, r.Date, r.CustomerName, r.Total, r.S.Status, r.S.Icv, r.S.SystemNumber, r.S.UniqueId?.ToString(), r.S.SubmittedAt,
             r.S.Attempts, Problems(r.S.LastError) is { Count: > 0 } p ? string.Join(" | ", p.Select(x => x.Message)) : Display(r.S.LastError)]).ToList();
-        if (Reports.ReportExporter.IsPrintout(format))   // FR-150
+        if (IReportExporter.IsPrintout(format))   // FR-150
             return await exporter.ListPrintoutAsync(En ? "E-invoicing" : "الفوترة الإلكترونية", "e-invoicing", headers, data, format!, ct, [0, 1, 2, 3, 4, 5, 7, 9, 11]).ConfigureAwait(false);
         return string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase)
             ? new GeneratedFile("e-invoicing.csv", "text/csv", sheets.WriteCsv(headers, data))

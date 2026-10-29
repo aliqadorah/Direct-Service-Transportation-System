@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// over 90. Payables: supplier bills. Receivables: approved transport invoices per transport customer, with on-account receipts shown
 /// separately as unapplied (7.7.3), and Accounting receivable documents per accounting customer.
 /// </summary>
-public sealed class AgeingService(IAppDbContext db, MasterDataSupport support, ReportExporter exporter)
+public sealed class AgeingService(IAppDbContext db, MasterDataSupport support, IReportExporter exporter)
 {
     private sealed record Due(string Type, long PartyId, DateOnly DueDate, decimal Amount);
 

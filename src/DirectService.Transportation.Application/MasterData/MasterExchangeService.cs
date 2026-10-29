@@ -21,7 +21,7 @@ namespace DirectService.Transportation.Application.MasterData;
 /// rejected row blocks the import; a committed import is one transaction logged in cfg.ImportBatches.
 /// </summary>
 public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    MasterDataSupport support, IStandardFields fields, ICustomFields customFields, Reports.ReportExporter exporter,
+    MasterDataSupport support, IStandardFields fields, ICustomFields customFields, IReportExporter exporter,
     DriverService drivers, CustomerService customers, PartnerService partners, MaterialService materials,
     LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, IErrorText errorText)
 {
@@ -232,7 +232,7 @@ public sealed class MasterExchangeService(IAppDbContext db, ISpreadsheetService 
             var keep = shown.Select(x => x.i).ToList();
             rows = rows.Select(r => (IReadOnlyList<object?>)[.. keep.Select(i => r[i]), .. r.Skip(all.Length)]).ToList();
         }
-        if (Reports.ReportExporter.IsPrintout(format))   // FR-150 printout of the master list
+        if (IReportExporter.IsPrintout(format))   // FR-150 printout of the master list
             return await exporter.ListPrintoutAsync(ListTitle(kind), kind, headers, rows, format!, ct).ConfigureAwait(false);
         var name = kind + (csv ? ".csv" : ".xlsx");
         return csv

@@ -24,7 +24,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// control account. Receivable returns are e-invoiced as credit notes when their document is (D-15). Void by reversal with a reason.
 /// </summary>
 public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, EInvoiceService einvoice, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArReturn";
     public const string SourceType = "ApArReturn";

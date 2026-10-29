@@ -7,7 +7,7 @@ using DirectService.Transportation.Contracts.Ledger;
 namespace DirectService.Transportation.Application.Ledger;
 
 /// <summary>Excel / CSV / PDF exports of the financial reports (FR-121, FR-150) with the filters printed.</summary>
-public sealed class LedgerReportExports(LedgerReportService reports, ReportExporter exporter)
+public sealed class LedgerReportExports(LedgerReportService reports, IReportExporter exporter)
 {
     private string L(string ar, string en) => exporter.L(ar, en);
 
@@ -132,7 +132,7 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
             var optional = s.Group is ProfitLossGroups.OtherIncome or ProfitLossGroups.OtherExpense;
             if (s.Rows.Count > 0 || !optional)
             {
-                rows.Add(ReportExporter.Group(SectionTitle(s.Group)));
+                rows.Add(IReportExporter.Group(SectionTitle(s.Group)));
                 rows.AddRange(s.Rows.Select(x => Values(new string(' ', (x.Level - 1) * 2) + Name(x.Account), x.Amounts, x.Total, x.CompareAmount)));
                 rows.Add(Values(L("مجموع ", "Total ") + SectionTitle(s.Group), s.Total.Amounts, s.Total.Total, s.Total.Compare));
             }
@@ -158,13 +158,13 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
     public async Task<GeneratedFile> BalanceSheetAsync(BalanceSheetQuery q, string? format, CancellationToken ct)
     {
         var r = await reports.BalanceSheetAsync(q, ct).ConfigureAwait(false);
-        var rows = new List<IReadOnlyList<object?>> { ReportExporter.Group(L("الأصول", "Assets")) };
+        var rows = new List<IReadOnlyList<object?>> { IReportExporter.Group(L("الأصول", "Assets")) };
         rows.AddRange(Lines(r.Assets, false));
         rows.Add([L("مجموع الأصول", "Total assets"), r.TotalAssets]);
-        rows.Add(ReportExporter.Group(L("الخصوم", "Liabilities")));
+        rows.Add(IReportExporter.Group(L("الخصوم", "Liabilities")));
         rows.AddRange(Lines(r.Liabilities, false));
         rows.Add([L("مجموع الخصوم", "Total liabilities"), r.TotalLiabilities]);
-        rows.Add(ReportExporter.Group(L("حقوق الملكية", "Equity")));
+        rows.Add(IReportExporter.Group(L("حقوق الملكية", "Equity")));
         rows.AddRange(Lines(r.Equity, false));
         rows.Add([L("نتيجة السنة الحالية", "Current year result"), r.CurrentYearResult]);
         if (r.PriorYearsResult != 0) rows.Add([L("نتائج سنوات سابقة غير مرحّلة", "Results of prior years not transferred"), r.PriorYearsResult]);
@@ -226,7 +226,7 @@ public sealed class LedgerReportExports(LedgerReportService reports, ReportExpor
             ? verdict + " " + L("ترحيلات معلّقة لم تدخل الأستاذ بعد: ", "Pending postings not in the ledger yet: ") + r.PendingPostings.ToString(CultureInfo.InvariantCulture)
             : verdict;
         // Excel / CSV have no note band: the verdict is their last row, so every format says what the screen says.
-        if (!ReportExporter.IsPrintout(format)) rows.Add([note, null, null, null, null, null, null, null, null, null, null, null]);
+        if (!IReportExporter.IsPrintout(format)) rows.Add([note, null, null, null, null, null, null, null, null, null, null, null]);
         var table = new ReportTable(L("مطابقة الحسابات الفرعية", "Sub-ledger reconciliation"), [(L("كما في", "As of"), Date(r.AsOf))],
             [new(L("حساب الرقابة", "Control account")), new(L("نوع الطرف", "Party type")), new(L("رصيد الأستاذ", "Ledger balance"), ReportValue.Money),
              new(L("مجموع أرصدة الأطراف", "Party balances"), ReportValue.Money), new(L("الفرق", "Difference"), ReportValue.Money),

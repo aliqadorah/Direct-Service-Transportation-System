@@ -18,7 +18,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Automatic entries change only through their source document (FR-112).
 /// </summary>
 public sealed class JournalService(IAppDbContext db, PostingEngine engine, PartyResolver parties, PostingSources sources,
-    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, ReportExporter exporter, JournalDraftService drafts)
+    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, IReportExporter exporter, JournalDraftService drafts)
 {
     public const string EntityType = "ACC.JournalEntry";
 

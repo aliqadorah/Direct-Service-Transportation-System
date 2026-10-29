@@ -1,50 +1,21 @@
 using System.Globalization;
 using System.Text;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using static DirectService.SharedKernel.DocumentPrinter;
 
-namespace DirectService.Transportation.Application.Reports;
-
-/// <summary>A report column: header, and how its values print (money with the currency decimals, number, date or text).</summary>
-public sealed record ReportColumn(string Header, ReportValue Kind = ReportValue.Text);
-
-public enum ReportValue
-{
-    Text,
-    Money,
-    Number,
-    Date,
-}
-
-/// <summary>
-/// A report ready for export: title, the filters applied (label → value), columns, rows, an optional totals row and an optional note
-/// (e.g. a warning). Rows marked as groups print in bold across the table. <see cref="Landscape"/>: the printout is A4 landscape (many columns).
-/// </summary>
-public sealed record ReportTable(string Title, IReadOnlyList<(string Label, string Value)> Filters, IReadOnlyList<ReportColumn> Columns,
-    IReadOnlyList<IReadOnlyList<object?>> Rows, IReadOnlyList<object?>? Totals = null, string? Note = null)
-{
-    public bool Landscape { get; init; }
-}
+namespace DirectService.Shared.Infrastructure.Reports;
 
 /// <summary>
 /// Export of any report or screen (FR-121, FR-150): Excel (default) or CSV with the same columns, or a printout (PDF, or its HTML) with
 /// the company header, title, filters, print date and user, page X of Y, in the reader's direction (RTL for Arabic). Used by the
-/// financial reports (B9) and the report engine (B10).
+/// financial reports (B9) and the report engine (B10). Shared since Stage 2 session 8; modules use it through <see cref="IReportExporter"/> (DT-326).
 /// </summary>
-public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, DocumentPrinter printer, ISpreadsheetService sheets, TimeProvider clock)
+public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, DocumentPrinter printer, ISpreadsheetService sheets, TimeProvider clock) : IReportExporter
 {
     public bool En => ctx.Language == "en";
 
     public string L(string ar, string en) => En ? en : ar;
 
-    /// <summary>Longest list a PDF/HTML printout renders (larger lists go to Excel or a background export).</summary>
-    public const int MaxPrintoutRows = 5000;
-
-    /// <summary>A list export asked as a printout ("pdf" or "html")? Excel and CSV stay with the list's own writer.</summary>
-    public static bool IsPrintout(string? format) => format?.Trim().ToLowerInvariant() is "pdf" or "html";
+    private const int MaxPrintoutRows = IReportExporter.MaxPrintoutRows;
 
     /// <summary>
     /// The printout (PDF / HTML) of a list screen's export (FR-150): the same rows as its Excel file, with the columns that fit an A4 page
@@ -62,7 +33,7 @@ public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, 
         ArgumentNullException.ThrowIfNull(headers);
         ArgumentNullException.ThrowIfNull(rows);
         if (rows.Count > MaxPrintoutRows)
-            throw new AppException(ErrorCodes.PrintoutTooLarge, 422, "format", MaxPrintoutRows.ToString("N0", CultureInfo.InvariantCulture));
+            throw new AppException(SharedErrorCodes.PrintoutTooLarge, 422, "format", MaxPrintoutRows.ToString("N0", CultureInfo.InvariantCulture));
         var columns = keep ?? Enumerable.Range(0, headers.Count).ToList();
         ReportValue Kind(int i) => rows.Select(r => i < r.Count ? r[i] : null).FirstOrDefault(v => v is not null) switch
         {
@@ -100,16 +71,11 @@ public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, 
                 var company = await companies.CurrentAsync(ct).ConfigureAwait(false);
                 return await printer.OutputAsync(Html(table, company), f, Safe(fileName), ct).ConfigureAwait(false);
             default:
-                throw Fail.Field("format", ErrorCodes.ValidationFormat, new FieldRef("format"));
+                throw Fail.Field("format", SharedErrorCodes.ValidationFormat, new FieldRef("format"));
         }
     }
 
-    /// <summary>Group rows: a single text cell shown as a band (Excel: the text in the first column).</summary>
-    public static IReadOnlyList<object?> Group(string text) => [new GroupCell(text)];
-
-    private sealed record GroupCell(string Text);
-
-    private static object? Cell(object? value) => value is GroupCell g ? g.Text : value;
+    private static object? Cell(object? value) => value is ReportGroupCell g ? g.Text : value;
 
     private static string SheetName(string title)
     {
@@ -142,7 +108,7 @@ public sealed class ReportExporter(ICompanyInfo companies, IRequestContext ctx, 
 
     private static void Row(StringBuilder sb, IReadOnlyList<ReportColumn> columns, IReadOnlyList<object?> r, bool total)
     {
-        if (r.Count == 1 && r[0] is GroupCell g)
+        if (r.Count == 1 && r[0] is ReportGroupCell g)
         {
             sb.Append("<tr><th colspan=\"").Append(columns.Count).Append("\">").Append(E(g.Text)).Append("</th></tr>");
             return;

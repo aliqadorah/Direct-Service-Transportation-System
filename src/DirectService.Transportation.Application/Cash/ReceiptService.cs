@@ -22,7 +22,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// customer; void with reason (reversal, invoice balance restored, number kept); list with filters, totals and export.
 /// </summary>
 public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "TRN.Receipt";
     public const string SourceType = "Receipt";
@@ -325,9 +325,9 @@ internal static class CashExport
             : new GeneratedFile(name + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sheets.WriteXlsx(name, headers, rows));
 
     public static async Task<GeneratedFile> FileAsync(string name, string? format, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<object?>> rows, ISpreadsheetService sheets,
-        Reports.ReportExporter exporter, CancellationToken ct)
+        IReportExporter exporter, CancellationToken ct)
     {
-        if (Reports.ReportExporter.IsPrintout(format)) return await exporter.ListPrintoutAsync(Title(name, exporter.En), name, headers, rows, format!, ct).ConfigureAwait(false);
+        if (IReportExporter.IsPrintout(format)) return await exporter.ListPrintoutAsync(Title(name, exporter.En), name, headers, rows, format!, ct).ConfigureAwait(false);
         return File(name, format, headers, rows, sheets);
     }
 

@@ -12,7 +12,7 @@ namespace DirectService.Transportation.Application.Trips;
 /// fields, frozen prices, amounts, flags and status; or the printout (PDF / HTML, FR-150).
 /// </summary>
 public sealed class TripExportService(TripService trips, ISpreadsheetService sheets, IRequestContext ctx, IStandardFields fields, ICustomFields customFields,
-    Reports.ReportExporter exporter)
+    IReportExporter exporter)
 {
     public async Task<GeneratedFile> ExportAsync(TripListQuery q, string? format, CancellationToken ct)
     {
@@ -53,7 +53,7 @@ public sealed class TripExportService(TripService trips, ISpreadsheetService she
                 t.NeedsReview, t.Status, t.Billing, t.Invoice?.Number, PaymentText(t.Payment, en), t.PartnerOpen, t.Notes,
             }, .. defs.Select(d => values.TryGetValue(d.FieldKey, out var v) ? Cell(v) : null)]);
         }
-        if (Reports.ReportExporter.IsPrintout(format))   // FR-150: the printout keeps the columns that fit A4 (receipt, date, parties, route, weights, amounts, status)
+        if (IReportExporter.IsPrintout(format))   // FR-150: the printout keeps the columns that fit A4 (receipt, date, parties, route, weights, amounts, status)
             return await exporter.ListPrintoutAsync(X("الرحلات", "Trips"), "trips", headers, rows, format!, ct, [0, 1, 4, 6, 10, 7, 8, 9, 12, 13, 15, 21, 22, 29, 31, 32],
                 totals: true, filters: q.From is null && q.To is null ? null : [(X("الفترة", "Period"), $"{q.From:yyyy-MM-dd} – {q.To:yyyy-MM-dd}")],
                 quantities: [12, 13, 14, 25], sums: [12, 13, 21, 22]).ConfigureAwait(false);   // weights print as numbers; the unit price is not totalled   // also the trip statement of a driver, customer or partner (FR-018)

@@ -30,7 +30,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// </summary>
 public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes,
     IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ChartOfAccountsService chart, ApArPartyService parties,
-    EInvoiceService einvoice, ISpreadsheetService sheets, Reports.ReportExporter exporter)
+    EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArDocument";
     public const int MaxLines = 200;
