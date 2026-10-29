@@ -158,7 +158,7 @@ public sealed class AccountingTests(ApiFactory f)
         await ok.EnsureOkAsync();
         Assert.Equal("4102", (await ok.Content.ReadFromJsonAsync<PostingKeyResponse>())!.Account!.Code);
         // FR-095: the change is audited old → new
-        var audited = await f.DbAsync(db => db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters()
+        var audited = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
             .AnyAsync(l => l.EntityType == "ACC.PostingKeyMapping" && l.Action == "MappingChange"));
         Assert.True(audited);
     }
@@ -345,7 +345,7 @@ public sealed class AccountingTests(ApiFactory f)
         await reopen.EnsureOkAsync();
         Assert.Equal("Open", (await reopen.Content.ReadFromJsonAsync<PeriodResponse>())!.Status);
         await (await c.PostAsJsonAsync(U(owner, $"/accounting/journal-entries/{entry.Id}/void"), new VoidRequest("x", null))).EnsureOkAsync();
-        var audit = await f.DbAsync(db => db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters()
+        var audit = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
             .Where(l => l.EntityType == "ACC.Period").Select(l => l.Action).ToListAsync());
         Assert.Contains("Close", audit);
         Assert.Contains("Reopen", audit);

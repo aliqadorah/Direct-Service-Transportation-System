@@ -122,7 +122,7 @@ public sealed class EInvoiceTests(ApiFactory f)
         {
             var pid = f.Services.GetRequiredService<IUrlTokenService>().Decode<Domain.Core.Company>(o.CompanyId)!.Value;
             var id = await db.Set<Domain.Core.Company>().IgnoreQueryFilters().Where(x => x.PublicId == pid).Select(x => x.Id).SingleAsync();
-            return await db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters()
+            return await db.Set<AuditLog>().IgnoreQueryFilters()
                 .Where(a => a.EntityType == "CORE.Company" && a.EntityId == id && a.Action == "SettingChange").Select(a => new { a.OldValues, a.NewValues }).ToListAsync();
         });
         var change = Assert.Single(audit, a => a.NewValues != null && a.NewValues.Contains("TaxRate", StringComparison.Ordinal));
@@ -164,7 +164,7 @@ public sealed class EInvoiceTests(ApiFactory f)
         var again = await ReadAsync<EInvoiceSettingsResponse>(await o.Client.PutAsJsonAsync(U(o, "/settings/e-invoicing"), Simulator(rowVersion: settings.RowVersion, clientId: null, secret: null)));
         Assert.True(again.HasSecretKey);
         // The audit log never holds the secrets.
-        var audit = await f.DbAsync(db => db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters().Where(a => a.EntityType != null && a.EntityType.Contains("EInvoiceSettings")).Select(a => a.NewValues).ToListAsync());
+        var audit = await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().Where(a => a.EntityType != null && a.EntityType.Contains("EInvoiceSettings")).Select(a => a.NewValues).ToListAsync());
         Assert.All(audit, a => Assert.DoesNotContain("s3cret", a ?? string.Empty, StringComparison.Ordinal));
 
         var dispatcher = await SecurityTests.InviteAndAcceptAsync(f, o, PresetRoles.Dispatcher);

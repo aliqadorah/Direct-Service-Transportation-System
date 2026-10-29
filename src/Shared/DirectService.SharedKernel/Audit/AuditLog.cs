@@ -1,6 +1,8 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on.
-namespace DirectService.Transportation.Domain.Core;
+// Shared since Stage 2 session 8 (DT-323): ids only; the foreign keys to core.Tenants / Companies / Users are in Transportation.Infrastructure
+// Persistence/CrossModuleRelationships.cs (design a.2), with the same names.
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// core.AuditLogs â€” Append-only log.
@@ -31,7 +33,4 @@ public class AuditLog : INullableTenantScoped, IAppendOnly, IAuditRow
     public string? NewValues { get; set; }
     /// <summary>Client IP address (IPv4 or IPv6).</summary>
     public string? IpAddress { get; set; }
-    public Tenant? Tenant { get; set; }
-    public Company? Company { get; set; }
-    public User? User { get; set; }
 }

@@ -21,6 +21,7 @@ internal static class CrossModuleRelationships
         SavedReport(modelBuilder.Entity<SavedReport>());
         DashboardPin(modelBuilder.Entity<DashboardPin>());
         TableColumnView(modelBuilder.Entity<TableColumnView>());
+        AuditLog(modelBuilder.Entity<AuditLog>());
     }
 
     private static void CompanySetting(EntityTypeBuilder<CompanySetting> builder)
@@ -315,6 +316,31 @@ internal static class CrossModuleRelationships
             .WithMany()
             .HasForeignKey(e => e.DeletedBy)
             .HasConstraintName("FK_TableColumnViews_Users_DeletedBy")
+            .OnDelete(DeleteBehavior.NoAction);
+    }
+
+    private static void AuditLog(EntityTypeBuilder<AuditLog> builder)
+    {
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(e => e.TenantId)
+            .HasPrincipalKey(p => p.Id)
+            .IsRequired(false)
+            .HasConstraintName("FK_AuditLogs_Tenants_TenantId")
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne<Company>()
+            .WithMany()
+            .HasForeignKey(e => e.CompanyId)
+            .HasPrincipalKey(p => p.Id)
+            .IsRequired(false)
+            .HasConstraintName("FK_AuditLogs_Companies_CompanyId")
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .HasPrincipalKey(p => p.Id)
+            .IsRequired(false)
+            .HasConstraintName("FK_AuditLogs_Users_UserId")
             .OnDelete(DeleteBehavior.NoAction);
     }
 }

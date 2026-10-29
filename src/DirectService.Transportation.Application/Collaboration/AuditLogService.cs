@@ -57,7 +57,8 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
         if (!string.IsNullOrWhiteSpace(q.User))
         {
             var pid = support.Decode<User>(q.User) ?? throw Fail.Field("user", ErrorCodes.ValidationFormat, new FieldRef("user"));
-            query = query.Where(a => a.User != null && a.User.PublicId == pid);
+            // The acting user among the filtered users, as the former navigation AuditLog.User did (DT-323).
+            query = query.Where(a => db.Set<User>().Any(u => u.Id == a.UserId && u.PublicId == pid));
         }
         if (!string.IsNullOrWhiteSpace(q.Action)) query = query.Where(a => a.Action == q.Action);
         if (!string.IsNullOrWhiteSpace(q.EntityType)) query = query.Where(a => a.EntityType == q.EntityType);

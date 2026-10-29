@@ -63,7 +63,7 @@ public sealed class PaidPartnerTripTests(ApiFactory f)
     {
         var pid = f.Services.GetRequiredService<IUrlTokenService>().Decode<Trip>(tripToken)!.Value;
         var id = await db.Set<Trip>().IgnoreQueryFilters().Where(t => t.PublicId == pid).Select(t => t.Id).SingleAsync();
-        return await db.Set<Domain.Core.AuditLog>().IgnoreQueryFilters().Where(a => a.EntityType == "TRN.Trip" && a.EntityId == id).Select(a => a.Action + " " + a.NewValues).ToListAsync();
+        return await db.Set<AuditLog>().IgnoreQueryFilters().Where(a => a.EntityType == "TRN.Trip" && a.EntityId == id).Select(a => a.Action + " " + a.NewValues).ToListAsync();
     });
 
     private Task<JournalEntry> EntryAsync(DocRef entry) => f.DbAsync(async db =>

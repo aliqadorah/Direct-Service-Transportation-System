@@ -1,11 +1,11 @@
 // Generated once from docs/inputs/Database_Design.md (rev. 5) by tools/design/gen_efcore.py.
 // Hand-maintained from here on. Names, types, defaults and constraints must match the design.
+// Shared since Stage 2 session 8; the foreign keys to core.Tenants / Companies / Users are in Transportation.Infrastructure
+// Persistence/CrossModuleRelationships.cs (design a.2), with the same names.
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using DirectService.Transportation.Domain.Core;
 
-
-namespace DirectService.Transportation.Infrastructure.Persistence.Configurations.Core;
+namespace DirectService.Shared.Infrastructure.Persistence.Configurations;
 
 internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
@@ -89,27 +89,5 @@ internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(new[] { "CompanyId", "EntityType", "EntityId", "OccurredAt" }, "IX_AuditLogs_Entity");
         builder.HasIndex(new[] { "UserId", "OccurredAt" }, "IX_AuditLogs_User");
         builder.HasIndex(new[] { "TenantId" }, "IX_AuditLogs_TenantId");
-
-        builder.HasOne(e => e.Tenant)
-            .WithMany()
-            .HasForeignKey(e => e.TenantId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_AuditLogs_Tenants_TenantId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.Company)
-            .WithMany()
-            .HasForeignKey(e => e.CompanyId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_AuditLogs_Companies_CompanyId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.User)
-            .WithMany()
-            .HasForeignKey(e => e.UserId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_AuditLogs_Users_UserId")
-            .OnDelete(DeleteBehavior.NoAction);
     }
 }

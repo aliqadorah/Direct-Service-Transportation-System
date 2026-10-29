@@ -54,10 +54,14 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
     private static readonly HashSet<string> NotAudited = ["CORE.UserSession", "CFG.RecordLock", "CORE.AuditLog", "TRN.RateHistory", "CORE.Notification", "CORE.Permission", "CORE.EmailOutbox",
         "CORE.MaintenanceLog"];
 
+    /// <summary>
+    /// Every record type by its pinned stored name, in the Transportation domain and in SharedKernel (cfg entities since Stage 2 session 5,
+    /// the audit log since session 8, DT-324) — the same types and names the namespace scan of the single domain assembly found before.
+    /// </summary>
     private static IEnumerable<(string Name, Type Type)> AuditedTypes() =>
-        typeof(AuditLog).Assembly.GetTypes()
-            .Where(t => t.IsClass && !t.IsAbstract && t.Namespace?.Split('.').Last() is "Acc" or "Cfg" or "Core" or "Trn" && t.GetProperty("Id") is not null)
-            .Select(t => (Name: t.Namespace!.Split('.').Last().ToUpperInvariant() + "." + t.Name, Type: t))
+        new[] { typeof(Trip).Assembly, typeof(AuditLog).Assembly }.SelectMany(a => a.GetTypes())
+            .Where(t => t.IsClass && !t.IsAbstract && StoredNames.IsPinned(t) && t.GetProperty("Id") is not null)
+            .Select(t => (Name: StoredNames.Of(t), Type: t))
             .Where(t => !NotAudited.Contains(t.Name));
 
     [Fact]
