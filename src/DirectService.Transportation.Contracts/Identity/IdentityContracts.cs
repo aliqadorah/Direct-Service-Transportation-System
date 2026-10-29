@@ -1,4 +1,3 @@
-using DirectService.Transportation.Contracts.Common;
 
 namespace DirectService.Transportation.Contracts.Identity;
 

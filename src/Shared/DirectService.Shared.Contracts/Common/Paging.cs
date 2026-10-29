@@ -1,6 +1,6 @@
-namespace DirectService.Transportation.Contracts.Common;
+namespace DirectService.Shared.Contracts;
 
-/// <summary>Paged list response (API-04).</summary>
+/// <summary>Paged list response (API-04); shared by every module (Stage 2 session 10, DT-332).</summary>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 /// <summary>Paging request; pageSize is capped at <see cref="MaxPageSize"/>.</summary>

@@ -85,7 +85,7 @@ public sealed class AccountingDashboardPageTests : PageTestBase
     [Fact]
     public void Payables_list_opens_the_due_soon_view_from_the_address()
     {
-        Respond("apar/bills", new ApArDocumentPage(new Contracts.Common.PagedResult<ApArDocumentResponse>([], 1, 50, 0), new ApArDocumentTotals(0, 0, 0)));
+        Respond("apar/bills", new ApArDocumentPage(new DirectService.Shared.Contracts.PagedResult<ApArDocumentResponse>([], 1, 50, 0), new ApArDocumentTotals(0, 0, 0)));
         Respond("apar/parties/options", Array.Empty<object>());
         Respond("accounting/accounts/options", Array.Empty<object>());
         Respond("accounting/cost-centres/options", Array.Empty<object>());

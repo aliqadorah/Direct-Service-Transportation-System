@@ -6,7 +6,6 @@ using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Application.Trips;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;

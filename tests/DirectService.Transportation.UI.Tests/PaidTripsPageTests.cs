@@ -1,5 +1,4 @@
 using System.Text.Json;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Contracts.Trips;

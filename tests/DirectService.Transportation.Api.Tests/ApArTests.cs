@@ -230,7 +230,7 @@ public sealed class ApArTests(ApiFactory f)
         var supplier = await SupplierAsync(w);
         Assert.Equal("apar.partyRole", await (await o.Client.PostAsJsonAsync(U(o, "/apar/receivables"), new ApArDocumentRequest(supplier.Id, null, Today, null, null,
             [new ApArLineRequest("x", w.Accounts["4102"].Id, 50m, 0m, null)], null))).ProblemCodeAsync());
-        var list = await ReadAsync<Contracts.Common.PagedResult<EInvoiceSubmissionResponse>>(await o.Client.GetAsync(U(o, "/apar/e-invoice-submissions?status=submitted")));
+        var list = await ReadAsync<DirectService.Shared.Contracts.PagedResult<EInvoiceSubmissionResponse>>(await o.Client.GetAsync(U(o, "/apar/e-invoice-submissions?status=submitted")));
         Assert.Equal(3, list.TotalCount);
     }
 

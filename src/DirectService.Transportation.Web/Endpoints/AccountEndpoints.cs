@@ -1,6 +1,5 @@
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Contracts.Security;

@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text;
 using DirectService.Transportation.Application.Notifications;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Infrastructure.Email;

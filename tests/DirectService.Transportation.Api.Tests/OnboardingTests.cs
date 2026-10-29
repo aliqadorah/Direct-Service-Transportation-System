@@ -6,7 +6,6 @@ using System.Text.Json;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Collaboration;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Platform;

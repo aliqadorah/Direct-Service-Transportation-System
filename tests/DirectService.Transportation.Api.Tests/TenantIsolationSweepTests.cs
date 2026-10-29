@@ -406,7 +406,7 @@ public sealed class TenantIsolationSweepTests(ApiFactory f)
         await (await c.PostAsJsonAsync(U("/tariffs"), new TariffRequest("Customer", customer.Id, material.Id, null, null, 6.000m, null, null, null, null, null))).EnsureOkAsync();
         await (await c.PostAsJsonAsync(U("/tariffs"), new TariffRequest("Partner", partner.Id, null, null, null, 2.750m, null, null, null, null, null))).EnsureOkAsync();
         await (await c.PutAsJsonAsync(U($"/monthly-rates/{Month}"), new MonthRatesRequest([new SiteRateRequest(loading.Id, 3.500m, 4.250m, null)]))).EnsureOkAsync();
-        var drivers = (await c.GetFromJsonAsync<Contracts.Common.PagedResult<DriverResponse>>(U("/drivers?pageSize=50")))!.Items;
+        var drivers = (await c.GetFromJsonAsync<DirectService.Shared.Contracts.PagedResult<DriverResponse>>(U("/drivers?pageSize=50")))!.Items;
         var ext = drivers.Single(d => d.FullName.EndsWith("Sami", StringComparison.Ordinal));
         async Task<TripResponse> Trip(string receipt, DriverResponse driver, string? partnerId) =>
             (await ReadAsync<TripSaveResult>(await c.PostAsJsonAsync(U("/trips"), new TripRequest(receipt, Today, null, null, driver.Id, customer.Id, loading.Id, unloading.Id,

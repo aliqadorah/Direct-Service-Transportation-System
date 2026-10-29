@@ -1,4 +1,3 @@
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.MasterData;
 
 namespace DirectService.Transportation.Contracts.Pricing;

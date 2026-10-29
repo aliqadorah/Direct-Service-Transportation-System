@@ -92,12 +92,12 @@ public sealed class InvoicePrintService(IAppDbContext db, IRequestContext ctx, M
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var customer = new Customer { Name = En ? "Sample customer" : "عميل للمعاينة", TaxNumber = "000000000" };
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
-        InvoiceLineResponse Line(int n, string site, decimal qty) => new($"s{n}", n, new Contracts.Common.Ref($"t{n}", $"TRP-{10480 + n}"), null, qty, 6.000m,
+        InvoiceLineResponse Line(int n, string site, decimal qty) => new($"s{n}", n, new DirectService.Shared.Contracts.Ref($"t{n}", $"TRP-{10480 + n}"), null, qty, 6.000m,
             Money.Round(qty * 6.000m), 0, today, today, "10-11111", En ? "Sample driver" : "سائق", site, En ? "Port" : "الميناء", En ? "Potash" : "بوتاس", qty + 0.15m, qty);
         var lines = new[] { Line(1, En ? "Site A" : "الموقع أ", 31.850m), Line(2, En ? "Site A" : "الموقع أ", 32.000m), Line(3, En ? "Site B" : "الموقع ب", 30.900m) };
         var subtotal = lines.Sum(l => l.Amount);
         var totals = InvoiceCalculator.Invoice(subtotal, 0, 0, company.TaxRate, company.TaxInclusive);
-        var invoice = new InvoiceResponse("preview", "INV-00000", InvoiceCodes.Trip, new Contracts.Common.Ref("c", customer.Name), today, today.AddDays(30), totals.Subtotal, 0, 0, null,
+        var invoice = new InvoiceResponse("preview", "INV-00000", InvoiceCodes.Trip, new DirectService.Shared.Contracts.Ref("c", customer.Name), today, today.AddDays(30), totals.Subtotal, 0, 0, null,
             totals.BaseAmount, company.TaxRate, totals.Tax, totals.Total, 0, 0, totals.Total, InvoiceCodes.Approved, "Unpaid", false, layout.LayoutType, null, null, null, null, false, null,
             "NotRequired", lines.Length, DateTime.UtcNow, string.Empty);
         var words = En ? AmountInWords.English(totals.Total, company.CurrencyCode, company.CurrencyDecimals) : AmountInWords.Arabic(totals.Total, company.CurrencyCode, company.CurrencyDecimals);

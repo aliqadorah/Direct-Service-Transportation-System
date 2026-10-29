@@ -1,4 +1,3 @@
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Trips;
 
 namespace DirectService.Transportation.Contracts.EInvoicing;

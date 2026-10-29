@@ -43,7 +43,7 @@ public sealed class AccountChangeTests(ApiFactory f)
     }
 
     private static async Task<UserListItem> RowAsync(SignedInUser owner, string id) =>
-        (await owner.Client.GetFromJsonAsync<Contracts.Common.PagedResult<UserListItem>>(U(owner, "/users?pageSize=200")))!.Items.Single(u => u.Id == id);
+        (await owner.Client.GetFromJsonAsync<DirectService.Shared.Contracts.PagedResult<UserListItem>>(U(owner, "/users?pageSize=200")))!.Items.Single(u => u.Id == id);
 
     private Task<List<string>> ActionsAsync(string email) => f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters()
         .Where(a => a.EntityType == "CORE.User" && db.Set<User>().IgnoreQueryFilters().Any(u => u.Id == a.EntityId && (u.Email == email || u.UserName == email)))

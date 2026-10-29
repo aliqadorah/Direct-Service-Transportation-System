@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Web.Client.Layout;
 using DirectService.Transportation.Web.Client.Pages.Console;

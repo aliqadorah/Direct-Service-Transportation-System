@@ -1,6 +1,5 @@
 using System.Text.Json;
 using DirectService.Shared.Contracts;
-using DirectService.Transportation.Contracts.Common;
 
 namespace DirectService.Transportation.Contracts.MasterData;
 

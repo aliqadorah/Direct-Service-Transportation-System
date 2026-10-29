@@ -1,5 +1,4 @@
 using DirectService.Transportation.Contracts.Collaboration;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Security;

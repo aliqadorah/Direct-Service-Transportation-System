@@ -488,7 +488,7 @@ public sealed class InvoiceTests(ApiFactory f)
         var preview = await ReadAsync<CreditNoteCalculation>(await c.PostAsJsonAsync(U(o, "/credit-notes/calculate"),
             new CreditNoteRequest(inv.Invoice.Id, Today, "Returned", [new CreditLineRequest(inv.Lines[0].Id, null)], null)));
         Assert.Equal((176.250m, 28.200m, 204.450m), (preview.BaseAmount, preview.Tax, preview.Total));
-        Assert.Empty((await c.GetFromJsonAsync<Contracts.Common.PagedResult<CreditNoteResponse>>(U(o, "/credit-notes")))!.Items);
+        Assert.Empty((await c.GetFromJsonAsync<DirectService.Shared.Contracts.PagedResult<CreditNoteResponse>>(U(o, "/credit-notes")))!.Items);
 
         // List exports (FR-047, FR-165).
         var csv = await c.GetAsync(U(o, "/invoices/export?format=csv"));

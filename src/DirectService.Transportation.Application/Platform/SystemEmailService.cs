@@ -5,7 +5,6 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Notifications;
-using DirectService.Transportation.Contracts.Common;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Transportation.Domain.Core;
