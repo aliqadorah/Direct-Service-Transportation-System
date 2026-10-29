@@ -1,35 +1,30 @@
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Shared.Contracts;
-using DirectService.Transportation.Contracts.Reports;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Reports;
+namespace DirectService.Shared.Infrastructure.Reports;
 
 /// <summary>
 /// Saved reports (FR-145, FR-146) and dashboard pins (FR-140). A report is private to its owner or shared with the company; shared reports
 /// are seen by users who can open their source (FR-147) and edited by the owner or an administrator (settings.manage, DT-116). Runs and
 /// exports apply the viewer's permissions; every run is logged (its last run is shown). Pins belong to a user: a saved report the user can
 /// see, a measure of its definition, warning and critical thresholds (value ≥ threshold), an order; the card shows the measure's grand
-/// total and its state normal / warning / exceeded.
+/// total and its state normal / warning / exceeded. Shared since Stage 2 session 10 (DT-333): the sources come from the modules'
+/// <see cref="IReportSourceProvider"/>s, the administrator permission from <see cref="SavedReportOptions"/>.
 /// </summary>
-public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportBuilder builder, IReportExporter exporter,
-    AuditTrail audit, IChangeContext changes, IUserNames users)
+public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IReportBuilder builder, IReportExporter exporter,
+    AuditTrail audit, IChangeContext changes, IUserNames users, IEnumerable<IReportSourceProvider> providers, IErrorText errorText, SavedReportOptions options)
+    : ISavedReportService
 {
+    private readonly IReadOnlyList<SourceDef> _sources = providers.SelectMany(p => p.Sources).ToList();
+
     public const string EntityType = "CFG.SavedReport";
 
     private long UserId => ctx.UserId ?? throw new InvalidOperationException("Saved reports need a user.");
 
     private bool En => ctx.Language == "en";
 
-    private bool IsAdministrator => ctx.HasPermission(PermissionKeys.SettingsManage);
+    private bool IsAdministrator => ctx.HasPermission(options.AdministratorPermission);
 
     private static ReportDefinition Parse(string json) => JsonSerializer.Deserialize<ReportDefinition>(json, ReportJson.Options) ?? throw new InvalidOperationException("Empty report definition.");
 
@@ -37,13 +32,13 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     private IQueryable<SavedReport> Visible()
     {
         var me = UserId;
-        var sources = ReportSources.All.Where(builder.CanUse).Select(s => s.Key).ToList();
+        var sources = _sources.Where(builder.CanUse).Select(s => s.Key).ToList();
         return db.Set<SavedReport>().AsNoTracking().Where(r => sources.Contains(r.Source) && (r.OwnerUserId == me || r.IsShared));
     }
 
     private async Task<SavedReport> FindVisibleAsync(string token, CancellationToken ct)
     {
-        var pid = support.Decode<SavedReport>(token) ?? throw Fail.NotFound();
+        var pid = tokens.Decode<SavedReport>(token) ?? throw Fail.NotFound();
         return await Visible().SingleOrDefaultAsync(r => r.PublicId == pid, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
     }
 
@@ -58,10 +53,10 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             "mine" => query.Where(r => r.OwnerUserId == me),
             "shared" => query.Where(r => r.IsShared),
             "pinned" => query.Where(r => db.Set<DashboardPin>().Any(p => p.SavedReportId == r.Id && p.UserId == me)),
-            _ => throw Fail.Field("scope", ErrorCodes.ValidationFormat, new FieldRef("scope")),
+            _ => throw Fail.Field("scope", SharedErrorCodes.ValidationFormat, new FieldRef("scope")),
         };
         if (!string.IsNullOrWhiteSpace(q.Source)) query = query.Where(r => r.Source == q.Source);
-        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(r => r.Name.Contains(text));
+        if (TextNormalizer.SearchText(q.Q) is { } text) query = query.Where(r => r.Name.Contains(text));
         var paging = new PageRequest(q.Page, q.PageSize);
         var total = await query.CountAsync(ct).ConfigureAwait(false);
         var ids = await query.OrderBy(r => r.Name).ThenBy(r => r.Id).Skip(paging.Skip).Take(paging.SafePageSize).Select(r => r.Id).ToListAsync(ct).ConfigureAwait(false);
@@ -127,8 +122,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     {
         var name = TextNormalizer.CleanText(r.Name);
         var errors = new List<FieldError>();
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 150) errors.Add(new FieldError("name", ErrorCodes.ReportName, [150]));
-        if (r.Definition is null) errors.Add(new FieldError("definition", ErrorCodes.ReportDefinition, []));
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 150) errors.Add(new FieldError("name", SharedErrorCodes.ReportName, [150]));
+        if (r.Definition is null) errors.Add(new FieldError("definition", SharedErrorCodes.ReportDefinition, []));
         if (errors.Count > 0) throw Fail.Fields(errors);
         var source = builder.Source(r.Source).Key;
         await builder.ValidateAsync(source, r.Definition!, ct).ConfigureAwait(false);
@@ -149,7 +144,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     public async Task<GeneratedFile> ExportAsync(string token, DateOnly? from, DateOnly? to, string? format, CancellationToken ct)
     {
         var result = await RunAsync(token, from, to, ct).ConfigureAwait(false);
-        return await exporter.ExportAsync(StandardReportService.ToTable(result), format, "report", ct).ConfigureAwait(false);
+        return await exporter.ExportAsync(ReportTable.FromResult(result), format, "report", ct).ConfigureAwait(false);
     }
 
     private async Task<List<SavedReportResponse>> ResponsesAsync(IReadOnlyList<long> ids, CancellationToken ct)
@@ -165,7 +160,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         // The owner among the users the request may see, as the former inner join on the filtered users did (DT-306, DT-322).
         var owners = await users.VisibleAsync(rows.Select(x => x.R.OwnerUserId).ToList(), ct).ConfigureAwait(false);
         var byId = rows.Where(x => owners.ContainsKey(x.R.OwnerUserId)).ToDictionary(x => x.R.Id);
-        return ids.Where(byId.ContainsKey).Select(id => byId[id]).Select(x => new SavedReportResponse(support.Token<SavedReport>(x.R.PublicId), x.R.Name, x.R.Source,
+        return ids.Where(byId.ContainsKey).Select(id => byId[id]).Select(x => new SavedReportResponse(tokens.Encode<SavedReport>(x.R.PublicId), x.R.Name, x.R.Source,
             Parse(x.R.Definition), x.R.IsShared, new Ref(owners[x.R.OwnerUserId].Token, owners[x.R.OwnerUserId].FullName), x.R.OwnerUserId == me || (x.R.IsShared && IsAdministrator), x.Pinned,
             x.LastRun is DateTime t ? DateTime.SpecifyKind(t, DateTimeKind.Utc) : null, DateTime.SpecifyKind(x.R.CreatedAt, DateTimeKind.Utc),
             Convert.ToBase64String(x.R.RowVersion))).ToList();
@@ -188,7 +183,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             decimal? value = null;
             string? problem = null;
             // A report no longer visible (unshared, source permission removed) shows neither its name nor a value (FR-141, review B10-9).
-            var visible = (x.OwnerUserId == me || x.IsShared) && builder.CanUse(ReportSources.Find(x.Source)!);
+            var visible = (x.OwnerUserId == me || x.IsShared) && builder.CanUse(_sources.FirstOrDefault(s => s.Key == x.Source)!);
             try
             {
                 if (!visible) throw Fail.Forbidden();
@@ -197,15 +192,15 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
             }
             catch (AppException ex)
             {
-                problem = ErrorCatalog.Format(ex.Code, ctx.Language);
+                problem = errorText.Format(ex.Code, ctx.Language);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // One broken pin never takes the dashboard down.
-                problem = ErrorCatalog.Format(ErrorCodes.ServerError, ctx.Language);
+                problem = errorText.Format(SharedErrorCodes.ServerError, ctx.Language);
             }
-            var reportRef = visible ? new Ref(support.Token<SavedReport>(x.ReportPid), x.Name) : new Ref(string.Empty, string.Empty);
-            result.Add(new DashboardPinResponse(support.Token<DashboardPin>(x.P.PublicId), reportRef, index, label, value,
+            var reportRef = visible ? new Ref(tokens.Encode<SavedReport>(x.ReportPid), x.Name) : new Ref(string.Empty, string.Empty);
+            result.Add(new DashboardPinResponse(tokens.Encode<DashboardPin>(x.P.PublicId), reportRef, index, label, value,
                 x.P.WarningThreshold, x.P.CriticalThreshold, problem is not null ? "unavailable" : PinStates.State(value, x.P.WarningThreshold, x.P.CriticalThreshold, x.P.WarnWhen),
                 x.P.SortOrder, problem, x.P.Measure, kind, x.P.WarnWhen));
         }
@@ -233,10 +228,10 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         var warnWhen = r.WarnWhen is null ? currentWarnWhen ?? PinStates.Above
             : new[] { PinStates.Above, PinStates.Below }.FirstOrDefault(d => string.Equals(d, r.WarnWhen.Trim(), StringComparison.OrdinalIgnoreCase));
         var known = key.Length <= 60 && await builder.HasPinOptionAsync(report.Source, Parse(report.Definition), key, ct).ConfigureAwait(false);
-        new Validator().Check(known, r.MeasureKey is null ? "measure" : "measureKey", ErrorCodes.ReportMeasure)
-            .Check(warnWhen is not null, "warnWhen", ErrorCodes.ValidationFormat)
+        new Validator().Check(known, r.MeasureKey is null ? "measure" : "measureKey", SharedErrorCodes.ReportMeasure)
+            .Check(warnWhen is not null, "warnWhen", SharedErrorCodes.ValidationFormat)
             .Check(warnWhen is null || PinStates.Ordered(r.WarningThreshold, r.CriticalThreshold, warnWhen), "criticalThreshold",
-                warnWhen == PinStates.Below ? ErrorCodes.ReportThresholdsBelow : ErrorCodes.ReportThresholds)
+                warnWhen == PinStates.Below ? SharedErrorCodes.ReportThresholdsBelow : SharedErrorCodes.ReportThresholds)
             .ThrowIfInvalid();
         return (key, warnWhen!);
     }
@@ -244,7 +239,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
     public async Task<DashboardPinResponse> PinAsync(DashboardPinRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", ErrorCodes.ValidationRequired, new FieldRef("savedReportId")), ct).ConfigureAwait(false);
+        var report = await FindVisibleAsync(r.SavedReportId ?? throw Fail.Field("savedReportId", SharedErrorCodes.ValidationRequired, new FieldRef("savedReportId")), ct).ConfigureAwait(false);
         var (measure, warnWhen) = await CheckPinAsync(report, r, null, null, ct).ConfigureAwait(false);
         var me = UserId;
         var order = (await db.Set<DashboardPin>().Where(p => p.UserId == me).MaxAsync(p => (int?)p.SortOrder, ct).ConfigureAwait(false) ?? 0) + 10;
@@ -255,7 +250,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         };
         db.Set<DashboardPin>().Add(pin);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return (await PinsAsync(ct).ConfigureAwait(false)).Single(p => p.Id == support.Token<DashboardPin>(pin.PublicId));
+        return (await PinsAsync(ct).ConfigureAwait(false)).Single(p => p.Id == tokens.Encode<DashboardPin>(pin.PublicId));
     }
 
     public async Task<DashboardPinResponse> UpdatePinAsync(string token, DashboardPinRequest r, CancellationToken ct)
@@ -280,8 +275,8 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
         var order = r.PinIds ?? [];
         for (var i = 0; i < order.Count; i++)
         {
-            var pid = support.Decode<DashboardPin>(order[i]) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, new FieldRef("pinIds"));
-            var pin = pins.SingleOrDefault(p => p.PublicId == pid) ?? throw Fail.Field("pinIds", ErrorCodes.ValidationFormat, new FieldRef("pinIds"));
+            var pid = tokens.Decode<DashboardPin>(order[i]) ?? throw Fail.Field("pinIds", SharedErrorCodes.ValidationFormat, new FieldRef("pinIds"));
+            var pin = pins.SingleOrDefault(p => p.PublicId == pid) ?? throw Fail.Field("pinIds", SharedErrorCodes.ValidationFormat, new FieldRef("pinIds"));
             pin.SortOrder = (i + 1) * 10;
             changes.SetAction(pin, "Reorder");
         }
@@ -299,7 +294,7 @@ public sealed class SavedReportService(IAppDbContext db, IRequestContext ctx, Ma
 
     private async Task<DashboardPin> MyPinAsync(string token, CancellationToken ct)
     {
-        var pid = support.Decode<DashboardPin>(token) ?? throw Fail.NotFound();
+        var pid = tokens.Decode<DashboardPin>(token) ?? throw Fail.NotFound();
         var me = UserId;
         return await db.Set<DashboardPin>().SingleOrDefaultAsync(p => p.PublicId == pid && p.UserId == me, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
     }

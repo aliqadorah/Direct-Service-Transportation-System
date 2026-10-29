@@ -426,7 +426,7 @@ public static class ErrorCodes
     public const string InvitationEmailMismatch = "invitation.emailMismatch";
     public const string ReasonRequired = SharedErrorCodes.ReasonRequired;
     public const string Antiforgery = "auth.antiforgery";
-    public const string ServerError = "server.error";
+    public const string ServerError = SharedErrorCodes.ServerError;
 
     public const string RecordInUse = "record.inUse";
     public const string RecordArchived = "record.archived";
@@ -604,8 +604,8 @@ public static class ErrorCodes
     public const string ReportFilterOperator = SharedErrorCodes.ReportFilterOperator;
     public const string ReportFilterValueRequired = SharedErrorCodes.ReportFilterValueRequired;
     public const string ReportFilterValueFormat = SharedErrorCodes.ReportFilterValueFormat;
-    public const string ReportName = "report.name";
+    public const string ReportName = SharedErrorCodes.ReportName;
     public const string ReportMeasure = SharedErrorCodes.ReportMeasure;
-    public const string ReportThresholds = "report.thresholds";
-    public const string ReportThresholdsBelow = "report.thresholdsBelow";
+    public const string ReportThresholds = SharedErrorCodes.ReportThresholds;
+    public const string ReportThresholdsBelow = SharedErrorCodes.ReportThresholdsBelow;
 }

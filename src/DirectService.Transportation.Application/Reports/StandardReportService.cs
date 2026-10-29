@@ -148,18 +148,7 @@ public sealed class StandardReportService(IAppDbContext db, IRequestContext ctx,
     }
 
     /// <summary>A result as an export table (columns typed for printing).</summary>
-    public static ReportTable ToTable(ReportResult r)
-    {
-        ArgumentNullException.ThrowIfNull(r);
-        return new ReportTable(r.Title, r.Filters.Select(f => (f.Label, f.Value)).ToList(),
-            r.Columns.Select(c => new ReportColumn(c.Header, c.Kind switch
-            {
-                "money" => ReportValue.Money,
-                "number" or "quantity" or "percent" => ReportValue.Number,
-                "date" => ReportValue.Date,
-                _ => ReportValue.Text,
-            })).ToList(), r.Rows.Select(x => x.Values).ToList(), r.Totals, r.Note);
-    }
+    public static ReportTable ToTable(ReportResult r) => ReportTable.FromResult(r);
 
     // ============================================================ helpers
 

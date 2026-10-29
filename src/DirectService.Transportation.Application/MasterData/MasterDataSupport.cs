@@ -128,11 +128,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     }
 
     /// <summary>Search text for LIKE filters: trimmed, ASCII digits, at most 100 characters; null when empty.</summary>
-    public static string? SearchText(string? q)
-    {
-        var text = TextNormalizer.CleanText(TextNormalizer.ToAsciiDigits(q));
-        return text is null ? null : text.Length <= 100 ? text : text[..100];
-    }
+    public static string? SearchText(string? q) => TextNormalizer.SearchText(q);
 
     // ------------------------------------------------------------ references (BR-040, FR-162)
 

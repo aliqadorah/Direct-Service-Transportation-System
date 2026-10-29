@@ -31,7 +31,7 @@ public interface IExportQueue
 /// worker generates the file with the requester's permissions and the larger background limits, stores it under the requester's folder for
 /// seven days and sends a notification with the download link; only that user can download it, in that company.
 /// </summary>
-public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, IReportBuilder builder, SavedReportService saved,
+public sealed class ExportService(IRequestContext ctx, IExportQueue queue, IFileStore files, IReportBuilder builder, ISavedReportService saved,
     StandardReportService standard, AuditLogService audit, IReportExporter exporter, NotificationService notifications, Platform.CompanyExportService company)
 {
     public static readonly TimeSpan Keep = TimeSpan.FromDays(7);

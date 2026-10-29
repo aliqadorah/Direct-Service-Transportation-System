@@ -56,4 +56,10 @@ public static class SharedErrorCodes
     public const string ReportFilterValueRequired = "report.filterValueRequired";
     public const string ReportFilterValueFormat = "report.filterValueFormat";
     public const string ReportMeasure = "report.measure";
+
+    // Saved reports and dashboard pins (Stage 2 session 10, DT-333).
+    public const string ReportName = "report.name";
+    public const string ReportThresholds = "report.thresholds";
+    public const string ReportThresholdsBelow = "report.thresholdsBelow";
+    public const string ServerError = "server.error";
 }

@@ -22,6 +22,13 @@ public static class TextNormalizer
         return sb.ToString();
     }
 
+    /// <summary>Search text of a list query: cleaned, ASCII digits, at most 100 characters; null when empty (from <c>MasterDataSupport</c>, DT-333).</summary>
+    public static string? SearchText(string? q)
+    {
+        var text = CleanText(ToAsciiDigits(q));
+        return text is null ? null : text.Length <= 100 ? text : text[..100];
+    }
+
     /// <summary>Trimmed text with ASCII digits; null when empty. Used for codes and numbers stored in VARCHAR columns.</summary>
     public static string? CleanCode(string? value)
     {

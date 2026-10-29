@@ -108,7 +108,6 @@ public static class DependencyInjection
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
 
         // Invoicing and credit notes (B6)
-        services.AddScoped<AuditTrail>();
         services.AddScoped<InvoiceService>();
         services.AddScoped<CreditNoteService>();
         services.AddScoped<InvoiceLayoutService>();
@@ -155,7 +154,7 @@ public static class DependencyInjection
         // Reports and dashboard (B10)
         services.AddScoped<StandardReportService>();
         services.AddScoped<IReportSourceProvider, TransportationReportSources>();
-        services.AddScoped<SavedReportService>();
+        services.AddSingleton(new SavedReportOptions { AdministratorPermission = Contracts.Security.PermissionKeys.SettingsManage });
         services.AddScoped<DashboardService>();
 
         // Platform (B12)

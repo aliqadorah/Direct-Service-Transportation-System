@@ -1,3 +1,4 @@
+using DirectService.Shared.Infrastructure.Reports;
 using DirectService.Transportation.Application.Reports;
 
 namespace DirectService.Transportation.Application.Tests;

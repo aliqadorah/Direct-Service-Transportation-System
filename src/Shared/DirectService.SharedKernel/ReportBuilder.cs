@@ -83,3 +83,47 @@ public sealed class ExportLimits
 {
     public bool Background { get; set; }
 }
+
+/// <summary>
+/// Saved reports (FR-145, FR-146) and the dashboard pins (FR-140) of the caller, implemented by the shared <c>SavedReportService</c>
+/// (Stage 2 session 10, DT-333); keys, measure keys, WarnWhen and the stored definitions are unchanged.
+/// </summary>
+public interface ISavedReportService
+{
+    Task<PagedResult<SavedReportResponse>> ListAsync(SavedReportListQuery q, CancellationToken ct);
+
+    Task<SavedReportResponse> GetAsync(string token, CancellationToken ct);
+
+    Task<SavedReportResponse> CreateAsync(SavedReportRequest r, CancellationToken ct);
+
+    Task<SavedReportResponse> UpdateAsync(string token, SavedReportRequest r, CancellationToken ct);
+
+    /// <summary>Soft delete with its pins (every user's).</summary>
+    Task DeleteAsync(string token, CancellationToken ct);
+
+    Task<ReportResult> RunAsync(string token, DateOnly? from, DateOnly? to, CancellationToken ct);
+
+    Task<GeneratedFile> ExportAsync(string token, DateOnly? from, DateOnly? to, string? format, CancellationToken ct);
+
+    Task<IReadOnlyList<DashboardPinResponse>> PinsAsync(CancellationToken ct);
+
+    /// <summary>The values a pin of this report can show, with their current totals (pin dialog, DT-275).</summary>
+    Task<IReadOnlyList<PinMeasureOption>> PinMeasuresAsync(string token, CancellationToken ct);
+
+    Task<DashboardPinResponse> PinAsync(DashboardPinRequest r, CancellationToken ct);
+
+    Task<DashboardPinResponse> UpdatePinAsync(string token, DashboardPinRequest r, CancellationToken ct);
+
+    Task<IReadOnlyList<DashboardPinResponse>> ReorderPinsAsync(PinOrderRequest r, CancellationToken ct);
+
+    Task UnpinAsync(string token, CancellationToken ct);
+}
+
+/// <summary>
+/// Set by the application: the permission that lets a user edit (and delete) the reports others shared with the company (settings.manage,
+/// DT-116); the owner always may (DT-333).
+/// </summary>
+public sealed class SavedReportOptions
+{
+    public string AdministratorPermission { get; init; } = string.Empty;
+}

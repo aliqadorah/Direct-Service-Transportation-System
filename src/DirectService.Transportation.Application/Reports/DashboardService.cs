@@ -24,7 +24,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// real-time channel (B11).
 /// </summary>
 public sealed class DashboardService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, MonthlyRateService rates,
-    PostingEngine posting, SavedReportService saved, TimeProvider clock)
+    PostingEngine posting, ISavedReportService saved, TimeProvider clock)
 {
     private const string Active = "Active";
 

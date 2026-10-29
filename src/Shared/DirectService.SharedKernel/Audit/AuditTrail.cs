@@ -1,12 +1,10 @@
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Domain.Core;
 
-namespace DirectService.Transportation.Application.Common;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// Audit rows for business events that change no column (e.g. every print, FR-058; reprints marked Copy, FR-090): added to
-/// core.AuditLogs with the acting user, company and IP, saved with the caller's next SaveChanges.
+/// core.AuditLogs with the acting user, company and IP, saved with the caller's next SaveChanges. In SharedKernel since Stage 2 session 10 (DT-333).
 /// </summary>
 public sealed class AuditTrail(IAppDbContext db, IRequestContext ctx, PrintMode print)
 {

@@ -11,5 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Application\DirectService.Transportation.Application.csproj" />
+    <!-- SavedReportService (the pin states) lives in Shared.Infrastructure since Stage 2 session 10 (DT-333). -->
+    <ProjectReference Include="..\..\src\Shared\DirectService.Shared.Infrastructure\DirectService.Shared.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

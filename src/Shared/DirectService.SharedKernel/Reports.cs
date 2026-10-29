@@ -21,6 +21,20 @@ public sealed record ReportTable(string Title, IReadOnlyList<(string Label, stri
     IReadOnlyList<IReadOnlyList<object?>> Rows, IReadOnlyList<object?>? Totals = null, string? Note = null)
 {
     public bool Landscape { get; init; }
+
+    /// <summary>A result as an export table (columns typed for printing); moved from <c>StandardReportService.ToTable</c> (Stage 2 session 10, DT-333).</summary>
+    public static ReportTable FromResult(ReportResult r)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        return new ReportTable(r.Title, r.Filters.Select(f => (f.Label, f.Value)).ToList(),
+            r.Columns.Select(c => new ReportColumn(c.Header, c.Kind switch
+            {
+                "money" => ReportValue.Money,
+                "number" or "quantity" or "percent" => ReportValue.Number,
+                "date" => ReportValue.Date,
+                _ => ReportValue.Text,
+            })).ToList(), r.Rows.Select(x => x.Values).ToList(), r.Totals, r.Note);
+    }
 }
 
 /// <summary>The single cell of a group row (<see cref="IReportExporter.Group"/>): a band across the printout, the text in the first column in Excel.</summary>
