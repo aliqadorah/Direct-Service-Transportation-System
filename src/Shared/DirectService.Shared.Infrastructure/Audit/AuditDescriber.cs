@@ -1,64 +1,42 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Accounting;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
-using DirectService.Transportation.Domain.Common;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Shared.Contracts;
+using DirectService.Shared.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
-using static DirectService.Transportation.Application.Audit.AuditVocabulary;
+using static DirectService.SharedKernel.AuditWords;
 
-namespace DirectService.Transportation.Application.Audit;
-
-/// <summary>An audit row as stored (core.AuditLogs), the input of <see cref="AuditDescriber"/>.</summary>
-public sealed record AuditRow(long Id, DateTime OccurredAt, long? UserId, string Action, string? EntityType, long? EntityId, string? OldValues, string? NewValues);
-
-/// <summary>
-/// An audit row in the reader's words: who, the action and record type in words, the record by its number or name, the event as a sentence
-/// (<see cref="Sentence"/> with the user, <see cref="Predicate"/> without), the reason, the changes (labels, formatted values, technical
-/// columns left out), the lines of a journal entry posted with it and the documents it names.
-/// </summary>
-public sealed record AuditDescription(AuditRow Row, string? User, string ActionLabel, string EntityLabel, string? Record, string Sentence, string Predicate,
-    string? Reason, IReadOnlyList<FieldChange> Changes, IReadOnlyList<HistoryLine> Lines, IReadOnlyList<HistoryLink> Links)
-{
-    /// <summary>An edit that changed only technical columns (e.g. the journal link set by a posting): not a business event of the record.</summary>
-    public bool IsTechnicalOnly => Row.Action == "Update" && Changes.Count == 0 && Reason is null && Lines.Count == 0;
-}
-
-/// <summary>Options of a description run.</summary>
-/// <param name="CreateValues">Show the values of a created record as changes (audit log); the record's own history does not repeat them.</param>
-/// <param name="LinkRecord">Add a link to the record itself (audit log); a record's history is on its own screen.</param>
-public sealed record DescribeOptions(bool CreateValues = false, bool LinkRecord = false);
+namespace DirectService.Shared.Infrastructure.Audit;
 
 /// <summary>
 /// The central audit describer (owner feedback 14 Oct 2026, DT-188): turns audit rows into readable events in the reader's language for
-/// every History panel and the audit log (screen and exports). Labels come from <see cref="AuditVocabulary"/>, the company's Field
-/// configuration labels and its custom fields; ids are resolved to document numbers, account code and name, names of people, places and
-/// users — soft-deleted records by their name, records no longer found by the last name the log recorded. Only records of the reader's
-/// tenant and company are read (the query filters stay on). Presentation only: nothing stored is changed.
+/// every History panel and the audit log (screen and exports). Labels come from the modules' vocabularies (<see cref="AuditVocabularies"/>),
+/// the company's Field configuration labels and its custom fields; ids are resolved to document numbers, account code and name, names of
+/// people, places and users — soft-deleted records by their name, records no longer found by the last name the log recorded. Only records
+/// of the reader's tenant and company are read (the query filters stay on). Presentation only: nothing stored is changed. A shared engine:
+/// the rules only a module knows are its <see cref="IAuditVocabularyProvider"/>'s hooks (Stage 2 session 9, DT-329).
 /// </summary>
-public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IUserNames users, ICompanyInfo companies)
+public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IUserNames users, ICompanyInfo companies,
+    IEnumerable<IAuditVocabularyProvider> providers, FieldCatalogs catalog) : IAuditDescriber
 {
     private const string Dash = "—";
-    private const string JournalEntry = "ACC.JournalEntry";
-    private const string EntryLine = "ACC.EntryLine";
+
+    private readonly AuditVocabularies _words = new(providers);
 
     private bool En => ctx.Language == "en";
 
     // For the run below (a nested class cannot read the primary constructor's parameters).
     private IAppDbContext Db => db;
 
-    private IRequestContext Ctx => ctx;
-
     private IUrlTokenService Tokens => tokens;
 
     private IUserNames Users => users;
 
     private ICompanyInfo Companies => companies;
+
+    private FieldCatalogs Catalog => catalog;
+
+    private AuditVocabularies V => _words;
 
     private string W(Words w) => w.In(En);
 
@@ -83,22 +61,10 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         ArgumentNullException.ThrowIfNull(options);
         if (rows.Count == 0) return [];
         var run = new Run(this, options);
-        var parsed = rows.Select(r => new Parsed(r, Parse(r.OldValues), Parse(r.NewValues))).ToList();
+        var parsed = rows.Select(r => new ParsedAuditRow(r, Parse(r.OldValues), Parse(r.NewValues))).ToList();
         var lines = await LinesAsync(parsed, ct).ConfigureAwait(false);
         await run.PrepareAsync(parsed, lines, ct).ConfigureAwait(false);
         return parsed.Select(p => run.Describe(p, lines.GetValueOrDefault(p.Row.Id) ?? [])).ToList();
-    }
-
-    private sealed record Parsed(AuditRow Row, Dictionary<string, JsonElement> Old, Dictionary<string, JsonElement> New)
-    {
-        public JsonElement? Value(string column) => New.TryGetValue(column, out var v) ? v : Old.TryGetValue(column, out var o) ? o : null;
-
-        public long? Long(string column, bool old = false) =>
-            (old ? Old : New).TryGetValue(column, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : null;
-
-        public string? Str(string column) => Value(column) is { ValueKind: JsonValueKind.String } v ? v.GetString() : null;
-
-        public string? Reason => New.TryGetValue("_reason", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
     }
 
     private static Dictionary<string, JsonElement> Parse(string? json)
@@ -116,41 +82,46 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         }
     }
 
-    // ================================================================= journal lines (item 6)
+    // ================================================================= entry lines (item 6)
 
     /// <summary>
-    /// The lines saved with each journal entry created in the rows (the interceptor writes one audit row per line in the same save, at the
-    /// same time): matched by the entry's id, or — for rows written before DT-188 with a temporary key — by the save they came with.
+    /// The lines saved with each entry created in the rows (<see cref="IAuditVocabularyProvider.Lines"/>; the interceptor writes one audit
+    /// row per line in the same save, at the same time): matched by the entry's id, or — for rows written before DT-188 with a temporary
+    /// key — by the save they came with.
     /// </summary>
-    private async Task<Dictionary<long, List<Parsed>>> LinesAsync(List<Parsed> rows, CancellationToken ct)
+    private async Task<Dictionary<long, List<ParsedAuditRow>>> LinesAsync(List<ParsedAuditRow> rows, CancellationToken ct)
     {
-        var entries = rows.Where(p => p.Row.EntityType == JournalEntry && p.Row.EntityId is not null && p.Row.Action != "Update" && p.New.ContainsKey("Number")).ToList();
-        var result = new Dictionary<long, List<Parsed>>();
-        if (entries.Count == 0) return result;
-        var companyId = ctx.CompanyId;
-        var times = entries.Select(e => e.Row.OccurredAt).Distinct().ToList();
-        var stored = await db.Set<AuditLog>().AsNoTracking()
-            .Where(a => a.EntityType == EntryLine && a.CompanyId == companyId && times.Contains(a.OccurredAt))
-            .OrderBy(a => a.Id).Select(a => new AuditRow(a.Id, a.OccurredAt, a.UserId, a.Action, a.EntityType, a.EntityId, a.OldValues, a.NewValues))
-            .ToListAsync(ct).ConfigureAwait(false);
-        var lines = stored.Select(r => new Parsed(r, Parse(r.OldValues), Parse(r.NewValues))).ToList();
-        foreach (var e in entries)
+        var result = new Dictionary<long, List<ParsedAuditRow>>();
+        foreach (var spec in V.Providers.Select(p => p.Lines).OfType<AuditLines>())
         {
-            var id = e.Row.EntityId!.Value;
-            var mine = lines.Where(l => l.Row.OccurredAt == e.Row.OccurredAt && l.Long("JournalEntryId") == id).ToList();
-            if (mine.Count == 0 && entries.Count(x => x.Row.OccurredAt == e.Row.OccurredAt && x.Row.UserId == e.Row.UserId) == 1)
-                mine = lines.Where(l => l.Row.OccurredAt == e.Row.OccurredAt && l.Row.UserId == e.Row.UserId && l.Long("JournalEntryId") is < 0).ToList();
-            result[e.Row.Id] = mine.OrderBy(l => l.Long("LineNo") ?? 0).ToList();
+            var entries = rows.Where(p => p.Row.EntityType == spec.EntryType && p.Row.EntityId is not null && p.Row.Action != "Update" && p.New.ContainsKey("Number")).ToList();
+            if (entries.Count == 0) continue;
+            var companyId = ctx.CompanyId;
+            var times = entries.Select(e => e.Row.OccurredAt).Distinct().ToList();
+            var lineType = spec.LineType;
+            var stored = await db.Set<AuditLog>().AsNoTracking()
+                .Where(a => a.EntityType == lineType && a.CompanyId == companyId && times.Contains(a.OccurredAt))
+                .OrderBy(a => a.Id).Select(a => new AuditRow(a.Id, a.OccurredAt, a.UserId, a.Action, a.EntityType, a.EntityId, a.OldValues, a.NewValues))
+                .ToListAsync(ct).ConfigureAwait(false);
+            var lines = stored.Select(r => new ParsedAuditRow(r, Parse(r.OldValues), Parse(r.NewValues))).ToList();
+            foreach (var e in entries)
+            {
+                var id = e.Row.EntityId!.Value;
+                var mine = lines.Where(l => l.Row.OccurredAt == e.Row.OccurredAt && l.Whole(spec.EntryColumn) == id).ToList();
+                if (mine.Count == 0 && entries.Count(x => x.Row.OccurredAt == e.Row.OccurredAt && x.Row.UserId == e.Row.UserId) == 1)
+                    mine = lines.Where(l => l.Row.OccurredAt == e.Row.OccurredAt && l.Row.UserId == e.Row.UserId && l.Whole(spec.EntryColumn) is < 0).ToList();
+                result[e.Row.Id] = mine.OrderBy(l => l.Whole(spec.OrderColumn) ?? 0).ToList();
+            }
         }
         return result;
     }
 
     // ================================================================= one run
 
-    /// <summary>A record found for an id: its name in the reader's language and its public id (links).</summary>
-    private sealed record Found(string Name, Guid? PublicId, long Id);
+    /// <summary>A record found for an id: its name in the reader's language, its public id and screen kind (links).</summary>
+    private sealed record Found(string Name, Guid? PublicId, long Id, string? LinkKind);
 
-    private sealed class Run(AuditDescriber d, DescribeOptions options)
+    private sealed class Run(AuditDescriber d, DescribeOptions options) : IAuditRun
     {
         private readonly Dictionary<(string Type, long Id), Found> _byId = [];
         private readonly Dictionary<(string Type, string Number), Found> _byNumber = [];
@@ -160,13 +131,21 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         private HashSet<(string Type, long Id)> _erased = [];
         private TimeZoneInfo? _zone;
 
-        private bool En => d.En;
+        public bool En => d.En;
+
+        private AuditVocabularies V => d.V;
 
         private string L(string ar, string en) => d.L(ar, en);
 
+        // ------------------------------------------------------------ what the modules' rules read
+
+        public string? Name(string type, long id) => _byId.TryGetValue((type, id), out var found) ? found.Name : null;
+
+        public HistoryLink? Link(string type, long id, string? text = null) => _byId.TryGetValue((type, id), out var found) ? LinkTo(type, found, text) : null;
+
         // ------------------------------------------------------------ preparation (batched look-ups)
 
-        public async Task PrepareAsync(List<Parsed> rows, Dictionary<long, List<Parsed>> lines, CancellationToken ct)
+        public async Task PrepareAsync(List<ParsedAuditRow> rows, Dictionary<long, List<ParsedAuditRow>> lines, CancellationToken ct)
         {
             var wanted = new Dictionary<string, HashSet<long>>(StringComparer.Ordinal);
             var numbers = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
@@ -192,13 +171,14 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                     var target = Target(type, column, p);
                     if (target is not null) Want(target, id);
                 }
-                if (type == JournalEntry) Want(SourceEntity(p.Str("SourceType")), p.Long("SourceId"));
+                foreach (var provider in V.Providers)
+                    foreach (var (relatedType, relatedId) in provider.Related(p))
+                        Want(relatedType, relatedId);
                 if (DocumentOf(p) is { } doc)
                 {
                     Want(doc.Type, doc.Id);
                     WantNumber(doc.Type, doc.Number);
                 }
-                if (type is "CORE.UserCompanyRole" or "CFG.DashboardPin" or "CORE.UserRecoveryCode") Want("CORE.User", p.Long("UserId") ?? p.Long("UserId", old: true));
             }
             await d.ResolveAsync(wanted, _byId, ct).ConfigureAwait(false);
             await d.ResolveNumbersAsync(numbers, _byNumber, ct).ConfigureAwait(false);
@@ -213,7 +193,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             }
 
             var types = rows.Select(r => r.Row.EntityType).Where(t => t is not null).Select(t => t!).Distinct().ToList();
-            if (types.Any(Configuration.FieldCatalog.IsEntity))
+            if (types.Any(d.Catalog.IsEntity))
             {
                 foreach (var s in await d.Db.Set<StandardFieldConfig>().AsNoTracking().Where(s => s.Label != null && types.Contains(s.EntityType))
                              .Select(s => new { s.EntityType, s.FieldKey, s.Label }).ToListAsync(ct).ConfigureAwait(false))
@@ -223,7 +203,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                              .Select(c => new { c.EntityType, c.FieldKey, c.LabelAr, c.LabelEn }).ToListAsync(ct).ConfigureAwait(false))
                     _customLabels[(c.EntityType, c.FieldKey)] = En ? c.LabelEn ?? c.LabelAr : c.LabelAr;
             }
-            _erased = await ErasedRecords.FindAsync(d.Db, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null)
+            _erased = await ErasedRecords.FindAsync(d.Db, V.PersonalFields, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null)
                 .Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct).ConfigureAwait(false);
             if (rows.Any(r => r.Old.Concat(r.New).Any(kv => d.KindOf(r.Row.EntityType, kv.Key) == Kind.DateTime)))
             {
@@ -233,68 +213,23 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         }
 
         /// <summary>The record type an id column points at (per record type where the same name means different things).</summary>
-        private static string? Target(string? entityType, string column, Parsed row)
+        private string? Target(string? entityType, string column, ParsedAuditRow row)
         {
-            if (column == "PartyId" && entityType == EntryLine) return PartyEntity(row.Str("PartyType"));
-            if (column == "SourceId") return null;
-            if (column == "UserId" && entityType is "CORE.UserCompanyRole" or "CFG.DashboardPin" or "CORE.UserRecoveryCode") return "CORE.User";
-            return Field(entityType, column) is { Kind: Kind.Ref, Target: { } t } ? t : null;
+            foreach (var provider in V.Providers)
+                if (provider.TryTarget(entityType, column, row, out var target)) return target;
+            return V.Field(entityType, column) is { Kind: Kind.Ref, Target: { } t } ? t : null;
         }
 
-        // ------------------------------------------------------------ documents named by actions
-
-        /// <summary>The document an action names (reason holds its number, or the row its id): type, id and number.</summary>
-        private static (string Type, long? Id, string? Number)? DocumentOf(Parsed p)
-        {
-            var reason = p.Reason;
-            return p.Row.Action switch
-            {
-                "AddedToInvoice" => ("TRN.Invoice", p.Long("InvoiceId"), null),
-                "RemovedFromInvoice" => ("TRN.Invoice", p.Long("InvoiceId", old: true), LooksLikeNumber(reason) ? reason : null),
-                "Invoiced" => ("TRN.Invoice", null, reason),
-                "Settled" => ("TRN.Settlement", p.Long("SettlementId"), reason),
-                "SettlementVoided" => ("TRN.Settlement", p.Long("SettlementId", old: true), reason),
-                "ReturnedByCreditNote" or "CreditNote" or "CreditNoteVoided" => ("TRN.CreditNote", null, reason),
-                "Receipt" or "ReceiptVoid" => ("TRN.Receipt", null, reason),
-                "Payment" or "PaymentVoid" => ("ACC.ApArPayment", null, reason),
-                "Return" or "ReturnVoid" => ("ACC.ApArReturn", null, reason),
-                "Reverse" => (JournalEntry, p.Long("ReversedByEntryId"), reason),
-                "Edit" when p.Row.EntityType == JournalEntry => (JournalEntry, null, reason?.Split('→')[0].Trim()),
-                _ => null,
-            };
-        }
-
-        private static bool LooksLikeNumber(string? text) => text is not null && text.Length > 0 && text.Any(char.IsDigit) && !text.Contains(' ', StringComparison.Ordinal);
-
-        private static readonly HashSet<string> DocumentActions =
-        [
-            "AddedToInvoice", "RemovedFromInvoice", "Invoiced", "Settled", "SettlementVoided", "ReturnedByCreditNote", "CreditNote", "CreditNoteVoided",
-            "Receipt", "ReceiptVoid", "Payment", "PaymentVoid", "Return", "ReturnVoid", "Reverse", "Edit", "Accepted", "LinkApArParty", "Approve",
-        ];
-
-        /// <summary>Columns an action already tells in its sentence (e.g. the invoice of a trip added to it).</summary>
-        private static readonly Dictionary<string, string[]> ToldByAction = new(StringComparer.Ordinal)
-        {
-            ["AddedToInvoice"] = ["InvoiceId"],
-            ["RemovedFromInvoice"] = ["InvoiceId"],
-            ["Invoiced"] = ["InvoiceId"],
-            ["Settled"] = ["SettlementId"],
-            ["SettlementVoided"] = ["SettlementId"],
-            ["ReturnedByCreditNote"] = ["InvoiceId"],
-            ["Reverse"] = ["ReversedByEntryId"],
-            ["Void"] = ["VoidReason"],
-            ["Close"] = ["Reason"],
-            ["Reopen"] = ["Reason"],
-        };
+        private (string Type, long? Id, string? Number)? DocumentOf(ParsedAuditRow p) => V.FirstValue(provider => provider.DocumentOf(p));
 
         // ------------------------------------------------------------ describe one row
 
-        public AuditDescription Describe(Parsed p, List<Parsed> lines)
+        public AuditDescription Describe(ParsedAuditRow p, List<ParsedAuditRow> lines)
         {
             var row = p.Row;
             var type = row.EntityType;
-            var entity = Entity(type);
-            var action = Action(row.Action == "Approve" && type == "CORE.SupportAccessGrant" ? "Approve.Support" : row.Action);
+            var entity = V.Entity(type);
+            var action = V.Action(V.First(provider => provider.ActionKey(row.Action, type)) ?? row.Action);
             var user = row.UserId is long uid ? _users.GetValueOrDefault(uid) : null;
             var record = RecordName(p);
             var recordPhrase = record is null ? d.W(entity.Noun) : $"{d.W(entity.Noun)} {record}";
@@ -309,116 +244,83 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             {
                 var found = named.Id is long id && _byId.TryGetValue((named.Type, id), out var byId) ? byId
                     : named.Number is not null && _byNumber.TryGetValue((named.Type, named.Number), out var byNumber) ? byNumber : null;
-                doc = DocumentPhrase(named.Type, found?.Name ?? named.Number);
-                // Added to a draft that has its number now: "draft invoice INV-00001" (owner's example).
-                if (row.Action == "AddedToInvoice" && found is not null && LooksLikeNumber(found.Name)) doc = L($"مسودة الفاتورة {found.Name}", $"draft invoice {found.Name}");
+                doc = DocumentPhrase(row.Action, named.Type, found?.Name ?? named.Number, found is not null);
                 // A numbered document links by its number; a draft invoice by its words ("a draft invoice").
                 var linkText = found is not null && doc.Contains(found.Name, StringComparison.Ordinal) && LooksLikeNumber(found.Name) ? found.Name : doc;
                 if (found is not null && LinkTo(named.Type, found, linkText) is { } link) links.Add(link);
             }
-            if (DocumentActions.Contains(row.Action)) reason = null;
-            switch (row.Action)
+            if (V.Any(provider => provider.TellsReason(row.Action))) reason = null;
+            if (V.First(provider => provider.Detail(p, this)) is { } detail)
             {
-                case "Post" or "Import" or "Create" when type == JournalEntry:
-                    if (SourceEntity(p.Str("SourceType")) is { } sourceType && p.Long("SourceId") is long sourceId && _byId.TryGetValue((sourceType, sourceId), out var source))
-                    {
-                        extra = $" ({SourceTitle(p.Str("SourceType"), sourceType)} {source.Name})";
-                        if (LinkTo(sourceType, source) is { } link) links.Add(link);
-                    }
-                    else if (row.Action == "Import" && p.Reason is { } file) extra = $" ({L("استيراد", "import")} {file})";
-                    if (row.Action == "Import") reason = null;
-                    break;
-                case "Accepted":
-                    extra = p.Reason ?? Dash;
-                    break;
-                case "LinkApArParty":
-                    doc = p.Reason;
-                    break;
-                case "SetupDone" or "SetupReopened":
-                    extra = p.Reason ?? "";
-                    reason = null;
-                    break;
+                extra = detail.Extra;
+                if (detail.Document is not null) doc = detail.Document;
+                if (detail.DropReason) reason = null;
+                if (detail.Link is not null) links.Add(detail.Link);
             }
             var words = action.Sentence.In(En);
             var predicate = words.Replace("{r}", recordPhrase, StringComparison.Ordinal).Replace("{d}", doc ?? L("مستند", "a document"), StringComparison.Ordinal)
                 .Replace("{x}", extra, StringComparison.Ordinal);
-            var sentence = Sentence(user, predicate);
+            var sentence = Sentence(user, predicate, En);
             var changes = Changes(p);
             var journal = lines.Select(Line).ToList();
             return new AuditDescription(row, user, d.W(action.Label), d.W(entity.Title), record, sentence, Capitalized(predicate), reason, changes, journal, links);
         }
 
-        private string Sentence(string? user, string predicate) => AuditVocabulary.Sentence(user, predicate, En);
-
         private string Capitalized(string text) => En && text.Length > 0 ? char.ToUpperInvariant(text[0]) + text[1..] : text;
 
-        private string DocumentPhrase(string type, string? number)
+        private string DocumentPhrase(string action, string type, string? number, bool found)
         {
-            var noun = d.W(Entity(type).Noun);
-            if (type == "TRN.Invoice" && (number is null || number == DraftWord(false) || number == DraftWord(true) || number == L("مسودة", "draft")))
-                return L("مسودة فاتورة", "a draft invoice");
+            if (V.First(provider => provider.DocumentPhrase(action, type, number, found, En)) is { } phrase) return phrase;
+            var noun = d.W(V.Entity(type).Noun);
             return number is null ? noun : $"{noun} {number}";
         }
 
-        private static string DraftWord(bool en) => en ? "Draft invoice" : "مسودة فاتورة";
-
-        private string SourceTitle(string? sourceType, string entityType) =>
-            sourceType is "SupplierBill" or "Receivable" ? Code(sourceType, En) : d.W(Entity(entityType).Title);
-
         // ------------------------------------------------------------ the record's name
 
-        private string? RecordName(Parsed p)
+        private string? RecordName(ParsedAuditRow p)
         {
             var type = p.Row.EntityType;
             if (type is null) return null;
-            // Link rows are named by whom they concern: a user's role in the company, a role's permission.
-            if (type is "CORE.UserCompanyRole" or "CFG.DashboardPin" or "CORE.UserRecoveryCode"
-                && (p.Long("UserId") ?? p.Long("UserId", old: true)) is long user && _byId.TryGetValue(("CORE.User", user), out var person)) return person.Name;
-            if (type == "CORE.RolePermission" && (p.Long("RoleId") ?? p.Long("RoleId", old: true)) is long role && _byId.TryGetValue(("CORE.Role", role), out var r)) return r.Name;
+            // Rows named by whom they concern (the modules' rules).
+            if (V.FirstValue(provider => provider.NamedBy(p)) is { } by && _byId.TryGetValue(by, out var person)) return person.Name;
             if (p.Row.EntityId is long id && _byId.TryGetValue((type, id), out var found)) return found.Name;
             // A record no longer readable: the name it was saved with.
-            return NameFromValues(type, p.New, En) ?? NameFromValues(type, p.Old, En);
+            return d.NameFromValues(type, Strings(p.New), loaded: false) ?? d.NameFromValues(type, Strings(p.Old), loaded: false);
         }
 
         // ------------------------------------------------------------ reason
 
         /// <summary>The reason in the reader's words: codes of a print ("Claim · Copy") translated, a person's own text as typed.</summary>
-        private string? Reason(Parsed p)
+        private string? Reason(ParsedAuditRow p)
         {
             var reason = p.Reason;
             if (string.IsNullOrWhiteSpace(reason)) return null;
             var parts = reason.Split(" · ", StringSplitOptions.None).Select(part =>
             {
                 var t = part.Trim();
-                if (IsCode(t)) return Code(t, En);
-                if (t.StartsWith("Statement ", StringComparison.Ordinal)) return L("كشف حساب ", "Statement ") + Dates(t["Statement ".Length..]);
-                return t;
+                if (V.IsCode(t)) return V.Code(t, En);
+                return V.First(provider => provider.ReasonPart(t, En)) ?? t;
             });
             return string.Join(" · ", parts);
         }
 
-        private static string Dates(string text) =>
-            string.Join("…", text.Split('…').Select(x => DateOnly.TryParseExact(x.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
-                ? day.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : x));
-
         // ------------------------------------------------------------ changes
 
-        private List<FieldChange> Changes(Parsed p)
+        private List<FieldChange> Changes(ParsedAuditRow p)
         {
             var row = p.Row;
             var type = row.EntityType;
             // No old values: a record created (or a business event recorded with its values) — the history tells it in its sentence.
             var isCreate = p.Old.Count == 0;
             if (isCreate && !options.CreateValues) return [];
-            var told = ToldByAction.GetValueOrDefault(row.Action) ?? [];
+            var told = V.Providers.SelectMany(provider => provider.ToldBy(row.Action)).ToHashSet(StringComparer.Ordinal);
             var erased = type is not null && row.EntityId is long eid && _erased.Contains((type, eid));
-            var maskDriver = type == "TRN.Driver" && !d.Ctx.HasPermission(PermissionKeys.DrvView);
             var result = new List<FieldChange>();
             foreach (var column in p.New.Keys.Concat(p.Old.Keys).Distinct().Where(k => !k.StartsWith('_')))
             {
-                if (Hidden.Contains(column) || told.Contains(column)) continue;
-                if (type == EntryLine && column is "PartyType" or "PartyModule") continue;
-                var fieldWords = Field(type, column);
+                if (V.IsHidden(column) || told.Contains(column)) continue;
+                if (V.Any(provider => provider.HidesColumn(type, column))) continue;
+                var fieldWords = V.Field(type, column);
                 if (fieldWords?.Kind == Kind.Hidden) continue;
                 var oldValue = p.Old.TryGetValue(column, out var o) ? o : (JsonElement?)null;
                 var newValue = p.New.TryGetValue(column, out var n) ? n : (JsonElement?)null;
@@ -428,7 +330,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                     continue;
                 }
                 var label = Label(type, column, fieldWords);
-                if ((erased && ErasedRecords.IsPersonal(type, column)) || (maskDriver && DriverPersonal.Contains(column)))
+                if ((erased && ErasedRecords.IsPersonal(V.PersonalFields, type, column)) || V.Any(provider => provider.Masks(type, column)))
                 {
                     result.Add(new FieldChange(label, ErasedRecords.Masked, ErasedRecords.Masked));
                     continue;
@@ -441,9 +343,6 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
             }
             return result;
         }
-
-        /// <summary>Personal fields of drivers shown only with drv.view (DT-36, review M4).</summary>
-        private static readonly HashSet<string> DriverPersonal = ["NationalId", "Iban", "CliqAlias", "BankName", "Phone1", "Phone2", "Address"];
 
         private IEnumerable<FieldChange> CustomChanges(string? type, JsonElement? oldValue, JsonElement? newValue, bool erased)
         {
@@ -472,15 +371,15 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
 
         private string Label(string? type, string column, FieldWords? words)
         {
-            // Trips, drivers and customers: the label the company gave the field on Field configuration (FR-182).
+            // Configurable records (trips, drivers, customers): the label the company gave the field on Field configuration (FR-182).
             var key = char.ToLowerInvariant(column[0]) + column[1..];
             if (type is not null && _standardLabels.TryGetValue((type, key), out var custom)) return custom;
-            if (type is not null && Configuration.FieldCatalog.IsEntity(type) && Configuration.FieldCatalog.Find(type, key) is { } std) return En ? std.LabelEn : std.LabelAr;
+            if (type is not null && d.Catalog.IsEntity(type) && d.Catalog.Find(type, key) is { } std) return En ? std.LabelEn : std.LabelAr;
             return words is not null ? words.Label.In(En) : Humanize(column);
         }
 
         /// <summary>A value in the reader's words: names for ids, amounts with 3 decimals, dates DD/MM/YYYY, yes/no, codes in words, "—" when empty.</summary>
-        private string Value(Parsed p, string column, JsonElement? value)
+        private string Value(ParsedAuditRow p, string column, JsonElement? value)
         {
             if (value is not { } v || v.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return Dash;
             if (v.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(v.GetString())) return Dash;
@@ -490,8 +389,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                 if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var id) && _byId.TryGetValue((target, id), out var found)) return found.Name;
                 return v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var unknown) && unknown < 0 ? Dash : L("(غير معروف)", "(unknown)");
             }
-            var kind = d.KindOf(type, column);
-            if (type == "CFG.CompanySetting" && column == "SettingValue") kind = Kind.Auto;
+            var kind = V.FirstValue(provider => provider.ValueKind(type, column)) ?? d.KindOf(type, column);
             switch (kind)
             {
                 case Kind.Money when v.ValueKind == JsonValueKind.Number && v.TryGetDecimal(out var m):
@@ -515,43 +413,19 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
                 JsonValueKind.True => L("نعم", "Yes"),
                 JsonValueKind.False => L("لا", "No"),
                 JsonValueKind.Number => v.TryGetDecimal(out var x) ? x.ToString(x == decimal.Truncate(x) ? "#,##0" : "#,##0.000", CultureInfo.InvariantCulture) : v.GetRawText(),
-                JsonValueKind.String => SettingText(type, p, v.GetString()!),
+                JsonValueKind.String => V.First(provider => provider.TextValue(type, p, v.GetString()!, En)) ?? v.GetString()!,
                 _ => v.GetRawText(),
             };
         }
 
-        private string CodeText(string? type, string column, string code) => column switch
-        {
-            "PostingKey" => PostingKeys.All.FirstOrDefault(k => k.Key == code) is { } k ? (En ? k.NameEn : k.NameAr) : code,
-            "EntityType" => d.W(Entity(code).Title),
-            "SettingKey" when code.StartsWith("CORE.Setup.", StringComparison.Ordinal) => L("خطوة إعداد ", "Setup step ") + code["CORE.Setup.".Length..],
-            "Status" when type == "TRN.Trip" && code == "Active" => L("نشطة", "Active"),
-            _ => Code(code, En),
-        };
+        private string CodeText(string? type, string column, string code) =>
+            V.First(provider => provider.CodeText(type, column, code, En))
+            ?? (column == "EntityType" ? d.W(V.Entity(code).Title) : V.Code(code, En));
 
-        /// <summary>A company setting's value ("true", "2.5") in words; other text as typed.</summary>
-        private string SettingText(string? type, Parsed p, string text)
-        {
-            if (type != "CFG.CompanySetting") return text;
-            if (bool.TryParse(text, out var b)) return b ? L("نعم", "Yes") : L("لا", "No");
-            if (p.Str("SettingKey") == "TRN.ShortageTolerancePct" && decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var pct))
-                return pct.ToString("0.##", CultureInfo.InvariantCulture) + "%";
-            return text;
-        }
+        // ------------------------------------------------------------ entry lines
 
-        // ------------------------------------------------------------ journal lines
-
-        private HistoryLine Line(Parsed line)
-        {
-            var account = line.Long("AccountId") is long a && _byId.TryGetValue(("ACC.Account", a), out var found) ? found.Name : Dash;
-            if (PartyEntity(line.Str("PartyType")) is { } partyType && line.Long("PartyId") is long party && _byId.TryGetValue((partyType, party), out var who))
-                account += " — " + who.Name;
-            static decimal Amount(Parsed l, string column) => l.Value(column) is { ValueKind: JsonValueKind.Number } v && v.TryGetDecimal(out var n) ? n : 0;
-            var debit = Amount(line, "Debit");
-            var credit = Amount(line, "Credit");
-            return new HistoryLine(account, debit == 0 ? null : debit.ToString("#,##0.000", CultureInfo.InvariantCulture),
-                credit == 0 ? null : credit.ToString("#,##0.000", CultureInfo.InvariantCulture));
-        }
+        private HistoryLine Line(ParsedAuditRow line) =>
+            V.Providers.First(provider => provider.Lines?.LineType == line.Row.EntityType).Line(line, this);
 
         // ------------------------------------------------------------ links
 
@@ -561,8 +435,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         /// <summary>A link to a document's screen; <paramref name="text"/> is the words of the sentence that become the link.</summary>
         private HistoryLink? LinkTo(string type, Found found, string? text = null)
         {
-            // A payable or a receivable opens its own screen.
-            var kind = type == "ACC.ApArDocument" ? d._documentKinds.GetValueOrDefault(found.Id) : LinkKind(type);
+            var kind = found.LinkKind;
             if (kind is null || found.PublicId is not Guid pid || !d.Types.TryGetValue(type, out var clr)) return null;
             return new HistoryLink(kind, d.Tokens.Encode(clr, pid), text ?? found.Name);
         }
@@ -571,25 +444,17 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
     // ================================================================= look-ups
 
     /// <summary>Name of a record from its values (Create rows hold them all; also the last name of a record no longer found).</summary>
-    private static string? NameFromValues(string type, Dictionary<string, JsonElement> values, bool en)
+    private string? NameFromValues(string type, Func<string, string?> S, bool loaded)
     {
-        string? S(string k) => values.TryGetValue(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-        return Special() ?? NameProperties.Select(S).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
-
-        string? Special() => type switch
-        {
-            "ACC.Account" => S("Code") is { } code ? $"{code} · {(en ? S("NameEn") ?? S("NameAr") : S("NameAr"))}" : null,
-            "CORE.Plan" or "CORE.Company" => en ? S("NameEn") ?? S("NameAr") ?? S("Name") : S("NameAr") ?? S("Name"),
-            "CFG.CustomFieldDefinition" => en ? S("LabelEn") ?? S("LabelAr") : S("LabelAr"),
-            "CFG.CompanySetting" => S("SettingKey") is { } key ? Code(key, en) : null,
-            "ACC.PostingKeyMapping" => S("PostingKey") is { } pk ? PostingKeys.All.FirstOrDefault(k => k.Key == pk) is { } def ? (en ? def.NameEn : def.NameAr) : pk : null,
-            "CFG.NumberSequence" => S("DocumentType") is { } dt ? Entity(dt).Title.In(en) : null,
-            "CFG.StandardFieldConfig" => S("FieldKey") is { } fk && S("EntityType") is { } et
-                ? (Configuration.FieldCatalog.IsEntity(et) && Configuration.FieldCatalog.Find(et, fk) is { } f ? (en ? f.LabelEn : f.LabelAr) : fk) : null,
-            "CORE.Role" => S("Name") is { } role ? Code(role, en) : null,
-            _ => null,
-        };
+        foreach (var provider in V.Providers)
+            if (provider.TryRecordName(type, S, loaded, En, out var name)) return name;
+        return NameProperties.Select(S).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
     }
+
+    /// <summary>The text values of a row or record by column name.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1859", Justification = "Reads the read-only values of a ParsedAuditRow as well.")]
+    private static Func<string, string?> Strings(IReadOnlyDictionary<string, JsonElement> values) =>
+        k => values.TryGetValue(k, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     private static readonly string[] NameProperties = ["Number", "ReceiptNo", "Name", "FullName", "Code", "BatchNo", "PeriodMonth", "Title", "Email", "FileName", "Description"];
 
@@ -601,7 +466,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         foreach (var (type, ids) in wanted)
         {
             if (!Types.TryGetValue(type, out var clr) || ids.Count == 0) continue;
-            var rows = await ((Task<List<object>>)LoadMethod.MakeGenericMethod(clr).Invoke(this, [ids.ToList(), null, ct])!).ConfigureAwait(false);
+            var rows = await ((Task<List<object>>)LoadMethod.MakeGenericMethod(clr).Invoke(this, [ids.ToList(), null, Unfiltered(type), ct])!).ConfigureAwait(false);
             foreach (var e in rows) Add(type, e, into);
         }
     }
@@ -612,7 +477,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         foreach (var (type, numbers) in wanted)
         {
             if (!Types.TryGetValue(type, out var clr) || clr.GetProperty("Number") is null || numbers.Count == 0) continue;
-            var rows = await ((Task<List<object>>)LoadMethod.MakeGenericMethod(clr).Invoke(this, [null, numbers.ToList(), ct])!).ConfigureAwait(false);
+            var rows = await ((Task<List<object>>)LoadMethod.MakeGenericMethod(clr).Invoke(this, [null, numbers.ToList(), Unfiltered(type), ct])!).ConfigureAwait(false);
             foreach (var e in rows)
             {
                 var found = Describe(type, e);
@@ -621,11 +486,13 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         }
     }
 
-    private async Task<List<object>> LoadAsync<T>(List<long>? ids, List<string>? numbers, CancellationToken ct) where T : class
+    private bool Unfiltered(string type) => V.Any(provider => provider.ReadsUnfiltered(type));
+
+    private async Task<List<object>> LoadAsync<T>(List<long>? ids, List<string>? numbers, bool unfiltered, CancellationToken ct) where T : class
     {
         var q = db.Set<T>().AsNoTracking();
         if (typeof(ISoftDeletable).IsAssignableFrom(typeof(T))) q = q.IgnoreQueryFilters(["SoftDelete"]);
-        if (typeof(T) == typeof(User)) q = db.Set<T>().AsNoTracking().IgnoreQueryFilters();   // users: names only, of ids found in this log
+        if (unfiltered) q = db.Set<T>().AsNoTracking().IgnoreQueryFilters();   // users: names only, of ids found in this log
         q = ids is not null ? q.Where(e => ids.Contains(EF.Property<long>(e, "Id"))) : q.Where(e => numbers!.Contains(EF.Property<string>(e, "Number")));
         return (await q.Take(2000).ToListAsync(ct).ConfigureAwait(false)).Cast<object>().ToList();
     }
@@ -642,17 +509,9 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         var id = (long)t.GetProperty("Id")!.GetValue(e)!;
         var pid = t.GetProperty("PublicId")?.GetValue(e) as Guid?;
         var values = t.GetProperties().Where(p => p.PropertyType == typeof(string)).ToDictionary(p => p.Name, p => JsonSerializer.SerializeToElement(p.GetValue(e) as string));
-        var name = type switch
-        {
-            "TRN.Invoice" => values["Number"].GetString() ?? L("مسودة", "draft"),
-            "CORE.Permission" => En ? values["DescriptionEn"].GetString() : values["DescriptionAr"].GetString(),
-            _ => NameFromValues(type, values, En),
-        };
-        if (type == "ACC.ApArDocument" && t.GetProperty("DocumentKind")?.GetValue(e) is string kind) _documentKinds[id] = kind;
-        return new Found(name ?? "", pid, id);
+        var name = NameFromValues(type, Strings(values), loaded: true);
+        return new Found(name ?? "", pid, id, V.First(provider => provider.LinkKind(type, e)));
     }
-
-    private readonly Dictionary<long, string> _documentKinds = [];
 
     /// <summary>
     /// Records not found (never deleted outright, but kept out by a filter of another era or erased): the last name the audit log recorded
@@ -664,13 +523,13 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
         foreach (var (type, ids) in wanted)
         {
             var missing = ids.Where(id => !into.ContainsKey((type, id))).Select(id => (long?)id).ToList();
-            if (missing.Count == 0 || type == "CORE.User") continue;
+            if (missing.Count == 0 || !V.Providers.All(provider => provider.KeepsLastName(type))) continue;
             var rows = await db.Set<AuditLog>().AsNoTracking().Where(a => a.EntityType == type && a.CompanyId == companyId && missing.Contains(a.EntityId) && a.NewValues != null)
                 .OrderByDescending(a => a.Id).Select(a => new { a.EntityId, a.NewValues }).Take(500).ToListAsync(ct).ConfigureAwait(false);
             foreach (var r in rows)
             {
                 if (into.ContainsKey((type, r.EntityId!.Value))) continue;
-                if (NameFromValues(type, Parse(r.NewValues), En) is { } name) into[(type, r.EntityId.Value)] = new Found(name, null, r.EntityId.Value);
+                if (NameFromValues(type, Strings(Parse(r.NewValues)), loaded: false) is { } name) into[(type, r.EntityId.Value)] = new Found(name, null, r.EntityId.Value, null);
             }
         }
     }
@@ -678,7 +537,7 @@ public sealed class AuditDescriber(IAppDbContext db, IRequestContext ctx, IUrlTo
     /// <summary>How a column's value is shown: the vocabulary's kind, else from the property's type.</summary>
     private Kind KindOf(string? entityType, string column)
     {
-        if (Field(entityType, column) is { } f && f.Kind != Kind.Auto) return f.Kind;
+        if (V.Field(entityType, column) is { } f && f.Kind != Kind.Auto) return f.Kind;
         var clr = ClrType(entityType, column);
         if (clr == typeof(decimal)) return Kind.Money;
         if (clr == typeof(DateOnly)) return Kind.Date;

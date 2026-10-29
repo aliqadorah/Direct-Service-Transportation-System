@@ -1,21 +1,16 @@
-namespace DirectService.Transportation.Application.Audit;
+using static DirectService.SharedKernel.AuditWords;
 
-/// <summary>An Arabic / English pair of the vocabulary.</summary>
-public readonly record struct Words(string Ar, string En)
-{
-    public string In(bool en) => en ? En : Ar;
-}
+namespace DirectService.Transportation.Application.Audit;
 
 /// <summary>
 /// The words of the readable history and audit log (owner feedback 14 Oct 2026, DT-188): record types, actions, field labels and stored
 /// codes in the reader's language, with the same labels the screens use. Presentation only — what the audit log stores is unchanged.
+/// The shared audit describer reads them through <see cref="TransportationAuditVocabulary"/>; the shapes (<see cref="Words"/>,
+/// <see cref="EntityWords"/>, <see cref="ActionWords"/>, <see cref="FieldWords"/>, <see cref="Kind"/>) are in SharedKernel (Stage 2 session 9).
 /// </summary>
 public static class AuditVocabulary
 {
     // ------------------------------------------------------------ record types
-
-    /// <summary>A record type: its title (record-type column, filter) and the noun used in a sentence ("the trip", "الرحلة").</summary>
-    public sealed record EntityWords(Words Title, Words Noun);
 
     private static EntityWords E(string titleAr, string titleEn, string nounAr, string nounEn) => new(new(titleAr, titleEn), new(nounAr, nounEn));
 
@@ -98,18 +93,10 @@ public static class AuditVocabulary
     public static EntityWords Entity(string? type)
     {
         if (type is not null && Entities.TryGetValue(type, out var w)) return w;
-        var name = type?.Split('.').LastOrDefault() ?? "";
-        return E(name, name, name, name);
+        return UnknownEntity(type);
     }
 
     // ------------------------------------------------------------ actions
-
-    /// <summary>
-    /// An action: its short label (action column, filter) and the sentence. {r} is the record ("the trip R-1001"), {d} the document the
-    /// action names ("draft invoice INV-00001"), {x} the extra detail (a reason, a change of name). The Arabic sentence is a verbal noun, so
-    /// it never guesses the gender of the user who acted.
-    /// </summary>
-    public sealed record ActionWords(Words Label, Words Sentence);
 
     private static ActionWords A(string labelAr, string labelEn, string ar, string en) => new(new(labelAr, labelEn), new(ar, en));
 
@@ -229,33 +216,16 @@ public static class AuditVocabulary
     public static ActionWords Action(string action)
     {
         if (Actions.TryGetValue(action, out var w)) return w;
-        var words = Humanize(action);
-        return A(words, words, words + " {r}", words.ToLowerInvariant() + " {r}");
+        return UnknownAction(action);
     }
 
     /// <summary>The event as a sentence: "Ali Ali added the trip…" / "علي علي: إضافة الرحلة…" (the Arabic verbal noun needs no gender).</summary>
-    public static string Sentence(string? user, string predicate, bool en) => en ? $"{user ?? "The system"} {predicate}" : $"{user ?? "النظام"}: {predicate}";
+    public static string Sentence(string? user, string predicate, bool en) => AuditWords.Sentence(user, predicate, en);
 
     /// <summary>"SomeCode" → "Some code".</summary>
-    public static string Humanize(string code)
-    {
-        if (string.IsNullOrEmpty(code)) return code;
-        var sb = new System.Text.StringBuilder();
-        for (var i = 0; i < code.Length; i++)
-        {
-            var c = code[i];
-            if (i > 0 && char.IsUpper(c) && !char.IsUpper(code[i - 1])) sb.Append(' ').Append(char.ToLowerInvariant(c));
-            else sb.Append(c);
-        }
-        return sb.ToString();
-    }
+    public static string Humanize(string code) => AuditWords.Humanize(code);
 
     // ------------------------------------------------------------ fields
-
-    /// <summary>How a field's value is shown.</summary>
-    public enum Kind { Auto, Hidden, Text, Code, Money, Percent, Number, Date, DateTime, Bool, Ref, Custom, Masked }
-
-    public sealed record FieldWords(Words Label, Kind Kind = Kind.Auto, string? Target = null);
 
     private static FieldWords F(string ar, string en, Kind kind = Kind.Auto, string? target = null) => new(new(ar, en), kind, target);
 
@@ -779,6 +749,18 @@ public static class AuditVocabulary
         "ApArReturn" => "ACC.ApArReturn",
         _ => null,
     };
+
+    // ------------------------------------------------------------ personal data
+
+    /// <summary>Personal fields per record type, cleared by an erasure (SEC-19) and masked in every view of the log (<see cref="ErasedRecords"/>).</summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> PersonalFields = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+    {
+        ["TRN.Driver"] = new HashSet<string>(StringComparer.Ordinal) { "FullName", "NationalId", "Phone1", "Phone2", "Address", "LicenceNo", "BankName", "Iban", "CliqAlias", "Notes", "CustomValues" },
+        ["CORE.User"] = new HashSet<string>(StringComparer.Ordinal) { "FullName", "Email", "NormalizedEmail", "UserName", "NormalizedUserName" },
+        ["CORE.Invitation"] = new HashSet<string>(StringComparer.Ordinal) { "Email" },
+    };
+
+    // ------------------------------------------------------------ journal parties
 
     /// <summary>Record type of the party of a journal line (its PartyType).</summary>
     public static string? PartyEntity(string? partyType) => partyType switch

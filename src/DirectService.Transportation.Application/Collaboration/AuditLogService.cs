@@ -18,11 +18,11 @@ namespace DirectService.Transportation.Application.Collaboration;
 /// The company audit log (FR-188, FR-189): read-only for everyone (rows are append-only, the database user cannot update them); filters by
 /// user, action, record type, period and text; each row shows the user, time, action, the record by its number or name (never an internal
 /// id, SEC-22), the reason and the changes; Excel/CSV/PDF export. Visible to administrators (settings.manage or users.manage, DT-121) for
-/// the selected company. Readable (owner feedback 14 Oct 2026, DT-188): every row is described by <see cref="AuditDescriber"/> — action
+/// the selected company. Readable (owner feedback 14 Oct 2026, DT-188): every row is described by <see cref="IAuditDescriber"/> — action
 /// and record type in words, the event as a sentence, labelled and formatted changes, a journal entry with its lines as one event; the
 /// stored values as they are ("technical details") only for settings.manage and only when asked.
 /// </summary>
-public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportExporter exporter, AuditDescriber describer)
+public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportExporter exporter, IAuditDescriber describer)
 {
     public const int MaxExportRows = 20_000;
 
@@ -140,7 +140,7 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
             .ToListAsync(ct).ConfigureAwait(false);
         var described = await describer.DescribeAsync(rows.Select(r => r.Row).ToList(), new DescribeOptions(CreateValues: true, LinkRecord: true), ct).ConfigureAwait(false);
         var erased = technical
-            ? await ErasedRecords.FindAsync(db, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null).Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct)
+            ? await ErasedRecords.FindAsync(db, AuditVocabulary.PersonalFields, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null).Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct)
                 .ConfigureAwait(false)
             : [];
         return rows.Zip(described, (r, d) => new AuditLogEntry(DateTime.SpecifyKind(r.Row.OccurredAt, DateTimeKind.Utc), d.User, r.Row.Action, r.Row.EntityType, d.Record,
@@ -160,7 +160,7 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
         var mask = row.EntityType == "TRN.Driver" && !ctx.HasPermission(PermissionKeys.DrvView);
         var isErased = row.EntityType is not null && row.EntityId is long id && erased.Contains((row.EntityType, id));
         return oldValues.Keys.Union(newValues.Keys).Where(k => !RawHidden.Contains(k))
-            .Select(k => (mask && DriverPersonal.Contains(k)) || (isErased && ErasedRecords.IsPersonal(row.EntityType, k))
+            .Select(k => (mask && DriverPersonal.Contains(k)) || (isErased && ErasedRecords.IsPersonal(AuditVocabulary.PersonalFields, row.EntityType, k))
                 ? new AuditChange(k, ErasedRecords.Masked, ErasedRecords.Masked)
                 : new AuditChange(k, oldValues.GetValueOrDefault(k), newValues.GetValueOrDefault(k)))
             .ToList();

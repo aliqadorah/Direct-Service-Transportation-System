@@ -28,7 +28,7 @@ public sealed record AuditChange(string Field, string? Old, string? New);
 /// </summary>
 public sealed record AuditLogEntry(DateTime OccurredAt, string? User, string Action, string? EntityType, string? Record, string? Reason, IReadOnlyList<AuditChange> Changes,
     string? IpAddress, string? ActionLabel = null, string? EntityLabel = null, string? Text = null,
-    IReadOnlyList<MasterData.HistoryLine>? Lines = null, IReadOnlyList<MasterData.HistoryLink>? Links = null, IReadOnlyList<AuditChange>? Technical = null);
+    IReadOnlyList<Shared.Contracts.HistoryLine>? Lines = null, IReadOnlyList<Shared.Contracts.HistoryLink>? Links = null, IReadOnlyList<AuditChange>? Technical = null);
 
 // ------------------------------------------------------------------ background exports (FR-151)
 

@@ -36,7 +36,7 @@ public static class MasterCodes
 /// Shared work of the master-data services (M04): finding records by token, list status/sort/paging, reference counts with
 /// their labels (BR-040, FR-162), history from the audit log (FR-166), market formats and the company's local date.
 /// </summary>
-public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens, IRequestContext ctx, TimeProvider clock, AuditDescriber describer)
+public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens, IRequestContext ctx, TimeProvider clock, IAuditDescriber describer)
 {
     private string? _phonePattern;
     private string? _ibanPattern;
@@ -185,7 +185,7 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     /// <summary>
     /// History of a record from core.AuditLogs, newest first (at most 200 entries), readable (owner feedback 14 Oct 2026, DT-188): each event
     /// as a sentence in the reader's language with its labelled changes, a journal entry's lines and links to the documents it names
-    /// (<see cref="AuditDescriber"/>). Technical-only edits (e.g. the journal link set by a posting) are left out.
+    /// (<see cref="IAuditDescriber"/>). Technical-only edits (e.g. the journal link set by a posting) are left out.
     /// </summary>
     public async Task<IReadOnlyList<HistoryEntry>> HistoryAsync(string entityType, long entityId, CancellationToken ct)
     {

@@ -77,7 +77,7 @@ public static class DependencyInjection
         // Master data and field configuration (B3)
         services.AddScoped<IFieldCatalogProvider, TransportationFieldCatalog>();
         services.AddScoped<MasterDataSupport>();
-        services.AddScoped<Audit.AuditDescriber>();
+        services.AddScoped<IAuditVocabularyProvider, Audit.TransportationAuditVocabulary>();
         services.AddScoped<DriverService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<PartnerService>();

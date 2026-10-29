@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<DocumentPrinter>();
         services.AddScoped<IssuedNames>();
         services.AddScoped<IReportExporter, ReportExporter>();
+        services.AddScoped<IAuditDescriber, Audit.AuditDescriber>();
         return services;
     }
 }

@@ -25,7 +25,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// centre or on a parent account made earlier (copy by cost centre, import) are kept and still counted.
 /// </summary>
 public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PostingEngine engine, IChangeContext changes,
-    AuditDescriber describer)
+    IAuditDescriber describer)
 {
     public const string EntityType = "ACC.Budget";
     public const string LineEntityType = "ACC.BudgetLine";

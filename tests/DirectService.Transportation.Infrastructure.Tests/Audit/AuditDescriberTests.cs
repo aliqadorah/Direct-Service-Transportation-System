@@ -6,6 +6,8 @@ using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
+using DirectService.Shared.Infrastructure.Audit;
+using DirectService.Shared.Infrastructure.Configuration;
 using DirectService.Shared.Infrastructure.Persistence;
 using DirectService.Transportation.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -40,7 +42,8 @@ public sealed class AuditDescriberTests(DatabaseFixture db)
             Permissions = Contracts.Security.PermissionKeys.All.ToHashSet(),
         };
         var tokens = new Tokens();
-        return new(ctx, request, tokens, new Application.Identity.UserNames(ctx, tokens), new Application.Platform.CompanyInfo(ctx, request));
+        return new(ctx, request, tokens, new Application.Identity.UserNames(ctx, tokens), new Application.Platform.CompanyInfo(ctx, request),
+            [new TransportationAuditVocabulary(request)], new FieldCatalogs([new Application.Configuration.TransportationFieldCatalog(ctx)]));
     }
 
     private static string Json(object values) => JsonSerializer.Serialize(values);

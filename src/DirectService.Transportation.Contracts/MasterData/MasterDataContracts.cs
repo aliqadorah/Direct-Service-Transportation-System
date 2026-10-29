@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Common;
 
 namespace DirectService.Transportation.Contracts.MasterData;
@@ -24,9 +25,6 @@ public sealed record ReferenceCount(string Type, string Label, int Count);
 /// <summary>What refers to a record; <see cref="CanDelete"/> is false while anything does (FR-162).</summary>
 public sealed record ReferencesResponse(bool CanDelete, IReadOnlyList<ReferenceCount> References);
 
-/// <summary>One change of a field in a history entry (old → new, FR-166): the field's label and both values in the reader's language (DT-188).</summary>
-public sealed record FieldChange(string Field, string? OldValue, string? NewValue);
-
 /// <summary>
 /// A history entry of a record (FR-166), readable (owner feedback 14 Oct 2026, DT-188): <paramref name="Text"/> is the event as a sentence in
 /// the reader's language ("Ali Ali added the trip to draft invoice INV-00001"), <paramref name="ActionLabel"/> the action in words, the
@@ -36,11 +34,7 @@ public sealed record FieldChange(string Field, string? OldValue, string? NewValu
 public sealed record HistoryEntry(DateTime At, string? User, string Action, string? Reason, IReadOnlyList<FieldChange> Changes,
     string? Text = null, string? ActionLabel = null, IReadOnlyList<HistoryLine>? Lines = null, IReadOnlyList<HistoryLink>? Links = null);
 
-/// <summary>A journal line shown with its entry's event: account "code · name", debit and credit formatted (empty when zero).</summary>
-public sealed record HistoryLine(string Account, string? Debit, string? Credit);
-
-/// <summary>A document named by a history event: its screen kind ("Invoice", "Settlement", "JournalEntry"…), token and number.</summary>
-public sealed record HistoryLink(string Kind, string Id, string Text);
+// FieldChange, HistoryLine and HistoryLink: Shared.Contracts (the shared audit describer builds them, Stage 2 session 9).
 
 // ---------------------------------------------------------------- drivers with truck (FR-152 … FR-156)
 
