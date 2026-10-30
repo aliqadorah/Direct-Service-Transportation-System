@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Contracts.Modules;
+using DirectService.Platform.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ public sealed class AccountService(
     IDataScope scope,
     IChangeContext changes,
     IEnumerable<ICompanyProvisioner> provisioning,
+    IEnumerable<IPermissionCatalog> catalogs,
     SessionService sessions,
     IUrlTokenService urlTokens,
     IEmailSender email,
@@ -101,10 +103,10 @@ public sealed class AccountService(
     {
         var permissions = await db.Set<Permission>().ToDictionaryAsync(p => p.PermissionKey, ct).ConfigureAwait(false);
         var roles = new Dictionary<string, Role>();
-        foreach (var name in PresetRoles.All)
+        foreach (var name in PlatformPresetRoles.All)
         {
             var role = new Role { TenantId = tenantId, Name = name, IsPreset = true };
-            foreach (var key in PresetRoles.Permissions[name])
+            foreach (var key in catalogs.PresetRoleKeys(name))
                 role.RolePermissions.Add(new RolePermission { TenantId = tenantId, Permission = permissions[key] });
             db.Set<Role>().Add(role);
             roles[name] = role;

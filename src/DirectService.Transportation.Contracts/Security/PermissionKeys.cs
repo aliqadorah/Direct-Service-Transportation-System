@@ -1,9 +1,11 @@
+using DirectService.Platform.Contracts.Security;
+
 namespace DirectService.Transportation.Contracts.Security;
 
 /// <summary>
 /// The 22 permission keys of PRD 3.4, namespaced per owner decision D-01 (module prefix + PRD key), the three budget keys of revision 6 and the journal
 /// posting key (DT-201).
-/// The UI shows the PRD names (<see cref="PrdName"/>).
+/// The UI shows the PRD names (<see cref="PrdName"/>). The three core.* keys are defined in <see cref="PlatformPermissionKeys"/> (Stage 2 session 13).
 /// </summary>
 public static class PermissionKeys
 {
@@ -26,9 +28,9 @@ public static class PermissionKeys
     public const string AcctMaint = "acc.acct.maint";
     public const string ReportsView = "trn.reports.view";
     public const string MastersManage = "trn.masters.manage";
-    public const string SettingsManage = "core.settings.manage";
-    public const string UsersManage = "core.users.manage";
-    public const string TenantManage = "core.tenant.manage";
+    public const string SettingsManage = PlatformPermissionKeys.SettingsManage;
+    public const string UsersManage = PlatformPermissionKeys.UsersManage;
+    public const string TenantManage = PlatformPermissionKeys.TenantManage;
     // Revision 6 part B (owner change request 15 Oct 2026): budgets.
     public const string BudgetView = "acc.budget.view";
     public const string BudgetManage = "acc.budget.manage";
@@ -44,17 +46,17 @@ public static class PermissionKeys
     ];
 
     /// <summary>PRD 3.4 name of a namespaced key, e.g. "trn.trips.view" → "trips.view".</summary>
-    public static string PrdName(string key) => key[(key.IndexOf('.', StringComparison.Ordinal) + 1)..];
+    public static string PrdName(string key) => PlatformPermissionKeys.PrdName(key);
 }
 
-/// <summary>The preset roles of PRD 3.5. Names are fixed codes; the UI translates them.</summary>
+/// <summary>The preset roles of PRD 3.5. Names are fixed codes (defined in <see cref="PlatformPresetRoles"/>); the UI translates them.</summary>
 public static class PresetRoles
 {
-    public const string Owner = "Owner";
-    public const string Administrator = "Administrator";
-    public const string Accountant = "Accountant";
-    public const string Dispatcher = "Dispatcher";
-    public const string Viewer = "Viewer";
+    public const string Owner = PlatformPresetRoles.Owner;
+    public const string Administrator = PlatformPresetRoles.Administrator;
+    public const string Accountant = PlatformPresetRoles.Accountant;
+    public const string Dispatcher = PlatformPresetRoles.Dispatcher;
+    public const string Viewer = PlatformPresetRoles.Viewer;
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Permissions =
         new Dictionary<string, IReadOnlyList<string>>
@@ -81,5 +83,5 @@ public static class PresetRoles
             ],
         };
 
-    public static readonly IReadOnlyList<string> All = [Owner, Administrator, Accountant, Dispatcher, Viewer];
+    public static readonly IReadOnlyList<string> All = PlatformPresetRoles.All;
 }

@@ -62,4 +62,7 @@ public static class SharedErrorCodes
     public const string ReportThresholds = "report.thresholds";
     public const string ReportThresholdsBelow = "report.thresholdsBelow";
     public const string ServerError = "server.error";
+
+    // A record still referenced (master data, accounts, plans; Stage 2 session 13).
+    public const string RecordInUse = "record.inUse";
 }

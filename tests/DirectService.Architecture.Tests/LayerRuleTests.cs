@@ -214,4 +214,42 @@ public sealed class LayerRuleTests
             Assert.True(DirectService.Transportation.Contracts.Errors.ErrorCatalog.IsKnown(value), $"{value} has no messages");
         }
     }
+
+    [Fact]
+    public void Every_platform_error_code_is_in_the_error_catalog_under_the_same_name()
+    {
+        // Stage 2 session 13 (the DT-310 pattern): each platform code is defined once (PlatformErrorCodes) and ErrorCodes names it; the
+        // catalogue holds both messages; no value is defined twice.
+        var catalog = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes);
+        var platform = typeof(DirectService.Platform.Contracts.Errors.PlatformErrorCodes).GetFields().Where(f => f.IsLiteral).ToList();
+        Assert.NotEmpty(platform);
+        foreach (var f in platform)
+        {
+            var value = (string)f.GetValue(null)!;
+            Assert.Equal(value, (string?)catalog.GetField(f.Name)?.GetValue(null));
+            Assert.True(DirectService.Transportation.Contracts.Errors.ErrorCatalog.IsKnown(value), $"{value} has no messages");
+        }
+        var shared = typeof(SharedErrorCodes).GetFields().Where(f => f.IsLiteral).Select(f => (string)f.GetValue(null)!).ToHashSet(StringComparer.Ordinal);
+        Assert.DoesNotContain(platform, f => shared.Contains((string)f.GetValue(null)!));
+    }
+
+    [Fact]
+    public void The_platform_permission_keys_and_preset_roles_are_named_by_the_module_under_the_same_names()
+    {
+        // Stage 2 session 13: core.* keys and the preset role names are defined in Platform.Contracts; PermissionKeys / PresetRoles name them,
+        // and the module's catalogue (IPermissionCatalog) gives every key and the keys of every preset role (values pinned, e.2).
+        var keys = typeof(DirectService.Transportation.Contracts.Security.PermissionKeys);
+        foreach (var f in typeof(DirectService.Platform.Contracts.Security.PlatformPermissionKeys).GetFields().Where(f => f.IsLiteral))
+            Assert.Equal((string)f.GetValue(null)!, (string?)keys.GetField(f.Name)?.GetValue(null));
+        var roles = typeof(DirectService.Transportation.Contracts.Security.PresetRoles);
+        foreach (var f in typeof(DirectService.Platform.Contracts.Security.PlatformPresetRoles).GetFields().Where(f => f.IsLiteral))
+            Assert.Equal((string)f.GetValue(null)!, (string?)roles.GetField(f.Name)?.GetValue(null));
+        Assert.Equal(["Owner", "Administrator", "Accountant", "Dispatcher", "Viewer"], DirectService.Platform.Contracts.Security.PlatformPresetRoles.All);
+
+        DirectService.Platform.Contracts.Modules.IPermissionCatalog[] catalogs = [new DirectService.Transportation.Application.Modules.TransportationPermissions()];
+        Assert.Equal(DirectService.Transportation.Contracts.Security.PermissionKeys.All, DirectService.Platform.Application.Identity.PermissionCatalogs.AllKeys(catalogs));
+        foreach (var role in DirectService.Platform.Contracts.Security.PlatformPresetRoles.All)
+            Assert.Equal(DirectService.Transportation.Contracts.Security.PresetRoles.Permissions[role],
+                DirectService.Platform.Application.Identity.PermissionCatalogs.PresetRoleKeys(catalogs, role));
+    }
 }

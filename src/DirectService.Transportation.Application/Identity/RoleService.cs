@@ -101,7 +101,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
     {
         var name = TextNormalizer.CleanText(r.Name);
         new Validator().Require("name", name).MaxLength("name", name, 100)
-            .Check(r.Permissions is not null && r.Permissions.All(k => catalogs.Any(c => c.Keys.Contains(k))), "permissions")
+            .Check(r.Permissions is not null && r.Permissions.All(catalogs.IsKey), "permissions")
             .Check(!PresetRoles.All.Contains(name ?? string.Empty, StringComparer.OrdinalIgnoreCase), "name", ErrorCodes.DuplicateKey)
             .ThrowIfInvalid();
         return name!;
