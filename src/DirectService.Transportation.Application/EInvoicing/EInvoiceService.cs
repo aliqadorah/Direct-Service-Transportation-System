@@ -31,7 +31,7 @@ public interface IEInvoiceSignal
 /// </summary>
 public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IEInvoiceStore store,
     EInvoiceSettingsService settings, EInvoiceDocumentBuilder builder, ISpreadsheetService sheets, IEInvoiceSignal signal, IOptions<EInvoicingOptions> options,
-    TimeProvider clock, Collaboration.NotificationService notifications, IReportExporter exporter)
+    TimeProvider clock, DirectService.Platform.Contracts.Collaboration.IUserNotifier notifications, IReportExporter exporter)
 {
     public const string EntityType = "TRN.EInvoiceSubmission";
     private const string ValidationPrefix = "validation:";
@@ -297,19 +297,20 @@ public sealed partial class EInvoiceService(IAppDbContext db, IRequestContext ct
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             if (accepted) await kind.Accepted(s, c).ConfigureAwait(false);
             // DT-189: an accepted document proves the credentials work again — the company's set-up notification is cleared.
-            if (accepted && ctx.CompanyId is long okCompany) await notifications.ClearSetupErrorAsync(okCompany, c).ConfigureAwait(false);
+            if (accepted && ctx.CompanyId is long okCompany) await notifications.ClearAsync(okCompany, Collaboration.TransportationNotificationTypes.EInvoiceSetupError, c).ConfigureAwait(false);
             if (rejected && outcome.CredentialsRefused && ctx.CompanyId is long setupCompany)
             {
                 // DT-189: refused credentials are a set-up problem — one notification per company for those who submit and those who fix the settings.
                 var to = (await notifications.HoldersAsync(setupCompany, kind.Permission, c).ConfigureAwait(false))
                     .Concat(await notifications.HoldersAsync(setupCompany, Contracts.Security.PermissionKeys.SettingsManage, c).ConfigureAwait(false));
-                await notifications.ReportSetupErrorAsync(to, setupCompany, s.LastError, c).ConfigureAwait(false);
+                await notifications.KeepOneAsync(to, setupCompany, Collaboration.TransportationNotificationTypes.EInvoiceSetupError,
+                    new Dictionary<string, string?> { ["reason"] = s.LastError }, Collaboration.TransportationNotificationLinks.EInvoiceSettings, c).ConfigureAwait(false);
             }
             else if (rejected && ctx.CompanyId is long companyId)
             {
                 // FR-190: the users who can submit are told (with the reason, as returned; shown as details).
                 await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, kind.Permission, c).ConfigureAwait(false), companyId,
-                    Collaboration.NotificationService.EInvoiceRejected,
+                    Collaboration.TransportationNotificationTypes.EInvoiceRejected,
                     new Dictionary<string, string?> { ["number"] = prepared.Document.Number, ["reason"] = s.LastError }, kind.Link(s), c).ConfigureAwait(false);
             }
         }, ct).ConfigureAwait(false);

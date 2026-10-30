@@ -67,4 +67,41 @@ public interface IUserNotifier
     /// <summary>Adds a notification for each user and saves (inside the caller's transaction when there is one), then pushes it.</summary>
     Task NotifyAsync(IEnumerable<long> userIds, long? companyId, string type, IReadOnlyDictionary<string, string?> parameters, string? link, CancellationToken ct,
         long? tenant = null);
+
+    /// <summary>Active users holding <paramref name="permission"/> in the company (recipients of a company event).</summary>
+    Task<IReadOnlyList<long>> HoldersAsync(long companyId, string permission, CancellationToken ct);
+
+    /// <summary>
+    /// Keeps ONE notification of <paramref name="type"/> per recipient and company: an existing one only gets the new parameters, the others
+    /// get a new notification (e.g. e-invoicing set up wrongly, DT-189).
+    /// </summary>
+    Task KeepOneAsync(IEnumerable<long> userIds, long companyId, string type, IReadOnlyDictionary<string, string?> parameters, string? link, CancellationToken ct);
+
+    /// <summary>Deletes the company's notifications of <paramref name="type"/> (the problem they report is gone).</summary>
+    Task<int> ClearAsync(long companyId, string type, CancellationToken ct);
 }
+
+/// <summary>A notification as the reader sees it: a short title, one readable sentence, and the technical details (codes, raw answers) kept apart.</summary>
+public sealed record NotificationText(string Title, string Message, string? Details);
+
+/// <summary>Where a notification leads: a screen route (company-relative, or absolute for tenant screens) or why it cannot be opened.</summary>
+public sealed record NotificationTarget(string? Route, string? Problem)
+{
+    /// <summary>The record the link names no longer exists (or never did).</summary>
+    public const string Missing = "missing";
+
+    /// <summary>The reader may not open the screen.</summary>
+    public const string Forbidden = "forbidden";
+
+    public static readonly NotificationTarget None = new(null, null);
+}
+
+/// <summary>
+/// Older notifications of <paramref name="FromType"/> whose stored message contains <paramref name="MessageContains"/> are replaced, for the
+/// reader in the company, by one notification of <paramref name="IntoType"/> linking to <paramref name="Link"/> (unread when any of them was
+/// unread), carrying <paramref name="Parameter"/> of one of them, an unread one when there is one (DT-189).
+/// </summary>
+public sealed record NotificationMerge(string FromType, string MessageContains, string IntoType, string Link, string Parameter);
+
+/// <summary>The words of one notification type: title and sentence in both languages ({name} placeholders), and the parameter shown as details.</summary>
+public sealed record NotificationWords(string TitleAr, string TitleEn, string MessageAr, string MessageEn, string? DetailsParam = null);

@@ -40,8 +40,11 @@ public sealed class StoredKeyTests
     public void Notification_types_are_unchanged()
     {
         Golden.SameSet("Notification types (core.Notifications.NotificationType, E-18)", Golden.Strings(Keys["notificationTypes"]),
-            DirectService.Transportation.Application.Collaboration.NotificationTexts.Types);
-        Golden.SameMap("Notification type constants", Golden.Map(Keys["notificationConstants"]), Golden.Constants(Golden.TypeNamed("NotificationService")));
+            [.. DirectService.Platform.Application.Notifications.NotificationTexts.Types, .. DirectService.Transportation.Application.Collaboration.TransportationNotificationTexts.Types]);
+        // The platform's types on its NotificationService, the module's on its provider (split in Stage 2 session 14, values unchanged).
+        Golden.SameMap("Notification type constants", Golden.Map(Keys["notificationConstants"]),
+            new[] { Golden.TypeNamed("NotificationService"), Golden.TypeNamed("TransportationNotificationTypes") }.SelectMany(Golden.Constants)
+                .ToDictionary(c => c.Key, c => c.Value, StringComparer.Ordinal));
     }
 
     [Fact]

@@ -1,4 +1,7 @@
+using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Application.Collaboration;
+using PlatformTexts = DirectService.Platform.Application.Notifications.NotificationTexts;
 
 namespace DirectService.Transportation.Application.Tests;
 
@@ -9,6 +12,17 @@ namespace DirectService.Transportation.Application.Tests;
 public sealed class NotificationUnitTests
 {
     private static Dictionary<string, string?> P(params (string Key, string? Value)[] values) => values.ToDictionary(v => v.Key, v => v.Value);
+
+    /// <summary>The words of every type: the platform's and this application's (split by type in Stage 2 session 14, the texts unchanged).</summary>
+    private static class NotificationTexts
+    {
+        public static IReadOnlyCollection<string> Types => [.. PlatformTexts.Types, .. TransportationNotificationTexts.Types];
+
+        public static NotificationText Render(string type, string message, string language, IReadOnlyDictionary<string, string>? extra = null) =>
+            TransportationNotificationTexts.Types.Contains(type)
+                ? TransportationNotificationTexts.Render(type, message, language, extra)
+                : PlatformTexts.Render(type, message, language, extra);
+    }
 
     [Fact]
     public void Long_parameters_fit_500_characters_and_Arabic_stays_readable_FR190()
@@ -23,9 +37,9 @@ public sealed class NotificationUnitTests
     /// <summary>Parameters each type is created with (as the services pass them).</summary>
     public static TheoryData<string, string> Types() => new()
     {
-        { NotificationService.EInvoiceRejected, NotificationService.Message(P(("number", "INV-00007"), ("reason", "E-INV-BUYER: buyer data refused."))) },
-        { NotificationService.EInvoiceSetupError, NotificationService.Message(P(("reason", "JoFotara refused the credentials (HTTP 401). CORE-401-001: Invalid client credentials"))) },
-        { NotificationService.PostingFailed, NotificationService.Message(P(("description", "INV-00007"))) },
+        { TransportationNotificationTypes.EInvoiceRejected, NotificationService.Message(P(("number", "INV-00007"), ("reason", "E-INV-BUYER: buyer data refused."))) },
+        { TransportationNotificationTypes.EInvoiceSetupError, NotificationService.Message(P(("reason", "JoFotara refused the credentials (HTTP 401). CORE-401-001: Invalid client credentials"))) },
+        { TransportationNotificationTypes.PostingFailed, NotificationService.Message(P(("description", "INV-00007"))) },
         { NotificationService.ExportReady, NotificationService.Message(P(("file", "report.xlsx"))) },
         { NotificationService.ExportFailed, NotificationService.Message(P()) },
         { NotificationService.InvitationAccepted, NotificationService.Message(P(("name", "Sara Ali"))) },
@@ -57,17 +71,17 @@ public sealed class NotificationUnitTests
         // As stored by the earlier version: English shown on Arabic screens because the text was fixed at creation.
         const string old = "{\"Ar\":\"رُفضت فاتورة إلكترونية: INV-00007 — E-INV-TOTALS: Simulated rejection: totals do not add up.\","
             + "\"En\":\"An e-invoice was rejected: INV-00007 — E-INV-TOTALS: Simulated rejection: totals do not add up.\"}";
-        var ar = NotificationTexts.Render(NotificationService.EInvoiceRejected, old, "ar");
+        var ar = NotificationTexts.Render(TransportationNotificationTypes.EInvoiceRejected, old, "ar");
         Assert.Equal("رُفضت فاتورة إلكترونية", ar.Title);
         Assert.Equal("رفض نظام الفوترة الوطني المستند INV-00007. افتحه لتصحيحه وإعادة إرساله.", ar.Message);
         Assert.Equal("E-INV-TOTALS: Simulated rejection: totals do not add up.", ar.Details);
-        var en = NotificationTexts.Render(NotificationService.EInvoiceRejected, old, "en");
+        var en = NotificationTexts.Render(TransportationNotificationTypes.EInvoiceRejected, old, "en");
         Assert.Equal("The national e-invoicing system refused INV-00007. Open it to correct and resubmit.", en.Message);
     }
 
     [Theory]
     [InlineData(NotificationService.ExportReady, "{\"Ar\":\"التصدير جاهز: a.xlsx\",\"En\":\"Export ready: a.xlsx\"}", "الملف a.xlsx جاهز للتنزيل.")]
-    [InlineData(NotificationService.PostingFailed, "{\"Ar\":\"x\",\"En\":\"An entry could not be posted and waits in pending postings: Trip 12\"}", "ينتظر القيد في الترحيلات المعلّقة: Trip 12")]
+    [InlineData(TransportationNotificationTypes.PostingFailed, "{\"Ar\":\"x\",\"En\":\"An entry could not be posted and waits in pending postings: Trip 12\"}", "ينتظر القيد في الترحيلات المعلّقة: Trip 12")]
     [InlineData(NotificationService.SupportRequested, "{\"Ar\":\"x\",\"En\":\"Provider support requests access to your data: Ticket 9\"}", "يطلب الدعم الفني لدى مزوّد الخدمة الوصول إلى بياناتكم: Ticket 9")]
     [InlineData(NotificationService.PaymentFailed, "{\"Ar\":\"x\",\"En\":\"The renewal payment failed; you have 7 days to update the payment method.\"}", "تعذّر تحصيل قيمة التجديد؛ لديكم 7 أيام لتحديث وسيلة الدفع.")]
     [InlineData(NotificationService.ExportFailed, "{\"Ar\":\"x\",\"En\":\"The export could not be prepared.\"}", "تعذّر إعداد التصدير. أعد المحاولة أو ضيّق الفترة.")]

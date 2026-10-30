@@ -67,7 +67,7 @@ public sealed class TenantFilterGuardTests
         ["SubscriptionService.WebhookAsync"] = "Signed payment webhook (no session): the invoice by gateway reference, scope set to that invoice's tenant.",
         ["PlatformNumbers"] = "Raw SQL: the platform-wide subscription invoice number sequence (provider data, no tenant rows).",
         // Notification holders and names of the people who acted.
-        ["NotificationService.HoldersAsync|NotifyAsync|PushAsync|ReportSetupErrorAsync|ClearSetupErrorAsync"] = "Notification holders/recipients by explicit company or user ids (users of the company; staff have no tenant).",
+        ["NotificationService.HoldersAsync|NotifyAsync|PushAsync|KeepOneAsync|ClearAsync"] = "Notification holders/recipients by explicit company or user ids (users of the company; staff have no tenant).",
         ["RecordLockService.AcquireAsync"] = "Record locks: scope set to the lock's own tenant/company.",
         ["UserNames.FullNameAsync|FullNamesAsync"] = "A user's display name by user id (the holder of a record lock, DT-312); names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only (DT-322).",
         ["AuditDescriber.LoadAsync"] = "Names of the users found in this tenant's own audit rows (support staff have no tenant): by those ids only.",

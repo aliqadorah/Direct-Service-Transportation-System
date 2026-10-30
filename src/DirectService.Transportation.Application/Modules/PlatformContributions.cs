@@ -101,15 +101,3 @@ public sealed class TransportationHealthFigures(IAppDbContext db) : IHealthFigur
         return new Dictionary<string, int>(StringComparer.Ordinal) { [HealthMeasures.Trips] = trips, [HealthMeasures.PendingPostings] = pending, [HealthMeasures.EInvoices] = einv };
     }
 }
-
-/// <summary>The notification types and texts of <see cref="NotificationTexts"/> (every type of the application until they are split by module).</summary>
-public sealed class TransportationNotificationTypes : INotificationTypeProvider
-{
-    public IReadOnlyCollection<string> Types => NotificationTexts.Types;
-
-    public NotificationTypeText Render(string type, string message, string language)
-    {
-        var text = NotificationTexts.Render(type, message, language);
-        return new NotificationTypeText(text.Title, text.Message, text.Details);
-    }
-}

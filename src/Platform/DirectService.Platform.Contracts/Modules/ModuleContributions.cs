@@ -69,17 +69,30 @@ public interface IPermissionCatalog
     IReadOnlyList<string> SupportSessionKeys { get; }
 }
 
-/// <summary>A module's notification types (stored in core.Notifications.Type; values pinned) with their texts.</summary>
+/// <summary>
+/// A module's notification types (stored in core.Notifications.Type; values pinned) with their texts, the links to its records, the
+/// parameters worked out when they are shown and the older notifications a reader's list replaces by one (DT-189; Stage 2 session 14).
+/// </summary>
 public interface INotificationTypeProvider
 {
     IReadOnlyCollection<string> Types { get; }
 
-    /// <summary>Title, text and details of a stored notification in the reader's language ("ar" or "en").</summary>
-    NotificationTypeText Render(string type, string message, string language);
-}
+    /// <summary>Title, text and details of a stored notification of one of <see cref="Types"/> in the reader's language ("ar" or "en");
+    /// <paramref name="extra"/> holds the parameters of <see cref="ExtraAsync"/>.</summary>
+    Collaboration.NotificationText Render(string type, string message, string language, IReadOnlyDictionary<string, string>? extra = null);
 
-/// <summary>A notification as the reader sees it.</summary>
-public sealed record NotificationTypeText(string Title, string Message, string? Details);
+    /// <summary>The parameters of a stored message of one of <see cref="Types"/> (the current form, or read back from an older text); null when unknown.</summary>
+    Dictionary<string, string>? Parameters(string type, string message);
+
+    /// <summary>Where a stored link (starting with "/") to one of the module's records or screens leads for the reader; null when it is not the module's.</summary>
+    Task<Collaboration.NotificationTarget?> ResolveLinkAsync(string link, CancellationToken ct);
+
+    /// <summary>Parameters worked out when notifications of <paramref name="type"/> are shown in the current company (e.g. a count); null for none.</summary>
+    Task<IReadOnlyDictionary<string, string>?> ExtraAsync(string type, CancellationToken ct);
+
+    /// <summary>Older notifications that the reader's list replaces by one, the first time it is shown in a company.</summary>
+    IReadOnlyList<Collaboration.NotificationMerge> Merges { get; }
+}
 
 /// <summary>A module's figures on the provider's health page (P-15), over every tenant (Stage 2 session 13).</summary>
 public interface IHealthFigureSource

@@ -3,8 +3,10 @@ using DirectService.Platform.Application.Companies;
 using DirectService.Platform.Application.Email;
 using DirectService.Platform.Application.Errors;
 using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Application.Notifications;
 using DirectService.Platform.Application.Staff;
 using DirectService.Platform.Application.Tenants;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Contracts.Modules;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -57,6 +59,13 @@ public static class DependencyInjection
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<CompanyExportService>();
         services.AddScoped<IExportJobProvider, PlatformExportJobs>();   // the "company" export kind (Stage 2 session 14)
+
+        // In-app notifications (Stage 2 session 14; registered by the module before, same lifetimes); a module adds its types, words and
+        // links through INotificationTypeProvider.
+        services.AddScoped<NotificationService>();
+        services.AddScoped<IUserNotifier>(sp => sp.GetRequiredService<NotificationService>());
+        services.AddScoped<NotificationLinks>();
+        services.AddScoped<IExportNotifier, ExportNotifications>();
         return services;
     }
 }

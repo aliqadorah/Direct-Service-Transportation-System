@@ -1,27 +1,21 @@
-using DirectService.Transportation.Application.Abstractions;
 using DirectService.Platform.Contracts.Collaboration;
-using DirectService.Transportation.Contracts.EInvoicing;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Collaboration;
+namespace DirectService.Platform.Application.Notifications;
 
 /// <summary>
-/// In-app notifications (FR-190): rejected e-invoices, e-invoicing set up wrongly, finished exports, failed postings, accepted invitations,
-/// support-access requests, failed renewals. A notification belongs to one user (and a company when it concerns one). It stores its type
-/// and parameters; the title and text are built in the reader's language when shown (<see cref="NotificationTexts"/>, DT-189) and its link
-/// is resolved again then (<see cref="NotificationLinks"/>). New ones are pushed to the user's connections (RT-01). Users list their own
-/// notifications and mark them read; nobody else can.
+/// In-app notifications (FR-190): finished exports, accepted invitations, support-access requests, failed renewals, and the modules' own
+/// (rejected e-invoices, e-invoicing set up wrongly, failed postings). A notification belongs to one user (and a company when it concerns one).
+/// It stores its type and parameters; the title and text are built in the reader's language when shown (<see cref="NotificationTexts"/> and
+/// the modules' <see cref="INotificationTypeProvider"/>s, DT-189) and its link is resolved again then (<see cref="NotificationLinks"/>). New
+/// ones are pushed to the user's connections (RT-01). Users list their own notifications and mark them read; nobody else can. Platform since
+/// Stage 2 session 14 (the e-invoicing parts are the module's provider).
 /// </summary>
 public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IServiceProvider services, TimeProvider clock, IAfterCommit afterCommit,
-    NotificationLinks links) : IUserNotifier
+    NotificationLinks links, IEnumerable<INotificationTypeProvider> providers) : IUserNotifier
 {
-    public const string EInvoiceRejected = "EINV.Rejected";
-    public const string EInvoiceSetupError = "EINV.SetupError";
-    public const string PostingFailed = "ACC.PostingFailed";
     public const string ExportReady = PlatformNotifications.ExportReady;
     public const string ExportFailed = PlatformNotifications.ExportFailed;
     public const string InvitationAccepted = PlatformNotifications.InvitationAccepted;
@@ -31,6 +25,10 @@ public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, I
     public const int MaxMessage = PlatformNotifications.MaxMessage;
 
     private static readonly string[] TenantFilter = ["Tenant"];
+
+    private readonly IReadOnlyList<INotificationTypeProvider> _providers = providers.ToList();
+
+    private INotificationTypeProvider? ProviderOf(string type) => _providers.FirstOrDefault(p => p.Types.Contains(type));
 
     /// <summary>Active users holding <paramref name="permission"/> in the company (recipients of a company event).</summary>
     public async Task<IReadOnlyList<long>> HoldersAsync(long companyId, string permission, CancellationToken ct) =>
@@ -84,27 +82,27 @@ public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, I
     }
 
     /// <summary>
-    /// JoFotara refused the company's credentials (DT-189): a configuration problem, not a document one, so each recipient keeps ONE open
-    /// notification per company ("e-invoicing is not set up correctly", linking to the settings) instead of one per document; a repeated
-    /// refusal only refreshes its details. The number of affected documents is counted when it is shown.
+    /// A problem of the company's set-up, not of one record (e.g. JoFotara refused the credentials, DT-189): each recipient keeps ONE
+    /// notification of the type per company instead of one per document; a repeated report only refreshes its parameters. (Was
+    /// <c>ReportSetupErrorAsync</c> of the module's notification service.)
     /// </summary>
-    public async Task ReportSetupErrorAsync(IEnumerable<long> userIds, long companyId, string? reason, CancellationToken ct)
+    public async Task KeepOneAsync(IEnumerable<long> userIds, long companyId, string type, IReadOnlyDictionary<string, string?> parameters, string? link, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(userIds);
         var ids = userIds.Distinct().ToList();
         if (ids.Count == 0) return;
-        var message = Message(new Dictionary<string, string?> { ["reason"] = reason });
+        var message = Message(parameters);
         var open = await db.Set<Notification>().IgnoreQueryFilters(TenantFilter)
-            .Where(n => n.CompanyId == companyId && n.NotificationType == EInvoiceSetupError && ids.Contains(n.UserId)).ToListAsync(ct).ConfigureAwait(false);
+            .Where(n => n.CompanyId == companyId && n.NotificationType == type && ids.Contains(n.UserId)).ToListAsync(ct).ConfigureAwait(false);
         foreach (var n in open) n.Message = message;
         if (open.Count > 0) await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var missing = ids.Except(open.Select(n => n.UserId)).ToList();
-        await NotifyAsync(missing, companyId, EInvoiceSetupError, new Dictionary<string, string?> { ["reason"] = reason }, "/settings/e-invoicing", ct).ConfigureAwait(false);
+        await NotifyAsync(missing, companyId, type, parameters, link, ct).ConfigureAwait(false);
     }
 
-    /// <summary>A document was accepted, so the credentials work again: the open set-up notifications of the company are cleared (DT-189).</summary>
-    public Task<int> ClearSetupErrorAsync(long companyId, CancellationToken ct) =>
-        db.Set<Notification>().IgnoreQueryFilters(TenantFilter).Where(n => n.CompanyId == companyId && n.NotificationType == EInvoiceSetupError)
+    /// <summary>The problem is gone (e.g. a document was accepted, so the credentials work again): the company's notifications of the type are cleared (DT-189).</summary>
+    public Task<int> ClearAsync(long companyId, string type, CancellationToken ct) =>
+        db.Set<Notification>().IgnoreQueryFilters(TenantFilter).Where(n => n.CompanyId == companyId && n.NotificationType == type)
             .ExecuteDeleteAsync(ct);
 
     /// <summary>The caller's notifications in the current company (and those without a company), newest first; unread count.</summary>
@@ -112,7 +110,9 @@ public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, I
     {
         var me = ctx.UserId ?? throw Fail.Forbidden();
         var companyId = ctx.CompanyId;
-        if (companyId is long c && !ctx.IsSupportSession) await CollapseCredentialRejectionsAsync(me, c, ct).ConfigureAwait(false);
+        if (companyId is long c && !ctx.IsSupportSession)
+            foreach (var merge in _providers.SelectMany(p => p.Merges.Select(m => (Provider: p, Merge: m))))
+                await MergeAsync(me, c, merge.Provider, merge.Merge, ct).ConfigureAwait(false);
         var query = db.Set<Notification>().AsNoTracking().Where(n => n.UserId == me && (n.CompanyId == null || n.CompanyId == companyId));
         var unread = await query.CountAsync(n => n.ReadAt == null, ct).ConfigureAwait(false);
         if (unreadOnly) query = query.Where(n => n.ReadAt == null);
@@ -120,44 +120,44 @@ public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, I
             .Select(n => new { n.PublicId, n.NotificationType, n.Message, n.Link, n.CompanyId, Company = n.Company != null ? n.Company.Name : null, n.CreatedAt, n.ReadAt })
             .ToListAsync(ct).ConfigureAwait(false);
         var targets = await links.ResolveAsync(rows.Select(n => (n.NotificationType, n.Link)).ToList(), ct).ConfigureAwait(false);
-        Dictionary<string, string>? setup = null;
-        if (rows.Any(n => n.NotificationType == EInvoiceSetupError))
-            setup = new(StringComparer.Ordinal) { ["count"] = NotificationTexts.Number(await CredentialRejectionsAsync(ct).ConfigureAwait(false)) };
+        // Parameters worked out when shown (e.g. the number of documents a set-up problem affects), once per type.
+        var extras = new Dictionary<string, IReadOnlyDictionary<string, string>?>(StringComparer.Ordinal);
+        foreach (var type in rows.Select(n => n.NotificationType).Distinct())
+            extras[type] = ProviderOf(type) is { } provider ? await provider.ExtraAsync(type, ct).ConfigureAwait(false) : null;
         var companyToken = ctx.CompanyPublicId is Guid pid ? tokens.Encode<Company>(pid) : null;
         return new NotificationPage(rows.Select((n, i) =>
         {
-            var text = NotificationTexts.Render(n.NotificationType, n.Message, ctx.Language, n.NotificationType == EInvoiceSetupError ? setup : null);
+            var text = Render(n.NotificationType, n.Message, ctx.Language, extras[n.NotificationType]);
             return new NotificationResponse(tokens.Encode<Notification>(n.PublicId), n.NotificationType, text.Title, text.Message, text.Details, targets[i].Route, targets[i].Problem,
                 n.CompanyId is null ? null : companyToken, n.Company, DateTime.SpecifyKind(n.CreatedAt, DateTimeKind.Utc),
                 n.ReadAt is DateTime r ? DateTime.SpecifyKind(r, DateTimeKind.Utc) : null);
         }).ToList(), unread);
     }
 
-    /// <summary>Documents of the current company refused because of the credentials and not resubmitted since (invoices, credit notes, AP/AR).</summary>
-    private async Task<int> CredentialRejectionsAsync(CancellationToken ct) =>
-        await db.Set<EInvoiceSubmission>().CountAsync(s => s.Status == EInvoiceCodes.Rejected && s.LastError!.StartsWith(EInvoiceOutcome.CredentialsRefusedText), ct).ConfigureAwait(false)
-        + await db.Set<ApArEInvoiceSubmission>().CountAsync(s => s.Status == EInvoiceCodes.Rejected && s.LastError!.StartsWith(EInvoiceOutcome.CredentialsRefusedText), ct).ConfigureAwait(false);
+    /// <summary>The text of a stored notification: a module's type through its provider, the platform's (or an unknown one) through <see cref="NotificationTexts"/>.</summary>
+    private NotificationText Render(string type, string message, string language, IReadOnlyDictionary<string, string>? extra) =>
+        ProviderOf(type) is { } provider ? provider.Render(type, message, language, extra) : NotificationTexts.Render(type, message, language, extra);
 
     /// <summary>
-    /// Older versions notified every document refused for the credentials: those notifications of the reader are replaced by the single
-    /// set-up notification (unread when any of them was unread), the first time the reader's list is shown (DT-189).
+    /// Older versions notified, for example, every document refused for the credentials: those notifications of the reader are replaced by
+    /// the single one of the merge (unread when any of them was unread), the first time the reader's list is shown (DT-189).
     /// </summary>
-    private async Task CollapseCredentialRejectionsAsync(long me, long companyId, CancellationToken ct)
+    private async Task MergeAsync(long me, long companyId, INotificationTypeProvider provider, NotificationMerge merge, CancellationToken ct)
     {
-        var old = db.Set<Notification>().Where(n => n.UserId == me && n.CompanyId == companyId && n.NotificationType == EInvoiceRejected
-            && n.Message.Contains(EInvoiceOutcome.CredentialsRefusedText));
+        var old = db.Set<Notification>().Where(n => n.UserId == me && n.CompanyId == companyId && n.NotificationType == merge.FromType
+            && n.Message.Contains(merge.MessageContains));
         var found = await old.Select(n => new { n.ReadAt, n.Message }).OrderByDescending(n => n.ReadAt == null).ToListAsync(ct).ConfigureAwait(false);
         if (found.Count == 0) return;
         await db.InTransactionAsync(async t =>
         {
             await old.ExecuteDeleteAsync(t).ConfigureAwait(false);
-            var reason = NotificationTexts.Parameters(EInvoiceRejected, found[0].Message)?.GetValueOrDefault("reason");
-            var open = await db.Set<Notification>().AnyAsync(n => n.UserId == me && n.CompanyId == companyId && n.NotificationType == EInvoiceSetupError, t).ConfigureAwait(false);
+            var value = provider.Parameters(merge.FromType, found[0].Message)?.GetValueOrDefault(merge.Parameter);
+            var open = await db.Set<Notification>().AnyAsync(n => n.UserId == me && n.CompanyId == companyId && n.NotificationType == merge.IntoType, t).ConfigureAwait(false);
             if (open) return;
             db.Set<Notification>().Add(new Notification
             {
-                TenantId = ctx.TenantId ?? 0, UserId = me, CompanyId = companyId, NotificationType = EInvoiceSetupError, Link = "/settings/e-invoicing",
-                Message = Message(new Dictionary<string, string?> { ["reason"] = reason }),
+                TenantId = ctx.TenantId ?? 0, UserId = me, CompanyId = companyId, NotificationType = merge.IntoType, Link = merge.Link,
+                Message = Message(new Dictionary<string, string?> { [merge.Parameter] = value }),
                 ReadAt = found.Any(n => n.ReadAt == null) ? null : clock.GetUtcNow().UtcDateTime,
             });
             await db.SaveChangesAsync(t).ConfigureAwait(false);

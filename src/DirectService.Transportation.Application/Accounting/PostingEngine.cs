@@ -44,7 +44,7 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 /// </list>
 /// </summary>
 public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IRequestContext ctx,
-    IChangeContext changes, TimeProvider clock, Collaboration.NotificationService? notifications = null, ILogger<PostingEngine>? log = null)
+    IChangeContext changes, TimeProvider clock, DirectService.Platform.Contracts.Collaboration.IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null)
 {
     public const int DescriptionMax = 500;
 
@@ -310,7 +310,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             {
                 // FR-190: the users who retry postings (je.export) learn that an entry waits.
                 await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, Contracts.Security.PermissionKeys.JeExport, ct).ConfigureAwait(false), companyId,
-                    Collaboration.NotificationService.PostingFailed, new Dictionary<string, string?> { ["description"] = request.Description }, "/ledger/pending-postings", ct)
+                    Collaboration.TransportationNotificationTypes.PostingFailed, new Dictionary<string, string?> { ["description"] = request.Description }, "/ledger/pending-postings", ct)
                     .ConfigureAwait(false);
             }
             return null;

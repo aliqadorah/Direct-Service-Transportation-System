@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
+using DirectService.Platform.Application.Notifications;
 
 namespace DirectService.Transportation.Api.Tests;
 
@@ -158,22 +159,22 @@ public sealed class CollaborationTests(ApiFactory f)
 
         // One notification for the company (not one per invoice), to e-invoicing settings, with the number of affected invoices.
         var page = await NotesAsync(o);
-        Assert.DoesNotContain(page.Items, n => n.Type == NotificationService.EInvoiceRejected);
-        var setup = Assert.Single(page.Items, n => n.Type == NotificationService.EInvoiceSetupError);
+        Assert.DoesNotContain(page.Items, n => n.Type == TransportationNotificationTypes.EInvoiceRejected);
+        var setup = Assert.Single(page.Items, n => n.Type == TransportationNotificationTypes.EInvoiceSetupError);
         Assert.Equal("E-invoicing is not set up correctly", setup.Title);
         Assert.Equal("JoFotara refused the credentials. Open e-invoicing settings. Affected invoices: 2", setup.Message);
         Assert.Equal("settings/e-invoicing", setup.Link);
         Assert.Equal(o.CompanyId, setup.Company);
         Assert.Contains("CORE-401-001", setup.Details, StringComparison.Ordinal);
         Assert.Null(setup.ReadAt);
-        var ar = Assert.Single((await NotesAsync(o, "ar")).Items, n => n.Type == NotificationService.EInvoiceSetupError);
+        var ar = Assert.Single((await NotesAsync(o, "ar")).Items, n => n.Type == TransportationNotificationTypes.EInvoiceSetupError);
         Assert.Equal("الفوترة الإلكترونية غير مضبوطة بشكل صحيح", ar.Title);
         Assert.EndsWith("الفواتير المتأثرة: 2", ar.Message, StringComparison.Ordinal);
 
         // A further refusal updates the same notification: still one, count 3.
         await IssueInvoiceAsync(o, customer.Id);
         await RunEInvoiceWorkerAsync();
-        var again = Assert.Single((await NotesAsync(o)).Items, n => n.Type == NotificationService.EInvoiceSetupError);
+        var again = Assert.Single((await NotesAsync(o)).Items, n => n.Type == TransportationNotificationTypes.EInvoiceSetupError);
         Assert.Equal(setup.Id, again.Id);
         Assert.EndsWith("Affected invoices: 3", again.Message, StringComparison.Ordinal);
 
@@ -181,7 +182,7 @@ public sealed class CollaborationTests(ApiFactory f)
         await EnableEInvoicingAsync(o, "client-1");
         var submission = (await ReadAsync<EInvoiceSubmissionDetails>(await o.Client.GetAsync(U(o, $"/invoices/{first.Invoice.Id}/e-invoice")))).Submission;
         await (await o.Client.PostAsync(U(o, $"/einvoice-submissions/{submission.Id}/submit"), null)).EnsureOkAsync();
-        Assert.DoesNotContain((await NotesAsync(o)).Items, n => n.Type == NotificationService.EInvoiceSetupError);
+        Assert.DoesNotContain((await NotesAsync(o)).Items, n => n.Type == TransportationNotificationTypes.EInvoiceSetupError);
     }
 
     /// <summary>Adds a notification as an earlier version stored it (text fixed at creation, API-style link).</summary>
@@ -242,7 +243,7 @@ public sealed class CollaborationTests(ApiFactory f)
         Assert.Null(payment.Company);
         // The three old credential refusals are now one set-up notification, unread.
         Assert.DoesNotContain(items, n => n.Message.Contains("INV-7700", StringComparison.Ordinal));
-        var setup = Assert.Single(items, n => n.Type == NotificationService.EInvoiceSetupError);
+        var setup = Assert.Single(items, n => n.Type == TransportationNotificationTypes.EInvoiceSetupError);
         Assert.Null(setup.ReadAt);
         Assert.Equal("settings/e-invoicing", setup.Link);
         Assert.Equal(0, await f.DbAsync(db => db.Set<DirectService.Platform.Domain.Notification>().IgnoreQueryFilters()
@@ -251,7 +252,7 @@ public sealed class CollaborationTests(ApiFactory f)
         // A Dispatcher may open neither tenant screens nor e-invoicing settings: the reason is given instead of a link.
         var dispatcher = await SecurityTests.InviteAndAcceptAsync(f, o, PresetRoles.Dispatcher);
         await InsertOldAsync(dispatcher, "CORE.PaymentFailed", "{\"Ar\":\"x\",\"En\":\"The renewal payment failed; you have 7 days to update the payment method.\"}", "/tenant/subscription", company: false);
-        await InsertOldAsync(dispatcher, NotificationService.EInvoiceSetupError, NotificationService.Message(new Dictionary<string, string?>()), "/settings/e-invoicing");
+        await InsertOldAsync(dispatcher, TransportationNotificationTypes.EInvoiceSetupError, NotificationService.Message(new Dictionary<string, string?>()), "/settings/e-invoicing");
         var theirs = (await NotesAsync(dispatcher)).Items;
         Assert.All(theirs, n => Assert.Equal(NotificationLinks.Forbidden, n.LinkProblem));
         Assert.All(theirs, n => Assert.Null(n.Link));
