@@ -2,7 +2,9 @@ using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Pages.Settings;
+using DirectService.Shared.UI.Pages.Settings;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
 using HistoryEntry = DirectService.Transportation.Contracts.MasterData.HistoryEntry;
 
 namespace DirectService.Transportation.UI.Tests;

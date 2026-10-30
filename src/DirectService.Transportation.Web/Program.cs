@@ -49,7 +49,8 @@ builder.Services.AddSignalR();
 builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
 builder.Services.AddScoped<AuthFlow>();
 // The design-system services also render the static account pages on the server (SCR-01…05).
-DirectService.Transportation.Web.Client.Services.ClientServices.AddClientUi(builder.Services);
+DirectService.Transportation.Web.Client.ClientComposition.Apply();   // the sign-in pages render the shared shell's text (DT-369)
+DirectService.Shared.UI.Services.ClientServices.AddClientUi(builder.Services);
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddHealthChecks().AddDbContextCheck<MasterDbContext>("database", tags: ["ready"]);
 
@@ -178,7 +179,7 @@ app.MapHub<LiveHub>(LiveHub.Path);
 app.MapStaticAssets().ShortCircuit();
 app.MapRazorComponents<DirectService.Transportation.Web.Components.App>()
     .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(DirectService.Transportation.Web.Client.Routes).Assembly);
+    .AddAdditionalAssemblies([typeof(DirectService.Transportation.Web.Client.Routes).Assembly, .. DirectService.Transportation.Web.Client.ClientComposition.PageAssemblies]);
 
 // DT-209: never serve with a database that lacks this version's migrations (Development applies them; elsewhere the host refuses).
 await DirectService.Transportation.Web.Pipeline.DatabaseVersion.EnsureCurrentAsync(app).ConfigureAwait(false);

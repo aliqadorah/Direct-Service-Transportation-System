@@ -1,6 +1,8 @@
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
+using DirectService.Shared.UI.Services;
 
 namespace DirectService.Transportation.Web.Client.Services;
 
@@ -53,6 +55,6 @@ public sealed class MoneyAccounts(Api api, ShellState shell)
     public IReadOnlyList<Option<string?>> For(string? method) => method == CashCodes.Cash ? CashBoxes : BankAccounts;
 
     /// <summary>The payment methods of the cash documents (7.4).</summary>
-    public static IReadOnlyList<Option<string?>> Methods(Localization.Loc l) =>
+    public static IReadOnlyList<Option<string?>> Methods(DirectService.Shared.UI.Localization.Loc l) =>
         [new(CashCodes.Cash, l["pay.Cash"]), new(CashCodes.Bank, l["pay.Bank"]), new(CashCodes.CliQ, l["pay.CliQ"])];
 }

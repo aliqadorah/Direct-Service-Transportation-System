@@ -1,5 +1,7 @@
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.UI.Tests;

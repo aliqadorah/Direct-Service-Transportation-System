@@ -137,7 +137,7 @@
 
     private static string Tone(string status) => status switch { "favourable" => "var-good", "unfavourable" => "var-bad", _ => "" };
 
-    private static Tone BadgeTone(string status) => status switch { "favourable" => Ui.Tone.Ok, "unfavourable" => Ui.Tone.Err, _ => Ui.Tone.Mute };
+    private static Tone BadgeTone(string status) => status switch { "favourable" => DirectService.Shared.UI.Ui.Tone.Ok, "unfavourable" => DirectService.Shared.UI.Ui.Tone.Err, _ => DirectService.Shared.UI.Ui.Tone.Mute };
 
     private static string Signed(decimal v) => (v > 0 ? "+" : "") + Fmt.Money(v);
 

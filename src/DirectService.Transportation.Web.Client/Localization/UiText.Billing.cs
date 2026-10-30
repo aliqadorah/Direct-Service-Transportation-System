@@ -1,9 +1,9 @@
 namespace DirectService.Transportation.Web.Client.Localization;
 
 /// <summary>Text of the billing and cash screens (SCR-20 … SCR-28), print preview (SCR-09) and the shared list and report frames.</summary>
-public static partial class UiText
+public static partial class AppTexts
 {
-    private static Dictionary<string, (string Ar, string En)> Billing() => new(StringComparer.Ordinal)
+    internal static Dictionary<string, (string Ar, string En)> Billing() => new(StringComparer.Ordinal)
     {
         // ---- shared list / report frames, documents
         ["list.noMatchText"] = ("لا سجلات تطابق التصفية الحالية. غيّر المرشحات أو امسحها.", "No records match the current filters. Change or clear them."),

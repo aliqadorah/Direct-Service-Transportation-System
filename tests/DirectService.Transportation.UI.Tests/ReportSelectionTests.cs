@@ -1,6 +1,7 @@
 using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Web.Client.Pages.Reports;
+using DirectService.Shared.UI.Pages.Reports;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;

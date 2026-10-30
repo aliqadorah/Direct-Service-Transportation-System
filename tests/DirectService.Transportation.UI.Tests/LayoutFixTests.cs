@@ -1,6 +1,7 @@
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Web.Client.Pages;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
 
 namespace DirectService.Transportation.UI.Tests;
 
@@ -67,16 +68,16 @@ public sealed class LayoutFixTests : PageTestBase
     public void Dashboards_and_list_plus_panel_pages_flow_and_the_flow_rule_never_scrolls_or_clips()
     {
         var root = FoundationTests.FindRepoRoot();
-        var pages = Path.Combine(root, "src", "DirectService.Transportation.Web.Client", "Pages");
+        var folders = FoundationTests.UiFolders(root, "Pages").ToList();
         foreach (var page in new[] { "Dashboard.razor", "SetupChecklist.razor", "Profile.razor", "Accounting/AccountingDashboard.razor", "Accounting/BalanceSheet.razor",
                      "Accounting/CashBanks.razor", "Accounting/CostCentres.razor", "Accounting/Maintenance.razor" })
         {
-            var source = File.ReadAllText(Path.Combine(pages, page));
+            var source = File.ReadAllText(folders.Select(f => Path.Combine(f, page)).First(File.Exists));
             Assert.True(source.Contains("class=\"cols flow", StringComparison.Ordinal), page);
             Assert.False(source.Contains("class=\"cols fill", StringComparison.Ordinal), page);
         }
         // Every list-plus-panel page flows.
-        foreach (var file in Directory.EnumerateFiles(pages, "*.razor", SearchOption.AllDirectories))
+        foreach (var file in folders.SelectMany(f => Directory.EnumerateFiles(f, "*.razor", SearchOption.AllDirectories)))
             Assert.False(File.ReadAllText(file).Contains("cols fill lp", StringComparison.Ordinal), file);
         var css = File.ReadAllText(Path.Combine(root, "src", "Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"));
         Assert.Contains(".flow { flex: none; min-height: auto; overflow: visible; }", css, StringComparison.Ordinal);

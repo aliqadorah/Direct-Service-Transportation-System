@@ -1,7 +1,9 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
@@ -15,7 +17,7 @@ namespace DirectService.Transportation.Web.Components.Account;
 /// </summary>
 [ExcludeFromInteractiveRouting]
 [EnableRateLimiting(RateLimits.Auth)]
-[Layout(typeof(DirectService.Transportation.Web.Client.Layout.BareLayout))]
+[Layout(typeof(DirectService.Shared.UI.Layout.BareLayout))]
 public abstract class AccountPage : ComponentBase
 {
     [CascadingParameter] protected HttpContext Http { get; set; } = default!;

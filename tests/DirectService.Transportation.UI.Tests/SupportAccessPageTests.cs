@@ -3,6 +3,7 @@ using System.Text;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Pages.Console;
 using DirectService.Transportation.Web.Client.Pages.Tenant;
 
@@ -107,7 +108,7 @@ public sealed class SupportAccessPageTests : PageTestBase
         Assert.Contains("Not needed now", refused, StringComparison.Ordinal);
     }
 
-    private static string Fmt(DateTime utc) => Web.Client.Ui.Fmt.DateTime(utc.ToLocalTime(), "yyyy-MM-dd");
+    private static string Fmt(DateTime utc) => DirectService.Shared.UI.Ui.Fmt.DateTime(utc.ToLocalTime(), "yyyy-MM-dd");
 
     [Fact]
     public void Approve_for_one_day_sends_24_hours()

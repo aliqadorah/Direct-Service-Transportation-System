@@ -1,10 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
-  <!-- Platform pages (console, tenant, company settings, users, audit log, profile, setup checklist), filled in Stage 2 session 7. -->
+  <!-- Platform pages (console, tenant, company settings, users and roles, audit log, home, profile, setup checklist) and the platform's
+       layouts and banners (design a.10; Stage 2 session 15). It reaches data only through the REST API: Platform.Contracts and Shared.UI. -->
   <PropertyGroup>
     <RootNamespace>DirectService.Platform.UI</RootNamespace>
+    <!-- CS8669: the Razor generator writes nullable type arguments (TValue="string?") into "#nullable disable" regions; harmless. -->
+    <NoWarn>$(NoWarn);CS8669</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="DirectService.Shared.Contracts" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\DirectService.Shared.UI\DirectService.Shared.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DirectService.Transportation.Web.Client" />
+    <InternalsVisibleTo Include="DirectService.Transportation.UI.Tests" />
   </ItemGroup>
 </Project>

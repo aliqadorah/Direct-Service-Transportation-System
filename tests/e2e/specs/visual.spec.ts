@@ -13,9 +13,9 @@ import { button, pick } from "../support/ui";
 import { open, VisualRun, wanted } from "../support/visual";
 import { addTrip, buildWorld, today, type World } from "../support/world";
 
-/** The help topics (D-18), read from the client's Help/HelpTopics.cs so that every help page is checked. */
+/** The help topics (D-18), read from the client's Help/AppHelpTopics.cs so that every help page is checked. */
 const HelpTopics = {
-  All: [...fs.readFileSync(path.join(ROOT, "src", "DirectService.Transportation.Web.Client", "Help", "HelpTopics.cs"), "utf8")
+  All: [...fs.readFileSync(path.join(ROOT, "src", "DirectService.Transportation.Web.Client", "Help", "AppHelpTopics.cs"), "utf8")
     .matchAll(/new\("([a-z-]+)", "9\.\d+",/g)].map((m) => m[1]),
 };
 

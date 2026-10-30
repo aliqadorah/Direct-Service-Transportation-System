@@ -132,8 +132,10 @@ public sealed class StoredNameTests
     {
         // RecordLockGuard EntityType="TRN.Trip", LiveRefresh filters and column views send these strings (E-9, E-15).
         var known = GoldenByName.Keys.Concat(Golden.Strings(Golden.Security["viewKeys"])).ToHashSet(StringComparer.Ordinal);
-        var client = Path.Combine(Golden.RepoRoot, "src", "DirectService.Transportation.Web.Client");
-        var used = Directory.EnumerateFiles(client, "*.*", SearchOption.AllDirectories)
+        // The browser app and its UI libraries (Stage 2 session 15).
+        string[] client = [Path.Combine(Golden.RepoRoot, "src", "DirectService.Transportation.Web.Client"), Path.Combine(Golden.RepoRoot, "src", "Shared", "DirectService.Shared.UI"),
+            Path.Combine(Golden.RepoRoot, "src", "Platform", "DirectService.Platform.UI")];
+        var used = client.SelectMany(d => Directory.EnumerateFiles(d, "*.*", SearchOption.AllDirectories))
             .Where(f => (f.EndsWith(".razor", StringComparison.Ordinal) || f.EndsWith(".cs", StringComparison.Ordinal)) && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(f), "\"((?:TRN|ACC|CFG|CORE)\\.[A-Za-z]+)\"").Select(m => m.Groups[1].Value))
             .Distinct().ToList();

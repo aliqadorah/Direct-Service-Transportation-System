@@ -1,7 +1,10 @@
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
 
 namespace DirectService.Transportation.UI.Tests;
 
@@ -30,7 +33,7 @@ public sealed class FoundationTests
         // Every key referenced in the screens and components (L["…"], L.F("…")) must be in the catalogue; keys built at run time
         // (a prefix followed by "+ value") are left out.
         var root = FindRepoRoot();
-        var sources = Directory.EnumerateFiles(Path.Combine(root, "src", "DirectService.Transportation.Web.Client"), "*.*", SearchOption.AllDirectories)
+        var sources = UiFolders(root).SelectMany(d => Directory.EnumerateFiles(d, "*.*", SearchOption.AllDirectories))
             .Where(p => (p.EndsWith(".razor", StringComparison.Ordinal) || p.EndsWith(".cs", StringComparison.Ordinal)) && !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
         var used = sources.SelectMany(p => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(p), "L(?:\\.F\\(|\\[)\"([a-z]+\\.[A-Za-z0-9_.-]*[A-Za-z0-9])\"(?!\\s*\\+)").Select(m => m.Groups[1].Value)).Distinct().ToList();
         Assert.NotEmpty(used);
@@ -147,7 +150,7 @@ public sealed class FoundationTests
     [Fact]
     public void Help_pages_cover_every_Section_9_flow_in_both_languages()
     {
-        var topics = Web.Client.Help.HelpTopics.All;
+        var topics = DirectService.Shared.UI.Help.HelpTopics.All;
         Assert.Equal(Enumerable.Range(1, 14).Select(i => $"9.{i}"), topics.Take(14).Select(t => t.Prd));
         // Owner change requests of 15 Oct 2026, part B ("Rev. 6"), and owner-feedback pages named by their requirements (DT-210: "FR-176/178").
         Assert.All(topics.Skip(14), t => Assert.True(t.Prd == "Rev. 6" || t.Prd.StartsWith("FR-", StringComparison.Ordinal), t.Key));
@@ -167,7 +170,7 @@ public sealed class FoundationTests
     public void Screens_link_only_to_existing_help_pages()
     {
         var root = FindRepoRoot();
-        var pages = Directory.EnumerateFiles(Path.Combine(root, "src", "DirectService.Transportation.Web.Client", "Pages"), "*.razor", SearchOption.AllDirectories);
+        var pages = UiFolders(root, "Pages").SelectMany(d => Directory.EnumerateFiles(d, "*.razor", SearchOption.AllDirectories));
         var helped = pages.Where(p => File.ReadAllText(p).Contains("<PageHeader Help=", StringComparison.Ordinal)).ToList();
         Assert.True(helped.Count >= 30, $"{helped.Count} screens link to help");
         foreach (var page in helped)
@@ -177,7 +180,7 @@ public sealed class FoundationTests
                 ? System.Text.RegularExpressions.Regex.Matches(attr, "\"([a-z-]+)\"").Select(m => m.Groups[1].Value).ToList()
                 : [attr];
             Assert.NotEmpty(keys);
-            Assert.All(keys, k => Assert.True(Web.Client.Help.HelpTopics.Find(k) is not null, $"{Path.GetFileName(page)}: {k}"));
+            Assert.All(keys, k => Assert.True(DirectService.Shared.UI.Help.HelpTopics.Find(k) is not null, $"{Path.GetFileName(page)}: {k}"));
         }
     }
 
@@ -199,4 +202,10 @@ public sealed class FoundationTests
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DirectService.Transportation.slnx"))) dir = dir.Parent;
         return dir?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
+
+    /// <summary>The source folders of the browser app and its UI libraries (Stage 2 session 15): the source checks read every one of them.</summary>
+    internal static IEnumerable<string> UiFolders(string root, params string[] sub) =>
+        UiProjects.Select(p => Path.Combine([root, "src", .. p, .. sub])).Where(Directory.Exists);
+
+    private static readonly string[][] UiProjects = [["DirectService.Transportation.Web.Client"], ["Shared", "DirectService.Shared.UI"], ["Platform", "DirectService.Platform.UI"]];
 }

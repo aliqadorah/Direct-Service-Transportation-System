@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;

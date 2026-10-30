@@ -150,7 +150,7 @@ public sealed class TenantFilterGuardTests
         return Path.Combine(dir?.FullName ?? throw new InvalidOperationException("Repository root not found."), "src");
     }
 
-    /// <summary>The server code: everything under src except the browser client, migrations and build output.</summary>
+    /// <summary>The server code: everything under src except the browser client (with its UI libraries), migrations and build output.</summary>
     internal static List<Finding> Scan(string src)
     {
         var findings = new List<Finding>();
@@ -158,7 +158,8 @@ public sealed class TenantFilterGuardTests
         {
             var rel = Path.GetRelativePath(src, file).Replace('\\', '/');
             if (rel.Contains("/obj/", StringComparison.Ordinal) || rel.Contains("/bin/", StringComparison.Ordinal) || rel.Contains("/Migrations/", StringComparison.Ordinal)
-                || rel.StartsWith("DirectService.Transportation.Web.Client/", StringComparison.Ordinal))
+                || rel.StartsWith("DirectService.Transportation.Web.Client/", StringComparison.Ordinal)
+                || rel.StartsWith("Shared/DirectService.Shared.UI/", StringComparison.Ordinal) || rel.StartsWith("Platform/DirectService.Platform.UI/", StringComparison.Ordinal))
                 continue;
             findings.AddRange(ScanText(rel, File.ReadAllText(file)));
         }

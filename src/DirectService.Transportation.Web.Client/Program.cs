@@ -1,8 +1,13 @@
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
+// The shared shell gets this application's menu, links, help pages and texts before anything renders (DT-369).
+DirectService.Transportation.Web.Client.ClientComposition.Apply();
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Same-origin API (/api/v1) with the auth cookie; the antiforgery header is added by the API client (step 8).

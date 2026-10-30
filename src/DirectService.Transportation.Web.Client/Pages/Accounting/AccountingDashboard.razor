@@ -253,5 +253,5 @@
         return pct.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static Tone SeverityTone(string severity) => severity switch { "error" => Ui.Tone.Err, "warning" => Ui.Tone.Warn, _ => Ui.Tone.Info };
+    private static Tone SeverityTone(string severity) => severity switch { "error" => Tone.Err, "warning" => Tone.Warn, _ => Tone.Info };
 }

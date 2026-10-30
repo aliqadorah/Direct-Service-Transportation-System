@@ -1,9 +1,9 @@
 namespace DirectService.Transportation.Web.Client.Localization;
 
 /// <summary>Text of the accounting screens (SCR-30 … SCR-45).</summary>
-public static partial class UiText
+public static partial class AppTexts
 {
-    private static Dictionary<string, (string Ar, string En)> Accounting() => new(StringComparer.Ordinal)
+    internal static Dictionary<string, (string Ar, string En)> Accounting() => new(StringComparer.Ordinal)
     {
         // ---- account types and parties
         ["acc.t.Asset"] = ("أصل", "Asset"),

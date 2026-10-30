@@ -1,5 +1,7 @@
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
+using DirectService.Shared.UI.Services;
 
 namespace DirectService.Transportation.Web.Client.Services;
 

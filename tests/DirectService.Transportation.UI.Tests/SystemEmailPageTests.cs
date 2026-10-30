@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Pages.Console;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -165,7 +166,7 @@ public sealed class SystemEmailPageTests : PageTestBase
         Respond(Path + "/log/e1/resend", new EmailResendResponse("newLink"));
         Act(() => cut.FindAll("table.grid tbody tr")[0].QuerySelector("button")!.Click());
         cut.WaitForAssertion(() => Assert.Contains(Requests, r => r.Method == "POST" && r.Path == Path + "/log/e1/resend"));
-        cut.WaitForAssertion(() => Assert.Contains(Services.GetRequiredService<Web.Client.Ui.ToastService>().Items, t => t.Text == L["sem.resentNewLink"]));
+        cut.WaitForAssertion(() => Assert.Contains(Services.GetRequiredService<DirectService.Shared.UI.Ui.ToastService>().Items, t => t.Text == L["sem.resentNewLink"]));
 
         // Filtering by status asks the server again.
         Act(() => cut.Find("select[aria-label]").Change("Failed"));

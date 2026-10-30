@@ -1,0 +1,135 @@
+@*
+  Column view of a list (FR-183, FR-165): which columns show and in what order. Each user can save a personal view; holders of
+  settings.manage can save the company default (used by everyone without a personal view); "Reset" drops the personal view. Loads the
+  effective view (personal, else company default, else all columns) and tells the list.
+*@
+@inject Api Api
+@inject Loc L
+@inject ShellState Shell
+@inject ToastService Toasts
+
+<Btn Small="true" Icon="columns" Text="@L["cols.title"]" OnClick="Open" />
+
+<Modal @bind-Open="_open" Title="@L["cols.title"]" Busy="_busy" Icon="columns">
+    <ChildContent>
+        <p class="help" style="margin:0">@L[_source == "Personal" ? "cols.personal" : _source == "CompanyDefault" ? "cols.companyDefault" : Default is null ? "cols.builtIn" : "cols.builtInSome"]</p>
+        <ul class="stack" style="list-style:none;margin:0;padding:0;gap:4px" aria-label="@L["cols.title"]">
+            @for (var i = 0; i < _rows.Count; i++)
+            {
+                var row = _rows[i];
+                var index = i;
+                <li class="row" style="gap:6px;align-items:center">
+                    <input type="checkbox" id="@($"col-{ViewKey}-{row.Key}")" checked="@row.On" @onchange="e => row.On = e.Value is true" />
+                    <label for="@($"col-{ViewKey}-{row.Key}")" style="flex:1">@row.Title</label>
+                    <Btn Small="true" Ghost="true" Icon="up" AriaLabel="@L.F("lay.up", row.Title)" Disabled="index == 0" OnClick="() => Move(index, -1)" />
+                    <Btn Small="true" Ghost="true" Icon="down" AriaLabel="@L.F("lay.down", row.Title)" Disabled="index == _rows.Count - 1" OnClick="() => Move(index, 1)" />
+                </li>
+            }
+        </ul>
+        @if (_error is not null) {<Banner Tone="Tone.Err" Text="@_error" />}
+    </ChildContent>
+    <Footer>
+        @if (_source == "Personal") {<Btn Ghost="true" Icon="refresh" Text="@L["cols.reset"]" Busy="_busy" OnClick="Reset" />}
+        @if (Shell.Can(PlatformPermissionKeys.SettingsManage)) {<Btn Text="@L["cols.saveDefault"]" Busy="_busy" Disabled="@(!_rows.Any(r => r.On))" OnClick="() => Save(true)" />}
+        <Btn Primary="true" Text="@L["cols.saveMine"]" Busy="_busy" Disabled="@(!_rows.Any(r => r.On))" OnClick="() => Save(false)" />
+    </Footer>
+</Modal>
+
+@code {
+    private bool _open, _busy;
+    private string? _error, _source;
+    private List<Row> _rows = [];
+    private IReadOnlyList<string>? _current;
+
+    /// <summary>View key on the server, e.g. "TRN.Trips".</summary>
+    [Parameter, EditorRequired] public string ViewKey { get; set; } = "";
+
+    /// <summary>Every column the list can show, in its default order: key and title.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<(string Key, string Title)> Columns { get; set; } = [];
+
+    /// <summary>The columns shown without a saved view, in order (DT-273: optional columns start hidden); null = all.</summary>
+    [Parameter] public IReadOnlyList<string>? Default { get; set; }
+
+    /// <summary>The columns to show, in order (null = the default columns).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<string>?> OnChange { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var v = await Api.GetAsync<ColumnViewResponse>(Api.C($"column-views/{ViewKey}"));
+            _source = v.Source;
+            _current = Known(v.Columns);
+            if (_current is not null) await OnChange.InvokeAsync(_current);
+        }
+        catch (ApiException) { }   // the list works with all columns
+    }
+
+    /// <summary>Saved keys that still exist (a removed custom field drops out); null when nothing is left.</summary>
+    private IReadOnlyList<string>? Known(IReadOnlyList<ColumnSetting> saved)
+    {
+        var keys = saved.Select(c => c.Key).Where(k => k is not null && Columns.Any(c => c.Key == k)).Select(k => k!).ToList();
+        return keys.Count == 0 ? null : keys;
+    }
+
+    private void Open()
+    {
+        var shown = _current ?? Default ?? Columns.Select(c => c.Key).ToList();
+        _rows = [.. shown.Select(k => new Row(k, Columns.First(c => c.Key == k).Title) { On = true }),
+                 .. Columns.Where(c => !shown.Contains(c.Key)).Select(c => new Row(c.Key, c.Title))];
+        _error = null;
+        _open = true;
+    }
+
+    private void Move(int index, int delta)
+    {
+        var r = _rows[index];
+        _rows.RemoveAt(index);
+        _rows.Insert(index + delta, r);
+    }
+
+    private async Task Save(bool companyDefault)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var request = new ColumnViewRequest(_rows.Where(r => r.On).Select(r => new ColumnSetting(r.Key, null)).ToList());
+            var v = await Api.PutAsync<ColumnViewResponse>(Api.C($"column-views/{ViewKey}" + (companyDefault ? "/default" : "")), request);
+            if (companyDefault)
+            {
+                // The company default applies to whoever has no personal view; the page shows this user's effective view.
+                v = await Api.GetAsync<ColumnViewResponse>(Api.C($"column-views/{ViewKey}"));
+            }
+            _source = v.Source;
+            _current = Known(v.Columns);
+            await OnChange.InvokeAsync(_current);
+            _open = false;
+            Toasts.Success(L[companyDefault ? "cols.defaultSaved" : "cols.saved"]);
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task Reset()
+    {
+        _busy = true;
+        try
+        {
+            var v = await Api.PostAsync<ColumnViewResponse>(Api.C($"column-views/{ViewKey}/reset"), null);
+            _source = v.Source;
+            _current = Known(v.Columns);
+            await OnChange.InvokeAsync(_current);
+            _open = false;
+        }
+        catch (ApiException e) { _error = e.Problem.Detail ?? L["ui.loadFailed"]; }
+        finally { _busy = false; }
+    }
+
+    private sealed class Row(string key, string title)
+    {
+        public string Key { get; } = key;
+        public string Title { get; } = title;
+        public bool On { get; set; }
+    }
+}

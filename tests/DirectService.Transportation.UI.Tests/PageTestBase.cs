@@ -4,6 +4,7 @@ using System.Text.Json;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.UI.Tests;

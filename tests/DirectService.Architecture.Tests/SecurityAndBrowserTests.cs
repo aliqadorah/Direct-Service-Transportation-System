@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
-using DirectService.Transportation.Contracts.Collaboration;
 using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Shared.Infrastructure.Security;
 using DirectService.Transportation.Web.Realtime;
@@ -89,14 +88,14 @@ public sealed class SecurityAndBrowserTests
         Golden.SameSet("Hub events (E-27)", Golden.Strings(G["signalRServerEvents"]),
             [LiveHubNames.RecordChanged, LiveHubNames.LockChanged, LiveHubNames.Notification, LiveHubNames.SupportEnded]);
         Golden.SameSet("Hub events the browser listens to", Golden.Strings(G["signalRClientEvents"]),
-            Regex.Matches(Source("src/DirectService.Transportation.Web.Client/Services/LiveUpdates.cs"), "On<JsonElement>\\(LiveHubNames\\.(\\w+)")
+            Regex.Matches(Source("src/Shared/DirectService.Shared.UI/Services/LiveUpdates.cs"), "On<JsonElement>\\(LiveHubNames\\.(\\w+)")
                 .Select(m => (string)typeof(LiveHubNames).GetField(m.Groups[1].Value)!.GetRawConstantValue()!));
     }
 
     [Fact]
     public void Local_storage_keys_are_unchanged()
     {
-        var prefKeys = typeof(DirectService.Transportation.Web.Client.Services.PrefKeys);
+        var prefKeys = typeof(DirectService.Shared.UI.Services.PrefKeys);
         Same(Value("localStorage", "prefix"), (string)prefKeys.GetField("StoragePrefix")!.GetRawConstantValue()!);
         Same(Value("localStorage", "themeKeyPrefix"), (string)prefKeys.GetField("Theme")!.GetRawConstantValue()!);
         Same(Value("localStorage", "navKeyPrefix"), (string)prefKeys.GetField("Nav")!.GetRawConstantValue()!);
@@ -123,11 +122,12 @@ public sealed class SecurityAndBrowserTests
         Same(Value("userSecretsIds", "infrastructure"), UserSecrets("src/Hosts/DirectService.Database/DirectService.Database.csproj"));
 
         // The Blazor JS initializer must carry the browser app's assembly name (E-21; renamed with the assembly in Stage 4).
-        var client = typeof(DirectService.Transportation.Web.Client.Services.PrefKeys).Assembly.GetName().Name!;
+        var client = typeof(DirectService.Transportation.Web.Client.Routes).Assembly.GetName().Name!;
         Assert.Equal(Golden.Strings(G["blazorJsInitializer"]).Single(), client + ".lib.module.js");
         Assert.True(File.Exists(Path.Combine(Golden.RepoRoot, "src", client, "wwwroot", client + ".lib.module.js")), "Blazor JS initializer file missing.");
 
-        var views = Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "src", client), "*.razor", SearchOption.AllDirectories)
+        var views = new[] { Path.Combine(Golden.RepoRoot, "src", client), Path.Combine(Golden.RepoRoot, "src", "Shared", "DirectService.Shared.UI"), Path.Combine(Golden.RepoRoot, "src", "Platform", "DirectService.Platform.UI") }
+            .SelectMany(d => Directory.EnumerateFiles(d, "*.razor", SearchOption.AllDirectories))
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), "ViewKey=\"([^\"]+)\"").Select(m => m.Groups[1].Value));
         Golden.SameSet("Column view keys (cfg.TableColumnViews.ViewKey, E-15)", Golden.Strings(G["viewKeys"]), views);
     }

@@ -1,6 +1,8 @@
 using DirectService.Transportation.Web.Client.Pages.Trips;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using DirectService.Transportation.Web.Client.Ui;
+using DirectService.Shared.UI.Ui;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 

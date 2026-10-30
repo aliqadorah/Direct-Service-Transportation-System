@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Pages;
 
 namespace DirectService.Transportation.UI.Tests;
@@ -121,7 +122,7 @@ public sealed partial class ThemeTests : PageTestBase
     public void No_page_component_or_style_sheet_has_a_colour_of_its_own()
     {
         var found = new List<string>();
-        var files = Directory.EnumerateFiles(Source("DirectService.Transportation.Web.Client"), "*.razor", SearchOption.AllDirectories)
+        var files = FoundationTests.UiFolders(FoundationTests.FindRepoRoot()).SelectMany(d => Directory.EnumerateFiles(d, "*.razor", SearchOption.AllDirectories))
             .Concat(Directory.EnumerateFiles(Source("DirectService.Transportation.Web", "Components"), "*.razor", SearchOption.AllDirectories))
             .Append(Source("Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));

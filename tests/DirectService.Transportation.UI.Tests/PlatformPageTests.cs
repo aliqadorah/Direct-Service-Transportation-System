@@ -3,11 +3,15 @@ using System.Text;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Help;
+using DirectService.Shared.UI.Help;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Pages.Console;
 using DirectService.Transportation.Web.Client.Pages.Tenant;
 using DirectService.Transportation.Web.Client.Services;
+using DirectService.Shared.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Transportation.UI.Tests;
@@ -381,7 +385,7 @@ public sealed class PlatformPageTests : PageTestBase
         Assert.DoesNotContain(L["con.refundDue"], Row("SUB-000005"));   // credited without a payment: nothing to refund
         var banner = Text(cut);
         Assert.Contains(L["con.refunds"], banner);
-        Assert.Contains(L.F("con.refundLine", "SUB-000002", "232.000", Web.Client.Ui.Fmt.Date(LatePayment.PaidAt!.Value.ToLocalTime(), Shell.DateFormat), L["con.refund.credited"]), banner);
+        Assert.Contains(L.F("con.refundLine", "SUB-000002", "232.000", DirectService.Shared.UI.Ui.Fmt.Date(LatePayment.PaidAt!.Value.ToLocalTime(), Shell.DateFormat), L["con.refund.credited"]), banner);
         Assert.Equal(2, cut.FindAll(".panel-side .banner button").Count(b => b.TextContent.Contains(L["con.markRefunded"], StringComparison.Ordinal)));
         Assert.Empty(cut.FindAll(".panel-side details.refunded"));        // nothing refunded yet
         Assert.Contains(L["con.refund.replaced"], banner);                // the replaced invoice is not a row, but it is listed
@@ -522,7 +526,7 @@ public sealed class PlatformPageTests : PageTestBase
         var cut = Render<ConsoleHelp>(p => p.Add(x => x.Topic, "console-staff"));
         Assert.Contains("/provider/setup", Text(cut));
         Assert.Contains("href=\"/console/staff\"", cut.Markup);
-        Assert.Single(Web.Client.Help.HelpTopics.ConsoleTopics, t => t.Key == "console-staff" && t.Ar.Steps.Count == t.En.Steps.Count && t.Ar.Problems.Count == t.En.Problems.Count);
+        Assert.Single(DirectService.Shared.UI.Help.HelpTopics.ConsoleTopics, t => t.Key == "console-staff" && t.Ar.Steps.Count == t.En.Steps.Count && t.Ar.Problems.Count == t.En.Problems.Count);
     }
 
     [Fact]

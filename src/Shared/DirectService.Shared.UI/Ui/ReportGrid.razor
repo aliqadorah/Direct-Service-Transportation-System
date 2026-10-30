@@ -1,0 +1,84 @@
+@*
+  A report result as a table (FR-148, FR-149): columns by kind (money, number, quantity, percent, date, text), the totals row, the filters
+  applied, the report's note and a "first rows only" warning; a row with a drill-down link opens its record or filtered list.
+*@
+@using System.Text.Json
+@using DirectService.Shared.Contracts
+@inject Loc L
+@inject ShellState Shell
+@inject NavigationManager Nav
+@if (ShowFilters && Result.Filters.Count > 0)
+{
+    <p class="muted" style="margin:0"><Tx Value="@string.Join(" · ", Result.Filters.Select(f => f.Label + ": " + f.Value))" /></p>
+}
+@if (Result.Note is not null) {<Banner Tone="Tone.Warn" Text="@Result.Note" />}
+@if (Result.Truncated) {<Banner Tone="Tone.Info" Text="@L["rep.truncated"]" />}
+<DataGrid TItem="Row" Items="_rows" Key="r => r.Index" Caption="@Result.Title" OnRowClick="Open" GroupBy="GroupBy" FooterLabel="@FooterLabel">
+    <Columns>
+        @for (var i = 0; i < Result.Columns.Count; i++)
+        {
+            var index = i;
+            var col = Result.Columns[i];
+            <GridColumn TItem="Row" Title="@col.Header" Value="r => Cell(r.Values, index)" Numeric="@IsNumeric(col.Kind)" Ltr="@(col.Kind == "date")"
+                        Footer="@(Result.Totals is { } t && index > 0 && index < t.Count && IsNumeric(col.Kind) ? Cell(t, index) : null)" />
+        }
+    </Columns>
+</DataGrid>
+
+@code {
+    private IReadOnlyList<Row> _rows = [];
+
+    [Parameter, EditorRequired] public ReportResult Result { get; set; } = default!;
+    [Parameter] public bool ShowFilters { get; set; } = true;
+    /// <summary>Optional band rows: a function of the row's first cell (e.g. statement groups).</summary>
+    [Parameter] public Func<IReadOnlyList<object?>, string?>? Group { get; set; }
+
+    private Func<Row, string?>? GroupBy => Group is null ? null : r => Group(r.Values);
+
+    private string? FooterLabel => Result.Totals is { Count: > 0 } t ? Cell(t, 0) : null;
+
+    protected override void OnParametersSet() => _rows = Result.Rows.Select((r, i) => new Row(i, r.Values, r.Link)).ToList();
+
+    private static bool IsNumeric(string kind) => kind is "money" or "number" or "quantity" or "percent";
+
+    private string? Cell(IReadOnlyList<object?> values, int index)
+    {
+        if (index >= values.Count || values[index] is not { } v) return null;
+        var kind = Result.Columns[index].Kind;
+        if (v is JsonElement e)
+        {
+            if (e.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return null;
+            if (e.ValueKind == JsonValueKind.Number && e.TryGetDecimal(out var d)) return Number(kind, d);
+            if (e.ValueKind == JsonValueKind.True) return L["ui.yes"];
+            if (e.ValueKind == JsonValueKind.False) return L["ui.no"];
+            var s = e.ValueKind == JsonValueKind.String ? e.GetString() : e.ToString();
+            if (kind == "date" && DateOnly.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var date)) return Fmt.Date(date, Shell.DateFormat);
+            return s;
+        }
+        return v switch
+        {
+            decimal d => Number(kind, d),
+            int n => Number(kind, n),
+            long n => Number(kind, n),
+            double n => Number(kind, (decimal)n),
+            DateOnly date => Fmt.Date(date, Shell.DateFormat),
+            _ => v.ToString(),
+        };
+    }
+
+    private static string Number(string kind, decimal d) => kind switch
+    {
+        "money" => Fmt.Money(d),
+        "quantity" => Fmt.Qty(d),
+        "percent" => Fmt.Percent(d),
+        "number" => d == decimal.Truncate(d) ? Fmt.Count((long)d) : Fmt.Qty(d),
+        _ => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+
+    private void Open(Row r)
+    {
+        if (r.Link is { } l && Shell.Company is { } c && Links.ForDrill(c.Id, l.Type, l.Id, l.Filters) is { } href) Nav.NavigateTo(href);
+    }
+
+    private sealed record Row(int Index, IReadOnlyList<object?> Values, DrillLink? Link);
+}

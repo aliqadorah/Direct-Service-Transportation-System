@@ -4,15 +4,16 @@ import { ROOT } from "./env";
 import type { Lang } from "./auth";
 
 /**
- * The application's own AR/EN text catalogue (`Localization/UiText*.cs`, entries `["key"] = ("ar", "en")`), so a spec finds buttons and
- * labels by the same text a user reads, in either language.
+ * The application's own AR/EN text catalogue (`Localization/UiText*.cs` of the browser app and its UI libraries, entries
+ * `["key"] = ("ar", "en")`), so a spec finds buttons and labels by the same text a user reads, in either language.
  */
 const catalogue = (() => {
-  const dir = path.join(ROOT, "src", "DirectService.Transportation.Web.Client", "Localization");
+  const dirs = [["DirectService.Transportation.Web.Client"], ["Shared", "DirectService.Shared.UI"], ["Platform", "DirectService.Platform.UI"]]
+    .map((p) => path.join(ROOT, "src", ...p, "Localization")).filter((d) => fs.existsSync(d));
   const map = new Map<string, { ar: string; en: string }>();
   const entry = /\["([^"]+)"\]\s*=\s*\("((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)"\)/g;
-  for (const file of fs.readdirSync(dir).filter((f) => f.startsWith("UiText") && f.endsWith(".cs"))) {
-    const text = fs.readFileSync(path.join(dir, file), "utf8");
+  for (const file of dirs.flatMap((d) => fs.readdirSync(d).filter((f) => f.startsWith("UiText") && f.endsWith(".cs")).map((f) => path.join(d, f)))) {
+    const text = fs.readFileSync(file, "utf8");
     for (const m of text.matchAll(entry)) map.set(m[1], { ar: unescape(m[2]), en: unescape(m[3]) });
   }
   return map;

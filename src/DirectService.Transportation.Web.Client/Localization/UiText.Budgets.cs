@@ -1,9 +1,9 @@
 namespace DirectService.Transportation.Web.Client.Localization;
 
 /// <summary>Text of the accounting additions of revision 6 part B (owner change request 15 Oct 2026): budgets, Budget vs Actual, journal templates, accounting dashboard.</summary>
-public static partial class UiText
+public static partial class AppTexts
 {
-    private static Dictionary<string, (string Ar, string En)> Budgets() => new(StringComparer.Ordinal)
+    internal static Dictionary<string, (string Ar, string En)> Budgets() => new(StringComparer.Ordinal)
     {
         ["nav.budgets"] = ("الموازنات", "Budgets"),
         ["nav.budgetVsActual"] = ("الموازنة مقابل الفعلي", "Budget vs Actual"),
