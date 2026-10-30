@@ -380,7 +380,7 @@
     private IReadOnlyList<string>? _emExtra;
 
     /// <summary>Owner or Administrator of this company: may edit names and usernames in Users &amp; roles (their own too).</summary>
-    private bool CanEditUsers => Shell.Company is { IsPresetRole: true, Role: PresetRoles.Owner or PresetRoles.Administrator };
+    private bool CanEditUsers => Shell.Company is { IsPresetRole: true, Role: PlatformPresetRoles.Owner or PlatformPresetRoles.Administrator };
 
     private void OpenEmail()
     {

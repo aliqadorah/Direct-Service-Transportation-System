@@ -3,9 +3,10 @@ using System.Text;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Shared.UI.Layout;
-using DirectService.Transportation.Web.Client.Pages.Console;
-using DirectService.Transportation.Web.Client.Pages.Tenant;
+using DirectService.Platform.UI.Pages.Console;
+using DirectService.Platform.UI.Pages.Tenant;
 
 namespace DirectService.Transportation.UI.Tests;
 

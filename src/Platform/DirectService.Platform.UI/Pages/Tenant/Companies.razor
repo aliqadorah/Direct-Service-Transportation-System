@@ -187,7 +187,7 @@
             Toasts.Success(L.F("ten.companyCreated", c.Name));
             await Load();
         }
-        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.ErrorCodes.PlanLimitReached)
+        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.PlatformErrorCodes.PlanLimitReached)
         {
             // Plan limit (BR-013): shown on the page with the way to upgrade (board SCR-81 error state).
             _creating = false;
@@ -218,7 +218,7 @@
             Toasts.Success(L.F(_archive ? "ten.archived" : "ten.restored", _target.Name));
             await Load();
         }
-        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.ErrorCodes.PlanLimitReached)
+        catch (ApiException e) when (e.Problem.Code == Contracts.Errors.PlatformErrorCodes.PlanLimitReached)
         {
             _asking = false;   // restoring beyond the plan: the page banner with the upgrade link, like creating
             _limitError = e.Problem.Detail;

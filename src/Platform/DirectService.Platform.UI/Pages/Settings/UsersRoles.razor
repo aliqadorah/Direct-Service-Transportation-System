@@ -303,7 +303,7 @@
 
     // ------------------------------------------------------------ DT-229: name, username and email (Owner / Administrator)
 
-    private bool CanEditAccounts => Shell.Company is { IsPresetRole: true, Role: PresetRoles.Owner or PresetRoles.Administrator };
+    private bool CanEditAccounts => Shell.Company is { IsPresetRole: true, Role: PlatformPresetRoles.Owner or PlatformPresetRoles.Administrator };
 
     private EditModel _edit = new();
     private EditContext _editCtx = new(new EditModel());
@@ -448,7 +448,7 @@
 
     /// <summary>Owner-level users (their role holds core.tenant.manage) are acted on only by tenant.manage holders (DT-18).</summary>
     private bool Protected(UserListItem u) =>
-        !Shell.Can(PermissionKeys.TenantManage) && _roles.FirstOrDefault(r => r.Id == u.Role?.Id)?.Permissions.Contains(PermissionKeys.TenantManage) == true;
+        !Shell.Can(PlatformPermissionKeys.TenantManage) && _roles.FirstOrDefault(r => r.Id == u.Role?.Id)?.Permissions.Contains(PlatformPermissionKeys.TenantManage) == true;
 
     private void OpenUser(UserListItem u) { _user = u; _userOpen = true; }
 

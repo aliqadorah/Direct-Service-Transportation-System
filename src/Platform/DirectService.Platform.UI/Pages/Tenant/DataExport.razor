@@ -10,7 +10,7 @@
 @inject ToastService Toasts
 
 <PageHeader Title="@L["nav.dataExport"]" Crumbs="@([new Crumb(L["nav.tenant"]), new Crumb(L["nav.dataExport"])])" />
-@if (Shell.Me?.Companies.Any(c => c.Permissions.Contains(PermissionKeys.TenantManage)) != true)   @* tenant.manage held in any company (DT-17) *@
+@if (Shell.Me?.Companies.Any(c => c.Permissions.Contains(PlatformPermissionKeys.TenantManage)) != true)   @* tenant.manage held in any company (DT-17) *@
 {
     <Box Fill="true"><NoAccessView /></Box>
 }

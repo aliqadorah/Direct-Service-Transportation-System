@@ -2,7 +2,7 @@
   Shown to a staff member instead of the company's pages when the support window closed (owner testing 20 Oct 2026, DT-220): who ended it
   and when (in the browser's time), with the way back to the provider console. No company data and no support banner stay on screen.
 *@
-@using DirectService.Transportation.Contracts.Errors
+@using DirectService.Platform.Contracts.Errors
 @inject Loc L
 <div class="empty errstate" role="alert" data-testid="support-ended">
     <div class="ei"><Icon Name="shield" /></div>
@@ -18,8 +18,8 @@
 
     internal string Message => End.Reason switch
     {
-        ErrorCodes.SupportEndedBySubscriber => L.F("support.endedBySubscriber", Time),
-        ErrorCodes.SupportWindowExpired => L.F("support.windowEnded", Time),
+        PlatformErrorCodes.SupportEndedBySubscriber => L.F("support.endedBySubscriber", Time),
+        PlatformErrorCodes.SupportWindowExpired => L.F("support.windowEnded", Time),
         _ => L["support.notApproved"],
     };
 }

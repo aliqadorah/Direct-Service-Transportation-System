@@ -1,7 +1,9 @@
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Pages;
+using DirectService.Platform.UI.Pages;
 using DirectService.Transportation.Web.Client.Pages.Settings;
+using DirectService.Platform.UI.Pages.Settings;
 using DirectService.Shared.UI.Pages.Settings;
 
 namespace DirectService.Transportation.UI.Tests;

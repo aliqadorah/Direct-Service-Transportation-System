@@ -1,6 +1,7 @@
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Web.Client.Pages.Accounting;
 using DirectService.Transportation.Web.Client.Pages.Settings;
+using DirectService.Platform.UI.Pages.Settings;
 using DirectService.Shared.UI.Pages.Settings;
 using DirectService.Transportation.Web.Client.Ui;
 using DirectService.Shared.UI.Ui;

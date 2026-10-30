@@ -9,7 +9,7 @@
 @inject NavigationManager Nav
 
 <PageHeader Help="setup" Title="@L["setup.title"]" Crumbs="@([new Crumb(L.Pick(Shell.Company?.Name ?? "", Shell.Company?.NameEn))])">
-    <Actions>@if (Shell.Can(PermissionKeys.TenantManage)) {<Btn Icon="building" Text="@L["setup.demo"]" Busy="_demoBusy" OnClick="Demo" />}</Actions>
+    <Actions>@if (Shell.Can(PlatformPermissionKeys.TenantManage)) {<Btn Icon="building" Text="@L["setup.demo"]" Busy="_demoBusy" OnClick="Demo" />}</Actions>
 </PageHeader>
 
 <StateView State="_state" Kind="SkeletonKind.Detail" ErrorReference="@_reference" OnRetry="Load">
@@ -38,7 +38,7 @@
                         <div style="display:flex;gap:8px;align-items:center">
                             <Badge Tone="tone" Icon="@icon" Text="@L["setup.st." + step.Status]" />
                             <Btn Small="true" Primary="@(step.Status != "Done")" Text="@L[step.Status switch { "Done" => "setup.review", "InProgress" => "setup.continue", _ => "setup.start" }]" Href="@Links.ForSetupStep(Company, step.Link)" />
-                            @if (Shell.Can(PermissionKeys.SettingsManage) && step.Key != "account")
+                            @if (Shell.Can(PlatformPermissionKeys.SettingsManage) && step.Key != "account")
                             {
                                 <Btn Small="true" Ghost="true" Icon="@(step.Marked ? "x" : "check")" Text="@L[step.Marked ? "setup.unmark" : "setup.mark"]" OnClick="() => Mark(step)" />
                             }
@@ -49,7 +49,7 @@
         </section>
         <div class="stack">
             <Box Title="@L["setup.anyOrder"]"><p class="muted">@L["setup.anyOrderText"]</p></Box>
-            @if (Shell.Me?.TenantStatus == "Trial" && Shell.Can(PermissionKeys.TenantManage))
+            @if (Shell.Me?.TenantStatus == "Trial" && Shell.Can(PlatformPermissionKeys.TenantManage))
             {
                 <Box Title="@L["setup.trial"]"><Btn Primary="true" Text="@L["banner.choosePlan"]" Href="/tenant/subscription" /></Box>
             }

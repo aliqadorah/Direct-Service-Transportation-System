@@ -1,5 +1,6 @@
 using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Shared.UI.Layout;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;

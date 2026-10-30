@@ -14,7 +14,7 @@
 <ListShell Label="@L["nav.audit"]" Search="@_q" OnSearch="Search" Exports="@(["xlsx", "csv", "pdf"])" OnExport="Export" State="_state" Reference="@_reference" OnRetry="Load"
            EmptyIcon="history" EmptyTitle="@L["aud.none"]" Filtered="Filtered" OnClear="ClearAll" Page="_page" PageSize="50" Total="_result?.TotalCount" OnPage="Go">
     <Tools>
-        @if (Shell.Can(PermissionKeys.SettingsManage))
+        @if (Shell.Can(PlatformPermissionKeys.SettingsManage))
         {
             <Btn Small="true" Ghost="@(!_technical)" Icon="eye" Text="@L["aud.technical"]" Pressed="@(_technical ? "true" : "false")" OnClick="ToggleTechnical" />
         }

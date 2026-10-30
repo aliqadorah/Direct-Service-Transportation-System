@@ -1,9 +1,11 @@
 using System.Reflection;
+using DirectService.Platform.UI.Localization;
 using DirectService.Shared.UI.Help;
 using DirectService.Shared.UI.Layout;
 using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Help;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Transportation.Web.Client.Localization;
 
 namespace DirectService.Transportation.Web.Client;
@@ -17,7 +19,7 @@ namespace DirectService.Transportation.Web.Client;
 public static class ClientComposition
 {
     /// <summary>The UI libraries with pages, besides the browser app itself (router and host AdditionalAssemblies): same routes as before.</summary>
-    public static readonly IReadOnlyList<Assembly> PageAssemblies = [typeof(NavModel).Assembly];
+    public static readonly IReadOnlyList<Assembly> PageAssemblies = [typeof(NavModel).Assembly, typeof(PlatformTexts).Assembly];
 
     public static void Apply()
     {

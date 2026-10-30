@@ -2,8 +2,10 @@ using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Pages;
+using DirectService.Platform.UI.Pages;
 
 namespace DirectService.Transportation.UI.Tests;
 

@@ -19,6 +19,8 @@
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
     <!-- Design system, shell and client services (Stage 2 session 15); its static files are served at the root URLs (DT-368). -->
     <ProjectReference Include="..\Shared\DirectService.Shared.UI\DirectService.Shared.UI.csproj" />
+    <!-- Platform pages, layouts and banners (Stage 2 session 15). -->
+    <ProjectReference Include="..\Platform\DirectService.Platform.UI\DirectService.Platform.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Web.Client.Pages.Settings;
+using DirectService.Platform.UI.Pages.Settings;
 using DirectService.Shared.UI.Pages.Settings;
 
 namespace DirectService.Transportation.UI.Tests;

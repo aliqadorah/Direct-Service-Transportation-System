@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Web.Client.Localization;
+namespace DirectService.Platform.UI.Localization;
 
 /// <summary>Text of the tenant screens (SCR-80 … SCR-83) and the provider console (SCR-90 … SCR-94).</summary>
 public static class PlatformTexts

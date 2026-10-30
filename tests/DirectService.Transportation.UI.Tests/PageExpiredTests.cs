@@ -4,6 +4,7 @@ using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Services;
 using DirectService.Shared.UI.Services;

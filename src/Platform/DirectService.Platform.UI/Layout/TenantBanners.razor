@@ -6,7 +6,7 @@
 @implements IDisposable
 @{
     var tenant = Shell.Me?.TenantStatus;
-    var canManage = Shell.Can(PermissionKeys.TenantManage);
+    var canManage = Shell.Can(PlatformPermissionKeys.TenantManage);
 }
 @foreach (var a in _announcements.Where(a => !Session.HiddenAnnouncements.Contains(a.Id) && a.StartsAt <= DateTime.UtcNow && a.EndsAt > DateTime.UtcNow))
 {

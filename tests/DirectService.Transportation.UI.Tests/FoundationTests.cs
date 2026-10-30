@@ -1,7 +1,9 @@
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Layout;
+using DirectService.Platform.UI.Layout;
 using DirectService.Shared.UI.Layout;
 using DirectService.Transportation.Web.Client.Localization;
+using DirectService.Platform.UI.Localization;
 using DirectService.Shared.UI.Localization;
 using DirectService.Transportation.Web.Client.Ui;
 using DirectService.Shared.UI.Ui;

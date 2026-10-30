@@ -182,7 +182,7 @@ else
         var reason = e.TryGetProperty("reason", out var r) ? r.GetString() : null;
         DateTime? at = e.TryGetProperty("endedAt", out var a) && a.TryGetDateTime(out var t) ? DateTime.SpecifyKind(t.ToUniversalTime(), DateTimeKind.Utc) : null;
         var by = e.TryGetProperty("endedBy", out var b) && b.ValueKind == System.Text.Json.JsonValueKind.String ? b.GetString() : null;
-        Shell.EndSupport(new ShellState.SupportEnd(reason ?? Contracts.Errors.ErrorCodes.SupportWindowExpired, at, by));
+        Shell.EndSupport(new ShellState.SupportEnd(reason ?? Contracts.Errors.PlatformErrorCodes.SupportWindowExpired, at, by));
     });
 
     private void ShellChanged() => _ = InvokeAsync(StateHasChanged);
