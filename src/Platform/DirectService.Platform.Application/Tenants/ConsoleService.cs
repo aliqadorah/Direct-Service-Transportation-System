@@ -1,23 +1,17 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Collaboration;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Billing;
-
 using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Contracts.Modules;
-using DirectService.Platform.Application.Tenants;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
+using DirectService.Platform.Application.Notifications;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// The provider console (5.5, D-13: every platform-staff user): tenants with status, plan, usage and dates; plans (create, edit, retire,
@@ -25,9 +19,9 @@ namespace DirectService.Transportation.Application.Platform;
 /// audited in the tenant's log; support-access requests (approved by the tenant's Owner, BR-014); announcements; platform health. Staff never
 /// read tenant business data here.
 /// </summary>
-public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PlanLimits limits, SubscriptionService subscriptions,
-    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, AuditTrail audit, IPlatformLock locks,
-    IEnumerable<IPermissionCatalog> catalogs)
+public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, RecordSupport support, PlanLimits limits, SubscriptionService subscriptions,
+    IUserNotifier notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, AuditTrail audit, IPlatformLock locks,
+    IEnumerable<IPermissionCatalog> catalogs, IEnumerable<IHealthFigureSource> health)
 {
     private static readonly DateTime Started = DateTime.UtcNow;
 
@@ -55,11 +49,11 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var code = TextNormalizer.CleanCode(r.Code)?.ToUpperInvariant();
         var nameAr = TextNormalizer.CleanText(r.NameAr);
         var nameEn = TextNormalizer.CleanText(r.NameEn);
-        var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", ErrorCodes.ValidationFormat, new FieldRef("billingCycle"));
+        var cycle = r.BillingCycle is "Annual" ? LifecycleCodes.Annual : r.BillingCycle is null or "Monthly" ? LifecycleCodes.Monthly : throw Fail.Field("billingCycle", SharedErrorCodes.ValidationFormat, new FieldRef("billingCycle"));
         new Validator().Require("code", code).MaxLength("code", code, 30).Require("nameAr", nameAr).MaxLength("nameAr", nameAr, 100).Require("nameEn", nameEn).MaxLength("nameEn", nameEn, 100)
-            .Check(r.Price is >= 0 && Money.IsValidAmount(r.Price.Value), "price", ErrorCodes.ValidationRange)
-            .Check(r.MaxCompanies is > 0, "maxCompanies", ErrorCodes.ValidationRange).Check(r.MaxActiveUsers is > 0, "maxActiveUsers", ErrorCodes.ValidationRange)
-            .Check(r.MaxTripsPerMonth is > 0, "maxTripsPerMonth", ErrorCodes.ValidationRange).Check(r.MaxStorageMb is > 0, "maxStorageMb", ErrorCodes.ValidationRange)
+            .Check(r.Price is >= 0 && Money.IsValidAmount(r.Price.Value), "price", SharedErrorCodes.ValidationRange)
+            .Check(r.MaxCompanies is > 0, "maxCompanies", SharedErrorCodes.ValidationRange).Check(r.MaxActiveUsers is > 0, "maxActiveUsers", SharedErrorCodes.ValidationRange)
+            .Check(r.MaxTripsPerMonth is > 0, "maxTripsPerMonth", SharedErrorCodes.ValidationRange).Check(r.MaxStorageMb is > 0, "maxStorageMb", SharedErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         Plan plan;
         if (token is null)
@@ -74,7 +68,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         }
         // The code is unique among all plans that are not deleted, retired ones included (UX_Plans_Code, review F11).
         if (await db.Set<Plan>().AnyAsync(p => p.Id != plan.Id && p.Code == code, ct).ConfigureAwait(false))
-            throw Fail.Field("code", ErrorCodes.DuplicateKey, code);
+            throw Fail.Field("code", SharedErrorCodes.DuplicateKey, code);
         // Changing a plan never changes invoices already issued (design).
         plan.Code = code!;
         plan.NameAr = nameAr!;
@@ -97,7 +91,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var why = MasterIds.Reason(reason);
         var plan = await support.FindAsync<Plan>(token, ct).ConfigureAwait(false);
         var used = await db.Set<Tenant>().IgnoreQueryFilters().CountAsync(t => t.PlanId == plan.Id && !t.IsDeleted, ct).ConfigureAwait(false);
-        if (used > 0) throw Fail.Rule(ErrorCodes.RecordInUse, used);
+        if (used > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, used);
         plan.DeleteReason = why;
         db.Set<Plan>().Remove(plan);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -108,7 +102,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     private async Task<ConsoleTenantResponse> TenantAsync(Tenant t, CancellationToken ct)
     {
         var owner = await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
-            .Where(r => r.TenantId == t.Id && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active")
+            .Where(r => r.TenantId == t.Id && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PlatformPresetRoles.Owner && r.User.Status == "Active")
             .Select(r => r.User.Email).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         return new ConsoleTenantResponse(support.Token<Tenant>(t.PublicId), t.Name, t.Status, new PlanSummary(support.Token<Plan>(t.Plan.PublicId), t.Plan.Code, t.Plan.NameEn),
             t.BillingCycle, await limits.UsageAsync(t.Id, ct).ConfigureAwait(false), DateTime.SpecifyKind(t.CreatedAt, DateTimeKind.Utc), Utc(t.TrialEndsAt), Utc(t.CurrentPeriodEnd),
@@ -123,7 +117,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     public async Task<SearchResponse> SearchAsync(string? q, CancellationToken ct)
     {
         _ = StaffId;
-        var text = MasterDataSupport.SearchText(q);
+        var text = TextNormalizer.SearchText(q);
         if (text is null || text.Length < 2) return new(q ?? "", []);
         const int max = 5;
         var hits = new List<SearchHit>();
@@ -152,7 +146,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         _ = StaffId;
         var query = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted).Include(t => t.Plan).AsQueryable();
         if (!string.IsNullOrWhiteSpace(q.Status)) query = query.Where(t => t.Status == q.Status);
-        if (MasterDataSupport.SearchText(q.Q) is { } text)
+        if (TextNormalizer.SearchText(q.Q) is { } text)
         {
             var byEmail = db.Set<User>().AsNoTracking().IgnoreQueryFilters().Where(u => !u.IsDeleted && u.TenantId != null && u.Email!.Contains(text)).Select(u => u.TenantId);
             query = query.Where(t => t.Name.Contains(text) || byEmail.Contains(t.Id));
@@ -207,20 +201,20 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var pid = support.Decode<SubscriptionInvoice>(invoiceToken) ?? throw Fail.NotFound();
         var invoice = await db.Set<SubscriptionInvoice>().AsNoTracking().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid, ct).ConfigureAwait(false)
             ?? throw Fail.NotFound();
-        await using var held = await locks.TryAcquireAsync("platform-refunds", ct).ConfigureAwait(false) ?? throw Fail.Conflict(ErrorCodes.RefundBusy);
+        await using var held = await locks.TryAcquireAsync("platform-refunds", ct).ConfigureAwait(false) ?? throw Fail.Conflict(PlatformErrorCodes.RefundBusy);
         var payment = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
             .Where(a => a.Action == PaidNotApplied && a.EntityType == InvoiceEntity && a.EntityId == invoice.Id).OrderBy(a => a.Id).Select(a => (long?)a.Id)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.RefundNotDue, invoice.Number);
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.Rule(PlatformErrorCodes.RefundNotDue, invoice.Number);
         if (await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters().AnyAsync(a => a.Action == Refunded && a.EntityType == InvoiceEntity && a.EntityId == invoice.Id, ct)
                 .ConfigureAwait(false))
-            throw Fail.Rule(ErrorCodes.RefundAlreadyMarked, invoice.Number);
+            throw Fail.Rule(PlatformErrorCodes.RefundAlreadyMarked, invoice.Number);
         var reference = TextNormalizer.CleanText(r.Reference);
         var paidOn = invoice.PaidAt is DateTime paid ? AmmanDate(paid) : (DateOnly?)null;
         var today = AmmanDate(Now);
         var errors = new List<FieldError>();
         if (r.RefundedOn is not DateOnly on || on > today || (paidOn is DateOnly first && on < first))
-            errors.Add(new FieldError("refundedOn", ErrorCodes.RefundDate, [paidOn?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "—"]));
-        if (string.IsNullOrEmpty(reference) || reference.Length > 100) errors.Add(new FieldError("reference", ErrorCodes.RefundReference, [100]));
+            errors.Add(new FieldError("refundedOn", PlatformErrorCodes.RefundDate, [paidOn?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "—"]));
+        if (string.IsNullOrEmpty(reference) || reference.Length > 100) errors.Add(new FieldError("reference", PlatformErrorCodes.RefundReference, [100]));
         if (errors.Count > 0) throw Fail.Fields(errors);
         audit.Record(InvoiceEntity, invoice.Id, Refunded, tenantId: invoice.TenantId, values: new Dictionary<string, object?>
         {
@@ -291,10 +285,10 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     {
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
-        if (r.Days is not (>= 1 and <= 90)) throw Fail.Field("days", ErrorCodes.ValidationRange, new FieldRef("days"));
+        if (r.Days is not (>= 1 and <= 90)) throw Fail.Field("days", SharedErrorCodes.ValidationRange, new FieldRef("days"));
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
         var suspendedTrial = t.Status == LifecycleCodes.Suspended && t.CurrentPeriodEnd is null;
-        if (t.Status != LifecycleCodes.Trial && !suspendedTrial) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        if (t.Status != LifecycleCodes.Trial && !suspendedTrial) throw Fail.Rule(SharedErrorCodes.ValidationFailed);
         var from = t.TrialEndsAt is DateTime e && e > Now ? e : Now;
         t.TrialEndsAt = from.AddDays(r.Days.Value);
         t.Status = LifecycleCodes.Trial;
@@ -313,13 +307,13 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
-        var pid = support.Decode<SubscriptionInvoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
+        var pid = support.Decode<SubscriptionInvoice>(r.InvoiceId) ?? throw Fail.Field("invoiceId", SharedErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
         var invoice = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid && i.TenantId == t.Id && !i.IsDeleted, ct).ConfigureAwait(false)
-            ?? throw Fail.Field("invoiceId", ErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
-        if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) throw Fail.Rule(ErrorCodes.SubscriptionInvoiceNotDue, invoice.Number);
+            ?? throw Fail.Field("invoiceId", SharedErrorCodes.ValidationFormat, new FieldRef("invoiceId"));
+        if (invoice.Status is not (LifecycleCodes.Due or LifecycleCodes.Failed)) throw Fail.Rule(PlatformErrorCodes.SubscriptionInvoiceNotDue, invoice.Number);
         var decimals = options.Value.CurrencyDecimals;
         if (r.Amount is not decimal credit || credit <= 0 || credit > invoice.Total || !Money.IsValidAmount(credit, decimals))
-            throw Fail.Field("amount", ErrorCodes.ValidationRange, new FieldRef("amount"));
+            throw Fail.Field("amount", SharedErrorCodes.ValidationRange, new FieldRef("amount"));
         return await ApplyCreditAsync(invoice, credit, why, ct).ConfigureAwait(false);
     }
 
@@ -337,7 +331,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var pid = support.Decode<SubscriptionInvoice>(invoiceToken) ?? throw Fail.NotFound();
         var invoice = await db.Set<SubscriptionInvoice>().IgnoreQueryFilters().SingleOrDefaultAsync(i => i.PublicId == pid && i.TenantId == t.Id && !i.IsDeleted, ct).ConfigureAwait(false)
             ?? throw Fail.NotFound();
-        if (invoice.Status != LifecycleCodes.Due || string.IsNullOrEmpty(invoice.GatewayReference)) throw Fail.Rule(ErrorCodes.SubscriptionNotAwaitingPayment, invoice.Number);
+        if (invoice.Status != LifecycleCodes.Due || string.IsNullOrEmpty(invoice.GatewayReference)) throw Fail.Rule(PlatformErrorCodes.SubscriptionNotAwaitingPayment, invoice.Number);
         return await ApplyCreditAsync(invoice, invoice.Total, "Unpaid checkout cancelled: " + why, ct).ConfigureAwait(false);
     }
 
@@ -366,7 +360,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
-        if (t.Status is LifecycleCodes.Suspended or LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        if (t.Status is LifecycleCodes.Suspended or LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(SharedErrorCodes.ValidationFailed);
         t.Status = LifecycleCodes.Suspended;
         t.GraceEndsAt = Now;
         changes.SetAction(t, "Suspend", why);
@@ -384,7 +378,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var why = MasterIds.Reason(r.Reason);
         var t = await FindTenantAsync(token, ct).ConfigureAwait(false);
-        if (t.Status is not (LifecycleCodes.Suspended or LifecycleCodes.PastDue or LifecycleCodes.Cancelled)) throw Fail.Rule(ErrorCodes.ValidationFailed);
+        if (t.Status is not (LifecycleCodes.Suspended or LifecycleCodes.PastDue or LifecycleCodes.Cancelled)) throw Fail.Rule(SharedErrorCodes.ValidationFailed);
         if (t.CurrentPeriodEnd is null && t.TrialEndsAt is DateTime e && e > Now)
         {
             t.Status = LifecycleCodes.Trial;
@@ -392,7 +386,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         }
         else if (t.Plan.Price == 0)
         {
-            throw Fail.Rule(ErrorCodes.SubscriptionFreePlan);
+            throw Fail.Rule(PlatformErrorCodes.SubscriptionFreePlan);
         }
         else if (t.CurrentPeriodEnd is DateTime end && end > Now)
         {
@@ -417,7 +411,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     {
         var rows = await q.OrderByDescending(g => g.Id).Take(200)
             .Select(g => new { G = g, Tenant = db.Set<Tenant>().IgnoreQueryFilters().Where(t => t.Id == g.TenantId).Select(t => t.Name).FirstOrDefault(),
-                OwnerEmail = db.Set<UserCompanyRole>().IgnoreQueryFilters().Where(r => r.TenantId == g.TenantId && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active")
+                OwnerEmail = db.Set<UserCompanyRole>().IgnoreQueryFilters().Where(r => r.TenantId == g.TenantId && !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PlatformPresetRoles.Owner && r.User.Status == "Active")
                     .OrderBy(r => r.Id).Select(r => r.User.Email).FirstOrDefault(),
                 Requester = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.RequestedBy).Select(u => u.FullName).FirstOrDefault(), Decider = db.Set<User>().IgnoreQueryFilters().Where(u => u.Id == g.ApprovedBy).Select(u => u.FullName).FirstOrDefault() })
             .ToListAsync(ct).ConfigureAwait(false);
@@ -439,10 +433,10 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     {
         _ = StaffId;
         const int max = 20;
-        var text = MasterDataSupport.SearchText(q);
+        var text = TextNormalizer.SearchText(q);
         var tenants = db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => !t.IsDeleted && t.Status != LifecycleCodes.Deleted);
         var owners = db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
-            .Where(r => !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted);
+            .Where(r => !r.IsDeleted && r.Role.IsPreset && r.Role.Name == PlatformPresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted);
         var shaped = tenants.Select(t => new
         {
             t.Id, t.PublicId, t.Name, t.Status, t.CreatedAt, t.Plan.Code, t.Plan.NameEn,
@@ -476,15 +470,15 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         ArgumentNullException.ThrowIfNull(r);
         var reason = TextNormalizer.CleanText(r.Reason);
         new Validator().Require("reason", reason).MaxLength("reason", reason, 500).ThrowIfInvalid();
-        var t = await FindTenantAsync(r.TenantId ?? throw Fail.Field("tenantId", ErrorCodes.ValidationRequired, new FieldRef("tenantId")), ct).ConfigureAwait(false);
+        var t = await FindTenantAsync(r.TenantId ?? throw Fail.Field("tenantId", SharedErrorCodes.ValidationRequired, new FieldRef("tenantId")), ct).ConfigureAwait(false);
         var grant = new SupportAccessGrant { TenantId = t.Id, RequestedBy = StaffId, Reason = reason!, Status = LifecycleCodes.Requested };
         db.Set<SupportAccessGrant>().Add(grant);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var owners = await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
             .Where(x => x.TenantId == t.Id && !x.IsDeleted && x.User.Status == "Active"
-                && db.Set<RolePermission>().IgnoreQueryFilters().Any(p => p.RoleId == x.RoleId && !p.IsDeleted && p.Permission.PermissionKey == PermissionKeys.TenantManage))
+                && db.Set<RolePermission>().IgnoreQueryFilters().Any(p => p.RoleId == x.RoleId && !p.IsDeleted && p.Permission.PermissionKey == PlatformPermissionKeys.TenantManage))
             .Select(x => x.UserId).Distinct().ToListAsync(ct).ConfigureAwait(false);
-        await notifications.NotifyAsync(owners, null, NotificationService.SupportRequested, new Dictionary<string, string?> { ["reason"] = reason },
+        await notifications.NotifyAsync(owners, null, PlatformNotifications.SupportRequested, new Dictionary<string, string?> { ["reason"] = reason },
             "/tenant/support-access", ct, t.Id).ConfigureAwait(false);
         return (await SupportRowsAsync(db.Set<SupportAccessGrant>().AsNoTracking().IgnoreQueryFilters().Where(g => g.Id == grant.Id), ct).ConfigureAwait(false))[0];
     }
@@ -532,7 +526,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var title = TextNormalizer.CleanText(r.Title);
         var message = TextNormalizer.CleanText(r.Message);
         new Validator().Require("title", title).MaxLength("title", title, 200).Require("message", message).MaxLength("message", message, 1000)
-            .Check(r.StartsAt is not null && r.EndsAt is not null && r.EndsAt > r.StartsAt, "endsAt", ErrorCodes.ValidationRange).ThrowIfInvalid();
+            .Check(r.StartsAt is not null && r.EndsAt is not null && r.EndsAt > r.StartsAt, "endsAt", SharedErrorCodes.ValidationRange).ThrowIfInvalid();
         Announcement a;
         if (token is null)
         {
@@ -573,12 +567,14 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
         var users = await db.Set<User>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(u => !u.IsDeleted && u.Status == "Active", ct).ConfigureAwait(false);
         var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(c => !c.IsDeleted && c.Status == "Active", ct).ConfigureAwait(false);
         var month = new DateTime(Now.Year, Now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var trips = await db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(t => !t.IsDeleted && t.CreatedAt >= month, ct).ConfigureAwait(false);
-        var pending = await db.Set<PendingPosting>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(p => p.ResolvedAt == null && !p.IsDeleted, ct).ConfigureAwait(false);
-        var einv = await db.Set<EInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
-            .ConfigureAwait(false)
-            + await db.Set<ApArEInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
-                .ConfigureAwait(false);
+        // The modules' figures (trips, postings waiting, e-invoices queued or rejected; IHealthFigureSource, Stage 2 session 13).
+        var figures = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var source in health)
+            foreach (var (measure, count) in await source.CountAsync(month, ct).ConfigureAwait(false))
+                figures[measure] = figures.GetValueOrDefault(measure) + count;
+        var trips = figures.GetValueOrDefault(HealthMeasures.Trips);
+        var pending = figures.GetValueOrDefault(HealthMeasures.PendingPostings);
+        var einv = figures.GetValueOrDefault(HealthMeasures.EInvoices);
         return new HealthResponse(ok, byStatus, users, companies, trips, pending, einv, Environment.WorkingSet / 1048576, DateTime.UtcNow - Started, Now);
     }
 }

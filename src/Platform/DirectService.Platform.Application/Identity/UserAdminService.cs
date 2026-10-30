@@ -342,5 +342,5 @@ public sealed class UserAdminService(
         if (reason.Length > 500) throw Fail.Field("reason", SharedErrorCodes.ValidationRange, new FieldRef("reason"));
     }
 
-    public static void RequireReasonPublic(string? reason) => RequireReason(reason);
+    internal static void RequireReasonPublic(string? reason) => RequireReason(reason);
 }

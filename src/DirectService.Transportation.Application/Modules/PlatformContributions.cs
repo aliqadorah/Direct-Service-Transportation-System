@@ -82,6 +82,26 @@ public sealed class TransportationPermissions : IPermissionCatalog
     public IReadOnlyList<string> SupportSessionKeys => SupportSession;
 }
 
+/// <summary>
+/// The module's figures on the provider's health page (P-15; the queries of <c>ConsoleService.HealthAsync</c> before Stage 2 session 13): trips
+/// saved this month, postings waiting, e-invoices queued or rejected — over every tenant, filters ignored.
+/// </summary>
+public sealed class TransportationHealthFigures(IAppDbContext db) : IHealthFigureSource
+{
+    public async Task<IReadOnlyDictionary<string, int>> CountAsync(DateTime monthStartUtc, CancellationToken ct)
+    {
+        string[] all = ["Tenant", "Company", "SoftDelete"];
+        var month = monthStartUtc;
+        var trips = await db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(t => !t.IsDeleted && t.CreatedAt >= month, ct).ConfigureAwait(false);
+        var pending = await db.Set<Domain.Acc.PendingPosting>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(p => p.ResolvedAt == null && !p.IsDeleted, ct).ConfigureAwait(false);
+        var einv = await db.Set<EInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
+            .ConfigureAwait(false)
+            + await db.Set<Domain.Acc.ApArEInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
+                .ConfigureAwait(false);
+        return new Dictionary<string, int>(StringComparer.Ordinal) { [HealthMeasures.Trips] = trips, [HealthMeasures.PendingPostings] = pending, [HealthMeasures.EInvoices] = einv };
+    }
+}
+
 /// <summary>The notification types and texts of <see cref="NotificationTexts"/> (every type of the application until they are split by module).</summary>
 public sealed class TransportationNotificationTypes : INotificationTypeProvider
 {

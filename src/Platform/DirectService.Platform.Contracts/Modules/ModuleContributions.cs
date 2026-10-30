@@ -80,3 +80,23 @@ public interface INotificationTypeProvider
 
 /// <summary>A notification as the reader sees it.</summary>
 public sealed record NotificationTypeText(string Title, string Message, string? Details);
+
+/// <summary>A module's figures on the provider's health page (P-15), over every tenant (Stage 2 session 13).</summary>
+public interface IHealthFigureSource
+{
+    /// <summary>The module's counts by measure (<see cref="HealthMeasures"/>); <paramref name="monthStartUtc"/> starts the current month.</summary>
+    Task<IReadOnlyDictionary<string, int>> CountAsync(DateTime monthStartUtc, CancellationToken ct);
+}
+
+/// <summary>Measures of <see cref="IHealthFigureSource"/> (fields of the health page).</summary>
+public static class HealthMeasures
+{
+    /// <summary>Trips saved this calendar month.</summary>
+    public const string Trips = "trips";
+
+    /// <summary>Automatic postings waiting to be resolved.</summary>
+    public const string PendingPostings = "pendingPostings";
+
+    /// <summary>E-invoice submissions queued or rejected.</summary>
+    public const string EInvoices = "eInvoices";
+}

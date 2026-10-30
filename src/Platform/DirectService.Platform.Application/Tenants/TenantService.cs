@@ -1,16 +1,13 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Tenants;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// Tenant-level administration (core.tenant.manage): tenant security settings (FR-175/176, rev. 5),
@@ -35,8 +32,8 @@ public sealed class TenantService(
     {
         ArgumentNullException.ThrowIfNull(r);
         new Validator()
-            .Check(r.PasswordMinLength is >= 8 and <= 64, "passwordMinLength", ErrorCodes.ValidationRange)
-            .Check(r.SessionIdleTimeoutMinutes is >= 5 and <= 1440, "sessionIdleTimeoutMinutes", ErrorCodes.ValidationRange)
+            .Check(r.PasswordMinLength is >= 8 and <= 64, "passwordMinLength", SharedErrorCodes.ValidationRange)
+            .Check(r.SessionIdleTimeoutMinutes is >= 5 and <= 1440, "sessionIdleTimeoutMinutes", SharedErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         var t = await db.Set<Tenant>().SingleAsync(x => x.Id == ctx.TenantId, ct).ConfigureAwait(false);
         db.ExpectRowVersion(t, r.RowVersion);
@@ -75,7 +72,7 @@ public sealed class TenantService(
         var nameEn = TextNormalizer.CleanText(r.NameEn);
         new Validator().Require("name", name).MaxLength("name", name, 200).MaxLength("nameEn", nameEn, 200).ThrowIfInvalid();
         if (await db.Set<Company>().AnyAsync(c => c.Name == name, ct).ConfigureAwait(false))
-            throw Fail.Conflict(ErrorCodes.DuplicateKey, name!);
+            throw Fail.Conflict(SharedErrorCodes.DuplicateKey, name!);
         await EnsureCompanyLimitAsync(ct).ConfigureAwait(false);
 
         var company = await db.InTransactionAsync(async c =>
@@ -83,7 +80,7 @@ public sealed class TenantService(
             var co = new Company { Name = name!, NameEn = nameEn };
             db.Set<Company>().Add(co);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PresetRoles.Owner, c).ConfigureAwait(false);
+            var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PlatformPresetRoles.Owner, c).ConfigureAwait(false);
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = ctx.UserId!.Value, CompanyId = co.Id, RoleId = ownerRole.Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             foreach (var p in provisioning) await p.ProvisionAsync(co.TenantId, co.Id, ctx.UserId, c).ConfigureAwait(false);
@@ -106,7 +103,7 @@ public sealed class TenantService(
         if (status == "Archived")
         {
             var otherActive = await db.Set<Company>().AnyAsync(c => c.Id != co.Id && c.Status == "Active", ct).ConfigureAwait(false);
-            if (!otherActive) throw Fail.Rule(ErrorCodes.LastActiveCompany);
+            if (!otherActive) throw Fail.Rule(PlatformErrorCodes.LastActiveCompany);
         }
         else
         {
@@ -126,11 +123,11 @@ public sealed class TenantService(
         var demo = await DemoCompanyIdsAsync(ct).ConfigureAwait(false);
         var active = await db.Set<Company>().Where(c => c.Status == "Active").Select(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
         if (active.Count(id => !demo.Contains(id)) >= max)
-            throw Fail.Conflict(ErrorCodes.PlanLimitReached, max);
+            throw Fail.Conflict(PlatformErrorCodes.PlanLimitReached, max);
     }
 
     private async Task<HashSet<long>> DemoCompanyIdsAsync(CancellationToken ct) =>
         (await db.Set<CompanySetting>().IgnoreQueryFilters(["Company"])
-            .Where(s => s.SettingKey == SettingKeys.IsDemo && s.SettingValue == "true")
+            .Where(s => s.SettingKey == PlatformSettingKeys.IsDemo && s.SettingValue == "true")
             .Select(s => s.CompanyId).ToListAsync(ct).ConfigureAwait(false)).ToHashSet();
 }

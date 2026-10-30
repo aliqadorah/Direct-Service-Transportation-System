@@ -46,6 +46,14 @@ public static class DependencyInjection
         services.AddScoped<TenantLifecycleService>();
         services.AddScoped<StaffAccountService>();
         services.AddScoped<SystemEmailService>();   // DT-250
+
+        // Tenants, subscriptions, the provider console, onboarding and the company export (Stage 2 session 13; registered by AddApplication before, same lifetimes).
+        services.AddScoped<TenantService>();
+        services.AddScoped<SubscriptionService>();
+        services.AddScoped<ConsoleService>();
+        services.AddScoped<SetupChecklistService>();
+        services.AddScoped<DemoCompanyService>();
+        services.AddScoped<CompanyExportService>();
         return services;
     }
 }

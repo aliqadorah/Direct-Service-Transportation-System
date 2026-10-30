@@ -7,7 +7,7 @@ namespace DirectService.Transportation.Application.Collaboration;
 /// The background export kinds of this application for the shared export engine (Stage 2 session 10, DT-334): standard reports, the audit
 /// log and the full copy of the company, with the same checks and files as before.
 /// </summary>
-public sealed class TransportationExportJobs(IRequestContext ctx, StandardReportService standard, AuditLogService audit, Platform.CompanyExportService company)
+public sealed class TransportationExportJobs(IRequestContext ctx, StandardReportService standard, AuditLogService audit, DirectService.Platform.Application.Tenants.CompanyExportService company)
     : IExportJobProvider
 {
     public IReadOnlyList<string> Kinds { get; } = ["standard", "audit-log", "company"];

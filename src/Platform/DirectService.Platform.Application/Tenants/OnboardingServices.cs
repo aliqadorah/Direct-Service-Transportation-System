@@ -1,31 +1,16 @@
 using System.Globalization;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Accounting;
-using DirectService.Transportation.Application.Cash;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Application.Invoicing;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Application.Pricing;
-using DirectService.Transportation.Application.Trips;
-using DirectService.Transportation.Contracts.Cash;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Invoicing;
-using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Platform.Contracts.Tenants;
-using DirectService.Transportation.Contracts.Pricing;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// The setup checklist (5.4, P-08, G-10): eight steps in any order, each Not started / In progress / Done worked out from the company's data —
@@ -48,9 +33,9 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
 
     public async Task<SetupChecklistResponse> GetAsync(CancellationToken ct)
     {
-        var marks = await db.Set<CompanySetting>().AsNoTracking().Where(s => s.SettingKey.StartsWith(SettingKeys.SetupPrefix) && s.SettingValue == "done")
+        var marks = await db.Set<CompanySetting>().AsNoTracking().Where(s => s.SettingKey.StartsWith(PlatformSettingKeys.SetupPrefix) && s.SettingValue == "done")
             .Select(s => s.SettingKey).ToListAsync(ct).ConfigureAwait(false);
-        bool Marked(string step) => marks.Contains(SettingKeys.SetupPrefix + step);
+        bool Marked(string step) => marks.Contains(PlatformSettingKeys.SetupPrefix + step);
         var company = await db.Set<Company>().AsNoTracking().SingleAsync(c => c.Id == ctx.CompanyId, ct).ConfigureAwait(false);
         var steps = new List<SetupStep>();
         void Add(string key, string ar, string en, string status, string? detail, string link, IReadOnlyList<string>? items = null) =>
@@ -77,7 +62,7 @@ public sealed class SetupChecklistService(IAppDbContext db, IRequestContext ctx,
     public async Task<SetupChecklistResponse> MarkAsync(string step, bool done, CancellationToken ct)
     {
         if (!Steps.Contains(step)) throw Fail.NotFound();
-        var key = SettingKeys.SetupPrefix + step;
+        var key = PlatformSettingKeys.SetupPrefix + step;
         var row = await db.Set<CompanySetting>().SingleOrDefaultAsync(s => s.SettingKey == key, ct).ConfigureAwait(false);
         if (row is null)
         {
@@ -117,9 +102,9 @@ public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, Dat
         var userId = ctx.UserId ?? throw Fail.Forbidden();
         var tenantId = ctx.TenantId ?? throw Fail.Forbidden();
         await using var held = locks is null ? null : await locks.TryAcquireAsync("demo-company:" + tenantId.ToString(CultureInfo.InvariantCulture), ct).ConfigureAwait(false);
-        if (locks is not null && held is null) throw Fail.Conflict(ErrorCodes.ConcurrencyConflict);
+        if (locks is not null && held is null) throw Fail.Conflict(SharedErrorCodes.ConcurrencyConflict);
         var existing = await db.Set<CompanySetting>().AsNoTracking().IgnoreQueryFilters(["Company"])
-            .Where(s => s.SettingKey == SettingKeys.IsDemo && s.SettingValue == "true").Select(s => s.CompanyId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            .Where(s => s.SettingKey == PlatformSettingKeys.IsDemo && s.SettingValue == "true").Select(s => s.CompanyId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (existing != 0)
         {
             var c = await db.Set<Company>().AsNoTracking().SingleAsync(x => x.Id == existing, ct).ConfigureAwait(false);
@@ -130,13 +115,13 @@ public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, Dat
             var co = new Company { Name = DemoName, NameEn = "Demo company (training)" };
             db.Set<Company>().Add(co);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PresetRoles.Owner, c).ConfigureAwait(false);
+            var ownerRole = await db.Set<Role>().SingleAsync(x => x.IsPreset && x.Name == PlatformPresetRoles.Owner, c).ConfigureAwait(false);
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = userId, CompanyId = co.Id, RoleId = ownerRole.Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             foreach (var p in provisioning) await p.ProvisionAsync(co.TenantId, co.Id, userId, c).ConfigureAwait(false);
             using (scope.Use(tenantId, co.Id, userId))
             {
-                db.Set<CompanySetting>().Add(new CompanySetting { TenantId = tenantId, CompanyId = co.Id, SettingKey = SettingKeys.IsDemo, SettingValue = "true" });
+                db.Set<CompanySetting>().Add(new CompanySetting { TenantId = tenantId, CompanyId = co.Id, SettingKey = PlatformSettingKeys.IsDemo, SettingValue = "true" });
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }
             await SeedAsync(co, userId, c).ConfigureAwait(false);

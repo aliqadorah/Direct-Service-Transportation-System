@@ -60,7 +60,8 @@ public sealed class TenantFilterGuardTests
         ["PersonalDataService.AnonymiseUserAsync"] = "Invitations by explicit TenantId, sessions by the id of a user of this tenant (checked by GrantGuard).",
         // Billing and plan limits: always by an explicit tenant id.
         ["PlanLimits.ActiveUsersAsync|EnsureTripsAsync|EnsureUserAsync|UsageAsync"] = "Plan usage and limits of one tenant: every query by the explicit tenant id passed in.",
-        ["TripUsageMeter.CountAsync"] = "Plan usage of one tenant (trips this month, moved out of PlanLimits, DT-346): every query by the explicit tenant id passed in.",
+        ["TransportationHealthFigures.CountAsync"] = "Provider health page counts over every tenant (moved out of ConsoleService.HealthAsync, Stage 2 session 13): totals only, no row leaves.",
+        ["TripUsageMeter.CountAsync"] ="Plan usage of one tenant (trips this month, moved out of PlanLimits, DT-346): every query by the explicit tenant id passed in.",
         ["TransportationDataEraser.AnonymiseAsync"] = "End of retention (lifecycle job, moved out of TenantLifecycleService, DT-346): personal fields of one tenant by its explicit id.",
         ["BillingService.ApplyPaymentAsync|SuspendedByStaffAsync"] = "Subscription invoices of one tenant: queries by the invoice's explicit tenant id.",
         ["SubscriptionService.WebhookAsync"] = "Signed payment webhook (no session): the invoice by gateway reference, scope set to that invoice's tenant.",

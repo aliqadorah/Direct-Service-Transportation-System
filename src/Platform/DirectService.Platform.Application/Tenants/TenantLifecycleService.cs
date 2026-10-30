@@ -64,7 +64,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     }
 
     /// <summary>The Owner's reason of each refused request (from its "Reject" audit row; no schema change), by grant id.</summary>
-    public static async Task<Dictionary<long, string>> RefusalReasonsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    internal static async Task<Dictionary<long, string>> RefusalReasonsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
     {
         if (grantIds.Count == 0) return [];
         var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
@@ -232,7 +232,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     }
 
     /// <summary>Who ended each window early (from its "End" audit row; a window that simply expired has none), by grant id.</summary>
-    public static async Task<Dictionary<long, string>> EndsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    internal static async Task<Dictionary<long, string>> EndsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
     {
         if (grantIds.Count == 0) return [];
         var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()

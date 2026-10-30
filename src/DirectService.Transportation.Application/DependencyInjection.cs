@@ -42,7 +42,6 @@ public static class DependencyInjection
         services.AddScoped<ITenantDataEraser, Modules.TransportationDataEraser>();
         services.AddSingleton<IPermissionCatalog, Modules.TransportationPermissions>();
         services.AddSingleton<INotificationTypeProvider, Modules.TransportationNotificationTypes>();
-        services.AddScoped<TenantService>();
         services.AddScoped<CompanySettingsService>();
         services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
@@ -150,13 +149,9 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
 
         // Platform (B12)
-        services.AddScoped<SubscriptionService>();
-        services.AddScoped<ConsoleService>();
-        services.AddScoped<SetupChecklistService>();
-        services.AddScoped<DemoCompanyService>();
         services.AddScoped<IDemoDataContributor, Modules.TransportationDemoData>();
         services.AddScoped<ISetupStepProvider, Modules.TransportationSetupSteps>();
-        services.AddScoped<CompanyExportService>();
+        services.AddScoped<IHealthFigureSource, Modules.TransportationHealthFigures>();
         services.AddScoped<PersonalDataService>();
 
         // Collaboration (B11)

@@ -1,16 +1,14 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Billing;
 using static DirectService.SharedKernel.DocumentPrinter;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// The tenant's subscription (5.3, tenant.manage): plan, status, period, usage against limits and the plans on offer; subscription invoices
@@ -18,7 +16,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// immediate pro-rated upgrade while Active; downgrades refused while usage exceeds the target's limits (BR-012) and otherwise effective at
 /// once on limits with the new price from the next renewal (DT-123); cancellation by the Owner starts the 90-day retention (5.2).
 /// </summary>
-public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, BillingService billing, PlanLimits limits, IPaymentGateway gateway,
+public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, RecordSupport support, BillingService billing, PlanLimits limits, IPaymentGateway gateway,
     DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, DocumentPrinter printer, TimeProvider clock)
 {
     private long TenantId => ctx.TenantId ?? throw Fail.Forbidden();
@@ -46,8 +44,8 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
 
     private async Task<Plan> ActivePlanAsync(string? token, CancellationToken ct)
     {
-        var p = await support.FindAsync<Plan>(token ?? throw Fail.Field("planId", ErrorCodes.ValidationRequired, new FieldRef("planId")), ct).ConfigureAwait(false);
-        return p.IsActive ? p : throw Fail.Field("planId", ErrorCodes.ValidationFormat, new FieldRef("planId"));
+        var p = await support.FindAsync<Plan>(token ?? throw Fail.Field("planId", SharedErrorCodes.ValidationRequired, new FieldRef("planId")), ct).ConfigureAwait(false);
+        return p.IsActive ? p : throw Fail.Field("planId", SharedErrorCodes.ValidationFormat, new FieldRef("planId"));
     }
 
     /// <summary>Checkout (P-04, P-06): an invoice and the gateway's payment page.</summary>
@@ -56,7 +54,7 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
         ArgumentNullException.ThrowIfNull(r);
         var plan = await ActivePlanAsync(r.PlanId, ct).ConfigureAwait(false);
         var t = await TenantAsync(ct).ConfigureAwait(false);
-        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(ErrorCodes.SubscriptionClosed);
+        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(PlatformErrorCodes.SubscriptionClosed);
         var now = clock.GetUtcNow().UtcDateTime;
         var today = DateOnly.FromDateTime(now);
         // A new checkout replaces any unpaid one (due or failed), so an old payment page can never be paid later at an old price or period
@@ -73,7 +71,7 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
         {
             kind = InvoiceKinds.Upgrade;
             // Upgrade now, pro-rated over the days left in the period (5.3).
-            if (plan.Price <= t.Plan.Price || plan.BillingCycle != t.Plan.BillingCycle) throw Fail.Rule(ErrorCodes.SubscriptionNotUpgrade);
+            if (plan.Price <= t.Plan.Price || plan.BillingCycle != t.Plan.BillingCycle) throw Fail.Rule(PlatformErrorCodes.SubscriptionNotUpgrade);
             var periodStart = t.Plan.BillingCycle == LifecycleCodes.Annual ? end.AddYears(-1) : end.AddMonths(-1);
             var total = (decimal)(end - periodStart).TotalDays;
             var left = (decimal)(end - now).TotalDays;
@@ -146,13 +144,13 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
         ArgumentNullException.ThrowIfNull(r);
         var plan = await ActivePlanAsync(r.PlanId, ct).ConfigureAwait(false);
         var t = await TenantAsync(ct).ConfigureAwait(false);
-        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(ErrorCodes.SubscriptionClosed);
+        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(PlatformErrorCodes.SubscriptionClosed);
         var lower = plan.BillingCycle == t.Plan.BillingCycle && plan.Price < t.Plan.Price && plan.MaxCompanies <= t.Plan.MaxCompanies
             && plan.MaxActiveUsers <= t.Plan.MaxActiveUsers && plan.MaxTripsPerMonth <= t.Plan.MaxTripsPerMonth && plan.MaxStorageMb <= t.Plan.MaxStorageMb;
-        if (!lower && plan.Id != t.PlanId) throw Fail.Rule(ErrorCodes.SubscriptionNotDowngrade);
+        if (!lower && plan.Id != t.PlanId) throw Fail.Rule(PlatformErrorCodes.SubscriptionNotDowngrade);
         var exceeded = await limits.ExceededAsync(t.Id, plan, ct).ConfigureAwait(false);
         if (exceeded.Count > 0)
-            throw Fail.Rule(ErrorCodes.SubscriptionDowngradeExceeds, string.Join(", ", exceeded.Select(x => $"{x.Limit} {x.Usage}/{x.Max}")));
+            throw Fail.Rule(PlatformErrorCodes.SubscriptionDowngradeExceeds, string.Join(", ", exceeded.Select(x => $"{x.Limit} {x.Usage}/{x.Max}")));
         t.PlanId = plan.Id;
         t.BillingCycle = plan.BillingCycle;
         changes.SetAction(t, "Downgrade", plan.Code);
@@ -165,7 +163,7 @@ public sealed class SubscriptionService(IAppDbContext db, IRequestContext ctx, M
     {
         var why = MasterIds.Reason(reason);
         var t = await TenantAsync(ct).ConfigureAwait(false);
-        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(ErrorCodes.SubscriptionClosed);
+        if (t.Status is LifecycleCodes.Cancelled or LifecycleCodes.Deleted) throw Fail.Rule(PlatformErrorCodes.SubscriptionClosed);
         var now = clock.GetUtcNow().UtcDateTime;
         t.Status = LifecycleCodes.Cancelled;
         t.CancelledAt = now;

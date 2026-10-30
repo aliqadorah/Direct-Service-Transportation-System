@@ -1,14 +1,14 @@
 using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Domain.Common;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// The full copy of a company's data (5.6, P-16, DX-04) for its Owner, also during the retention period: one ZIP with every company table as
