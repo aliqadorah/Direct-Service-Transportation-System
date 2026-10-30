@@ -126,14 +126,17 @@ public sealed class LayerRuleTests
     private static readonly string[] Anchors = ["Tenant", "Company", "User"];
 
     /// <summary>Every Platform.Domain type the compiled assembly refers to (its type references into that assembly).</summary>
-    private static List<string> PlatformTypesUsedBy(Assembly assembly)
+    private static List<string> PlatformTypesUsedBy(Assembly assembly) => TypesUsedBy(assembly, PlatformDomain);
+
+    /// <summary>Every type of <paramref name="target"/> the compiled assembly refers to (its type references into that assembly).</summary>
+    private static List<string> TypesUsedBy(Assembly assembly, string target)
     {
         using var stream = File.OpenRead(assembly.Location);
         using var pe = new System.Reflection.PortableExecutable.PEReader(stream);
         var md = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
         return md.TypeReferences.Select(md.GetTypeReference)
             .Where(t => t.ResolutionScope.Kind == System.Reflection.Metadata.HandleKind.AssemblyReference
-                && md.GetString(md.GetAssemblyReference((System.Reflection.Metadata.AssemblyReferenceHandle)t.ResolutionScope).Name) == PlatformDomain)
+                && md.GetString(md.GetAssemblyReference((System.Reflection.Metadata.AssemblyReferenceHandle)t.ResolutionScope).Name) == target)
             .Select(t => md.GetString(t.Namespace) + "." + md.GetString(t.Name)).Distinct().Order(StringComparer.Ordinal).ToList();
     }
 
@@ -156,13 +159,31 @@ public sealed class LayerRuleTests
     [Fact]
     public void Module_application_references_its_domain_and_contracts_and_the_platform_contracts()
     {
-        // Design a.2. The one temporary exception (Stage 2 session 12, DT-343): Platform.Application, used by the Platform services still in
-        // Transportation.Application (console, tenants, subscriptions, account and user services); it goes when they have moved.
+        // Design a.2. The one temporary exception (Stage 2 session 12, DT-343): Platform.Application. Since session 13 the identity, tenant,
+        // console, subscription, staff and onboarding services are in Platform.Application; what the module still uses of it is pinned below
+        // (the notification, audit-log and company-settings services still here, and the module's calls into platform services), so the
+        // reference can only shrink until it goes.
         Only("DirectService.Transportation.Application",
             r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
                 or "DirectService.Platform.Application",
             "a module's Application references its own Domain and Contracts, SharedKernel and Platform.Contracts");
+        var used = TypesUsedBy(typeof(DirectService.Transportation.Application.DependencyInjection).Assembly, "DirectService.Platform.Application");
+        var more = used.Except(StillUsedOfPlatformApplication, StringComparer.Ordinal).ToList();
+        Assert.True(more.Count == 0, "Transportation.Application uses more of Platform.Application (DT-343): " + string.Join(", ", more));
     }
+
+    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343, end of Stage 2 session 13); remove entries as they go.</summary>
+    private static readonly string[] StillUsedOfPlatformApplication =
+    [
+        "DirectService.Platform.Application.Billing.PlanLimits",                    // TripService: trips per month (plan limit)
+        "DirectService.Platform.Application.Companies.CompanyInfo",                 // CompanyHeaderPrinting
+        "DirectService.Platform.Application.Identity.AccessService",                // NotificationLinks: tenant screens
+        "DirectService.Platform.Application.Identity.AccountService",               // CompanySettingsService, CustomerService: e-mail checks
+        "DirectService.Platform.Application.Identity.GrantGuard",                   // PersonalDataService
+        "DirectService.Platform.Application.Notifications.IUserNotifier",           // NotificationService implements it
+        "DirectService.Platform.Application.Notifications.PlatformNotifications",   // NotificationService / NotificationTexts
+        "DirectService.Platform.Application.Tenants.CompanyExportService",          // TransportationExports: the "company" export kind
+    ];
 
     [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
