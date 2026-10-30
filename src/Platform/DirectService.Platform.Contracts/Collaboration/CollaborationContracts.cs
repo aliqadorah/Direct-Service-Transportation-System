@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Contracts.Collaboration;
+namespace DirectService.Platform.Contracts.Collaboration;
 
 // ------------------------------------------------------------------ notifications (FR-190)
 

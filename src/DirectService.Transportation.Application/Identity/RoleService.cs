@@ -1,7 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;

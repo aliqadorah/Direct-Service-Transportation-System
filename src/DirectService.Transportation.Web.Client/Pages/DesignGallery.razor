@@ -174,7 +174,7 @@ else
 
     protected override void OnInitialized()
     {
-        Shell.SetMe(new DirectService.Transportation.Contracts.Identity.MeResponse("u1", "رنا الخطيب", "rana@example.jo", L.Language, "yyyy-MM-dd", "c1", false, "Arab Transport", "Active",
+        Shell.SetMe(new DirectService.Platform.Contracts.Identity.MeResponse("u1", "رنا الخطيب", "rana@example.jo", L.Language, "yyyy-MM-dd", "c1", false, "Arab Transport", "Active",
             [new("c1", "الشركة العربية للنقل", "Arab Transport Co.", "Active", "Owner", true, [.. typeof(PermissionKeys).GetFields().Where(f => f.IsLiteral && f.Name != "Owner").Select(f => (string)f.GetRawConstantValue()!)]),
              new("c2", "شركة الجنوب للشحن", "South Freight", "Active", "Accountant", true, [PermissionKeys.AcctView])]));
         Shell.SelectCompany("c1");

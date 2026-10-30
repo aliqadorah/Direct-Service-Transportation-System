@@ -2,6 +2,7 @@ using System.Security.Claims;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;

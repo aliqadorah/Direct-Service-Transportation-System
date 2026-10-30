@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Acc;

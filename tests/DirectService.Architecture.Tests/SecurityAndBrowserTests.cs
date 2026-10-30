@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Shared.Infrastructure.Security;
 using DirectService.Transportation.Web.Realtime;
 using DirectService.Transportation.Web.Security;

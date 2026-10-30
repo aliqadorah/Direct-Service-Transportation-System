@@ -8,7 +8,7 @@ using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Infrastructure.EInvoicing;

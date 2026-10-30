@@ -1,6 +1,6 @@
-using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Invoicing;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
 using DirectService.Transportation.Web.Client.Layout;

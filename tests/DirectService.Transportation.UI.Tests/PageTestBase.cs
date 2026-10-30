@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Services;
 using Microsoft.Extensions.DependencyInjection;

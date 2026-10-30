@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Api.Tests;

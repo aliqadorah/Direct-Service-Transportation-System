@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

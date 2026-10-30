@@ -3,7 +3,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;

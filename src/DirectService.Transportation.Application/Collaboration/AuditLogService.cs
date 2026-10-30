@@ -5,7 +5,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;

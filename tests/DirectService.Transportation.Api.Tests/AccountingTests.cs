@@ -6,6 +6,7 @@ using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Acc;
 using Microsoft.EntityFrameworkCore;

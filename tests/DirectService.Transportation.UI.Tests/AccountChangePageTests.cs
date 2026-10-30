@@ -1,4 +1,4 @@
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Pages;
 using DirectService.Transportation.Web.Client.Pages.Settings;

@@ -1,4 +1,4 @@
-using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Client.Pages.Settings;

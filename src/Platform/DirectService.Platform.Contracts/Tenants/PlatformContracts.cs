@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Contracts.Platform;
+namespace DirectService.Platform.Contracts.Tenants;
 
 public sealed record TenantResponse(
     string Name, string Status, string PlanCode, string PlanName, DateTime? TrialEndsAt, DateTime? CurrentPeriodEnd,
@@ -29,17 +29,5 @@ public sealed record MarketSettingsRequest(
     string CountryCode, string CurrencyCode, int CurrencyDecimals, decimal TaxRate, bool TaxInclusive, string TimeZone,
     string PhonePattern, string IbanPattern, string? RowVersion);
 
-public sealed record OperationSettingsResponse(
-    bool BillOnUnloadedWeight, bool PayDriverOnLoadedWeight, decimal ShortageTolerancePct, bool LockTariffs,
-    bool InvoiceApproval, bool AccrueDriverWage, DateTime? MigrationCompletedAt);
-
-/// <summary>FR-170: changing a weight-basis setting requires <see cref="ConfirmWeightBasisChange"/> = true.</summary>
-public sealed record OperationSettingsRequest(
-    bool BillOnUnloadedWeight, bool PayDriverOnLoadedWeight, decimal ShortageTolerancePct, bool LockTariffs,
-    bool InvoiceApproval, bool AccrueDriverWage, bool ConfirmWeightBasisChange);
-
 public sealed record NumberSequenceResponse(string Id, string DocumentType, string Prefix, int Digits, long NextNumber, string NextFormatted, string RowVersion);
 public sealed record NumberSequenceRequest(string Prefix, int Digits, long NextNumber, string? RowVersion);
-
-/// <summary>FR-171: irreversible; <see cref="Confirm"/> must be true.</summary>
-public sealed record MigrationCompleteRequest(bool Confirm);

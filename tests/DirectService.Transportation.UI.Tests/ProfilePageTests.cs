@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Web.Client.Pages;
 
 namespace DirectService.Transportation.UI.Tests;

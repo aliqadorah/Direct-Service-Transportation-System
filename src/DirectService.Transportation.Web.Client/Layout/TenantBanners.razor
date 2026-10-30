@@ -45,7 +45,7 @@ else if (tenant == "Trial" && canManage)
 }
 
 @code {
-    private IReadOnlyList<Contracts.Platform.AnnouncementResponse> _announcements = [];
+    private IReadOnlyList<DirectService.Platform.Contracts.Tenants.AnnouncementResponse> _announcements = [];
 
     protected override async Task OnInitializedAsync()
     {

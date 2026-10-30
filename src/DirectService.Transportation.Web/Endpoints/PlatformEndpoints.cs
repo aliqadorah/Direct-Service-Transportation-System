@@ -1,8 +1,8 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Identity;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Identity;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Pipeline;
 using Microsoft.AspNetCore.Http.HttpResults;

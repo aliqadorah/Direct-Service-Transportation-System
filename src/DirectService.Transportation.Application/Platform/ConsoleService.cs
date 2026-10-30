@@ -3,8 +3,8 @@ using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Identity;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Identity;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Platform.Domain;
@@ -494,7 +494,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
     /// The active companies the staff member can open now: those of tenants with an approved, current window of theirs (DT-152), with the
     /// read-only session permissions — the same rule the request pipeline applies to every support request.
     /// </summary>
-    public async Task<IReadOnlyList<Contracts.Identity.CompanyAccess>> SupportCompaniesAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<DirectService.Platform.Contracts.Identity.CompanyAccess>> SupportCompaniesAsync(CancellationToken ct)
     {
         var me = StaffId;
         var now = Now;
@@ -503,7 +503,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
                 .Any(g => g.TenantId == c.TenantId && g.RequestedBy == me && !g.IsDeleted && g.Status == LifecycleCodes.Approved && g.StartsAt <= now && g.EndsAt > now))
             .OrderBy(c => c.Name).Select(c => new { c.PublicId, c.Name, c.NameEn, c.CurrencyCode, c.CurrencyDecimals }).Take(200).ToListAsync(ct).ConfigureAwait(false);
         var permissions = SupportAccessService.SessionPermissions.Order(StringComparer.Ordinal).ToList();
-        return companies.Select(c => new Contracts.Identity.CompanyAccess(support.Token<Company>(c.PublicId), c.Name, c.NameEn, "Active", "Support", true, permissions,
+        return companies.Select(c => new DirectService.Platform.Contracts.Identity.CompanyAccess(support.Token<Company>(c.PublicId), c.Name, c.NameEn, "Active", "Support", true, permissions,
             c.CurrencyCode, c.CurrencyDecimals)).ToList();
     }
 

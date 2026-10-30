@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace DirectService.Transportation.Web.Client.Services;

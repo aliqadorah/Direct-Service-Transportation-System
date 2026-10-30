@@ -1,5 +1,5 @@
 
-namespace DirectService.Transportation.Contracts.Identity;
+namespace DirectService.Platform.Contracts.Identity;
 
 // All identifiers are URL tokens (SEC-22); RowVersion is base64 for optimistic concurrency.
 

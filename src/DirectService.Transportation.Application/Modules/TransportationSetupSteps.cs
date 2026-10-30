@@ -13,7 +13,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;

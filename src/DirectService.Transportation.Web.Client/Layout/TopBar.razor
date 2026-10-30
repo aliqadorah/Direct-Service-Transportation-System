@@ -49,7 +49,7 @@
 
 @code {
     [Parameter] public bool Provider { get; set; }
-    [Parameter] public IReadOnlyList<DirectService.Transportation.Contracts.Identity.CompanyAccess> Companies { get; set; } = [];
+    [Parameter] public IReadOnlyList<DirectService.Platform.Contracts.Identity.CompanyAccess> Companies { get; set; } = [];
     [Parameter] public string? CurrentCompany { get; set; }
     [Parameter] public string? UserName { get; set; }
     [Parameter] public int Unread { get; set; }

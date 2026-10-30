@@ -1,4 +1,4 @@
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 
 namespace DirectService.Transportation.Web.Client.Services;
 

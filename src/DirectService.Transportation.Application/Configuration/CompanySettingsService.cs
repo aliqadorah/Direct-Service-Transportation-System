@@ -5,6 +5,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;

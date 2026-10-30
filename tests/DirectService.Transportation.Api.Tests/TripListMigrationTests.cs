@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
 using Microsoft.EntityFrameworkCore;

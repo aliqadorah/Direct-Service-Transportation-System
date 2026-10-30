@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
@@ -387,7 +388,7 @@ public sealed class InvoiceTests(ApiFactory f)
         var inv = await ReadAsync<InvoiceDetails>(await o.Client.PostAsJsonAsync(U(o, "/invoices"), TripInvoice(w, w.Trips.Take(2), approve: true)));
         foreach (var language in new[] { "ar", "en" })
         {
-            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
+            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new DirectService.Platform.Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
             foreach (var path in new[] { $"/invoices/{inv.Invoice.Id}/print", $"/drivers/{w.Trips[0].Driver.Id}/statement/export?format=pdf" })
             {
                 var r = await o.Client.GetAsync(U(o, path));

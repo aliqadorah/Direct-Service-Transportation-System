@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Contracts.Platform;
+namespace DirectService.Platform.Contracts.Tenants;
 
 /// <summary>
 /// A setup step (5.4, P-08): key, title, status (NotStarted / InProgress / Done), what is missing, where to do it, whether marked by hand;

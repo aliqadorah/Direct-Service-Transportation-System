@@ -2,7 +2,7 @@ using DirectService.Shared.Infrastructure.Collaboration;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Collaboration;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Web.Pipeline;

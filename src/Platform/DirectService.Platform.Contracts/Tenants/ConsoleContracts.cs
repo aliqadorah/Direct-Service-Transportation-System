@@ -1,5 +1,5 @@
 
-namespace DirectService.Transportation.Contracts.Platform;
+namespace DirectService.Platform.Contracts.Tenants;
 
 /// <summary>Stored tenant and billing states (design: core.Tenants, core.SubscriptionInvoices, core.SupportAccessGrants).</summary>
 public static class LifecycleCodes

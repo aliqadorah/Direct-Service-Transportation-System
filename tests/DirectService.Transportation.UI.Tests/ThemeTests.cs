@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using AngleSharp.Dom;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Web.Client.Layout;
 using DirectService.Transportation.Web.Client.Pages;
 

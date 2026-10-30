@@ -5,7 +5,7 @@ using System.Text.Json;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Shared.Contracts;
 using DirectService.Transportation.Contracts.Reports;
@@ -233,7 +233,7 @@ public sealed class ReportTests(ApiFactory f)
         async Task<(string Field, string Code, string Message)> Refused(ReportRunRequest body, string language)
         {
             // Signed-in requests speak the user's language (preferences).
-            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
+            await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new DirectService.Platform.Contracts.Identity.PreferencesRequest(language, null, o.Me.DateFormat))).EnsureOkAsync();
             var r = await o.Client.PostAsJsonAsync(U(o, "/reports/builder/run"), body);
             Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
             var error = (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")[0];
@@ -277,7 +277,7 @@ public sealed class ReportTests(ApiFactory f)
             [new ReportMeasure("count", null)], null, null, null, false, null)), "en")).Message);
 
         // Saving checks the same definition, and its own name with the limit.
-        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest("en", null, o.Me.DateFormat))).EnsureOkAsync();
+        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new DirectService.Platform.Contracts.Identity.PreferencesRequest("en", null, o.Me.DateFormat))).EnsureOkAsync();
         var saved = await (await o.Client.PostAsJsonAsync(U(o, "/reports/saved"), new SavedReportRequest(" ", "trips", owners.Definition, false, null))).Content.ReadAsStringAsync();
         Assert.Contains("Enter the report name (at most 150 characters).", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("«name»", saved, StringComparison.Ordinal);

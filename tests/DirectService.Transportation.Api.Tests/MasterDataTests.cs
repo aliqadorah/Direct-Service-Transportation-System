@@ -67,7 +67,7 @@ public sealed class MasterDataTests(ApiFactory f)
     public async Task Built_in_ownership_type_is_shown_and_accepted_in_the_readers_language()
     {
         var o = await f.SignUpOwnerAsync();
-        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new Contracts.Identity.PreferencesRequest("ar", null, o.Me.DateFormat))).EnsureOkAsync();
+        await (await o.Client.PutAsJsonAsync("/api/v1/me/preferences", new DirectService.Platform.Contracts.Identity.PreferencesRequest("ar", null, o.Me.DateFormat))).EnsureOkAsync();
         var builtIn = await BuiltInAsync(o);
         Assert.Equal("الشركة", builtIn.Name);
         var driver = await CreateDriverAsync(o, Driver(builtIn.Id));
@@ -546,16 +546,16 @@ public sealed class MasterDataTests(ApiFactory f)
         Assert.Equal(HttpStatusCode.Forbidden, (await dispatcher.Client.PutAsJsonAsync(U(owner, "/standard-fields/TRN.Customer"), new StandardFieldsRequest([]))).StatusCode);
 
         // A custom role without drv.view / masters.manage sees pick lists but not driver records.
-        var roles = await owner.Client.GetFromJsonAsync<List<Contracts.Identity.RoleResponse>>(U(owner, "/roles"));
+        var roles = await owner.Client.GetFromJsonAsync<List<DirectService.Platform.Contracts.Identity.RoleResponse>>(U(owner, "/roles"));
         Assert.NotNull(roles);
-        var clerk = await ReadAsync<Contracts.Identity.RoleResponse>(await owner.Client.PostAsJsonAsync(U(owner, "/roles"),
-            new Contracts.Identity.RoleRequest("Trip clerk", [PermissionKeys.TripsView, PermissionKeys.TripsEdit], null)));
+        var clerk = await ReadAsync<DirectService.Platform.Contracts.Identity.RoleResponse>(await owner.Client.PostAsJsonAsync(U(owner, "/roles"),
+            new DirectService.Platform.Contracts.Identity.RoleRequest("Trip clerk", [PermissionKeys.TripsView, PermissionKeys.TripsEdit], null)));
         var email = $"clerk-{Guid.NewGuid():N}@example.test";
-        await (await owner.Client.PostAsJsonAsync(U(owner, "/invitations"), new Contracts.Identity.InviteRequest(email, clerk.Id))).EnsureOkAsync();
+        await (await owner.Client.PostAsJsonAsync(U(owner, "/invitations"), new DirectService.Platform.Contracts.Identity.InviteRequest(email, clerk.Id))).EnsureOkAsync();
         var token = f.Emails.LinkParameters(email, "Invitation")["t"];
         var client = f.NewClient();
         await client.UseAntiforgeryAsync();
-        await (await client.PostAsJsonAsync("/api/v1/auth/invitations/accept", new Contracts.Identity.InvitationAcceptRequest(token, "Clerk", ApiHelpers.Password))).EnsureOkAsync();
+        await (await client.PostAsJsonAsync("/api/v1/auth/invitations/accept", new DirectService.Platform.Contracts.Identity.InvitationAcceptRequest(token, "Clerk", ApiHelpers.Password))).EnsureOkAsync();
         var clerkUser = await f.SignInFirstTimeAsync(client, email, ApiHelpers.Password);
         Assert.Equal(HttpStatusCode.Forbidden, (await clerkUser.Client.GetAsync(U(owner, "/drivers"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await clerkUser.Client.GetAsync(U(owner, "/partners"))).StatusCode);

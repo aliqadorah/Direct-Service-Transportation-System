@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Web.Pipeline;

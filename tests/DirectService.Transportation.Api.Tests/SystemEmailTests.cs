@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Platform.Domain;
 using DirectService.Platform.Infrastructure.Email;
 using Microsoft.EntityFrameworkCore;

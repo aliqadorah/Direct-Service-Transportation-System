@@ -72,6 +72,19 @@ public sealed class LayerRuleTests
     }
 
     [Fact]
+    public void Platform_contracts_are_browser_safe()
+    {
+        // The browser app references Platform.Contracts (the identity and platform DTOs, Stage 2 session 13): only Shared.Contracts, no package.
+        Only("DirectService.Platform.Contracts", r => r == SharedContracts, "Platform.Contracts references only Shared.Contracts");
+        var file = Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "src", "Platform", "DirectService.Platform.Contracts"), "*.csproj").Single();
+        Assert.Empty(XDocument.Load(file).Descendants("PackageReference"));
+        var compiled = typeof(DirectService.Platform.Contracts.Identity.MeResponse).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => !n.StartsWith("System", StringComparison.Ordinal) && n != "netstandard" && n != "mscorlib" && n != SharedContracts).ToList();
+        Assert.True(compiled.Count == 0, "The compiled Platform.Contracts references " + string.Join(", ", compiled));
+        Assert.Contains("DirectService.Platform.Contracts", Projects["DirectService.Transportation.Web.Client"]);
+    }
+
+    [Fact]
     public void The_browser_app_does_not_receive_SharedKernel_through_the_contracts()
     {
         // Transportation.Contracts uses only the constants of SharedErrorCodes; its reference is private (DT-310).

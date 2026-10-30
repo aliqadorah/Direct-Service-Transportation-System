@@ -1,4 +1,4 @@
-namespace DirectService.Transportation.Contracts.Platform;
+namespace DirectService.Platform.Contracts.Tenants;
 
 /// <summary>
 /// One set of system email settings as the console shows it (DT-250). The client secret is never returned: only whether one is saved, when,

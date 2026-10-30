@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
-using DirectService.Transportation.Contracts.Identity;
-using DirectService.Transportation.Contracts.Platform;
+using DirectService.Platform.Contracts.Identity;
+using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Web.Client.Help;
 using DirectService.Transportation.Web.Client.Layout;
 using DirectService.Transportation.Web.Client.Localization;

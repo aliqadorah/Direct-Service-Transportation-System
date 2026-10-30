@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using DirectService.Transportation.Contracts.Identity;
+using DirectService.Platform.Contracts.Identity;
 
 namespace DirectService.Transportation.Api.Tests;
 

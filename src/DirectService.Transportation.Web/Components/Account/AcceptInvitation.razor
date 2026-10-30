@@ -4,7 +4,7 @@
 @inherits AccountPage
 @using DirectService.Transportation.Application.Abstractions
 @using DirectService.Transportation.Application.Identity
-@using DirectService.Transportation.Contracts.Identity
+@using DirectService.Platform.Contracts.Identity
 @inject InvitationService Invitations
 
 <AuthCard Title="@L["acct.inviteTitle"]" Lead="@(_info is { IsValid: true } && !_done ? L.F("acct.inviteLead", _info.CompanyName, _info.Email) : null)">
