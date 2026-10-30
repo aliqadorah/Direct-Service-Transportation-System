@@ -100,8 +100,8 @@ public sealed class SecurityAndBrowserTests
         Same(Value("localStorage", "prefix"), (string)prefKeys.GetField("StoragePrefix")!.GetRawConstantValue()!);
         Same(Value("localStorage", "themeKeyPrefix"), (string)prefKeys.GetField("Theme")!.GetRawConstantValue()!);
         Same(Value("localStorage", "navKeyPrefix"), (string)prefKeys.GetField("Nav")!.GetRawConstantValue()!);
-        Assert.Contains($"localStorage.getItem(\"{Value("localStorage", "prefix")}\" + key)", Source("src/DirectService.Transportation.Web.Client/wwwroot/js/ui.js"), StringComparison.Ordinal);
-        Assert.Contains($"localStorage.getItem(\"{Value("localStorage", "beforeSignInTheme")}\")", Source("src/DirectService.Transportation.Web.Client/wwwroot/js/theme.js"), StringComparison.Ordinal);
+        Assert.Contains($"localStorage.getItem(\"{Value("localStorage", "prefix")}\" + key)", Source("src/Shared/DirectService.Shared.UI/wwwroot/js/ui.js"), StringComparison.Ordinal);
+        Assert.Contains($"localStorage.getItem(\"{Value("localStorage", "beforeSignInTheme")}\")", Source("src/Shared/DirectService.Shared.UI/wwwroot/js/theme.js"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -130,6 +130,21 @@ public sealed class SecurityAndBrowserTests
         var views = Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "src", client), "*.razor", SearchOption.AllDirectories)
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), "ViewKey=\"([^\"]+)\"").Select(m => m.Groups[1].Value));
         Golden.SameSet("Column view keys (cfg.TableColumnViews.ViewKey, E-15)", Golden.Strings(G["viewKeys"]), views);
+    }
+
+    [Fact]
+    public void The_design_system_files_are_served_by_the_browser_app_at_their_root_urls()
+    {
+        // Stage 2 session 15 (DT-368): the files live in Shared.UI, whose static web assets have the base path "/" (not _content/…), so
+        // css/app.css, js/ui.js, img/icons.svg … keep their URLs and fingerprints; the browser app keeps only its JS initializer (E-21).
+        var www = Path.Combine(Golden.RepoRoot, "src", "Shared", "DirectService.Shared.UI", "wwwroot");
+        string[] urls = ["css/app.css", "css/fonts.css", "css/tokens.css", "img/icons.svg", "img/logo.png", "js/theme.js", "js/ui.js"];
+        Assert.Equal(urls, Directory.EnumerateFiles(www, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(www, f).Replace('\\', '/')).Order(StringComparer.Ordinal));
+        Assert.Contains("<StaticWebAssetBasePath>/</StaticWebAssetBasePath>", Source("src/Shared/DirectService.Shared.UI/DirectService.Shared.UI.csproj"), StringComparison.Ordinal);
+        var clientWww = Path.Combine(Golden.RepoRoot, "src", "DirectService.Transportation.Web.Client", "wwwroot");
+        Assert.Equal(["DirectService.Transportation.Web.Client.lib.module.js"], Directory.EnumerateFiles(clientWww, "*", SearchOption.AllDirectories).Select(Path.GetFileName));
+        var page = Source("src/DirectService.Transportation.Web/Components/App.razor");
+        foreach (var u in urls.Where(u => u != "img/icons.svg" && u != "js/ui.js")) Assert.Contains($"@Assets[\"{u}\"]", page, StringComparison.Ordinal);
     }
 
     [Fact]

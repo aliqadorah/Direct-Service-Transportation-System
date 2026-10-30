@@ -8,7 +8,7 @@ import { ROOT } from "../support/env";
  * sign-in. Ctrl+S works by the physical key whatever the keyboard language (Arabic layout: e.key is "س"), commits the field being typed in
  * before pressing the save button, picks the open dialog's button first, and never lets the browser open its "Save page" dialog.
  */
-const UI_JS = fs.readFileSync(path.join(ROOT, "src", "DirectService.Transportation.Web.Client", "wwwroot", "js", "ui.js"), "utf8");
+const UI_JS = fs.readFileSync(path.join(ROOT, "src", "Shared", "DirectService.Shared.UI", "wwwroot", "js", "ui.js"), "utf8");
 
 async function load(page: Page, body: string): Promise<void> {
   await page.route("https://shortcuts.test/**", (route) => route.request().url().endsWith("/ui.js")

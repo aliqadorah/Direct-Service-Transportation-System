@@ -13,6 +13,7 @@ public sealed class LayerRuleTests
 {
     private const string Kernel = "DirectService.SharedKernel";
     private const string SharedContracts = "DirectService.Shared.Contracts";
+    private const string SharedUi = "DirectService.Shared.UI";
 
     /// <summary>Every project under src/ with the names of the projects it references.</summary>
     private static readonly Dictionary<string, List<string>> Projects =
@@ -98,8 +99,20 @@ public sealed class LayerRuleTests
     [Fact]
     public void Shared_projects_reference_no_platform_or_module_project()
     {
+        // The one exception (owner decision DT-367, Stage 2 session 15): Shared.UI may use the platform's browser-safe DTOs, because the shell
+        // shows the signed-in user, the companies and the notifications. Platform.Contracts itself references only Shared.Contracts.
         foreach (var p in Projects.Keys.Where(p => p.StartsWith("DirectService.Shared", StringComparison.Ordinal)))
-            Only(p, r => r.StartsWith("DirectService.Shared", StringComparison.Ordinal), "Shared.* references no Platform or module project");
+            Only(p, r => r.StartsWith("DirectService.Shared", StringComparison.Ordinal) || p == SharedUi && r == "DirectService.Platform.Contracts",
+                "Shared.* references no Platform or module project (Shared.UI: Platform.Contracts only)");
+    }
+
+    [Fact]
+    public void The_ui_libraries_reference_only_contracts_and_shared_ui()
+    {
+        // a.2: a UI library reaches data only through the REST API — Contracts and Shared.UI, never Application, Infrastructure or Domain.
+        Only(SharedUi, r => r is SharedContracts or "DirectService.Platform.Contracts", "Shared.UI references Shared.Contracts and Platform.Contracts only");
+        Only("DirectService.Platform.UI", r => r is SharedContracts or "DirectService.Platform.Contracts" or SharedUi,
+            "Platform.UI references its own Contracts, Shared.Contracts and Shared.UI only");
     }
 
     [Fact]

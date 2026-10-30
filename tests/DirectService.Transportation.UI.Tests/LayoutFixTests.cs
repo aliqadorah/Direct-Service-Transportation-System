@@ -78,7 +78,7 @@ public sealed class LayoutFixTests : PageTestBase
         // Every list-plus-panel page flows.
         foreach (var file in Directory.EnumerateFiles(pages, "*.razor", SearchOption.AllDirectories))
             Assert.False(File.ReadAllText(file).Contains("cols fill lp", StringComparison.Ordinal), file);
-        var css = File.ReadAllText(Path.Combine(root, "src", "DirectService.Transportation.Web.Client", "wwwroot", "css", "app.css"));
+        var css = File.ReadAllText(Path.Combine(root, "src", "Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"));
         Assert.Contains(".flow { flex: none; min-height: auto; overflow: visible; }", css, StringComparison.Ordinal);
     }
 

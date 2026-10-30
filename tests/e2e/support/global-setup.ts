@@ -14,7 +14,7 @@ export default async function globalSetup(): Promise<void> {
 CREATE DATABASE [${DB_NAME}] COLLATE Arabic_100_CI_AI_SC_UTF8;
 ALTER DATABASE [${DB_NAME}] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;`;
   execFileSync("sqlcmd", ["-S", "localhost", "-E", "-I", "-b", "-Q", sql], { stdio: "inherit" });
-  const infrastructure = path.join(ROOT, "src", "DirectService.Transportation.Infrastructure");   // design-time factory (docs/step3)
+  const infrastructure = path.join(ROOT, "src", "Hosts", "DirectService.Database");   // migrations + design-time factory (Stage 2 session 3)
   execFileSync("dotnet", ["ef", "database", "update", "--no-build", "--project", infrastructure, "--startup-project", infrastructure, "--connection", CONNECTION],
     { stdio: "inherit", cwd: ROOT });
 

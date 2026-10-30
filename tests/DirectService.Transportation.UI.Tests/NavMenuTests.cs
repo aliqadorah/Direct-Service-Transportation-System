@@ -26,7 +26,7 @@ public sealed partial class NavMenuTests : PageTestBase
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "src"))) dir = dir.Parent;
-        var svg = File.ReadAllText(Path.Combine(dir!.FullName, "src", "DirectService.Transportation.Web.Client", "wwwroot", "img", "icons.svg"));
+        var svg = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Shared", "DirectService.Shared.UI", "wwwroot", "img", "icons.svg"));
         return [.. SymbolId().Matches(svg).Select(m => m.Groups[1].Value)];
     }
 

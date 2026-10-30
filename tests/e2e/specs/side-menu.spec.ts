@@ -7,7 +7,7 @@ import { ROOT } from "../support/env";
  * DT-242: in the collapsed side menu, Escape hides a section's flyout (or name) shown because it is pointed at or focused — as it closes
  * one opened with Enter. Tested on its own in a bare page with the real ui.js and stylesheets — no application, no sign-in.
  */
-const WWW = path.join(ROOT, "src", "DirectService.Transportation.Web.Client", "wwwroot");
+const WWW = path.join(ROOT, "src", "Shared", "DirectService.Shared.UI", "wwwroot");
 const FILES: Record<string, [string, string]> = {
   "/ui.js": ["text/javascript", fs.readFileSync(path.join(WWW, "js", "ui.js"), "utf8")],
   "/tokens.css": ["text/css", fs.readFileSync(path.join(WWW, "css", "tokens.css"), "utf8")],

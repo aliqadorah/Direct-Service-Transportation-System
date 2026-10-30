@@ -17,6 +17,8 @@
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Contracts\DirectService.Transportation.Contracts.csproj" />
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+    <!-- Design system, shell and client services (Stage 2 session 15); its static files are served at the root URLs (DT-368). -->
+    <ProjectReference Include="..\Shared\DirectService.Shared.UI\DirectService.Shared.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

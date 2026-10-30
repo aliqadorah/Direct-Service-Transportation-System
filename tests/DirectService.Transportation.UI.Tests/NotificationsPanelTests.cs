@@ -99,7 +99,7 @@ public sealed class NotificationsPanelTests : PageTestBase
     public void The_panel_styles_never_scroll_sideways_DT189()
     {
         // Long codes wrap inside the block; the button is full width and wraps (the browser check measures the real panel).
-        var css = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "DirectService.Transportation.Web.Client", "wwwroot", "css", "app.css"));
+        var css = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"));
         Assert.Matches(@"\.notes > \.note \{[^}]*overflow-wrap: anywhere", css);
         Assert.Matches(@"\.notes > \.note \{[^}]*min-width: 0", css);
         Assert.Matches(@"\.note-open \{[^}]*width: 100%[^}]*white-space: normal", css);

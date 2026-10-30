@@ -1,7 +1,36 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
-  <!-- Design system, shell and client services shared by every module UI (design a.1, a.10): filled in Stage 2 session 7. Browser-safe: it
-       references no EF Core, so not SharedKernel. -->
+  <!-- Design system, shell and client services shared by every module UI (design a.1, a.10; Stage 2 session 15). Browser-safe: it references
+       no EF Core, so not SharedKernel. It may use the platform's browser-safe DTOs (Platform.Contracts, owner decision DT-367): the shell
+       shows the signed-in user, the companies and the notifications. -->
   <PropertyGroup>
     <RootNamespace>DirectService.Shared.UI</RootNamespace>
+    <!-- CS8669: the Razor generator writes nullable type arguments (TValue="string?") into "#nullable disable" regions; harmless. -->
+    <NoWarn>$(NoWarn);CS8669</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="DirectService.Shared.Contracts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DirectService.Shared.Contracts\DirectService.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+  </ItemGroup>
+
+  <!-- The static files (css, img, js) are served at today's root URLs (css/app.css, js/ui.js, img/icons.svg …; design g, DT-368): the library's
+       static web assets have the base path "/" instead of _content/DirectService.Shared.UI, so every URL, fingerprint and cache entry is unchanged. -->
+  <PropertyGroup>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DirectService.Platform.UI" />
+    <InternalsVisibleTo Include="DirectService.Transportation.Web.Client" />
+    <InternalsVisibleTo Include="DirectService.Transportation.UI.Tests" />
+  </ItemGroup>
 </Project>

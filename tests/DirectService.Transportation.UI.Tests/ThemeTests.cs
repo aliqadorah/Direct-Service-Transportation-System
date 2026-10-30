@@ -123,7 +123,7 @@ public sealed partial class ThemeTests : PageTestBase
         var found = new List<string>();
         var files = Directory.EnumerateFiles(Source("DirectService.Transportation.Web.Client"), "*.razor", SearchOption.AllDirectories)
             .Concat(Directory.EnumerateFiles(Source("DirectService.Transportation.Web", "Components"), "*.razor", SearchOption.AllDirectories))
-            .Append(Source("DirectService.Transportation.Web.Client", "wwwroot", "css", "app.css"))
+            .Append(Source("Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
         foreach (var file in files)
         {
@@ -143,9 +143,9 @@ public sealed partial class ThemeTests : PageTestBase
     [Fact]
     public void Every_token_in_use_is_defined_and_the_dark_theme_is_for_the_screen_only()
     {
-        var tokens = File.ReadAllText(Source("DirectService.Transportation.Web.Client", "wwwroot", "css", "tokens.css"));
+        var tokens = File.ReadAllText(Source("Shared", "DirectService.Shared.UI", "wwwroot", "css", "tokens.css"));
         var defined = TokenDefinition().Matches(tokens).Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
-        var app = File.ReadAllText(Source("DirectService.Transportation.Web.Client", "wwwroot", "css", "app.css"));
+        var app = File.ReadAllText(Source("Shared", "DirectService.Shared.UI", "wwwroot", "css", "app.css"));
         Assert.All(TokenUse().Matches(app).Select(m => m.Groups[1].Value).Distinct(), t => Assert.True(defined.Contains(t), $"--{t} is not defined in tokens.css"));
 
         // Printing (and every print preview) keeps the light tokens: the dark block sits inside @media screen.
