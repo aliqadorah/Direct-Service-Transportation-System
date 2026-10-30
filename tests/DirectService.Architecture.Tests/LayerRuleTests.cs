@@ -172,17 +172,11 @@ public sealed class LayerRuleTests
         Assert.True(more.Count == 0, "Transportation.Application uses more of Platform.Application (DT-343): " + string.Join(", ", more));
     }
 
-    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343, end of Stage 2 session 13); remove entries as they go.</summary>
+    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343; end of Stage 2 session 13: eight, session 14 step 1: two, which go with the notification and personal-data services); remove entries as they go.</summary>
     private static readonly string[] StillUsedOfPlatformApplication =
     [
-        "DirectService.Platform.Application.Billing.PlanLimits",                    // TripService: trips per month (plan limit)
-        "DirectService.Platform.Application.Companies.CompanyInfo",                 // CompanyHeaderPrinting
         "DirectService.Platform.Application.Identity.AccessService",                // NotificationLinks: tenant screens
-        "DirectService.Platform.Application.Identity.AccountService",               // CompanySettingsService, CustomerService: e-mail checks
         "DirectService.Platform.Application.Identity.GrantGuard",                   // PersonalDataService
-        "DirectService.Platform.Application.Notifications.IUserNotifier",           // NotificationService implements it
-        "DirectService.Platform.Application.Notifications.PlatformNotifications",   // NotificationService / NotificationTexts
-        "DirectService.Platform.Application.Tenants.CompanyExportService",          // TransportationExports: the "company" export kind
     ];
 
     [Fact]

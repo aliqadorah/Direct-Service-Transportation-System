@@ -3,7 +3,6 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Configuration;
-using DirectService.Platform.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Domain.Acc;
@@ -162,7 +161,7 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
         rules.Require(errors, "phone", phone is null);
         if (phone is not null && !await support.IsPhoneAsync(phone, ct).ConfigureAwait(false)) rules.Invalid(errors, "phone");
         rules.Require(errors, "email", email is null);
-        if (email is not null && (email.Length > 150 || !AccountService.IsEmail(email))) rules.Invalid(errors, "email");
+        if (email is not null && (email.Length > 150 || !EmailFormat.IsValid(email))) rules.Invalid(errors, "email");
         rules.Require(errors, "address", address is null);
         if (address is { Length: > 300 }) rules.Invalid(errors, "address", ErrorCodes.ValidationRange);
         rules.Require(errors, "city", city is null);

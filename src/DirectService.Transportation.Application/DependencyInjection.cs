@@ -156,7 +156,7 @@ public static class DependencyInjection
 
         // Collaboration (B11)
         services.AddScoped<NotificationService>();
-        services.AddScoped<DirectService.Platform.Application.Notifications.IUserNotifier>(sp => sp.GetRequiredService<NotificationService>());
+        services.AddScoped<DirectService.Platform.Contracts.Collaboration.IUserNotifier>(sp => sp.GetRequiredService<NotificationService>());
         services.AddScoped<NotificationLinks>();
         services.AddScoped<ISearchProvider, TransportationSearch>();
         services.AddScoped<AuditLogService>();

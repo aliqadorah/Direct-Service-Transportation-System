@@ -9,7 +9,7 @@ using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Contracts.Errors;
 using DirectService.Platform.Contracts.Security;
 using DirectService.Platform.Contracts.Settings;
-using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Contracts.Collaboration;
 
 namespace DirectService.Platform.Application.Tenants;
 

@@ -5,6 +5,7 @@ using DirectService.Platform.Application.Errors;
 using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Application.Staff;
 using DirectService.Platform.Application.Tenants;
+using DirectService.Platform.Contracts.Modules;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DirectService.Platform.Application;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<RoleService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<PlanLimits>();
+        services.AddScoped<IPlanLimitCheck>(sp => sp.GetRequiredService<PlanLimits>());   // the module's trip limit (Stage 2 session 14)
         services.AddScoped<BillingService>();
 
         // Staff, provider set-up, system e-mail, support access and the tenant lifecycle (Stage 2 session 13; registered by AddApplication before, same lifetimes).
@@ -54,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<SetupChecklistService>();
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<CompanyExportService>();
+        services.AddScoped<IExportJobProvider, PlatformExportJobs>();   // the "company" export kind (Stage 2 session 14)
         return services;
     }
 }

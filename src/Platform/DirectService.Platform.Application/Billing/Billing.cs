@@ -13,7 +13,7 @@ namespace DirectService.Platform.Application.Billing;
 /// Usage against plan limits (5.3, P-07, BR-013): active non-demo companies (Q-06, G-11), active users, trips saved this calendar month,
 /// storage of exports. Creating beyond a limit is refused with an upgrade message; viewing, printing and exporting never are.
 /// </summary>
-public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider clock, IEnumerable<IUsageMeter> meters)
+public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider clock, IEnumerable<IUsageMeter> meters) : IPlanLimitCheck
 {
     private static readonly string[] AllFilters = ["Tenant", "Company"];
 

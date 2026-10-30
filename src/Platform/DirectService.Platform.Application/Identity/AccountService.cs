@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Contracts.Security;
@@ -208,19 +207,8 @@ public sealed class AccountService(
     private string Link(string path, string userToken, string token) =>
         $"{options.Value.PublicBaseUrl.TrimEnd('/')}/{path}?u={Uri.EscapeDataString(userToken)}&t={Uri.EscapeDataString(token)}";
 
-    public static bool IsEmail(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value) || value.Contains(' ', StringComparison.Ordinal)) return false;
-        try
-        {
-            var a = new MailAddress(value);
-            return a.Address == value && value.Contains('.', StringComparison.Ordinal);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
+    /// <summary>The e-mail address check (<see cref="EmailFormat"/>, SharedKernel since Stage 2 session 14).</summary>
+    public static bool IsEmail(string? value) => EmailFormat.IsValid(value);
 
     public static AppException PolicyError(PasswordPolicy p)
     {

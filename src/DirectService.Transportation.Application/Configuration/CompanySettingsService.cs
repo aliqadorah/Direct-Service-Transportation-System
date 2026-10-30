@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
-using DirectService.Platform.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Contracts.Tenants;
@@ -44,7 +43,7 @@ public sealed partial class CompanySettingsService(IAppDbContext db, IRequestCon
             .MaxLength("taxNumber", r.TaxNumber, 30).MaxLength("commercialRegNo", r.CommercialRegNo, 30)
             .MaxLength("address", r.Address, 300)
             .Check(phone is null || Regex.IsMatch(phone, phonePattern ?? SettingKeys.JordanPhonePattern, RegexOptions.None, TimeSpan.FromSeconds(1)), "phone")
-            .Check(string.IsNullOrEmpty(mail) || AccountService.IsEmail(mail), "email").MaxLength("email", mail, 150)
+            .Check(string.IsNullOrEmpty(mail) || EmailFormat.IsValid(mail), "email").MaxLength("email", mail, 150)
             .ThrowIfInvalid();
         if (await db.Set<Company>().AnyAsync(x => x.Id != c.Id && x.Name == name, ct).ConfigureAwait(false))
             throw Fail.Conflict(ErrorCodes.DuplicateKey, name!);

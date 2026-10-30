@@ -13,12 +13,4 @@ public sealed class CompanyInfo(IAppDbContext db, IRequestContext ctx) : ICompan
 
     public Task<string?> TimeZoneAsync(CancellationToken ct) =>
         db.Set<Company>().AsNoTracking().Where(c => c.Id == ctx.CompanyId).Select(c => (string?)c.TimeZone).SingleOrDefaultAsync(ct);
-
-    /// <summary>The print header of a company row a service has already read.</summary>
-    public static CompanyHeader Of(Company company)
-    {
-        ArgumentNullException.ThrowIfNull(company);
-        return new CompanyHeader(company.Name, company.NameEn, company.TaxNumber, company.CommercialRegNo, company.Address, company.Phone, company.LogoFile,
-            company.CurrencyCode, company.CurrencyDecimals, company.TimeZone);
-    }
 }

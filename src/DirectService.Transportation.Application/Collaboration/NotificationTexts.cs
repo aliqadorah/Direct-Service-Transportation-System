@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Contracts.Collaboration;
 
 namespace DirectService.Transportation.Application.Collaboration;
 

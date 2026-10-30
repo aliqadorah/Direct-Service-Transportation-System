@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text.Json;
 
-namespace DirectService.Platform.Application.Notifications;
+namespace DirectService.Platform.Contracts.Collaboration;
 
 /// <summary>
 /// The platform's notification types (stored in core.Notifications.Type; values pinned) and the stored form of a notification's message
 /// (DT-189): its parameters as JSON {"p":{…}}, the text built in the reader's language when shown. Defined here only: the module's
-/// <c>NotificationService</c> names the types and <c>NotificationTexts</c> stores and reads through these members (Stage 2 session 13).
+/// <c>NotificationService</c> names the types and <c>NotificationTexts</c> stores and reads through these members (Stage 2 session 13;
+/// Platform.Contracts since session 14, so a module stores and sends notifications without Platform.Application).
 /// </summary>
 public static class PlatformNotifications
 {
@@ -58,8 +59,8 @@ public static class PlatformNotifications
 }
 
 /// <summary>
-/// Sends in-app notifications (FR-190) to users: stored with their type and parameters, pushed after the commit. Implemented by the module's
-/// <c>NotificationService</c> until the notification service moves to the platform (Stage 2 session 13).
+/// Sends in-app notifications (FR-190) to users: stored with their type and parameters, pushed after the commit. Implemented by the
+/// <c>NotificationService</c>.
 /// </summary>
 public interface IUserNotifier
 {

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Application.Email;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Contracts.Modules;

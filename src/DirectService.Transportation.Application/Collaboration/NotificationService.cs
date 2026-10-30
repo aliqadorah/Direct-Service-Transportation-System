@@ -5,7 +5,6 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
-using DirectService.Platform.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Collaboration;

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Notifications;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Contracts.Errors;
 using DirectService.Platform.Contracts.Security;
 using DirectService.Platform.Application.Billing;
