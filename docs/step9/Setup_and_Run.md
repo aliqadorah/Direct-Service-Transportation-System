@@ -34,7 +34,7 @@ git config core.hooksPath .githooks
 | `src/Shared/DirectService.Shared.Infrastructure` | the composed `MasterDbContext` (each module adds its model through an `IModelContributor`), query filters, the audit interceptor, `MasterDatabase.UseMasterDatabase` (SQL Server, migrations assembly, history table) |
 | `src/Hosts/DirectService.Database` | the EF Core migrations (20 + the model snapshot) and the design-time factory (user secrets `dst-infrastructure-designtime`); every `dotnet ef` command names this project |
 | `src/DirectService.Transportation.Web` | ASP.NET Core host: minimal-API endpoints `/api/v1`, account pages (static SSR), workers, SignalR hub, hosts the UI |
-| `src/DirectService.Transportation.Web.Client` | Blazor WebAssembly UI: design system (`Ui/`, `Layout/`), screens (`Pages/`), AR/EN text (`Localization/`) |
+| `src/DirectService.Transportation.Web.Client` | Blazor WebAssembly UI: module screens (`Pages/`), the static menu, links and help content, AR/EN module text (`Localization/`); design system, shell and client services in `src/Shared/DirectService.Shared.UI`, platform screens in `src/Platform/DirectService.Platform.UI` (Stage 2 session 15) |
 | `tests/*.Tests` | Domain, Application (unit), Infrastructure (database rules), Api (integration, isolation, security), UI (bUnit) |
 | `tests/e2e` | Playwright end-to-end flows (PRD Section 9) and the WCAG 2.1 AA check, Arabic and English |
 | `database/` | `00_CreateDatabase.sql`, `MasterDatabase_Idempotent.sql`, `90_ApplicationUser.sql` |

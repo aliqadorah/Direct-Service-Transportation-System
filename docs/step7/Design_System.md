@@ -5,14 +5,15 @@ _11 Oct 2026. Built from the approved step 6 board (`docs/step6/`, direction **A
 ## Where it lives
 | Part | Location |
 |---|---|
-| WebAssembly UI project (references **Contracts only**, ADR-02) | `src/DirectService.Transportation.Web.Client` |
-| Design tokens | `wwwroot/css/tokens.css` |
-| Component styles (board class names, logical properties, RTL + LTR) | `wwwroot/css/app.css` |
-| Brand fonts (one copy, SIL OFL 1.1) | `assets/fonts/*.woff2` → served at `/fonts/…` (`wwwroot/css/fonts.css`) and embedded in printouts (`Application/Common/BrandFonts.cs`) |
-| Icons (sprite from the board + 9 additions) | `wwwroot/img/icons.svg` |
-| Browser helpers (focus trap, shortcuts, outside click, device preferences) | `wwwroot/js/ui.js` (ES module, no inline script) |
-| Components | `Ui/` (primitives, feedback, forms, grid), `Layout/` (shell) |
-| Interface text AR/EN | `Localization/UiText.cs`, `Loc` service |
+| WebAssembly UI project (references **Contracts and the UI libraries only**, ADR-02) | `src/DirectService.Transportation.Web.Client` (module screens, the static menu / links / help content and `ClientComposition`) |
+| Design system, shell and client services (since Stage 2 session 15) | `src/Shared/DirectService.Shared.UI`; platform screens and layouts in `src/Platform/DirectService.Platform.UI` |
+| Design tokens | `Shared.UI/wwwroot/css/tokens.css` (served at `/css/tokens.css`: the library's static web assets have the base path "/", DT-368) |
+| Component styles (board class names, logical properties, RTL + LTR) | `Shared.UI/wwwroot/css/app.css` |
+| Brand fonts (one copy, SIL OFL 1.1) | `assets/fonts/*.woff2` → served at `/fonts/…` (`Shared.UI/wwwroot/css/fonts.css`) and embedded in printouts (`SharedKernel/Printing/BrandFonts.cs`) |
+| Icons (sprite from the board + 9 additions) | `Shared.UI/wwwroot/img/icons.svg` |
+| Browser helpers (focus trap, shortcuts, outside click, device preferences) | `Shared.UI/wwwroot/js/ui.js` (ES module, no inline script); `theme.js` before the first paint |
+| Components | `Shared.UI/Ui/` (primitives, feedback, forms, grid), `Shared.UI/Layout/` (shell); platform layouts in `Platform.UI/Layout/` |
+| Interface text AR/EN | `Shared.UI/Localization/UiText*.cs` (common, reports, settings) with `Loc`; `Platform.UI/Localization/UiText.Platform.cs` (`PlatformTexts`) and the module parts in the browser app (`AppTexts`), added by `ClientComposition.Apply` |
 | Host wiring | `Web/Components/App.razor`, `Program.cs` (`AddRazorComponents().AddInteractiveWebAssemblyComponents()`, `MapStaticAssets`, `MapRazorComponents`) |
 | Component gallery (development only) | `/design` — every component in its states inside the real shell |
 | Tests | `tests/DirectService.Transportation.UI.Tests` (bUnit, 52 tests) |

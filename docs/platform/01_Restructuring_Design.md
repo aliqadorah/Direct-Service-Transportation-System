@@ -84,7 +84,7 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 | `*.Application` | its own Domain and Contracts, SharedKernel, `Platform.Contracts`, **other modules' Contracts**. No exception since Stage 2 session 14 (the temporary Transportation.Application → Platform.Application reference of DT-343 is gone, DT-365; the compiled assembly is checked too). Test: `LayerRuleTests.Module_application_references_its_domain_and_contracts_and_the_platform_contracts` |
 | `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09); a module's Domain may hold them as foreign-key navigation properties (a.4, DT-338). Test: `LayerRuleTests.Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1` |
 | `*.UI` | its own Contracts, `Platform.Contracts`, Shared.UI |
-| Shared.* | nothing from Platform or the modules |
+| Shared.* | nothing from Platform or the modules. One exception (owner decision DT-367, Stage 2 session 15): **Shared.UI may reference `Platform.Contracts`** (browser-safe DTOs; the shell shows the signed-in user, the companies and the notifications). Tests: `LayerRuleTests.Shared_projects_reference_no_platform_or_module_project`, `The_ui_libraries_reference_only_contracts_and_shared_ui` |
 | `Shared.Contracts` (added in Stage 2 session 6, owner decision DT-309) | nothing at all — browser-safe DTOs of the shared engines; SharedKernel may reference it, and the module Contracts and UI use it |
 | Web.Client | the UI projects, Shared.UI, Contracts |
 | Web | everything (composition root) |
@@ -311,6 +311,8 @@ Dashboard:
 | Help topics: monthly-rates, quick-entry, trip-import, trip-edit, invoicing, e-invoicing, credit-notes, receipts, driver-accounts, partner-payments | T |
 | Help topics: concurrent-work, fields | S |
 | `wwwroot/DirectService.Transportation.Web.Client.lib.module.js` | renamed with the client assembly (section e, item E-21) |
+
+**Done in Stage 2 session 15 (DT-368…DT-371)** as listed above, with these differences: `NavModel`, `Links` and `HelpTopics` are in Shared.UI as logic only (`Links` over an `ILinkResolver`); their content (`AppMenu`, `AppLinks`, `AppHelpTopics`) and the module texts (`AppTexts`) stay in the browser app, which gives them to the shell once at start-up (`ClientComposition.Apply`, also called by the host and the UI tests) until Stage 4 composes them per module; `UiText.Settings` / `UiText.Reports` are in Shared.UI whole (the split by key comes with Accounting.UI / Transportation.UI); `CompanyLayout`, `NotFoundPage` and the console help page are in Platform.UI (they show the platform's banners / the console layout); still in the browser app: `RecordHistory` (the module's `HistoryEntry`), `FieldConfiguration` (`DeleteRequest`), `CompanySettings` (the operations section, DT-363), `PrintPreview` (`VoucherHtml`), `Dashboard`, `ReportsCatalog` (lookups), `DesignGallery` and `PostingBanner`. `LiveHubNames` moved to Shared.Contracts (values unchanged).
 
 ### a.11 Test classes → see section i.2.
 
@@ -586,7 +588,7 @@ Every value kept its byte-for-byte value; the golden files in `tests/DirectServi
 | E-25 | `AuthSchemes`, `AppClaims`, new `AuthCookies` (`Web/Security/AuthSetup.cs`) | cookies, antiforgery cookie and header; used by `AuthSetup`, `Program.cs`, `OpenApiSetup`; golden reads the cookie names from the real authentication set-up |
 | E-26 | `ReplaySafeAuthenticatorTokenProvider.Name` (since Stage 2 session 11 in `Platform.Infrastructure/Identity`), `StaffService.InvitationTokenProvider` / `InvitationPurpose` | already constants; `Default` is the framework's provider name |
 | E-27 | `Contracts/Collaboration/LiveHubNames.cs` (path, group prefix, hub methods, 4 events) | shared by `LiveHub` / `SignalRNotifier` and the browser's `LiveUpdates`; hub methods now carry `[HubMethodName]` with the same names |
-| E-28 | `Web.Client/Services/PrefKeys.cs` (`dst.`, `theme.`, `nav.`); `wwwroot/js/ui.js` (`"dst." + key`), `wwwroot/js/theme.js` (`dst.theme`) | test reads both scripts |
+| E-28 | `Shared.UI/Services/PrefKeys.cs` (`dst.`, `theme.`, `nav.`); `Shared.UI/wwwroot/js/ui.js` (`"dst." + key`), `Shared.UI/wwwroot/js/theme.js` (`dst.theme`) (in `Web.Client` until Stage 2 session 15) | test reads both scripts |
 | E-29 | `<UserSecretsId>` in `Web/…Web.csproj` and `Hosts/DirectService.Database/DirectService.Database.csproj` (moved from Infrastructure in Stage 2 session 3, same value) | golden |
 | E-30 | not stored — configuration and environment names (`DST_` prefix in `DesignTimeDbContextFactory`, `DST_TEST_DB`, …) | unchanged; not data |
 | E-31 | `UrlTokenOptions.Section` (`UrlTokens`) + `Key` | unchanged |
@@ -735,7 +737,7 @@ Rollback: Down drops the new tables while no manual action or product trial exis
   - `tokens.css` (colour tokens, light/dark themes, RTL/LTR) and `app.css`;
   - fonts and the icon sprite;
   - the components and the shell.
-  - Module libraries use only tokens and Shared components (no colour literals, test-enforced as today). Static files stay at the root URLs they have today (`css/app.css`, `js/ui.js`, `img/icons.svg`), so the Shared.UI files are served by the Web.Client project, not at `_content/…`, to keep every URL and cache entry the same.
+  - Module libraries use only tokens and Shared components (no colour literals, test-enforced as today). Static files stay at the root URLs they have today (`css/app.css`, `js/ui.js`, `img/icons.svg`): since Stage 2 session 15 they live in `Shared.UI/wwwroot` and the library's static web assets have the base path `/` instead of `_content/DirectService.Shared.UI` (DT-368), so every URL and fingerprint is the same (proved on the endpoint manifest and the requests of a first load). Linking the files into the browser app's wwwroot was tried first and refused: in Development the server then answers those URLs with empty bodies.
 - **Menu by product**:
   - f.7. Before Stage 5, the product provider returns "every product Full" for all tenants, so Stage 4 can deliver the composed menu with no behaviour change.
   - Product hiding is UI only. The API checks are authoritative (f.7).
