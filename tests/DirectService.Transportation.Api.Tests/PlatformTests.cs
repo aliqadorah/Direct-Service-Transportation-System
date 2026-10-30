@@ -13,6 +13,8 @@ using DirectService.Transportation.Domain.Trn;
 using DirectService.Platform.Infrastructure.Billing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Staff;
+using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Api.Tests;
 

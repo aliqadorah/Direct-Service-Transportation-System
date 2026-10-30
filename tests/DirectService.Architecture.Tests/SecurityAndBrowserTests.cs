@@ -69,8 +69,8 @@ public sealed class SecurityAndBrowserTests
     public void Identity_token_providers_and_the_url_token_prefix_are_unchanged()
     {
         Same(Value("identityTokenProviders", "replaySafe"), DirectService.Platform.Infrastructure.Identity.ReplaySafeAuthenticatorTokenProvider.Name);
-        Same(Value("identityTokenProviders", "staffInvitationProvider"), DirectService.Transportation.Application.Platform.StaffService.InvitationTokenProvider);
-        Same(Value("identityTokenProviders", "staffInvitationPurpose"), DirectService.Transportation.Application.Platform.StaffService.InvitationPurpose);
+        Same(Value("identityTokenProviders", "staffInvitationProvider"), DirectService.Platform.Application.Staff.StaffService.InvitationTokenProvider);
+        Same(Value("identityTokenProviders", "staffInvitationPurpose"), DirectService.Platform.Application.Staff.StaffService.InvitationPurpose);
         Same(Value("urlTokenInfoPrefix"), UrlTokenService.InfoPrefix);
     }
 

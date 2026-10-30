@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
+using DirectService.Platform.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Contracts.Tenants;

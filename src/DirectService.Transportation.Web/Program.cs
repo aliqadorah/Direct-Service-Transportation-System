@@ -187,7 +187,7 @@ await DirectService.Transportation.Web.Pipeline.DatabaseVersion.EnsureCurrentAsy
 if (args is ["create-staff", var staffEmail, .. var staffName])
 {
     using var opsScope = app.Services.CreateScope();
-    var outcome = await opsScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Application.Platform.StaffAccountService>()
+    var outcome = await opsScope.ServiceProvider.GetRequiredService<DirectService.Platform.Application.Staff.StaffAccountService>()
         .CreateAsync(staffEmail, string.Join(' ', staffName), CancellationToken.None).ConfigureAwait(false);
     // The email went into the outbox (DT-251); the command sends it now rather than leave it to the next start of the host.
     using (var sendScope = app.Services.CreateScope())
@@ -201,7 +201,7 @@ if (args is ["create-staff", var staffEmail, .. var staffName])
 try
 {
     using var setupScope = app.Services.CreateScope();
-    await setupScope.ServiceProvider.GetRequiredService<DirectService.Transportation.Application.Platform.ProviderSetupService>()
+    await setupScope.ServiceProvider.GetRequiredService<DirectService.Platform.Application.Staff.ProviderSetupService>()
         .AnnounceAsync(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ProviderSetup"), CancellationToken.None).ConfigureAwait(false);
 }
 catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or InvalidOperationException)

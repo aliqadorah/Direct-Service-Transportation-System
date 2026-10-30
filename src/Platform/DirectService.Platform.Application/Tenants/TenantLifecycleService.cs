@@ -1,24 +1,18 @@
 using System.Reflection;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Collaboration;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Tenants;
-using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Common;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
 using DirectService.Platform.Application.Email;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Contracts.Modules;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Tenants;
 
 /// <summary>
 /// Support access on the tenant side (5.5, BR-014, tenant.manage): the Owner sees the provider's requests and approves a time-limited window
@@ -27,7 +21,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// Every query here names the signed-in tenant explicitly besides the tenant filter (owner testing 19 Oct 2026, DT-213: a nested
 /// IgnoreQueryFilters had switched the filter off for the whole list query, so another tenant's requests were listed).
 /// </summary>
-public sealed partial class SupportAccessService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, TimeProvider clock,
+public sealed partial class SupportAccessService(IAppDbContext db, IRequestContext ctx, RecordSupport support, IChangeContext changes, TimeProvider clock,
     IEmailSender email, IOptions<AppOptions> app, Microsoft.Extensions.Logging.ILogger<SupportAccessService> log, IRealtimeNotifier live, DataScope scope)
 {
     public const int MaxWindowDays = 7;
@@ -70,7 +64,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     }
 
     /// <summary>The Owner's reason of each refused request (from its "Reject" audit row; no schema change), by grant id.</summary>
-    internal static async Task<Dictionary<long, string>> RefusalReasonsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    public static async Task<Dictionary<long, string>> RefusalReasonsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
     {
         if (grantIds.Count == 0) return [];
         var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
@@ -92,18 +86,18 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         var tenantId = TenantId;
         var publicId = support.Decode<SupportAccessGrant>(token);
         return (publicId is Guid pid ? await Mine.SingleOrDefaultAsync(g => g.PublicId == pid && g.TenantId == tenantId, ct).ConfigureAwait(false) : null)
-            ?? throw new AppException(ErrorCodes.SupportRequestNotFound, 404);
+            ?? throw new AppException(PlatformErrorCodes.SupportRequestNotFound, 404);
     }
 
     public async Task<IReadOnlyList<SupportAccessResponse>> ApproveAsync(string token, SupportApprovalRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
         var g = await FindAsync(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested);
+        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(PlatformErrorCodes.SupportNotRequested);
         var starts = (r.StartsAt ?? Now).ToUniversalTime();
         // A length in hours (DT-157) is measured on the server's clock, never the browser's.
         var ends = (r.EndsAt ?? starts.AddHours(r.Hours is int h and > 0 ? h : 24)).ToUniversalTime();
-        if (ends <= starts || ends - starts > TimeSpan.FromDays(MaxWindowDays) || ends <= Now) throw Fail.Rule(ErrorCodes.SupportWindow);
+        if (ends <= starts || ends - starts > TimeSpan.FromDays(MaxWindowDays) || ends <= Now) throw Fail.Rule(PlatformErrorCodes.SupportWindow);
         g.Status = LifecycleCodes.Approved;
         g.ApprovedBy = ctx.UserId;
         g.StartsAt = starts;
@@ -118,7 +112,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     {
         var why = MasterIds.Reason(reason);
         var g = await FindAsync(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(ErrorCodes.SupportNotRequested);
+        if (g.Status != LifecycleCodes.Requested) throw Fail.Rule(PlatformErrorCodes.SupportNotRequested);
         g.Status = LifecycleCodes.Rejected;
         g.ApprovedBy = ctx.UserId;
         changes.SetAction(g, RejectAction, why);
@@ -156,7 +150,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
     public async Task<IReadOnlyList<SupportAccessResponse>> EndAsync(string token, CancellationToken ct)
     {
         var g = await FindAsync(token, ct).ConfigureAwait(false);
-        if (g.Status != LifecycleCodes.Approved || g.EndsAt <= Now) throw Fail.Rule(ErrorCodes.SupportNotOpen);
+        if (g.Status != LifecycleCodes.Approved || g.EndsAt <= Now) throw Fail.Rule(PlatformErrorCodes.SupportNotOpen);
         g.Status = LifecycleCodes.Expired;
         g.EndsAt = Now > g.StartsAt ? Now : g.StartsAt!.Value.AddSeconds(1);
         changes.SetAction(g, EndAction);
@@ -203,7 +197,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
             var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => c.TenantId == g.TenantId && !c.IsDeleted)
                 .Select(c => c.PublicId).ToListAsync(ct).ConfigureAwait(false);
             var at = DateTime.SpecifyKind(g.EndsAt ?? Now, DateTimeKind.Utc);
-            var reason = endedBy is null ? ErrorCodes.SupportWindowExpired : ErrorCodes.SupportEndedBySubscriber;
+            var reason = endedBy is null ? PlatformErrorCodes.SupportWindowExpired : PlatformErrorCodes.SupportEndedBySubscriber;
             await live.SupportEndedAsync(staff.PublicId, new { reason, endedAt = at, endedBy, companies = companies.Select(c => support.Token<Company>(c)).ToList() }, ct)
                 .ConfigureAwait(false);
             if (staff.Email is null) return;
@@ -232,13 +226,13 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         {
             var ended = (await EndsAsync(db, tenantId, [g.Id], ct).ConfigureAwait(false)).GetValueOrDefault(g.Id);
             var at = DateTime.SpecifyKind(ends, DateTimeKind.Utc);
-            return ended is not null ? new ClosedWindow(ErrorCodes.SupportEndedBySubscriber, at, ended) : new ClosedWindow(ErrorCodes.SupportWindowExpired, at, null);
+            return ended is not null ? new ClosedWindow(PlatformErrorCodes.SupportEndedBySubscriber, at, ended) : new ClosedWindow(PlatformErrorCodes.SupportWindowExpired, at, null);
         }
-        return new ClosedWindow(ErrorCodes.SupportNotApproved, null, null);
+        return new ClosedWindow(PlatformErrorCodes.SupportNotApproved, null, null);
     }
 
     /// <summary>Who ended each window early (from its "End" audit row; a window that simply expired has none), by grant id.</summary>
-    internal static async Task<Dictionary<long, string>> EndsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
+    public static async Task<Dictionary<long, string>> EndsAsync(IAppDbContext db, long? tenantId, IReadOnlyCollection<long> grantIds, CancellationToken ct)
     {
         if (grantIds.Count == 0) return [];
         var rows = await db.Set<AuditLog>().AsNoTracking().IgnoreQueryFilters()
@@ -253,11 +247,6 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
         return result;
     }
 
-    /// <summary>Read-only permissions of a support session (G-09: all view permissions of the company, nothing that creates or changes).</summary>
-    public static readonly IReadOnlySet<string> SessionPermissions = new HashSet<string>(StringComparer.Ordinal)
-    {
-        PermissionKeys.TripsView, PermissionKeys.InvView, PermissionKeys.DrvView, PermissionKeys.JeView, PermissionKeys.AcctView, PermissionKeys.ReportsView,
-    };
 }
 
 /// <summary>
@@ -267,7 +256,7 @@ public sealed partial class SupportAccessService(IAppDbContext db, IRequestConte
 /// soft-deleted (reason "Retention period ended") and personal data is anonymised in place (SEC-19), the tenant is marked Deleted and the
 /// Owner receives a confirmation. The suspension date is kept in GraceEndsAt (DT-125).
 /// </summary>
-public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope scope, BillingService billing, IPaymentGateway gateway, NotificationService notifications,
+public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope scope, BillingService billing, IPaymentGateway gateway, IUserNotifier notifications,
     IEmailSender email, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, IEnumerable<ITenantDataEraser> erasers, IPlatformLock? locks = null,
     Microsoft.Extensions.Logging.ILogger<TenantLifecycleService>? log = null)
 {
@@ -401,13 +390,13 @@ public sealed partial class TenantLifecycleService(IAppDbContext db, DataScope s
         changes.SetAction(t, "PaymentFailed", invoice.Number);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var owners = await OwnersAsync(t.Id, ct).ConfigureAwait(false);
-        await notifications.NotifyAsync(owners.Select(o => o.Id), null, NotificationService.PaymentFailed,
-            new Dictionary<string, string?> { ["days"] = NotificationTexts.Number(O.GraceDays) }, "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
+        await notifications.NotifyAsync(owners.Select(o => o.Id), null, PlatformNotifications.PaymentFailed,
+            new Dictionary<string, string?> { ["days"] = PlatformNotifications.Number(O.GraceDays) }, "/tenant/subscription", ct, t.Id).ConfigureAwait(false);
     }
 
     private async Task<List<(long Id, string? Email, string Name, string Language)>> OwnersAsync(long tenantId, CancellationToken ct) =>
         (await db.Set<UserCompanyRole>().AsNoTracking().IgnoreQueryFilters()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.User.Status == "Active" && x.Role.IsPreset && x.Role.Name == PresetRoles.Owner)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.User.Status == "Active" && x.Role.IsPreset && x.Role.Name == PlatformPresetRoles.Owner)
             .Select(x => new { x.UserId, x.User.Email, x.User.FullName, x.User.LanguageCode }).Distinct().ToListAsync(ct).ConfigureAwait(false))
         .Select(x => (x.UserId, x.Email, x.FullName, x.LanguageCode)).ToList();
 

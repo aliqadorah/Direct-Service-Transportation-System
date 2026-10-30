@@ -1,11 +1,12 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
+using DirectService.Platform.Application.Tenants;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Staff;
 
 /// <summary>
 /// Platform staff accounts by the operations command (D-13, DT-131) — for recovery only since owner feedback 13 Oct 2026 (the first account
@@ -28,7 +29,7 @@ public sealed class StaffAccountService(IDataScope scope, UserManager<User> user
         var existing = await users.FindByEmailAsync(mail!).ConfigureAwait(false);
         if (existing is not null)
         {
-            if (!existing.IsPlatformStaff || existing.TenantId is not null) throw Fail.Conflict(ErrorCodes.EmailInUse);
+            if (!existing.IsPlatformStaff || existing.TenantId is not null) throw Fail.Conflict(PlatformErrorCodes.EmailInUse);
             await accounts.SendPasswordResetAsync(existing, ct).ConfigureAwait(false);
             return "Existing staff account: a new set-password link was sent.";
         }
@@ -39,7 +40,7 @@ public sealed class StaffAccountService(IDataScope scope, UserManager<User> user
         };
         changes.SetAction(user, "CreateStaff");
         var created = await users.CreateAsync(user).ConfigureAwait(false);   // no password: set through the e-mailed link
-        if (!created.Succeeded) throw Fail.Rule(ErrorCodes.ValidationFailed, string.Join("; ", created.Errors.Select(e => e.Description)));
+        if (!created.Succeeded) throw Fail.Rule(SharedErrorCodes.ValidationFailed, string.Join("; ", created.Errors.Select(e => e.Description)));
         await accounts.SendPasswordResetAsync(user, ct).ConfigureAwait(false);
         return "Staff account created: a set-password link was sent.";
     }

@@ -1,14 +1,11 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
-using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Roles of the tenant (PRD 3.3–3.5, FR-173): presets are fixed and cannot be deleted; custom roles are
@@ -20,7 +17,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
 {
     public async Task<IReadOnlyList<PermissionItem>> PermissionsAsync(CancellationToken ct) =>
         (await db.Set<Permission>().AsNoTracking().OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false))
-            .Select(p => new PermissionItem(p.PermissionKey, PermissionKeys.PrdName(p.PermissionKey), p.GroupName, p.DescriptionAr, p.DescriptionEn))
+            .Select(p => new PermissionItem(p.PermissionKey, PlatformPermissionKeys.PrdName(p.PermissionKey), p.GroupName, p.DescriptionAr, p.DescriptionEn))
             .ToList();
 
     public async Task<IReadOnlyList<RoleResponse>> ListAsync(CancellationToken ct)
@@ -54,7 +51,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
     {
         ArgumentNullException.ThrowIfNull(r);
         var role = await FindAsync(roleToken, ct).ConfigureAwait(false);
-        if (role.IsPreset) throw Fail.Rule(ErrorCodes.PresetRoleFixed);
+        if (role.IsPreset) throw Fail.Rule(PlatformErrorCodes.PresetRoleFixed);
         var name = Validate(r);
         guard.EnsureCanGrant(r.Permissions.Concat(role.RolePermissions.Select(p => p.Permission.PermissionKey))); // SR-01
         db.ExpectRowVersion(role, r.RowVersion);
@@ -62,7 +59,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
         await SetPermissionsAsync(role, r.Permissions, ct).ConfigureAwait(false);
 
         // BR-002: removing users.manage must not leave a company without an active user manager.
-        if (!r.Permissions.Contains(PermissionKeys.UsersManage))
+        if (!r.Permissions.Contains(PlatformPermissionKeys.UsersManage))
         {
             var companies = await db.Set<UserCompanyRole>().AsNoTracking().Where(u => u.RoleId == role.Id)
                 .Select(u => u.CompanyId).Distinct().ToListAsync(ct).ConfigureAwait(false);
@@ -70,8 +67,8 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
             {
                 var others = await db.Set<UserCompanyRole>().AsNoTracking().AnyAsync(u => u.CompanyId == companyId && u.RoleId != role.Id
                     && u.User.Status == "Active" && !u.User.IsDeleted
-                    && u.Role.RolePermissions.Any(p => p.Permission.PermissionKey == PermissionKeys.UsersManage), ct).ConfigureAwait(false);
-                if (!others) throw Fail.Rule(ErrorCodes.LastUserManager);
+                    && u.Role.RolePermissions.Any(p => p.Permission.PermissionKey == PlatformPermissionKeys.UsersManage), ct).ConfigureAwait(false);
+                if (!others) throw Fail.Rule(PlatformErrorCodes.LastUserManager);
             }
         }
         await SaveUniqueAsync(role, name, ct).ConfigureAwait(false);
@@ -83,10 +80,10 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
     {
         UserAdminService.RequireReasonPublic(reason);
         var role = await FindAsync(roleToken, ct).ConfigureAwait(false);
-        if (role.IsPreset) throw Fail.Rule(ErrorCodes.PresetRoleFixed);
+        if (role.IsPreset) throw Fail.Rule(PlatformErrorCodes.PresetRoleFixed);
         guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // SR-01
         var inUse = await db.Set<UserCompanyRole>().CountAsync(u => u.RoleId == role.Id && !u.User.IsDeleted, ct).ConfigureAwait(false);
-        if (inUse > 0) throw Fail.Rule(ErrorCodes.RoleInUse, inUse);
+        if (inUse > 0) throw Fail.Rule(PlatformErrorCodes.RoleInUse, inUse);
         foreach (var p in role.RolePermissions)
         {
             p.DeleteReason = "Role deleted";
@@ -102,7 +99,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
         var name = TextNormalizer.CleanText(r.Name);
         new Validator().Require("name", name).MaxLength("name", name, 100)
             .Check(r.Permissions is not null && r.Permissions.All(catalogs.IsKey), "permissions")
-            .Check(!PresetRoles.All.Contains(name ?? string.Empty, StringComparer.OrdinalIgnoreCase), "name", ErrorCodes.DuplicateKey)
+            .Check(!PlatformPresetRoles.All.Contains(name ?? string.Empty, StringComparer.OrdinalIgnoreCase), "name", SharedErrorCodes.DuplicateKey)
             .ThrowIfInvalid();
         return name!;
     }
@@ -127,7 +124,7 @@ public sealed class RoleService(IAppDbContext db, IChangeContext changes, Access
     private async Task SaveUniqueAsync(Role role, string name, CancellationToken ct)
     {
         if (await db.Set<Role>().AnyAsync(x => x.Name == name && x.Id != role.Id, ct).ConfigureAwait(false))
-            throw Fail.Conflict(ErrorCodes.DuplicateKey, name);
+            throw Fail.Conflict(SharedErrorCodes.DuplicateKey, name);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

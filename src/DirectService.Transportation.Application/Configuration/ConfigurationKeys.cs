@@ -1,6 +1,8 @@
+using DirectService.Platform.Contracts.Settings;
+
 namespace DirectService.Transportation.Application.Configuration;
 
-/// <summary>cfg.CompanySettings keys (module-prefixed, design §3.2) with their PRD defaults (7.9.1).</summary>
+/// <summary>cfg.CompanySettings keys (module-prefixed, design §3.2) with their PRD defaults (7.9.1); the CORE.* keys are defined in <see cref="PlatformSettingKeys"/>.</summary>
 public static class SettingKeys
 {
     public const string BillOnUnloadedWeight = "TRN.BillOnUnloadedWeight";
@@ -11,12 +13,12 @@ public static class SettingKeys
     public const string AccrueDriverWage = "TRN.AccrueDriverWage";
 
     /// <summary>Market validation formats (7.9.1 "phone and IBAN validation formats"; launch market Jordan).</summary>
-    public const string PhonePattern = "CORE.PhonePattern";
-    public const string IbanPattern = "CORE.IbanPattern";
+    public const string PhonePattern = PlatformSettingKeys.PhonePattern;
+    public const string IbanPattern = PlatformSettingKeys.IbanPattern;
 
     /// <summary>Demo company flag (G-11) and setup checklist marks (G-10).</summary>
-    public const string IsDemo = "CORE.IsDemo";
-    public const string SetupPrefix = "CORE.Setup.";
+    public const string IsDemo = PlatformSettingKeys.IsDemo;
+    public const string SetupPrefix = PlatformSettingKeys.SetupPrefix;
 
     /// <summary>
     /// Last date (company time, yyyy-MM-dd) a supplier bill with a deduction was refused because "Supplier deductions" is not mapped: the
@@ -24,8 +26,8 @@ public static class SettingKeys
     /// </summary>
     public const string SupplierDeductionAttempted = "ACC.SupplierDeductionAttempted";
 
-    public const string JordanPhonePattern = "^(07[789][0-9]{7}|06[0-9]{7})$";
-    public const string JordanIbanPattern = "^JO[0-9]{2}[A-Z]{4}[0-9]{4}[A-Z0-9]{18}$";
+    public const string JordanPhonePattern = PlatformSettingKeys.JordanPhonePattern;
+    public const string JordanIbanPattern = PlatformSettingKeys.JordanIbanPattern;
 
     /// <summary>Defaults written when a company is created (cfg.CompanySettings business rules).</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>

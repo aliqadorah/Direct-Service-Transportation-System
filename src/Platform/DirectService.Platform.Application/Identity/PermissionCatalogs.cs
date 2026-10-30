@@ -18,4 +18,8 @@ public static class PermissionCatalogs
     /// <summary>The keys of the preset role <paramref name="name"/> (<c>PlatformPresetRoles</c>) from every catalogue, first occurrence kept.</summary>
     public static IReadOnlyList<string> PresetRoleKeys(this IEnumerable<IPermissionCatalog> catalogs, string name) =>
         catalogs.SelectMany(c => c.PresetRoles.TryGetValue(name, out var keys) ? keys : []).Distinct(StringComparer.Ordinal).ToList();
+
+    /// <summary>The keys of a support session (G-09) from every catalogue.</summary>
+    public static IReadOnlySet<string> SupportSessionKeys(this IEnumerable<IPermissionCatalog> catalogs) =>
+        new HashSet<string>(catalogs.SelectMany(c => c.SupportSessionKeys), StringComparer.Ordinal);
 }

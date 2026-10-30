@@ -1,16 +1,14 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// The signed-in user manages their own two-step verification from the profile (owner testing 19 Oct 2026, DT-210):
@@ -57,8 +55,8 @@ public sealed partial class TwoFactorSettingsService(
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(r);
-        if (IsStaff(user)) throw Fail.Rule(ErrorCodes.TwoFactorRequiredForStaff);
-        if (await auth.RequiresTwoFactorAsync(user, ct).ConfigureAwait(false)) throw Fail.Rule(ErrorCodes.TwoFactorRequiredByPolicy);
+        if (IsStaff(user)) throw Fail.Rule(PlatformErrorCodes.TwoFactorRequiredForStaff);
+        if (await auth.RequiresTwoFactorAsync(user, ct).ConfigureAwait(false)) throw Fail.Rule(PlatformErrorCodes.TwoFactorRequiredByPolicy);
         await auth.VerifyStepUpAsync(user, r.CurrentPassword, r.Code, r.RecoveryCode, ct).ConfigureAwait(false);
         using (scope.Use(user.TenantId, null, user.Id))
         {
@@ -89,17 +87,17 @@ public sealed partial class TwoFactorSettingsService(
     public async Task ConfirmChangeAsync(User user, string? code, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (user.TwoFactorEnabledAt is null) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (user.TwoFactorEnabledAt is null) throw new AppException(SharedErrorCodes.Forbidden, 403);
         // The pending key belongs to the session that started the change (security review 19 Oct 2026) and allows a few wrong codes only.
         if (!cache.TryGetValue<PendingChange>(PendingKey(user.Id), out var pending) || pending is null
             || !string.Equals(pending.Stamp, user.SecurityStamp, StringComparison.Ordinal) || pending.SessionId != ctx.SessionId)
-            throw Fail.Rule(ErrorCodes.TwoFactorChangeExpired);
+            throw Fail.Rule(PlatformErrorCodes.TwoFactorChangeExpired);
         var step = TotpCode.MatchStep(pending.Key, TextNormalizer.DigitsOnly(code), clock.GetUtcNow());
         if (step is null)
         {
             if (Interlocked.Increment(ref pending.WrongCodes) >= MaxWrongCodes) cache.Remove(PendingKey(user.Id));
             await auth.RecordStepUpFailureAsync(user, ct).ConfigureAwait(false);   // counts towards the lockout like any wrong code
-            throw Fail.Field("code", ErrorCodes.TwoFactorInvalid);
+            throw Fail.Field("code", PlatformErrorCodes.TwoFactorInvalid);
         }
         using (scope.Use(user.TenantId, null, user.Id))
         {

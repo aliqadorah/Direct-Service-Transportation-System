@@ -1,6 +1,5 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Shared.Infrastructure.Collaboration;
-using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Infrastructure.Persistence;
 using DirectService.Platform.Application.Identity;
 

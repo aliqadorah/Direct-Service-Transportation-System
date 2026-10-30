@@ -1,21 +1,16 @@
 using System.Net.Mail;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
-using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Platform.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Application.Billing;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 public sealed record SignUpResult(Guid TenantPublicId, Guid CompanyPublicId, Guid UserPublicId);
 
@@ -52,12 +47,12 @@ public sealed class AccountService(
             .Require("email", mail).Check(IsEmail(mail), "email").MaxLength("email", mail, 150)
             .Require("organisationName", org).MaxLength("organisationName", org, 200)
             .Require("password", r.Password)
-            .Check(r.AcceptTerms, "acceptTerms", ErrorCodes.ValidationRequired)
+            .Check(r.AcceptTerms, "acceptTerms", SharedErrorCodes.ValidationRequired)
             .ThrowIfInvalid();
         if (!PasswordPolicy.Default.IsSatisfiedBy(r.Password))
             throw PolicyError(PasswordPolicy.Default);
         if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null)
-            throw Fail.Conflict(ErrorCodes.NotAvailable);   // DT-203: generic answer
+            throw Fail.Conflict(PlatformErrorCodes.NotAvailable);   // DT-203: generic answer
 
         var now = clock.GetUtcNow().UtcDateTime;
         var lang = r.Language is "en" ? "en" : "ar";
@@ -84,7 +79,7 @@ public sealed class AccountService(
             var roles = await CreatePresetRolesAsync(tenant.Id, c).ConfigureAwait(false);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
 
-            db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = user.Id, CompanyId = company.Id, RoleId = roles[PresetRoles.Owner].Id });
+            db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = user.Id, CompanyId = company.Id, RoleId = roles[PlatformPresetRoles.Owner].Id });
             user.DefaultCompanyId = company.Id;
             db.Set<TermsAcceptance>().Add(new TermsAcceptance { UserId = user.Id, DocumentType = "Terms", DocumentVersion = options.Value.TermsVersion, AcceptedAt = now });
             db.Set<TermsAcceptance>().Add(new TermsAcceptance { UserId = user.Id, DocumentType = "Privacy", DocumentVersion = options.Value.TermsVersion, AcceptedAt = now });
@@ -142,14 +137,14 @@ public sealed class AccountService(
     /// </summary>
     public async Task VerifyEmailAsync(string userToken, string token, CancellationToken ct)
     {
-        var user = await FindByTokenAsync(userToken, ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.TokenInvalid);
+        var user = await FindByTokenAsync(userToken, ct).ConfigureAwait(false) ?? throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         if (user.EmailConfirmedAt is not null) return;
         var adminEntered = user.UserName is not null;
-        if (adminEntered && ctx.UserId != user.Id) throw new AppException(ErrorCodes.VerifySignInRequired, 403);
+        if (adminEntered && ctx.UserId != user.Id) throw new AppException(PlatformErrorCodes.VerifySignInRequired, 403);
         using var _ = scope.Use(user.TenantId, null, user.Id);
         changes.SetAction(user, "EmailVerified");
         var ok = await users.ConfirmEmailAsync(user, token ?? string.Empty).ConfigureAwait(false);
-        if (!ok.Succeeded) throw Fail.Rule(ErrorCodes.TokenInvalid);
+        if (!ok.Succeeded) throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         // Single-use link (SEC-04). A signed-in user keeps their session: the confirmed email already makes the link a no-op.
         if (!adminEntered) await users.UpdateSecurityStampAsync(user).ConfigureAwait(false);
     }
@@ -177,7 +172,7 @@ public sealed class AccountService(
 
     public async Task ResetPasswordAsync(string userToken, string token, string newPassword, CancellationToken ct)
     {
-        var user = await FindByTokenAsync(userToken, ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.TokenInvalid);
+        var user = await FindByTokenAsync(userToken, ct).ConfigureAwait(false) ?? throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, user.TenantId, ct).ConfigureAwait(false);
         if (!policy.IsSatisfiedBy(newPassword)) throw PolicyError(policy);
         using var _ = scope.Use(user.TenantId, null, user.Id);
@@ -186,7 +181,7 @@ public sealed class AccountService(
         if (!result.Succeeded)
         {
             if (result.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode)) throw PolicyError(policy);
-            throw Fail.Rule(ErrorCodes.TokenInvalid);
+            throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         }
         user.FailedSignInCount = 0;
         user.LockedUntil = null;
@@ -233,16 +228,16 @@ public sealed class AccountService(
         // DT-208: the message names exactly the rules of this organisation.
         var code = (p.RequireLetter, p.RequireDigit) switch
         {
-            (true, true) => ErrorCodes.PasswordPolicy,
-            (true, false) => ErrorCodes.PasswordPolicyLetter,
-            (false, true) => ErrorCodes.PasswordPolicyDigit,
-            _ => ErrorCodes.PasswordPolicyLength,
+            (true, true) => PlatformErrorCodes.PasswordPolicy,
+            (true, false) => PlatformErrorCodes.PasswordPolicyLetter,
+            (false, true) => PlatformErrorCodes.PasswordPolicyDigit,
+            _ => PlatformErrorCodes.PasswordPolicyLength,
         };
         return Fail.Field("password", code, p.MinLength);
     }
 
     private static AppException ToAppException(IdentityResult result, PasswordPolicy policy) =>
         result.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode) ? PolicyError(policy)
-        : result.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(ErrorCodes.NotAvailable)
-        : Fail.Rule(ErrorCodes.ValidationFailed);
+        : result.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(PlatformErrorCodes.NotAvailable)
+        : Fail.Rule(SharedErrorCodes.ValidationFailed);
 }

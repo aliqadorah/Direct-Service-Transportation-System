@@ -251,7 +251,7 @@ public sealed class SupportAccessTests(ApiFactory f)
 
         // The window job closes it: Expired, "Expire" in the audit log, pushed and emailed; then every read answers the same.
         using (var scope = f.Services.CreateScope())
-            Assert.True(await scope.ServiceProvider.GetRequiredService<Application.Platform.SupportAccessService>().ExpireDueAsync(CancellationToken.None) >= 1);
+            Assert.True(await scope.ServiceProvider.GetRequiredService<DirectService.Platform.Application.Tenants.SupportAccessService>().ExpireDueAsync(CancellationToken.None) >= 1);
         Assert.Equal("Expired", await f.DbAsync(db => db.Set<SupportAccessGrant>().IgnoreQueryFilters().Where(g => g.TenantId == tenantId).Select(g => g.Status).SingleAsync()));
         Assert.True(await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().AnyAsync(a => a.TenantId == tenantId && a.Action == "Expire")));
         var staffId = await PublicIdAsync(staff.Email);
@@ -264,7 +264,7 @@ public sealed class SupportAccessTests(ApiFactory f)
         Assert.Null(row.EndedBy);
         // Nothing left to close: the job does not close it twice.
         using (var scope = f.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<Application.Platform.SupportAccessService>().ExpireDueAsync(CancellationToken.None);
+            await scope.ServiceProvider.GetRequiredService<DirectService.Platform.Application.Tenants.SupportAccessService>().ExpireDueAsync(CancellationToken.None);
         Assert.Equal(1, await f.DbAsync(db => db.Set<AuditLog>().IgnoreQueryFilters().CountAsync(a => a.TenantId == tenantId && a.Action == "Expire")));
     }
 

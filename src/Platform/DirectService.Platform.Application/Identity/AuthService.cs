@@ -1,11 +1,10 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>What the client must do after a correct password (FR-177; revision 6 adds the forced password change and sign-in without 2FA).</summary>
 public enum SignInNextStep
@@ -52,27 +51,27 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         {
             // Same cost as a real check so the response time does not reveal whether the email exists.
             new PasswordHasher<User>().HashPassword(new User(), password ?? string.Empty);
-            throw new AppException(ErrorCodes.SignInFailed, 401);
+            throw new AppException(PlatformErrorCodes.SignInFailed, 401);
         }
 
         if (await IsLockedAsync(user).ConfigureAwait(false))
         {
             // The ordinary failure, at the cost of a real check (DT-204): neither the answer nor the time tells that a lock exists.
             new PasswordHasher<User>().HashPassword(new User(), password ?? string.Empty);
-            throw new AppException(ErrorCodes.SignInFailed, 401);
+            throw new AppException(PlatformErrorCodes.SignInFailed, 401);
         }
 
         if (!await users.CheckPasswordAsync(user, password ?? string.Empty).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw new AppException(ErrorCodes.SignInFailed, 401);
+            throw new AppException(PlatformErrorCodes.SignInFailed, 401);
         }
 
         if (user.Status != "Active")
-            throw new AppException(ErrorCodes.SignInFailed, 401);
+            throw new AppException(PlatformErrorCodes.SignInFailed, 401);
         // A user created by an administrator with a username needs no email verification: the administrator vouches for the account.
         if (user.UserName is null && user.EmailConfirmedAt is null)
-            throw new AppException(ErrorCodes.EmailNotConfirmed, 403);
+            throw new AppException(PlatformErrorCodes.EmailNotConfirmed, 403);
         await EnsureTenantAllowsSignInAsync(user, ct).ConfigureAwait(false);
 
         // DT-205: with 2FA the code comes first; the forced password change follows it (AuthFlow.VerifyAsync).
@@ -96,7 +95,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     /// <summary>Whether the user holds the preset Owner or Administrator role in any company.</summary>
     private Task<bool> IsOwnerOrAdministratorAsync(long userId, CancellationToken ct) =>
         db.Set<UserCompanyRole>().IgnoreQueryFilters().AnyAsync(r => r.UserId == userId && !r.IsDeleted && r.Role.IsPreset
-            && (r.Role.Name == Contracts.Security.PresetRoles.Owner || r.Role.Name == Contracts.Security.PresetRoles.Administrator), ct);
+            && (r.Role.Name == PlatformPresetRoles.Owner || r.Role.Name == PlatformPresetRoles.Administrator), ct);
 
     /// <summary>Platform staff always need 2FA, without exception; tenant users when their tenant requires it for all users.</summary>
     public async Task<bool> RequiresTwoFactorAsync(User user, CancellationToken ct)
@@ -120,7 +119,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     {
         ArgumentNullException.ThrowIfNull(user);
         if (user.TwoFactorEnabledAt is not null || await RequiresTwoFactorAsync(user, ct).ConfigureAwait(false))
-            throw new AppException(ErrorCodes.TwoFactorRequired, 401);   // checked again at the last moment (the tenant may require it now)
+            throw new AppException(PlatformErrorCodes.TwoFactorRequired, 401);   // checked again at the last moment (the tenant may require it now)
         if (skippedOffer)
         {
             using (scope.Use(user.TenantId, null, user.Id))
@@ -140,7 +139,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task ChangeRequiredPasswordAsync(User user, string? newPassword, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (!user.MustChangePassword) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (!user.MustChangePassword) throw new AppException(SharedErrorCodes.Forbidden, 403);
         await SetOwnPasswordAsync(user, newPassword, ct).ConfigureAwait(false);
     }
 
@@ -148,11 +147,11 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task ChangePasswordAsync(User user, string? currentPassword, string? newPassword, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", PlatformErrorCodes.PasswordWrong);
         if (!await users.CheckPasswordAsync(user, currentPassword ?? string.Empty).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+            throw Fail.Field("currentPassword", PlatformErrorCodes.PasswordWrong);
         }
         await SetOwnPasswordAsync(user, newPassword, ct).ConfigureAwait(false);
     }
@@ -161,7 +160,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     {
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, user.TenantId, ct).ConfigureAwait(false);
         if (!policy.IsSatisfiedBy(newPassword)) throw AccountService.PolicyError(policy);
-        if (await users.CheckPasswordAsync(user, newPassword!).ConfigureAwait(false)) throw Fail.Field("password", ErrorCodes.PasswordUnchanged);
+        if (await users.CheckPasswordAsync(user, newPassword!).ConfigureAwait(false)) throw Fail.Field("password", PlatformErrorCodes.PasswordUnchanged);
         using (scope.Use(user.TenantId, null, user.Id))
         {
             changes.SetAction(user, "PasswordChanged");
@@ -185,13 +184,13 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task VerifyStepUpAsync(User user, string? password, string? code, string? recoveryCode, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (user.TwoFactorEnabledAt is null) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (user.TwoFactorEnabledAt is null) throw new AppException(SharedErrorCodes.Forbidden, 403);
         // Both proofs must be given before anything is checked (security review 19 Oct 2026: no "password right, now the code" answer).
         new Validator()
             .Require("currentPassword", password)
-            .Check(!string.IsNullOrWhiteSpace(code) || !string.IsNullOrWhiteSpace(recoveryCode), string.IsNullOrWhiteSpace(recoveryCode) ? "code" : "recoveryCode", ErrorCodes.TwoFactorStepUpCode)
+            .Check(!string.IsNullOrWhiteSpace(code) || !string.IsNullOrWhiteSpace(recoveryCode), string.IsNullOrWhiteSpace(recoveryCode) ? "code" : "recoveryCode", PlatformErrorCodes.TwoFactorStepUpCode)
             .ThrowIfInvalid();
-        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Rule(ErrorCodes.StepUpFailed);
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Rule(PlatformErrorCodes.StepUpFailed);
         var ok = await users.CheckPasswordAsync(user, password!).ConfigureAwait(false);
         // The code is checked only after the right password, so a wrong password never uses up a recovery code; the answer is the same.
         if (ok && !string.IsNullOrWhiteSpace(recoveryCode))
@@ -205,7 +204,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         if (!ok)
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw Fail.Rule(ErrorCodes.StepUpFailed);
+            throw Fail.Rule(PlatformErrorCodes.StepUpFailed);
         }
         throttle.Reset(user.Id, ctx.IpAddress);
     }
@@ -217,13 +216,13 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task VerifyFreshCodeAsync(User user, string? code, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (user.TwoFactorEnabledAt is null) throw new AppException(ErrorCodes.Forbidden, 403);
-        if (string.IsNullOrWhiteSpace(code)) throw Fail.Field("code", ErrorCodes.SystemEmailFreshCode);
-        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("code", ErrorCodes.TwoFactorInvalid);
+        if (user.TwoFactorEnabledAt is null) throw new AppException(SharedErrorCodes.Forbidden, 403);
+        if (string.IsNullOrWhiteSpace(code)) throw Fail.Field("code", PlatformErrorCodes.SystemEmailFreshCode);
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("code", PlatformErrorCodes.TwoFactorInvalid);
         if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Clean(code)).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw Fail.Field("code", ErrorCodes.TwoFactorInvalid);
+            throw Fail.Field("code", PlatformErrorCodes.TwoFactorInvalid);
         }
         throttle.Reset(user.Id, ctx.IpAddress);
     }
@@ -242,11 +241,11 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
             return;
         }
         new Validator().Require("currentPassword", password).ThrowIfInvalid();
-        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw Fail.Field("currentPassword", PlatformErrorCodes.PasswordWrong);
         if (!await users.CheckPasswordAsync(user, password!).ConfigureAwait(false))
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw Fail.Field("currentPassword", ErrorCodes.PasswordWrong);
+            throw Fail.Field("currentPassword", PlatformErrorCodes.PasswordWrong);
         }
         throttle.Reset(user.Id, ctx.IpAddress);
     }
@@ -271,7 +270,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task VerifySecondFactorAsync(User user, string? code, string? recoveryCode, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (await IsLockedAsync(user).ConfigureAwait(false)) throw new AppException(ErrorCodes.TwoFactorInvalid, 401, "code");   // DT-204
+        if (await IsLockedAsync(user).ConfigureAwait(false)) throw new AppException(PlatformErrorCodes.TwoFactorInvalid, 401, "code");   // DT-204
 
         bool ok;
         if (!string.IsNullOrWhiteSpace(recoveryCode))
@@ -287,7 +286,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         if (!ok)
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw new AppException(ErrorCodes.TwoFactorInvalid, 401, "code");
+            throw new AppException(PlatformErrorCodes.TwoFactorInvalid, 401, "code");
         }
         await RecordSuccessAsync(user, ct).ConfigureAwait(false);
     }
@@ -296,7 +295,7 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task<AuthenticatorSetup> GetAuthenticatorSetupAsync(User user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (user.TwoFactorEnabledAt is not null) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (user.TwoFactorEnabledAt is not null) throw new AppException(SharedErrorCodes.Forbidden, 403);
         var key = await users.GetAuthenticatorKeyAsync(user).ConfigureAwait(false);
         if (string.IsNullOrEmpty(key))
         {
@@ -311,12 +310,12 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
     public async Task<IReadOnlyList<string>> CompleteAuthenticatorSetupAsync(User user, string code, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
-        if (user.TwoFactorEnabledAt is not null) throw new AppException(ErrorCodes.Forbidden, 403);
+        if (user.TwoFactorEnabledAt is not null) throw new AppException(SharedErrorCodes.Forbidden, 403);
         var ok = await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Clean(code)).ConfigureAwait(false);
         if (!ok)
         {
             await RecordFailureAsync(user, "SignInFailed", ct).ConfigureAwait(false);
-            throw new AppException(ErrorCodes.TwoFactorInvalid, 401, "code");
+            throw new AppException(PlatformErrorCodes.TwoFactorInvalid, 401, "code");
         }
         using (scope.Use(user.TenantId, null, user.Id))
         {
@@ -390,13 +389,13 @@ public sealed class AuthService(UserManager<User> users, IUserStore<User> store,
         switch (status)
         {
             case null or "Deleted":
-                throw new AppException(ErrorCodes.TenantUnavailable, 403);
+                throw new AppException(PlatformErrorCodes.TenantUnavailable, 403);
             case "Cancelled":
                 // 5.2: during the retention period only the Owner may sign in, for data export.
                 var isOwner = await db.Set<UserCompanyRole>().IgnoreQueryFilters()
-                    .AnyAsync(r => r.UserId == user.Id && !r.IsDeleted && r.Role.Name == Contracts.Security.PresetRoles.Owner && r.Role.IsPreset, ct)
+                    .AnyAsync(r => r.UserId == user.Id && !r.IsDeleted && r.Role.Name == PlatformPresetRoles.Owner && r.Role.IsPreset, ct)
                     .ConfigureAwait(false);
-                if (!isOwner) throw new AppException(ErrorCodes.TenantUnavailable, 403);
+                if (!isOwner) throw new AppException(PlatformErrorCodes.TenantUnavailable, 403);
                 break;
         }
     }

@@ -1,4 +1,3 @@
-using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Contracts.Tenants;

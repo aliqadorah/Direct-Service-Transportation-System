@@ -7,6 +7,8 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
+using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application.Modules;
 
@@ -71,6 +73,13 @@ public sealed class TransportationPermissions : IPermissionCatalog
     public IReadOnlyList<string> Keys => PermissionKeys.All;
 
     public IReadOnlyDictionary<string, IReadOnlyList<string>> PresetRoles => Contracts.Security.PresetRoles.Permissions;
+
+    /// <summary>Read-only permissions of a support session (G-09: all view permissions of the company, nothing that creates or changes;
+    /// <c>SupportAccessService.SessionPermissions</c> before Stage 2 session 13).</summary>
+    public static readonly IReadOnlyList<string> SupportSession =
+        [PermissionKeys.TripsView, PermissionKeys.InvView, PermissionKeys.DrvView, PermissionKeys.JeView, PermissionKeys.AcctView, PermissionKeys.ReportsView];
+
+    public IReadOnlyList<string> SupportSessionKeys => SupportSession;
 }
 
 /// <summary>The notification types and texts of <see cref="NotificationTexts"/> (every type of the application until they are split by module).</summary>

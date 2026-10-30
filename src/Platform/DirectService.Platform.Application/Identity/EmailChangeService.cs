@@ -1,17 +1,14 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Email address changes (owner testing 21 Oct 2026, DT-229). The user asks in the profile with the current password (and a current code
@@ -44,7 +41,7 @@ public sealed partial class EmailChangeService(
         var user = await SelfAsync(ct).ConfigureAwait(false);
         var mail = Address(r.NewEmail);
         // The user's own address reveals nothing: refused before a recovery code could be used up (security review 21 Oct 2026, F6).
-        if (string.Equals(user.Email, mail, StringComparison.OrdinalIgnoreCase)) throw Fail.Field("newEmail", ErrorCodes.EmailUnchanged);
+        if (string.Equals(user.Email, mail, StringComparison.OrdinalIgnoreCase)) throw Fail.Field("newEmail", PlatformErrorCodes.EmailUnchanged);
         // Re-authentication next: without it nobody learns whether an address is taken.
         await auth.VerifyReauthenticationAsync(user, r.CurrentPassword, r.Code, r.RecoveryCode, ct).ConfigureAwait(false);
         await StartAsync(user, mail, byAdministrator: false, ct).ConfigureAwait(false);
@@ -56,7 +53,7 @@ public sealed partial class EmailChangeService(
     {
         ArgumentNullException.ThrowIfNull(r);
         var user = await admin.AccountTargetAsync(userToken, ct).ConfigureAwait(false);
-        if (user.Id == ctx.UserId) throw Fail.Rule(ErrorCodes.EmailOwnInProfile);
+        if (user.Id == ctx.UserId) throw Fail.Rule(PlatformErrorCodes.EmailOwnInProfile);
         var mail = Address(r.NewEmail);
         await EnsureDailyLimitsAsync(user.Id, ct).ConfigureAwait(false);
         await StartAsync(user, mail, byAdministrator: true, ct).ConfigureAwait(false);
@@ -72,9 +69,9 @@ public sealed partial class EmailChangeService(
         var since = clock.GetUtcNow().UtcDateTime.AddHours(-24);
         var started = db.Set<AuditLog>().IgnoreQueryFilters().Where(a => a.Action == "EmailChangeStarted" && a.EntityType == "CORE.User" && a.OccurredAt >= since);
         if (await started.CountAsync(a => a.UserId == ctx.UserId, ct).ConfigureAwait(false) >= DailyLimitPerAdministrator)
-            throw new AppException(ErrorCodes.EmailChangeLimitAdmin, 429, null, DailyLimitPerAdministrator);
+            throw new AppException(PlatformErrorCodes.EmailChangeLimitAdmin, 429, null, DailyLimitPerAdministrator);
         if (await started.CountAsync(a => a.EntityId == targetId, ct).ConfigureAwait(false) >= DailyLimitPerUser)
-            throw new AppException(ErrorCodes.EmailChangeLimitUser, 429, null, DailyLimitPerUser);
+            throw new AppException(PlatformErrorCodes.EmailChangeLimitUser, 429, null, DailyLimitPerUser);
     }
 
     public async Task<EmailChangeResponse> CancelOwnAsync(CancellationToken ct) => await CancelAsync(await SelfAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false);
@@ -101,10 +98,10 @@ public sealed partial class EmailChangeService(
     /// </summary>
     public async Task<User> ConfirmAsync(string? userToken, string? token, CancellationToken ct)
     {
-        var user = await LinkUserAsync(userToken, token, ct).ConfigureAwait(false) ?? throw Fail.Rule(ErrorCodes.TokenInvalid);
-        if (ctx.UserId != user.Id) throw new AppException(ErrorCodes.VerifySignInRequired, 403);
+        var user = await LinkUserAsync(userToken, token, ct).ConfigureAwait(false) ?? throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
+        if (ctx.UserId != user.Id) throw new AppException(PlatformErrorCodes.VerifySignInRequired, 403);
         var mail = user.PendingEmail!;
-        if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } other && other.Id != user.Id) throw Fail.Conflict(ErrorCodes.NotAvailable);
+        if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } other && other.Id != user.Id) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
         var previous = user.EmailConfirmedAt is null ? null : user.Email;
         var now = clock.GetUtcNow().UtcDateTime;
         using (scope.Use(user.TenantId, null, user.Id))
@@ -124,7 +121,7 @@ public sealed partial class EmailChangeService(
             {
                 // Taken at the same moment (unique index) — any other failure is not hidden behind "not available" (F7).
                 db.ChangeTracker.Clear();
-                if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } taken && taken.Id != user.Id) throw Fail.Conflict(ErrorCodes.NotAvailable);
+                if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } taken && taken.Id != user.Id) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
                 throw;
             }
         }
@@ -147,9 +144,9 @@ public sealed partial class EmailChangeService(
 
     private async Task StartAsync(User user, string mail, bool byAdministrator, CancellationToken ct)
     {
-        if (string.Equals(user.Email, mail, StringComparison.OrdinalIgnoreCase)) throw Fail.Field("newEmail", ErrorCodes.EmailUnchanged);
+        if (string.Equals(user.Email, mail, StringComparison.OrdinalIgnoreCase)) throw Fail.Field("newEmail", PlatformErrorCodes.EmailUnchanged);
         // Owner decision 18 Oct 2026 (DT-203): one generic answer for a taken address, never which account has it.
-        if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } other && other.Id != user.Id) throw Fail.Conflict(ErrorCodes.NotAvailable);
+        if (await users.FindByEmailAsync(mail).ConfigureAwait(false) is { } other && other.Id != user.Id) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
         changes.SetAction(user, byAdministrator ? "EmailChangeStarted" : "EmailChangeRequested");
         user.PendingEmail = mail;
         user.PendingEmailAt = clock.GetUtcNow().UtcDateTime;

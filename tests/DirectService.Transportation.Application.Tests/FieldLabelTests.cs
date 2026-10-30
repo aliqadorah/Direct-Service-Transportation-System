@@ -22,11 +22,13 @@ public sealed partial class FieldLabelTests
     [GeneratedRegex(@"\{[^}]+\}")]
     private static partial Regex Hole();
 
-    // The server code that names fields; the Shared projects hold the engines moved out of Application (Stage 2 session 6, DT-311).
+    // The server code that names fields; the Shared projects hold the engines moved out of Application (Stage 2 session 6, DT-311), the
+    // Platform projects the identity and platform services (Stage 2 session 13).
     private static readonly string[] ServerProjects =
     [
         "DirectService.Transportation.Application", "DirectService.Transportation.Web",
         Path.Combine("Shared", "DirectService.SharedKernel"), Path.Combine("Shared", "DirectService.Shared.Infrastructure"),
+        Path.Combine("Platform", "DirectService.Platform.Application"), Path.Combine("Platform", "DirectService.Platform.Infrastructure"),
     ];
 
     private static string Root()

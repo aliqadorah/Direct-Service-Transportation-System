@@ -1,10 +1,9 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Prevents privilege escalation through user and role administration (security review B1, finding SR-01):
@@ -36,17 +35,17 @@ public sealed class GrantGuard(IAppDbContext db, IRequestContext ctx, AccessServ
     /// <inheritdoc cref="EnsureCanManageUserAsync(long, CancellationToken)"/>
     public async Task EnsureCanManageUserAsync(long targetUserId, bool accountWide, CancellationToken ct)
     {
-        if (ctx.HasPermission(PermissionKeys.TenantManage)) return;
+        if (ctx.HasPermission(PlatformPermissionKeys.TenantManage)) return;
         var callerId = ctx.UserId ?? throw Fail.Forbidden();
         var mine = (await access.GrantsAsync(callerId, ct).ConfigureAwait(false)).ToDictionary(g => g.CompanyId);
         foreach (var g in await access.GrantsAsync(targetUserId, ct).ConfigureAwait(false))
         {
             if (!accountWide && g.CompanyId != ctx.CompanyId)
             {
-                if (g.Permissions.Contains(PermissionKeys.TenantManage)) throw Fail.Forbidden();
+                if (g.Permissions.Contains(PlatformPermissionKeys.TenantManage)) throw Fail.Forbidden();
                 continue;
             }
-            if (!mine.TryGetValue(g.CompanyId, out var m) || !m.Permissions.Contains(PermissionKeys.UsersManage)
+            if (!mine.TryGetValue(g.CompanyId, out var m) || !m.Permissions.Contains(PlatformPermissionKeys.UsersManage)
                 || g.Permissions.Any(k => !m.Permissions.Contains(k)))
                 throw Fail.Forbidden();
         }

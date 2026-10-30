@@ -8,6 +8,8 @@ using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using DirectService.Platform.Application.Staff;
+using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Api.Tests;
 

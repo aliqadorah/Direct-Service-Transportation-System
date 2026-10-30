@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 
-namespace DirectService.Transportation.Application.Abstractions;
+namespace DirectService.SharedKernel;
 
-/// <summary>Default mutable, request-scoped implementation of <see cref="IDataScope"/>.</summary>
+/// <summary>Default mutable, request-scoped implementation of <see cref="IDataScope"/> (SharedKernel since Stage 2 session 13).</summary>
 public sealed class DataScope : IDataScope
 {
     public long? TenantId { get; private set; }

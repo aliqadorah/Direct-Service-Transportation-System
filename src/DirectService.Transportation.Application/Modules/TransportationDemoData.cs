@@ -4,7 +4,6 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Cash;
 using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Invoicing;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Pricing;

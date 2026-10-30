@@ -1,3 +1,5 @@
+using DirectService.Platform.Application.Staff;
+
 namespace DirectService.Platform.Application.Identity;
 
 /// <summary>

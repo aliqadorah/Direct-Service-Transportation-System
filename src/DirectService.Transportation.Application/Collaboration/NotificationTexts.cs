@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DirectService.Platform.Application.Notifications;
 
 namespace DirectService.Transportation.Application.Collaboration;
 
@@ -42,46 +43,18 @@ public static partial class NotificationTexts
     public static IReadOnlyCollection<string> Types => Catalog.Keys;
 
 
-    private sealed record Stored([property: System.Text.Json.Serialization.JsonPropertyName("p")] Dictionary<string, string>? P);
-
     private sealed record Legacy(string? Ar, string? En);
 
     private static readonly JsonSerializerOptions LegacyJson = new() { PropertyNameCaseInsensitive = true };
 
-    private static readonly JsonSerializerOptions Json = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-
-    /// <summary>The stored form of the parameters, trimmed so it fits the 500-character column (longest values shortened first).</summary>
-    public static string Store(IReadOnlyDictionary<string, string?> parameters)
-    {
-        ArgumentNullException.ThrowIfNull(parameters);
-        var p = parameters.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!, StringComparer.Ordinal);
-        var json = JsonSerializer.Serialize(new Stored(p), Json);
-        while (json.Length > NotificationService.MaxMessage)
-        {
-            var longest = p.MaxBy(kv => kv.Value.Length);
-            p[longest.Key] = Cut(longest.Value, Math.Max(1, longest.Value.Length - Math.Max(2, json.Length - NotificationService.MaxMessage)));
-            json = JsonSerializer.Serialize(new Stored(p), Json);
-        }
-        return json;
-    }
-
-    private static string Cut(string text, int max) => text.Length <= max ? text : max <= 1 ? "…" : text[..(max - 1)] + "…";
+    /// <summary>The stored form of the parameters (<see cref="PlatformNotifications.Store"/>).</summary>
+    public static string Store(IReadOnlyDictionary<string, string?> parameters) => PlatformNotifications.Store(parameters);
 
     /// <summary>The parameters of a stored message: the current form, or read back from an older stored text; null when unknown.</summary>
     public static Dictionary<string, string>? Parameters(string type, string message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (message.StartsWith("{\"p\"", StringComparison.Ordinal))
-        {
-            try
-            {
-                return JsonSerializer.Deserialize<Stored>(message)?.P ?? [];
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
-        }
+        if (message.StartsWith("{\"p\"", StringComparison.Ordinal)) return PlatformNotifications.Read(message);
         var (_, en) = LegacyText(message);
         if (en is null) return null;
         Match m;
@@ -147,7 +120,7 @@ public static partial class NotificationTexts
         return slash > 0 ? (message, message) : (null, null);
     }
 
-    public static string Number(int value) => value.ToString(CultureInfo.InvariantCulture);
+    public static string Number(int value) => PlatformNotifications.Number(value);
 
     [GeneratedRegex(@"\{(\w+)\}")]
     private static partial Regex Placeholder();

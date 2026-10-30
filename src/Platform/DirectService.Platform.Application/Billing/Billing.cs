@@ -1,18 +1,13 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Accounting;
-using DirectService.Transportation.Application.Collaboration;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Tenants;
-using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Contracts.Modules;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Billing;
 
 /// <summary>
 /// Usage against plan limits (5.3, P-07, BR-013): active non-demo companies (Q-06, G-11), active users, trips saved this calendar month,
@@ -26,7 +21,7 @@ public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider 
     {
         var plan = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => t.Id == tenantId).Select(t => t.Plan).SingleAsync(ct).ConfigureAwait(false);
         var demo = await db.Set<CompanySetting>().AsNoTracking().IgnoreQueryFilters(AllFilters)
-            .Where(s => s.TenantId == tenantId && s.SettingKey == SettingKeys.IsDemo && s.SettingValue == "true").Select(s => s.CompanyId).ToListAsync(ct).ConfigureAwait(false);
+            .Where(s => s.TenantId == tenantId && s.SettingKey == PlatformSettingKeys.IsDemo && s.SettingValue == "true").Select(s => s.CompanyId).ToListAsync(ct).ConfigureAwait(false);
         var companies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters(AllFilters).CountAsync(c => c.TenantId == tenantId && c.Status == "Active" && !demo.Contains(c.Id), ct)
             .ConfigureAwait(false);
         var users = await ActiveUsersAsync(tenantId, ct).ConfigureAwait(false);
@@ -58,14 +53,14 @@ public sealed class PlanLimits(IAppDbContext db, IFileStore files, TimeProvider 
     public async Task EnsureUserAsync(long tenantId, CancellationToken ct)
     {
         var max = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => t.Id == tenantId).Select(t => t.Plan.MaxActiveUsers).SingleAsync(ct).ConfigureAwait(false);
-        if (await ActiveUsersAsync(tenantId, ct).ConfigureAwait(false) >= max) throw Fail.Conflict(ErrorCodes.PlanLimitReached, max);
+        if (await ActiveUsersAsync(tenantId, ct).ConfigureAwait(false) >= max) throw Fail.Conflict(PlatformErrorCodes.PlanLimitReached, max);
     }
 
     /// <summary><paramref name="adding"/> more trips this month must fit MaxTripsPerMonth ("trips saved per calendar month").</summary>
     public async Task EnsureTripsAsync(long tenantId, int adding, CancellationToken ct)
     {
         var max = await db.Set<Tenant>().AsNoTracking().IgnoreQueryFilters().Where(t => t.Id == tenantId).Select(t => t.Plan.MaxTripsPerMonth).SingleAsync(ct).ConfigureAwait(false);
-        if (await TripsThisMonthAsync(tenantId, ct).ConfigureAwait(false) + adding > max) throw Fail.Conflict(ErrorCodes.PlanLimitReached, max);
+        if (await TripsThisMonthAsync(tenantId, ct).ConfigureAwait(false) + adding > max) throw Fail.Conflict(PlatformErrorCodes.PlanLimitReached, max);
     }
 
     /// <summary>The limits the current usage exceeds on a target plan (BR-012).</summary>

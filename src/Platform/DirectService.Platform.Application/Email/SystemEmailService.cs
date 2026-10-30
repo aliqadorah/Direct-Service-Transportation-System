@@ -1,19 +1,18 @@
 using System.Globalization;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
-using DirectService.Platform.Application.Email;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
+using DirectService.Platform.Application.Staff;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Email;
 
 /// <summary>
 /// Provider console → System email (DT-250…DT-252), platform staff only (PlatformStaffFilter). The settings: Development (save to folder) or
@@ -94,7 +93,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
             ?.ClientSecretEncrypted;
 
         var v = new Validator()
-            .Check(mode is not null && EmailModes.All.Contains(mode), "mode", mode is null ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat)
+            .Check(mode is not null && EmailModes.All.Contains(mode), "mode", mode is null ? SharedErrorCodes.ValidationRequired : SharedErrorCodes.ValidationFormat)
             .Require("displayName", name).MaxLength("displayName", name, 100)
             .Check(name is null || !HasControl(name), "displayName")
             .MaxLength("replyTo", replyTo, 254).Check(replyTo is null || IsAddress(replyTo), "replyTo");
@@ -103,9 +102,9 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
             v.Require("entraTenantId", tenant).Check(tenant is null || TenantIdPattern().IsMatch(tenant), "entraTenantId")
                 .Require("entraClientId", client).Check(client is null || Guid.TryParse(client, out _), "entraClientId")
                 .Require("senderMailbox", mailbox).MaxLength("senderMailbox", mailbox, 254).Check(mailbox is null || IsAddress(mailbox), "senderMailbox")
-                .Check(secret is not null || KeptSecret() is not null, "clientSecret", ErrorCodes.ValidationRequired)
+                .Check(secret is not null || KeptSecret() is not null, "clientSecret", SharedErrorCodes.ValidationRequired)
                 .MaxLength("clientSecret", secret, 400).Check(secret is null || !HasControl(secret), "clientSecret")
-                .Check(r.SecretExpiresOn is not null, "secretExpiresOn", ErrorCodes.ValidationRequired);
+                .Check(r.SecretExpiresOn is not null, "secretExpiresOn", SharedErrorCodes.ValidationRequired);
         }
         v.ThrowIfInvalid();
 
@@ -206,7 +205,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
         // Test emails go out at once (not through the queue and its per-address limit): at most 10 in 10 minutes for the whole console.
         var since = Now.AddMinutes(-10);
         if (await db.Set<EmailOutbox>().CountAsync(e => e.Template == EmailTemplateNames.TestEmail && e.CreatedAt >= since, ct).ConfigureAwait(false) >= 10)
-            throw new AppException(ErrorCodes.RateLimited, 429);
+            throw new AppException(SharedErrorCodes.RateLimited, 429);
 
         var pending = await db.Set<SystemEmailSetting>().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Pending, ct).ConfigureAwait(false);
         var active = await db.Set<SystemEmailSetting>().SingleOrDefaultAsync(s => s.State == EmailSettingStates.Active, ct).ConfigureAwait(false);
@@ -304,9 +303,9 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
     {
         if (!Guid.TryParseExact(id, "N", out var publicId)) throw Fail.NotFound();
         var row = await db.Set<EmailOutbox>().SingleOrDefaultAsync(e => e.PublicId == publicId, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
-        if (row.Status != EmailStatus.Failed) throw Fail.Rule(ErrorCodes.SystemEmailNotFailed);
+        if (row.Status != EmailStatus.Failed) throw Fail.Rule(PlatformErrorCodes.SystemEmailNotFailed);
         var (how, _) = ResendWay(row.Template, row.PayloadEncrypted is not null);
-        if (how is null) throw Fail.Rule(ErrorCodes.SystemEmailNotResendable);
+        if (how is null) throw Fail.Rule(PlatformErrorCodes.SystemEmailNotResendable);
         var now = Now;
         if (how == "same")
         {
@@ -332,7 +331,7 @@ public sealed partial class SystemEmailService(IAppDbContext db, IRequestContext
                 default:
                     var invited = await db.Set<User>().IgnoreQueryFilters().AsNoTracking()
                         .Where(u => u.Email == row.Recipient && u.IsPlatformStaff && !u.IsDeleted).Select(u => (Guid?)u.PublicId).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                        ?? throw Fail.Rule(ErrorCodes.SystemEmailNotResendable);
+                        ?? throw Fail.Rule(PlatformErrorCodes.SystemEmailNotResendable);
                     await staff.ResendAsync(urlTokens.Encode<User>(invited), ct).ConfigureAwait(false);
                     break;
             }

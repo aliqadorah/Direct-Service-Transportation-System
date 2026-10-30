@@ -1,6 +1,10 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using DirectService.Platform.Application.Billing;
+using DirectService.Platform.Application.Staff;
+using DirectService.Platform.Application.Email;
+using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application.Tests;
 

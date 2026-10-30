@@ -13,6 +13,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Billing;
 
+using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Modules;
+using DirectService.Platform.Application.Tenants;
+
 namespace DirectService.Transportation.Application.Platform;
 
 /// <summary>
@@ -22,7 +26,8 @@ namespace DirectService.Transportation.Application.Platform;
 /// read tenant business data here.
 /// </summary>
 public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PlanLimits limits, SubscriptionService subscriptions,
-    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, AuditTrail audit, IPlatformLock locks)
+    NotificationService notifications, DataScope scope, IChangeContext changes, IOptions<PlatformOptions> options, TimeProvider clock, AuditTrail audit, IPlatformLock locks,
+    IEnumerable<IPermissionCatalog> catalogs)
 {
     private static readonly DateTime Started = DateTime.UtcNow;
 
@@ -502,7 +507,7 @@ public sealed class ConsoleService(IAppDbContext db, IRequestContext ctx, Master
             .Where(c => !c.IsDeleted && c.Status == "Active" && db.Set<SupportAccessGrant>().IgnoreQueryFilters()
                 .Any(g => g.TenantId == c.TenantId && g.RequestedBy == me && !g.IsDeleted && g.Status == LifecycleCodes.Approved && g.StartsAt <= now && g.EndsAt > now))
             .OrderBy(c => c.Name).Select(c => new { c.PublicId, c.Name, c.NameEn, c.CurrencyCode, c.CurrencyDecimals }).Take(200).ToListAsync(ct).ConfigureAwait(false);
-        var permissions = SupportAccessService.SessionPermissions.Order(StringComparer.Ordinal).ToList();
+        var permissions = catalogs.SupportSessionKeys().Order(StringComparer.Ordinal).ToList();
         return companies.Select(c => new DirectService.Platform.Contracts.Identity.CompanyAccess(support.Token<Company>(c.PublicId), c.Name, c.NameEn, "Active", "Support", true, permissions,
             c.CurrencyCode, c.CurrencyDecimals)).ToList();
     }

@@ -5,6 +5,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
+using DirectService.Platform.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Collaboration;
@@ -17,18 +18,18 @@ namespace DirectService.Transportation.Application.Collaboration;
 /// notifications and mark them read; nobody else can.
 /// </summary>
 public sealed class NotificationService(IAppDbContext db, IRequestContext ctx, IUrlTokenService tokens, IServiceProvider services, TimeProvider clock, IAfterCommit afterCommit,
-    NotificationLinks links)
+    NotificationLinks links) : IUserNotifier
 {
     public const string EInvoiceRejected = "EINV.Rejected";
     public const string EInvoiceSetupError = "EINV.SetupError";
     public const string PostingFailed = "ACC.PostingFailed";
-    public const string ExportReady = "CORE.ExportReady";
-    public const string ExportFailed = "CORE.ExportFailed";
-    public const string InvitationAccepted = "CORE.InvitationAccepted";
-    public const string SupportRequested = "CORE.SupportRequested";
-    public const string PaymentFailed = "CORE.PaymentFailed";
+    public const string ExportReady = PlatformNotifications.ExportReady;
+    public const string ExportFailed = PlatformNotifications.ExportFailed;
+    public const string InvitationAccepted = PlatformNotifications.InvitationAccepted;
+    public const string SupportRequested = PlatformNotifications.SupportRequested;
+    public const string PaymentFailed = PlatformNotifications.PaymentFailed;
 
-    public const int MaxMessage = 500;
+    public const int MaxMessage = PlatformNotifications.MaxMessage;
 
     private static readonly string[] TenantFilter = ["Tenant"];
 

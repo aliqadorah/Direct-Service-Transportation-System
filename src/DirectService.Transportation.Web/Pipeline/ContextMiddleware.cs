@@ -1,7 +1,6 @@
 using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -65,7 +64,8 @@ internal sealed class RequestContextMiddleware(RequestDelegate next)
 /// </summary>
 internal sealed class CompanyContextMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext http, RequestContext ctx, DataScope scope, AccessService access, IUrlTokenService tokens, IAppDbContext db, TimeProvider clock)
+    public async Task InvokeAsync(HttpContext http, RequestContext ctx, DataScope scope, AccessService access, IUrlTokenService tokens, IAppDbContext db, TimeProvider clock,
+        IEnumerable<DirectService.Platform.Contracts.Modules.IPermissionCatalog> catalogs)
     {
         // API requests only: the pages /c/{company}/… are the WebAssembly shell without data (no prerendering); it asks the API, which is
         // checked here. A page address of a closed support window or another tenant's company then shows the app's own message (with the
@@ -75,7 +75,7 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
             var publicId = tokens.Decode<Company>(token);
             if (ctx.IsPlatformStaff && ctx.TenantId is null)
             {
-                await SupportSessionAsync(http, ctx, scope, db, clock, publicId, userId).ConfigureAwait(false);
+                await SupportSessionAsync(http, ctx, scope, db, clock, publicId, userId, catalogs).ConfigureAwait(false);
                 return;
             }
             var grants = publicId is null ? [] : await access.GrantsAsync(userId, http.RequestAborted).ConfigureAwait(false);
@@ -102,7 +102,8 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
     /// Provider staff inside an approved, current support window of the company's tenant (BR-014, D-13): read-only view permissions; every request
     /// is written to the tenant's audit log. Without a window the company is not found (404).
     /// </summary>
-    private async Task SupportSessionAsync(HttpContext http, RequestContext ctx, DataScope scope, IAppDbContext db, TimeProvider clock, Guid? companyPublicId, long userId)
+    private async Task SupportSessionAsync(HttpContext http, RequestContext ctx, DataScope scope, IAppDbContext db, TimeProvider clock, Guid? companyPublicId, long userId,
+        IEnumerable<DirectService.Platform.Contracts.Modules.IPermissionCatalog> catalogs)
     {
         var now = clock.GetUtcNow().UtcDateTime;
         var company = companyPublicId is Guid pid
@@ -115,7 +116,7 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
         // A window of this staff member for the tenant that is closed (ended by the subscriber, expired, not approved): a clear 403 with the
         // reason, when and by whom (owner testing 20 Oct 2026, DT-220). Without any grant for that tenant the company stays "not found".
         if (company is not null && !window
-            && await Application.Platform.SupportAccessService.WhyClosedAsync(db, company.TenantId, userId, now, http.RequestAborted).ConfigureAwait(false) is { } closed)
+            && await DirectService.Platform.Application.Tenants.SupportAccessService.WhyClosedAsync(db, company.TenantId, userId, now, http.RequestAborted).ConfigureAwait(false) is { } closed)
         {
             var at = closed.At?.ToString("HH:mm", CultureInfo.InvariantCulture) + " UTC";
             await ProblemWriter.WriteAsync(http, closed.Code, StatusCodes.Status403Forbidden, ctx.Language, args: [at, closed.By],
@@ -134,7 +135,7 @@ internal sealed class CompanyContextMiddleware(RequestDelegate next)
         ctx.CompanyStatus = "Active";
         ctx.RoleName = "Support";
         ctx.IsSupportSession = true;
-        ctx.Permissions = Application.Platform.SupportAccessService.SessionPermissions;
+        ctx.Permissions = catalogs.SupportSessionKeys();
         scope.Set(company.TenantId, company.Id, userId, ctx.IpAddress);
         // The status written is the one the client gets: an exception is mapped the way the exception handler will map it (review F6).
         int? status = null;

@@ -4,7 +4,6 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
 using DirectService.Transportation.Application.Cash;
 using DirectService.Transportation.Application.EInvoicing;
 using DirectService.Transportation.Application.Invoicing;
@@ -16,7 +15,9 @@ using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Platform.Contracts.Modules;
 using Microsoft.Extensions.DependencyInjection;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Application.Staff;
+using DirectService.Platform.Application.Email;
+using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application;
 
@@ -34,18 +35,6 @@ public static class DependencyInjection
         services.AddScoped<RequestContext>();
         services.AddScoped<IRequestContext>(sp => sp.GetRequiredService<RequestContext>());
 
-        services.AddScoped<AccessService>();
-        services.AddScoped<GrantGuard>();
-        services.AddScoped<SessionService>();
-        services.AddScoped<AuthService>();
-        services.AddScoped<TwoFactorSettingsService>();   // DT-210: 2FA management from the profile
-        services.AddSingleton<SignInThrottle>();   // DT-204: failed sign-ins per account + IP
-        services.AddScoped<AccountService>();
-        services.AddScoped<MeService>();
-        services.AddScoped<UserAdminService>();
-        services.AddScoped<EmailChangeService>();
-        services.AddScoped<RoleService>();
-        services.AddScoped<InvitationService>();
         services.AddScoped<CompanyProvisioningService>();
         services.AddScoped<ICompanyProvisioner>(sp => sp.GetRequiredService<CompanyProvisioningService>());
         // What the module gives the Platform services (platform design a.3, DT-346).
@@ -106,9 +95,6 @@ public static class DependencyInjection
         services.AddScoped<TripService>();
         services.AddScoped<TripImportService>();
         services.AddScoped<IImportTemplateProvider, Imports.TransportationImportTemplates>();
-        services.AddSingleton<Platform.ProviderSetupState>();
-        services.AddScoped<Platform.ProviderSetupService>();
-        services.AddScoped<Platform.StaffService>();
         services.AddScoped<TripExportService>();
         services.AddScoped<TripPostingHandler>();
         services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
@@ -164,23 +150,18 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
 
         // Platform (B12)
-        services.AddScoped<PlanLimits>();
-        services.AddScoped<BillingService>();
         services.AddScoped<SubscriptionService>();
         services.AddScoped<ConsoleService>();
-        services.AddScoped<SupportAccessService>();
-        services.AddScoped<TenantLifecycleService>();
-        services.AddScoped<StaffAccountService>();
         services.AddScoped<SetupChecklistService>();
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<IDemoDataContributor, Modules.TransportationDemoData>();
         services.AddScoped<ISetupStepProvider, Modules.TransportationSetupSteps>();
         services.AddScoped<CompanyExportService>();
         services.AddScoped<PersonalDataService>();
-        services.AddScoped<SystemEmailService>();   // DT-250
 
         // Collaboration (B11)
         services.AddScoped<NotificationService>();
+        services.AddScoped<DirectService.Platform.Application.Notifications.IUserNotifier>(sp => sp.GetRequiredService<NotificationService>());
         services.AddScoped<NotificationLinks>();
         services.AddScoped<ISearchProvider, TransportationSearch>();
         services.AddScoped<AuditLogService>();

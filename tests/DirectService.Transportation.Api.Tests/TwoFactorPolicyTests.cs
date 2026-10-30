@@ -7,6 +7,7 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using DirectService.Platform.Application.Staff;
 
 namespace DirectService.Transportation.Api.Tests;
 
@@ -224,6 +225,6 @@ public sealed class TwoFactorPolicyTests(ApiFactory f)
         var r = await client.PostAsJsonAsync("/api/v1/auth/sign-in", new SignInRequest(email, ApiHelpers.Password));
         Assert.Equal("twoFactorSetup", (await r.Content.ReadFromJsonAsync<SignInResponse>())!.Next);   // never the optional offer
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/v1/auth/2fa/skip", null)).StatusCode);
-        Assert.True(Application.Identity.AuthService.RequiresTwoFactor(new User { IsPlatformStaff = true, UserName = "staff" }, tenantRequires: false));
+        Assert.True(DirectService.Platform.Application.Identity.AuthService.RequiresTwoFactor(new User { IsPlatformStaff = true, UserName = "staff" }, tenantRequires: false));
     }
 }

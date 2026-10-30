@@ -45,11 +45,10 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
 
     // ------------------------------------------------------------ finding
 
-    public async Task<T> FindAsync<T>(string? token, CancellationToken ct) where T : AuditableEntity
-    {
-        var publicId = tokens.Decode<T>(token) ?? throw Fail.NotFound();
-        return await db.Set<T>().SingleOrDefaultAsync(x => x.PublicId == publicId, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
-    }
+    // Finding by token and the tokens themselves: RecordSupport (SharedKernel, Stage 2 session 13).
+    private readonly RecordSupport _records = new(db, tokens);
+
+    public Task<T> FindAsync<T>(string? token, CancellationToken ct) where T : AuditableEntity => _records.FindAsync<T>(token, ct);
 
     /// <summary>The record named by a client id of a repeated create (API-05), or null.</summary>
     public async Task<T?> ExistingAsync<T>(Guid? clientId, CancellationToken ct) where T : AuditableEntity =>
@@ -69,10 +68,10 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
         return record;
     }
 
-    public string Token<T>(Guid publicId) => tokens.Encode<T>(publicId);
+    public string Token<T>(Guid publicId) => _records.Token<T>(publicId);
 
     /// <summary>The PublicId of a token of type <typeparamref name="T"/>, or null when malformed or of another type.</summary>
-    public Guid? Decode<T>(string? token) => tokens.Decode<T>(token);
+    public Guid? Decode<T>(string? token) => _records.Decode<T>(token);
 
     /// <summary>
     /// Saves a new record. When the create carried a client id and the save fails (two identical requests racing, review M4), the

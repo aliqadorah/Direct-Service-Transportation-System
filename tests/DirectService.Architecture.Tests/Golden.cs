@@ -68,7 +68,10 @@ internal static class Golden
     /// <summary>Every application assembly (all modules), wherever a constant moves to.</summary>
     public static IReadOnlyList<Assembly> AppAssemblies =>
     [
-        typeof(DataScope).Assembly,         // Application
+        typeof(DirectService.Transportation.Application.DependencyInjection).Assembly,   // Application (DataScope is SharedKernel since Stage 2 session 13)
+        typeof(DirectService.Platform.Application.DependencyInjection).Assembly,
+        typeof(DirectService.Platform.Infrastructure.DependencyInjection).Assembly,
+        typeof(DirectService.Platform.Contracts.Errors.PlatformErrorCodes).Assembly,
         typeof(DirectService.Transportation.Infrastructure.DependencyInjection).Assembly,
         typeof(MasterDbContext).Assembly,   // Shared.Infrastructure
         typeof(DirectService.Transportation.Web.Security.AuthSchemes).Assembly,

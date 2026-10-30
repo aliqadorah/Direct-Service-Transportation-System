@@ -1,17 +1,15 @@
 using System.Security.Cryptography;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Application.Billing;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// Invitations (FR-172, US-32): invite by email with a role in the current company; the link is
@@ -22,7 +20,7 @@ namespace DirectService.Transportation.Application.Identity;
 public sealed class InvitationService(
     IAppDbContext db, IRequestContext ctx, IDataScope scope, IChangeContext changes, UserManager<User> users,
     AccessService access, IUrlTokenService tokens, IEmailSender email, TimeProvider clock, IOptions<AppOptions> options, GrantGuard guard,
-    Platform.PlanLimits? limits = null)
+    PlanLimits? limits = null)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
@@ -44,17 +42,17 @@ public sealed class InvitationService(
         ArgumentNullException.ThrowIfNull(r);
         var address = r.Email?.Trim();
         new Validator().Require("email", address).Check(AccountService.IsEmail(address), "email").MaxLength("email", address, 150).ThrowIfInvalid();
-        var rolePublicId = tokens.Decode<Role>(r.Role) ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+        var rolePublicId = tokens.Decode<Role>(r.Role) ?? throw Fail.Field("role", SharedErrorCodes.ValidationFormat);
         var role = await db.Set<Role>().SingleOrDefaultAsync(x => x.PublicId == rolePublicId, ct).ConfigureAwait(false)
-            ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+            ?? throw Fail.Field("role", SharedErrorCodes.ValidationFormat);
         guard.EnsureCanGrant(await guard.RoleKeysAsync(role.Id, ct).ConfigureAwait(false)); // SR-01
 
         var existing = await users.FindByEmailAsync(address!).ConfigureAwait(false);
         if (existing is not null)
         {
-            if (existing.TenantId != ctx.TenantId) throw Fail.Conflict(ErrorCodes.NotAvailable);   // DT-203: generic answer
+            if (existing.TenantId != ctx.TenantId) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);   // DT-203: generic answer
             var hasRole = await db.Set<UserCompanyRole>().AnyAsync(x => x.UserId == existing.Id && x.CompanyId == ctx.CompanyId, ct).ConfigureAwait(false);
-            if (hasRole) throw Fail.Conflict(ErrorCodes.DuplicateKey, address!);
+            if (hasRole) throw Fail.Conflict(SharedErrorCodes.DuplicateKey, address!);
         }
 
         // A new invitation replaces any open one for the same email in this company.
@@ -81,7 +79,7 @@ public sealed class InvitationService(
     public async Task ResendAsync(string invitationToken, CancellationToken ct)
     {
         var inv = await FindAsync(invitationToken, ct).ConfigureAwait(false);
-        if (inv.AcceptedAt is not null) throw Fail.Rule(ErrorCodes.TokenInvalid);
+        if (inv.AcceptedAt is not null) throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         var token = NewToken();
         inv.TokenHash = SessionService.HashToken(token);
         inv.ExpiresAt = Now.AddDays(options.Value.InvitationDays);
@@ -93,7 +91,7 @@ public sealed class InvitationService(
     public async Task CancelAsync(string invitationToken, CancellationToken ct)
     {
         var inv = await FindAsync(invitationToken, ct).ConfigureAwait(false);
-        if (inv.AcceptedAt is not null) throw Fail.Rule(ErrorCodes.TokenInvalid);
+        if (inv.AcceptedAt is not null) throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         inv.DeleteReason = "Cancelled";
         db.Set<Invitation>().Remove(inv);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -115,8 +113,8 @@ public sealed class InvitationService(
     {
         ArgumentNullException.ThrowIfNull(r);
         var inv = await ByLinkTokenAsync(r.Token, ct).ConfigureAwait(false);
-        if (inv is null || !IsUsable(inv)) throw Fail.Rule(ErrorCodes.TokenInvalid);
-        if (await users.FindByEmailAsync(inv.Email).ConfigureAwait(false) is not null) throw Fail.Conflict(ErrorCodes.NotAvailable);
+        if (inv is null || !IsUsable(inv)) throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
+        if (await users.FindByEmailAsync(inv.Email).ConfigureAwait(false) is not null) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
         var fullName = TextNormalizer.CleanText(r.FullName);
         new Validator().Require("fullName", fullName).MaxLength("fullName", fullName, 150).Require("password", r.Password).ThrowIfInvalid();
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, inv.TenantId, ct).ConfigureAwait(false);
@@ -140,10 +138,10 @@ public sealed class InvitationService(
     public async Task AcceptExistingAsync(string token, CancellationToken ct)
     {
         var inv = await ByLinkTokenAsync(token, ct).ConfigureAwait(false);
-        if (inv is null || !IsUsable(inv)) throw Fail.Rule(ErrorCodes.TokenInvalid);
+        if (inv is null || !IsUsable(inv)) throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         var user = await db.Set<User>().IgnoreQueryFilters(TenantFilter).SingleAsync(u => u.Id == ctx.UserId, ct).ConfigureAwait(false);
         if (!string.Equals(user.NormalizedEmail, inv.Email.ToUpperInvariant(), StringComparison.Ordinal) || user.TenantId != inv.TenantId)
-            throw Fail.Rule(ErrorCodes.InvitationEmailMismatch);
+            throw Fail.Rule(PlatformErrorCodes.InvitationEmailMismatch);
         await db.InTransactionAsync(c => CompleteAsync(inv, user, c), ct).ConfigureAwait(false);
     }
 
@@ -159,8 +157,8 @@ public sealed class InvitationService(
         // FR-190: the inviter is notified that the invitation was accepted.
         db.Set<Notification>().Add(new Notification
         {
-            TenantId = inv.TenantId, UserId = inv.InvitedBy, CompanyId = inv.CompanyId, NotificationType = Collaboration.NotificationService.InvitationAccepted,
-            Message = Collaboration.NotificationService.Message(new Dictionary<string, string?> { ["name"] = user.FullName }),
+            TenantId = inv.TenantId, UserId = inv.InvitedBy, CompanyId = inv.CompanyId, NotificationType = PlatformNotifications.InvitationAccepted,
+            Message = PlatformNotifications.Store(new Dictionary<string, string?> { ["name"] = user.FullName }),
         });
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         access.Invalidate(user.Id);

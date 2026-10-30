@@ -1,9 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -11,8 +7,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
+using DirectService.Platform.Application.Tenants;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Staff;
 
 /// <summary>
 /// The one-time setup code of the first-run provider setup (owner feedback 13 Oct 2026, item 8a), kept in this process's memory: generated
@@ -174,8 +174,8 @@ public sealed class ProviderSetupService(IAppDbContext db, IRequestContext ctx, 
         if (!await IsOpenAsync(ct).ConfigureAwait(false)) throw Fail.NotFound();
         var (ok, locked, session) = state.Try(code, Now, ctx.IpAddress);
         await AuditAsync(ok ? "SetupCodeAccepted" : locked ? "SetupCodeLocked" : "SetupCodeRefused", ct).ConfigureAwait(false);
-        if (locked) throw new AppException(ErrorCodes.SetupLocked, 429, "code", ProviderSetupState.LockMinutes);
-        if (!ok) throw Fail.Field("code", ErrorCodes.SetupCodeInvalid);
+        if (locked) throw new AppException(PlatformErrorCodes.SetupLocked, 429, "code", ProviderSetupState.LockMinutes);
+        if (!ok) throw Fail.Field("code", PlatformErrorCodes.SetupCodeInvalid);
         return session!;
     }
 
@@ -192,7 +192,7 @@ public sealed class ProviderSetupService(IAppDbContext db, IRequestContext ctx, 
         if (!state.SessionValid(session, Now))
         {
             await AuditAsync("SetupSessionRefused", ct).ConfigureAwait(false);
-            throw Fail.Rule(ErrorCodes.SetupSessionExpired);
+            throw Fail.Rule(PlatformErrorCodes.SetupSessionExpired);
         }
         try
         {
@@ -210,13 +210,13 @@ public sealed class ProviderSetupService(IAppDbContext db, IRequestContext ctx, 
         var name = TextNormalizer.CleanText(fullName);
         var mail = email?.Trim();
         new Validator().Require("fullName", name).MaxLength("fullName", name, 150).Require("email", mail).MaxLength("email", mail, 150)
-            .Check(mail is null || AccountService.IsEmail(mail), "email", ErrorCodes.ValidationFormat).Require("password", password).ThrowIfInvalid();
+            .Check(mail is null || AccountService.IsEmail(mail), "email", SharedErrorCodes.ValidationFormat).Require("password", password).ThrowIfInvalid();
         var policy = PasswordPolicy.Default;
         if (!policy.IsSatisfiedBy(password) || password!.Length > 64) throw AccountService.PolicyError(policy);
 
-        await using var held = await locks.TryAcquireAsync("provider-setup", ct).ConfigureAwait(false) ?? throw Fail.Conflict(ErrorCodes.SetupBusy);
+        await using var held = await locks.TryAcquireAsync("provider-setup", ct).ConfigureAwait(false) ?? throw Fail.Conflict(PlatformErrorCodes.SetupBusy);
         if (!await IsOpenAsync(ct).ConfigureAwait(false)) throw Fail.NotFound();
-        if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null) throw Fail.Conflict(ErrorCodes.EmailInUse);
+        if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null) throw Fail.Conflict(PlatformErrorCodes.EmailInUse);
         var system = await lifecycle.SystemUserAsync(ct).ConfigureAwait(false);
         var user = new User
         {
@@ -228,8 +228,8 @@ public sealed class ProviderSetupService(IAppDbContext db, IRequestContext ctx, 
             var created = await users.CreateAsync(user, password).ConfigureAwait(false);
             if (!created.Succeeded)
                 throw created.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode) ? AccountService.PolicyError(policy)
-                    : created.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(ErrorCodes.EmailInUse)
-                    : Fail.Rule(ErrorCodes.ValidationFailed);
+                    : created.Errors.Any(e => e.Code is "DuplicateEmail" or "DuplicateUserName") ? Fail.Conflict(PlatformErrorCodes.EmailInUse)
+                    : Fail.Rule(SharedErrorCodes.ValidationFailed);
         }
         state.Consume();
         await AuditAsync("SetupCompleted", ct, user.Email).ConfigureAwait(false);

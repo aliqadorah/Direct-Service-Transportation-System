@@ -1,11 +1,10 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// The signed-in user's own data: profile with the companies for the switcher (5.1, US-34), preferences
@@ -22,7 +21,7 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
         var tenant = u.TenantId is null ? null : await db.Set<Tenant>().AsNoTracking()
             .Where(t => t.Id == u.TenantId).Select(t => new { t.Name, t.Status }).SingleOrDefaultAsync(ct).ConfigureAwait(false);
         var grants = await access.GrantsAsync(userId, ct).ConfigureAwait(false);
-        var isOwner = grants.Any(g => g.Permissions.Contains(Contracts.Security.PermissionKeys.TenantManage));
+        var isOwner = grants.Any(g => g.Permissions.Contains(PlatformPermissionKeys.TenantManage));
         var visible = grants.Where(g => g.CompanyStatus == "Active" || isOwner).ToList();
         var ids = visible.Select(g => g.CompanyId).ToList();
         var currencies = await db.Set<Company>().AsNoTracking().IgnoreQueryFilters().Where(c => ids.Contains(c.Id))
@@ -51,10 +50,10 @@ public sealed class MeService(IAppDbContext db, IRequestContext ctx, AccessServi
         long? defaultCompanyId = null;
         if (!string.IsNullOrEmpty(r.DefaultCompany))
         {
-            var publicId = tokens.Decode<Company>(r.DefaultCompany) ?? throw Fail.Field("defaultCompany", ErrorCodes.ValidationFormat);
+            var publicId = tokens.Decode<Company>(r.DefaultCompany) ?? throw Fail.Field("defaultCompany", SharedErrorCodes.ValidationFormat);
             var grant = (await access.GrantsAsync(userId, ct).ConfigureAwait(false))
                 .FirstOrDefault(g => g.CompanyPublicId == publicId && g.CompanyStatus == "Active")
-                ?? throw Fail.Field("defaultCompany", ErrorCodes.ValidationFormat);
+                ?? throw Fail.Field("defaultCompany", SharedErrorCodes.ValidationFormat);
             defaultCompanyId = grant.CompanyId;
         }
         u.LanguageCode = r.LanguageCode;

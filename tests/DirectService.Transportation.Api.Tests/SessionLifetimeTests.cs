@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using DirectService.Transportation.Application.Identity;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;

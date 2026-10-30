@@ -1,4 +1,5 @@
 using DirectService.Transportation.Application.Platform;
+using DirectService.Platform.Application.Billing;
 
 namespace DirectService.Transportation.Application.Tests;
 

@@ -1,19 +1,17 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Identity;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using DirectService.Platform.Application;
 using DirectService.Platform.Application.Notifications;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Contracts.Settings;
+using DirectService.Platform.Application.Tenants;
 
-namespace DirectService.Transportation.Application.Platform;
+namespace DirectService.Platform.Application.Staff;
 
 /// <summary>
 /// Platform staff in the provider console (owner feedback 13 Oct 2026, item 8b): the list (name, e-mail, state, last sign-in); invitations by
@@ -22,7 +20,7 @@ namespace DirectService.Transportation.Application.Platform;
 /// reactivate — never one's own account nor the last active staff member. There is no public sign-up for staff. Every action is audited.
 /// A pending invitation is a staff account without a password; cancelling it deletes it (soft), so the address can be invited again.
 /// </summary>
-public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserManager<User> users, MasterDataSupport support, IChangeContext changes, IDataScope scope,
+public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserManager<User> users, RecordSupport support, IChangeContext changes, IDataScope scope,
     SessionService sessions, IEmailSender email, IUrlTokenService urlTokens, IOptions<AppOptions> options, IPlatformLock locks, TimeProvider clock)
 {
     /// <summary>Identity token provider of staff invitations (registered with a 48-hour lifespan).</summary>
@@ -71,14 +69,14 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var name = TextNormalizer.CleanText(r.FullName);
         var mail = r.Email?.Trim();
         new Validator().Require("fullName", name).MaxLength("fullName", name, 150).Require("email", mail).MaxLength("email", mail, 150)
-            .Check(mail is null || AccountService.IsEmail(mail), "email", ErrorCodes.ValidationFormat).ThrowIfInvalid();
-        if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null) throw Fail.Field("email", ErrorCodes.EmailInUse);
+            .Check(mail is null || AccountService.IsEmail(mail), "email", SharedErrorCodes.ValidationFormat).ThrowIfInvalid();
+        if (await users.FindByEmailAsync(mail!).ConfigureAwait(false) is not null) throw Fail.Field("email", PlatformErrorCodes.EmailInUse);
         var user = new User { FullName = name!, Email = mail!, LanguageCode = ctx.Language == "en" ? "en" : "ar", IsPlatformStaff = true, TenantId = null };
         using (scope.Use(null, null, self))
         {
             changes.SetAction(user, "InviteStaff");
             var created = await users.CreateAsync(user).ConfigureAwait(false);   // no password: set from the invitation link
-            if (!created.Succeeded) throw Fail.Field("email", ErrorCodes.EmailInUse);
+            if (!created.Succeeded) throw Fail.Field("email", PlatformErrorCodes.EmailInUse);
         }
         await SendInvitationAsync(user, ct).ConfigureAwait(false);
         return ToResponse(user, self);
@@ -89,7 +87,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
     {
         var self = StaffId;
         var user = await FindAsync(token, ct).ConfigureAwait(false);
-        if (!Pending(user)) throw await RefusedAsync(user, ErrorCodes.StaffNotPending, ct).ConfigureAwait(false);
+        if (!Pending(user)) throw await RefusedAsync(user, PlatformErrorCodes.StaffNotPending, ct).ConfigureAwait(false);
         using (scope.Use(null, null, self))
         {
             changes.SetAction(user, "ResendStaffInvitation");
@@ -105,7 +103,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
     {
         var self = StaffId;
         var user = await FindAsync(token, ct).ConfigureAwait(false);
-        if (!Pending(user)) throw await RefusedAsync(user, ErrorCodes.StaffNotPending, ct).ConfigureAwait(false);
+        if (!Pending(user)) throw await RefusedAsync(user, PlatformErrorCodes.StaffNotPending, ct).ConfigureAwait(false);
         using (scope.Use(null, null, self))
         {
             changes.SetAction(user, "CancelStaffInvitation");
@@ -125,14 +123,14 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var why = MasterIds.Reason(r.Reason);
         var user = await FindAsync(token, ct).ConfigureAwait(false);
         // One status change at a time, so two staff members cannot deactivate each other at once and leave nobody (security review 13 Oct 2026).
-        await using var held = await locks.TryAcquireAsync("platform-staff-status", ct).ConfigureAwait(false) ?? throw Fail.Conflict(ErrorCodes.SetupBusy);
-        if (user.Id == self) throw await RefusedAsync(user, ErrorCodes.StaffSelf, ct).ConfigureAwait(false);
-        if (user.Status != "Active") throw await RefusedAsync(user, ErrorCodes.StaffNotActive, ct).ConfigureAwait(false);
+        await using var held = await locks.TryAcquireAsync("platform-staff-status", ct).ConfigureAwait(false) ?? throw Fail.Conflict(PlatformErrorCodes.SetupBusy);
+        if (user.Id == self) throw await RefusedAsync(user, PlatformErrorCodes.StaffSelf, ct).ConfigureAwait(false);
+        if (user.Status != "Active") throw await RefusedAsync(user, PlatformErrorCodes.StaffNotActive, ct).ConfigureAwait(false);
         if (CanSignIn(user))
         {
             var others = await Staff.Where(u => u.Id != user.Id && u.Status == "Active" && u.PasswordHash != "" && u.TwoFactorEnabledAt != null)
                 .CountAsync(ct).ConfigureAwait(false);
-            if (others == 0) throw await RefusedAsync(user, ErrorCodes.StaffLastActive, ct).ConfigureAwait(false);
+            if (others == 0) throw await RefusedAsync(user, PlatformErrorCodes.StaffLastActive, ct).ConfigureAwait(false);
         }
         using (scope.Use(null, null, self))
         {
@@ -181,8 +179,8 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
         var user = await InvitationAsync(userToken, token, ct).ConfigureAwait(false);
         if (user is null)
         {
-            await AuditAsync("StaffInvitationRefused", null, ErrorCodes.TokenInvalid, ct).ConfigureAwait(false);
-            throw Fail.Rule(ErrorCodes.TokenInvalid);
+            await AuditAsync("StaffInvitationRefused", null, PlatformErrorCodes.TokenInvalid, ct).ConfigureAwait(false);
+            throw Fail.Rule(PlatformErrorCodes.TokenInvalid);
         }
         var policy = PasswordPolicy.Default;
         if (!policy.IsSatisfiedBy(password) || password!.Length > 64) throw AccountService.PolicyError(policy);
@@ -192,7 +190,7 @@ public sealed class StaffService(IAppDbContext db, IRequestContext ctx, UserMana
             user.EmailConfirmedAt = Now;
             var result = await users.AddPasswordAsync(user, password).ConfigureAwait(false);
             if (!result.Succeeded)
-                throw result.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode) ? AccountService.PolicyError(policy) : Fail.Rule(ErrorCodes.TokenInvalid);
+                throw result.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode) ? AccountService.PolicyError(policy) : Fail.Rule(PlatformErrorCodes.TokenInvalid);
         }
         return user;
     }

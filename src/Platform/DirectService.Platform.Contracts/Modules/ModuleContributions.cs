@@ -64,6 +64,9 @@ public interface IPermissionCatalog
 
     /// <summary>Preset role name → its keys from this module.</summary>
     IReadOnlyDictionary<string, IReadOnlyList<string>> PresetRoles { get; }
+
+    /// <summary>The module's keys a support session holds (G-09: the view permissions, nothing that creates or changes; Stage 2 session 13).</summary>
+    IReadOnlyList<string> SupportSessionKeys { get; }
 }
 
 /// <summary>A module's notification types (stored in core.Notifications.Type; values pinned) with their texts.</summary>

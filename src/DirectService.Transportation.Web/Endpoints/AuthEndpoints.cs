@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Identity;
+using DirectService.Platform.Application.Identity;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Platform.Domain;

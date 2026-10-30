@@ -1,13 +1,12 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Platform.Contracts.Identity;
-using DirectService.Transportation.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Identity;
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Platform.Contracts.Security;
+using DirectService.Platform.Application.Billing;
 
-namespace DirectService.Transportation.Application.Identity;
+namespace DirectService.Platform.Application.Identity;
 
 /// <summary>
 /// User administration in the current company (core.users.manage; FR-174, US-32): assign/remove the
@@ -17,7 +16,7 @@ namespace DirectService.Transportation.Application.Identity;
 /// </summary>
 public sealed class UserAdminService(
     IAppDbContext db, IRequestContext ctx, IChangeContext changes, AccessService access, SessionService sessions,
-    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard, SignInThrottle throttle, Platform.PlanLimits? limits = null)
+    AccountService accounts, UserManager<User> users, IUrlTokenService tokens, GrantGuard guard, SignInThrottle throttle, PlanLimits? limits = null)
 {
     private static readonly string[] TenantFilter = ["Tenant"];
 
@@ -72,7 +71,7 @@ public sealed class UserAdminService(
             .Require("password", r.Password)
             .Require("role", r.Role)
             .ThrowIfInvalid();
-        if (!IsValidUserName(userName)) throw Fail.Field("userName", ErrorCodes.UserNameFormat);
+        if (!IsValidUserName(userName)) throw Fail.Field("userName", PlatformErrorCodes.UserNameFormat);
         var role = await RoleByTokenAsync(r.Role, ct).ConfigureAwait(false);
         guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // no escalation (SR-01)
         var tenantId = ctx.TenantId ?? throw Fail.Forbidden();
@@ -83,7 +82,7 @@ public sealed class UserAdminService(
         // Owner decision 18 Oct 2026 (DT-203): one generic "not available" answer for a taken username or email (any tenant), never which.
         if (await users.FindByNameAsync(userName!).ConfigureAwait(false) is not null
             || (mail is not null && await users.FindByEmailAsync(mail).ConfigureAwait(false) is not null))
-            throw Fail.Conflict(ErrorCodes.NotAvailable);
+            throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
 
         var user = await db.InTransactionAsync(async c =>
         {
@@ -98,8 +97,8 @@ public sealed class UserAdminService(
             if (!created.Succeeded)
             {
                 if (created.Errors.Any(e => e.Code == TenantPasswordValidator.ErrorCode)) throw AccountService.PolicyError(policy);
-                if (created.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail")) throw Fail.Conflict(ErrorCodes.NotAvailable);
-                throw Fail.Rule(ErrorCodes.ValidationFailed);
+                if (created.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail")) throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
+                throw Fail.Rule(SharedErrorCodes.ValidationFailed);
             }
             db.Set<UserCompanyRole>().Add(new UserCompanyRole { UserId = u.Id, CompanyId = ctx.CompanyId!.Value, RoleId = role.Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
@@ -119,7 +118,7 @@ public sealed class UserAdminService(
     {
         ArgumentNullException.ThrowIfNull(r);
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
-        if (user.UserName is null) throw Fail.Rule(ErrorCodes.PasswordSetNotAllowed);
+        if (user.UserName is null) throw Fail.Rule(PlatformErrorCodes.PasswordSetNotAllowed);
         var policy = await TenantPasswordValidator.GetPolicyAsync(db, user.TenantId, ct).ConfigureAwait(false);
         if (!policy.IsSatisfiedBy(r.Password)) throw AccountService.PolicyError(policy);
         changes.SetAction(user, "PasswordSetByAdmin");
@@ -149,16 +148,16 @@ public sealed class UserAdminService(
         var userName = string.IsNullOrWhiteSpace(r.UserName) ? null : r.UserName.Trim();
         new Validator()
             .Require("fullName", fullName).MaxLength("fullName", fullName, 150)
-            .Check(userName is not null || user.UserName is null, "userName", ErrorCodes.ValidationRequired)
-            .Check(userName is null || user.UserName is not null, "userName", ErrorCodes.UserNameNotForEmailUser)
+            .Check(userName is not null || user.UserName is null, "userName", SharedErrorCodes.ValidationRequired)
+            .Check(userName is null || user.UserName is not null, "userName", PlatformErrorCodes.UserNameNotForEmailUser)
             .Require("rowVersion", r.RowVersion)
             .ThrowIfInvalid();
-        if (userName is not null && !IsValidUserName(userName)) throw Fail.Field("userName", ErrorCodes.UserNameFormat);
+        if (userName is not null && !IsValidUserName(userName)) throw Fail.Field("userName", PlatformErrorCodes.UserNameFormat);
         db.ExpectRowVersion(user, r.RowVersion!);
         var normalized = userName is null ? null : users.NormalizeName(userName);
         if (normalized is not null && normalized != user.NormalizedUserName
             && (await users.FindByNameAsync(userName!).ConfigureAwait(false) is { } other && other.Id != user.Id))
-            throw Fail.Conflict(ErrorCodes.NotAvailable);
+            throw Fail.Conflict(PlatformErrorCodes.NotAvailable);
         if (user.FullName == fullName && user.UserName == userName) return;
         changes.SetAction(user, "ProfileChangedByAdmin");
         user.FullName = fullName!;
@@ -170,7 +169,7 @@ public sealed class UserAdminService(
         }
         catch (DbUpdateException e) when (normalized is not null && e is not DbUpdateConcurrencyException)
         {
-            throw Fail.Conflict(ErrorCodes.NotAvailable);   // taken at the same moment (unique index)
+            throw Fail.Conflict(PlatformErrorCodes.NotAvailable);   // taken at the same moment (unique index)
         }
         access.Invalidate(user.Id);
     }
@@ -179,8 +178,8 @@ public sealed class UserAdminService(
     public async Task EnsureOwnerOrAdministratorAsync(CancellationToken ct)
     {
         var ok = await db.Set<UserCompanyRole>().AsNoTracking().AnyAsync(r => r.UserId == ctx.UserId && r.CompanyId == ctx.CompanyId && r.Role.IsPreset
-            && (r.Role.Name == PresetRoles.Owner || r.Role.Name == PresetRoles.Administrator), ct).ConfigureAwait(false);
-        if (!ok) throw new AppException(ErrorCodes.OwnerOrAdministratorOnly, 403);
+            && (r.Role.Name == PlatformPresetRoles.Owner || r.Role.Name == PlatformPresetRoles.Administrator), ct).ConfigureAwait(false);
+        if (!ok) throw new AppException(PlatformErrorCodes.OwnerOrAdministratorOnly, 403);
     }
 
     /// <summary>DT-229: a user whose name, username or email the caller (Owner / Administrator) may change.</summary>
@@ -201,7 +200,7 @@ public sealed class UserAdminService(
         if (link.RoleId == role.Id) return;
         guard.EnsureCanGrant(role.RolePermissions.Select(p => p.Permission.PermissionKey)); // no escalation (SR-01)
         await EnsureOwnerKeptAsync(user.Id, losingOwnerIn: link.CompanyId, ct, newRole: role).ConfigureAwait(false);
-        if (!role.RolePermissions.Any(p => p.Permission.PermissionKey == PermissionKeys.UsersManage))
+        if (!role.RolePermissions.Any(p => p.Permission.PermissionKey == PlatformPermissionKeys.UsersManage))
             await EnsureUserManagerKeptAsync(link.CompanyId, user.Id, ct).ConfigureAwait(false);
         link.RoleId = role.Id;
         changes.SetAction(link, "RoleChange");
@@ -241,8 +240,8 @@ public sealed class UserAdminService(
     public async Task SendPasswordResetAsync(string userToken, CancellationToken ct)
     {
         var (user, _) = await TargetAsync(userToken, ct).ConfigureAwait(false);
-        if (user.Email is null) throw Fail.Rule(ErrorCodes.UserHasNoEmail);
-        if (user.EmailConfirmedAt is null && !user.IsPlatformStaff) throw Fail.Rule(ErrorCodes.UserEmailNotVerified);
+        if (user.Email is null) throw Fail.Rule(PlatformErrorCodes.UserHasNoEmail);
+        if (user.EmailConfirmedAt is null && !user.IsPlatformStaff) throw Fail.Rule(PlatformErrorCodes.UserEmailNotVerified);
         await accounts.SendPasswordResetAsync(user, ct).ConfigureAwait(false);
     }
 
@@ -291,14 +290,14 @@ public sealed class UserAdminService(
     /// <summary>BR-001: after the change at least one other active user must hold the Owner role in an active company.</summary>
     private async Task EnsureOwnerKeptAsync(long userId, long? losingOwnerIn, CancellationToken ct, Role? newRole = null)
     {
-        if (newRole is { IsPreset: true, Name: PresetRoles.Owner }) return;
+        if (newRole is { IsPreset: true, Name: PlatformPresetRoles.Owner }) return;
         var ownerLinks = await db.Set<UserCompanyRole>().AsNoTracking()
-            .Where(r => r.Role.IsPreset && r.Role.Name == PresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted && r.Company.Status == "Active")
+            .Where(r => r.Role.IsPreset && r.Role.Name == PlatformPresetRoles.Owner && r.User.Status == "Active" && !r.User.IsDeleted && r.Company.Status == "Active")
             .Select(r => new { r.UserId, r.CompanyId }).ToListAsync(ct).ConfigureAwait(false);
         var isOwner = ownerLinks.Any(o => o.UserId == userId && (losingOwnerIn is null || o.CompanyId == losingOwnerIn));
         if (!isOwner) return;
         var remaining = ownerLinks.Where(o => !(o.UserId == userId && (losingOwnerIn is null || o.CompanyId == losingOwnerIn)));
-        if (!remaining.Any()) throw Fail.Rule(ErrorCodes.LastOwner);
+        if (!remaining.Any()) throw Fail.Rule(PlatformErrorCodes.LastOwner);
     }
 
     /// <summary>BR-002: the company must keep another active user whose role has users.manage.</summary>
@@ -306,8 +305,8 @@ public sealed class UserAdminService(
     {
         var others = await db.Set<UserCompanyRole>().AsNoTracking()
             .AnyAsync(r => r.CompanyId == companyId && r.UserId != excludingUserId && r.User.Status == "Active" && !r.User.IsDeleted
-                && r.Role.RolePermissions.Any(p => p.Permission.PermissionKey == PermissionKeys.UsersManage), ct).ConfigureAwait(false);
-        if (!others) throw Fail.Rule(ErrorCodes.LastUserManager);
+                && r.Role.RolePermissions.Any(p => p.Permission.PermissionKey == PlatformPermissionKeys.UsersManage), ct).ConfigureAwait(false);
+        if (!others) throw Fail.Rule(PlatformErrorCodes.LastUserManager);
     }
 
     private async Task AfterAccessChangeAsync(long userId, string reason, CancellationToken ct)
@@ -331,17 +330,17 @@ public sealed class UserAdminService(
 
     private async Task<Role> RoleByTokenAsync(string roleToken, CancellationToken ct)
     {
-        var publicId = tokens.Decode<Role>(roleToken) ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+        var publicId = tokens.Decode<Role>(roleToken) ?? throw Fail.Field("role", SharedErrorCodes.ValidationFormat);
         return await db.Set<Role>().Include(r => r.RolePermissions).ThenInclude(p => p.Permission)
             .SingleOrDefaultAsync(r => r.PublicId == publicId, ct).ConfigureAwait(false)
-            ?? throw Fail.Field("role", ErrorCodes.ValidationFormat);
+            ?? throw Fail.Field("role", SharedErrorCodes.ValidationFormat);
     }
 
     private static void RequireReason(string? reason)
     {
-        if (string.IsNullOrWhiteSpace(reason)) throw Fail.Field("reason", ErrorCodes.ReasonRequired);
-        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
+        if (string.IsNullOrWhiteSpace(reason)) throw Fail.Field("reason", SharedErrorCodes.ReasonRequired);
+        if (reason.Length > 500) throw Fail.Field("reason", SharedErrorCodes.ValidationRange, new FieldRef("reason"));
     }
 
-    internal static void RequireReasonPublic(string? reason) => RequireReason(reason);
+    public static void RequireReasonPublic(string? reason) => RequireReason(reason);
 }
