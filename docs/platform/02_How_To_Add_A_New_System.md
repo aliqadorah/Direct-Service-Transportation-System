@@ -126,7 +126,8 @@ POS never touches `acc` tables. It uses `Accounting.Contracts` (§c):
    - `ISearchProvider` (global search);
    - `IDashboardContributor` (figures and alerts);
    - `IReportSourceProvider` / `IStandardReportProvider` (report builder and catalogue);
-   - `INotificationTypeProvider` (types `POS.*`);
+   - `INotificationTypeProvider` (types `POS.*` with their AR/EN words through `NotificationWording`, links to the module's records, parameters worked out when shown; Transportation's: `TransportationNotificationTypes`); send notifications through `IUserNotifier` (Platform.Contracts), never Platform.Application;
+   - `IAuditVocabularyProvider` also decides which fields are masked for the reader (`Masks`) in the platform's audit log;
    - `IAuditVocabularyProvider` (entity, field and action labels AR/EN);
    - `ICompanyProvisioner` (number sequences, defaults for a new company);
    - `IDemoDataContributor`;
