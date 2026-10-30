@@ -90,9 +90,6 @@ public sealed class DemoCompanyService(IAppDbContext db, RequestContext ctx, Dat
 {
     public const string DemoName = "شركة تجريبية (للتدريب)";
 
-    /// <summary>Sample trips of the demo company (not counted toward the monthly trip limit).</summary>
-    public const int SampleTrips = 6;
-
     /// <summary>
     /// Creates and fills the demo company in one transaction (a failure leaves nothing half-filled), one request per tenant at a time
     /// (review R6).

@@ -9,9 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Domain\DirectService.Transportation.Domain.csproj" />
     <ProjectReference Include="..\DirectService.Transportation.Contracts\DirectService.Transportation.Contracts.csproj" />
-    <!-- Temporary (Stage 2 session 12, DT-343): the Platform services still in this project use the ones already in Platform.Application;
-         the reference goes when they have moved too (design a.2: an Application project references Platform.Contracts only). -->
-    <ProjectReference Include="..\Platform\DirectService.Platform.Application\DirectService.Platform.Application.csproj" />
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

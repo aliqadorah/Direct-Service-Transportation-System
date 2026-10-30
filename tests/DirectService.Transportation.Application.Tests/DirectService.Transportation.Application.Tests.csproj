@@ -13,5 +13,8 @@
     <ProjectReference Include="..\..\src\DirectService.Transportation.Application\DirectService.Transportation.Application.csproj" />
     <!-- SavedReportService (the pin states) lives in Shared.Infrastructure since Stage 2 session 10 (DT-333). -->
     <ProjectReference Include="..\..\src\Shared\DirectService.Shared.Infrastructure\DirectService.Shared.Infrastructure.csproj" />
+    <!-- The platform services, texts and e-mail templates these tests check: referenced through Transportation.Application until the
+         DT-343 reference went in Stage 2 session 14. -->
+    <ProjectReference Include="..\..\src\Platform\DirectService.Platform.Application\DirectService.Platform.Application.csproj" />
   </ItemGroup>
 </Project>

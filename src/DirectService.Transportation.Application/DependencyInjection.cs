@@ -15,9 +15,6 @@ using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Platform.Contracts.Modules;
 using Microsoft.Extensions.DependencyInjection;
-using DirectService.Platform.Application.Staff;
-using DirectService.Platform.Application.Email;
-using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application;
 

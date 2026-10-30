@@ -7,8 +7,6 @@ using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Billing;
-using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application.Modules;
 
@@ -32,7 +30,7 @@ public sealed class TripUsageMeter(IAppDbContext db) : IUsageMeter
         var trips = db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(AllFilters).Where(t => t.TenantId == tenantId && !t.IsDeleted && t.CreatedAt >= fromUtc);
         var real = await trips.CountAsync(t => !demo.Contains(t.CompanyId), ct).ConfigureAwait(false);
         var practice = await trips.CountAsync(t => demo.Contains(t.CompanyId), ct).ConfigureAwait(false);
-        return real + Math.Max(0, practice - DemoCompanyService.SampleTrips);
+        return real + Math.Max(0, practice - TransportationDemoData.SampleTrips);
     }
 }
 

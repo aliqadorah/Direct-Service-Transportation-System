@@ -21,10 +21,7 @@ using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Billing;
-using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Contracts.Modules;
-using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application.Modules;
 

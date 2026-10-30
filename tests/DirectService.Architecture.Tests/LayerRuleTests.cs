@@ -159,33 +159,27 @@ public sealed class LayerRuleTests
     [Fact]
     public void Module_application_references_its_domain_and_contracts_and_the_platform_contracts()
     {
-        // Design a.2. The one temporary exception (Stage 2 session 12, DT-343): Platform.Application. Since session 13 the identity, tenant,
-        // console, subscription, staff and onboarding services are in Platform.Application; what the module still uses of it is pinned below
-        // (the notification, audit-log and company-settings services still here, and the module's calls into platform services), so the
-        // reference can only shrink until it goes.
+        // Design a.2, without exception since Stage 2 session 14 (the temporary Platform.Application reference of DT-343 is gone): the module
+        // reaches the platform services through Platform.Contracts (notifier, plan limit, contribution interfaces).
         Only("DirectService.Transportation.Application",
-            r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
-                or "DirectService.Platform.Application",
+            r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel,
             "a module's Application references its own Domain and Contracts, SharedKernel and Platform.Contracts");
-        var used = TypesUsedBy(typeof(DirectService.Transportation.Application.DependencyInjection).Assembly, "DirectService.Platform.Application");
-        var more = used.Except(StillUsedOfPlatformApplication, StringComparer.Ordinal).ToList();
-        Assert.True(more.Count == 0, "Transportation.Application uses more of Platform.Application (DT-343): " + string.Join(", ", more));
+        // The compiled assembly too (a reference could also come in through another project).
+        var platform = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => n.StartsWith("DirectService.Platform.", StringComparison.Ordinal) && n is not PlatformDomain and not "DirectService.Platform.Contracts").ToList();
+        Assert.True(platform.Count == 0, "The compiled Transportation.Application references " + string.Join(", ", platform));
     }
-
-    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343; end of Stage 2 session 13: eight, session 14 step 1: two, step 2: one, step 3: none); remove entries as they go.</summary>
-    private static readonly string[] StillUsedOfPlatformApplication =
-    [
-    ];
 
     [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
     {
-        // Exception E-1 (design a.2, owner decision K-09): a module's Domain and Infrastructure may use Tenant, Company and User of
-        // Platform.Domain, and only to map foreign keys. Transportation.Application still holds Platform services (console, tenants,
-        // subscriptions, account and user services; DT-343), so it is checked once they have moved to Platform.Application.
+        // Exception E-1 (design a.2, owner decision K-09): a module's Domain, Application and Infrastructure may use Tenant, Company and
+        // User of Platform.Domain, and only to map foreign keys and read those rows (Application checked since Stage 2 session 14, when the
+        // Platform services it held had moved).
         var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
+        var application = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly;
         var infrastructure = typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly;
-        foreach (var assembly in new[] { domain, infrastructure })
+        foreach (var assembly in new[] { domain, application, infrastructure })
         {
             var used = PlatformTypesUsedBy(assembly);
             Assert.NotEmpty(used);   // the reader works: the User navigations and their mapping

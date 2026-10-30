@@ -21,11 +21,8 @@ using DirectService.Transportation.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
-using DirectService.Platform.Application.Billing;
-using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Contracts.Modules;
 using DirectService.Transportation.Application.Platform;
-using DirectService.Platform.Application.Tenants;
 
 namespace DirectService.Transportation.Application.Modules;
 
@@ -38,6 +35,9 @@ public sealed class TransportationDemoData(IAppDbContext db, IUrlTokenService to
     MaterialService materials, LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, DriverService drivers,
     TariffService tariffs, MonthlyRateService rates, TripService trips, InvoiceService invoices, ReceiptService receipts, MasterDataSupport support) : IDemoDataContributor
 {
+    /// <summary>Sample trips of the demo company (not counted toward the monthly trip limit; was <c>DemoCompanyService.SampleTrips</c>, Stage 2 session 14).</summary>
+    public const int SampleTrips = 6;
+
     public async Task AddDemoDataAsync(CancellationToken ct)
     {
         await chart.ApplyTemplateAsync(ct).ConfigureAwait(false);
