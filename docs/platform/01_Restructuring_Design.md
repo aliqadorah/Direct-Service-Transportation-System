@@ -81,7 +81,7 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 |---|---|
 | `*.Domain` | SharedKernel only |
 | `*.Contracts` | SharedKernel only (WASM-safe: no EF, no ASP.NET) |
-| `*.Application` | its own Domain and Contracts, SharedKernel, `Platform.Contracts`, **other modules' Contracts**. Temporary exception (Stage 2 session 12, DT-343): Transportation.Application → Platform.Application while it still holds Platform services. Test: `LayerRuleTests.Module_application_references_its_domain_and_contracts_and_the_platform_contracts` |
+| `*.Application` | its own Domain and Contracts, SharedKernel, `Platform.Contracts`, **other modules' Contracts**. Temporary exception (Stage 2 session 12, DT-343): Transportation.Application → Platform.Application while it still holds Platform services (since session 13 limited to the eight types listed in the test, DT-356). Test: `LayerRuleTests.Module_application_references_its_domain_and_contracts_and_the_platform_contracts` |
 | `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09); a module's Domain may hold them as foreign-key navigation properties (a.4, DT-338). Test: `LayerRuleTests.Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1` |
 | `*.UI` | its own Contracts, `Platform.Contracts`, Shared.UI |
 | Shared.* | nothing from Platform or the modules |
@@ -93,7 +93,7 @@ A module never touches another module's tables with `Set<T>()`. This is guarante
 
 ### a.3 Contribution interfaces (how Shared/Platform/Accounting use module data without referencing it)
 
-Defined in SharedKernel (for Shared), Platform.Contracts or Accounting.Contracts. Each module registers its implementations in its `IModule.AddServices`. Stage 2 session 12 (DT-346) added the Platform ones to `Platform.Contracts/Modules` — `ICompanyProvisioner`, `IDemoDataContributor`, `ISetupStepProvider`, `IUsageMeter` (no separate `ILimitCheck`: the plan limit compares the meters' counts), `ITenantDataEraser`, `IPermissionCatalog`, `INotificationTypeProvider` — with the Transportation implementations in `Transportation.Application/Modules`; and `IErrorTextProvider` (SharedKernel) for the module's error catalogue.
+Defined in SharedKernel (for Shared), Platform.Contracts or Accounting.Contracts. Each module registers its implementations in its `IModule.AddServices`. Stage 2 session 12 (DT-346) added the Platform ones to `Platform.Contracts/Modules` — `ICompanyProvisioner`, `IDemoDataContributor`, `ISetupStepProvider`, `IUsageMeter` (no separate `ILimitCheck`: the plan limit compares the meters' counts), `ITenantDataEraser`, `IPermissionCatalog`, `INotificationTypeProvider` — with the Transportation implementations in `Transportation.Application/Modules`; session 13 added `IHealthFigureSource` (the module's figures on the console's health page, DT-355) and `IPermissionCatalog.SupportSessionKeys` (the view keys of a support session, DT-354), and `IUserNotifier` in Platform.Application (implemented by the module's notification service until it moves, DT-353); and `IErrorTextProvider` (SharedKernel) for the module's error catalogue.
 
 | Interface | Owner | Replaces today's direct reads in | Implemented by |
 |---|---|---|---|

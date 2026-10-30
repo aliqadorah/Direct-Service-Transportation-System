@@ -133,9 +133,10 @@ POS never touches `acc` tables. It uses `Accounting.Contracts` (§c):
    - `ISetupStepProvider`;
    - `IUsageMeter` (plan limits such as `POS.Registers`; a new measure in `UsageMeasures`);
    - `ITenantDataEraser` (personal-data columns);
-   - `IPermissionCatalog` (the module's permission keys and preset-role keys; the rows themselves through `IPermissionSeedProvider`, section 3).
+   - `IPermissionCatalog` (the module's permission keys, preset-role keys and the view keys a support session gets; the rows themselves through `IPermissionSeedProvider`, section 3);
+   - `IHealthFigureSource` (the module's counts on the provider's health page, measures in `HealthMeasures`), if it has any.
 
-   The Platform interfaces are in `DirectService.Platform.Contracts.Modules` (added in Stage 2 session 12, DT-346); Transportation's implementations are in `Transportation.Application/Modules` and `CompanyProvisioningService` — copy their shape.
+   The Platform interfaces are in `DirectService.Platform.Contracts.Modules` (added in Stage 2 sessions 12–13, DT-346, DT-354, DT-355); platform problem codes, permission keys, preset role names and `CORE.*` setting keys are in `PlatformErrorCodes`, `PlatformPermissionKeys`, `PlatformPresetRoles` and `PlatformSettingKeys` (Platform.Contracts) — a module names them, never copies the values; Transportation's implementations are in `Transportation.Application/Modules` and `CompanyProvisioningService` — copy their shape.
 4. Background work: a worker in `Infrastructure/Workers`, claiming rows with `UPDLOCK, READPAST`, switched by `Jobs:Enabled`.
 
 ---
