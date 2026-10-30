@@ -45,7 +45,8 @@ jobs:
       - name: Build
         run: dotnet build DirectService.Transportation.slnx --no-restore -c Release
 
-      # First: the architecture tests compare every name stored in data (entity stored names, URL token labels, keys, cookies, Data
+      # First: the architecture tests check the layer and module rules of the platform design (a.2: project files and compiled
+      # assemblies, the two decided exceptions DT-367 and E-1 only), compare every name stored in data (entity stored names, URL token labels, keys, cookies, Data
       # Protection purposes, the OpenAPI document) with the golden files of the restore tag (platform restructuring, DT-283), and check the
       # migration history: the 20 migration ids in src/Hosts/DirectService.Database, the history table, no model change against the
       # snapshot (the in-process form of `dotnet ef migrations has-pending-model-changes`, DT-294).

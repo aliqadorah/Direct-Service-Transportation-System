@@ -89,6 +89,8 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 | Web.Client | the UI projects, Shared.UI, Contracts |
 | Web | everything (composition root) |
 
+Every project may also use Shared of its own layer (SharedKernel / `Shared.Contracts`; `Shared.Infrastructure` from Infrastructure, `Shared.UI` from UI) and `Platform.Contracts`, except Shared.* and the Domain projects (the rows above). The whole table, with DT-367 and E-1 as its only exceptions, is checked by `ModuleRuleTests` (Stage 2 session 16, DT-375).
+
 A module never touches another module's tables with `Set<T>()`. This is guaranteed at compile time: the other module's Domain assembly is not referenced. Foreign keys that cross modules are configured by entity name in one file per module (`CrossModuleRelationships.cs`), so the database model and its constraints stay exactly as they are (section d).
 
 ### a.3 Contribution interfaces (how Shared/Platform/Accounting use module data without referencing it)
@@ -824,6 +826,8 @@ Rule for each move: **namespace and file move only, no assertion changed.** The 
    - Shared references no Platform or module;
    - UI never references Application, Infrastructure or Domain;
    - exception E-1 allowed only in `*.Infrastructure` and only for `Tenant`, `Company` and `User`.
+
+   **Done in Stage 2 session 16 (DT-375):** `ModuleRuleTests` checks the whole a.2 table for every project under `src/` by its kind (owner + layer; a new module's projects are checked as soon as they exist), together with the general rule "everyone may use Shared of its own layer and `Platform.Contracts`"; the only references outside the table must be exactly Shared.UI → Platform.Contracts (DT-367) and a module Domain → Platform.Domain (E-1, its use limited to the anchor navigations by `LayerRuleTests`); every compiled assembly may name only projects its project references reach (private references do not flow on); no module reaches another module's Domain, Application, Infrastructure or UI; the browser-side assemblies (Contracts, UI, browser app) reference no SharedKernel, Domain, Application, Infrastructure or EF Core.
 2. **Stored names (golden):** E-1 entity names, E-3 token labels (fixed key + GUID → token), E-4 email template names, E-6 entity property lists, E-8…E-20 stored keys (setting keys, document types, posting keys, notification types, permission keys + groups + seed Ids, field-catalog entity types, view keys, report-builder source keys, source/party codes).
 3. **Crypto and browser literals:** Data Protection application name and purposes, cookie and scheme names, hub path and group format, localStorage keys.
 4. **Ownership:**
