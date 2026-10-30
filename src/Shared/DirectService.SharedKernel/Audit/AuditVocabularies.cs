@@ -1,10 +1,11 @@
 using static DirectService.SharedKernel.AuditWords;
 
-namespace DirectService.Shared.Infrastructure.Audit;
+namespace DirectService.SharedKernel;
 
 /// <summary>
 /// The vocabulary of every module (<see cref="IAuditVocabularyProvider"/>s) for the shared audit describer (Stage 2 session 9, DT-329): the
-/// first module that has words for a record type, action, field or code gives them; hooks are asked module by module.
+/// first module that has words for a record type, action, field or code gives them; hooks are asked module by module. SharedKernel since
+/// Stage 2 session 14 (the platform's audit log reads the same words).
 /// </summary>
 public sealed class AuditVocabularies(IEnumerable<IAuditVocabularyProvider> providers)
 {

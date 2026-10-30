@@ -1,17 +1,10 @@
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Audit;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Application.Reports;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Platform.Contracts.Collaboration;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.Security;
+using DirectService.Platform.Contracts.Security;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Collaboration;
+namespace DirectService.Platform.Application.Audit;
 
 /// <summary>
 /// The company audit log (FR-188, FR-189): read-only for everyone (rows are append-only, the database user cannot update them); filters by
@@ -19,14 +12,16 @@ namespace DirectService.Transportation.Application.Collaboration;
 /// id, SEC-22), the reason and the changes; Excel/CSV/PDF export. Visible to administrators (settings.manage or users.manage, DT-121) for
 /// the selected company. Readable (owner feedback 14 Oct 2026, DT-188): every row is described by <see cref="IAuditDescriber"/> — action
 /// and record type in words, the event as a sentence, labelled and formatted changes, a journal entry with its lines as one event; the
-/// stored values as they are ("technical details") only for settings.manage and only when asked.
+/// stored values as they are ("technical details") only for settings.manage and only when asked. Platform since Stage 2 session 14: the
+/// words, the entries shown with their lines and the masked personal fields (drivers without drv.view) come from the modules'
+/// <see cref="IAuditVocabularyProvider"/>s.
 /// </summary>
-public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IReportExporter exporter, IAuditDescriber describer)
+public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, RecordSupport support, IReportExporter exporter, IAuditDescriber describer,
+    IEnumerable<IAuditVocabularyProvider> vocabularies)
 {
     public const int MaxExportRows = 20_000;
 
-    private const string EntryLine = "ACC.EntryLine";
-    private const string JournalEntry = "ACC.JournalEntry";
+    private readonly AuditVocabularies _words = new(vocabularies);
 
     /// <summary>Record types of the tenant (not of one company) shown with the company's log: users, roles, permissions, invitations, sign-ins (review M5).</summary>
     private static readonly string[] TenantTypes = ["CORE.User", "CORE.Role", "CORE.RolePermission", "CORE.UserCompanyRole", "CORE.Invitation", "CORE.Tenant", "CORE.UserRecoveryCode"];
@@ -34,17 +29,14 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
     /// <summary>Columns of the technical details that are never shown, even raw (the stored row keys and stamps add nothing).</summary>
     private static readonly HashSet<string> RawHidden = ["Id", "TenantId", "CompanyId", "PublicId", "RowVersion", "_reason"];
 
-    /// <summary>Personal fields of drivers shown only with drv.view (DT-36, review M4).</summary>
-    private static readonly HashSet<string> DriverPersonal = ["NationalId", "Iban", "CliqAlias", "BankName", "Phone1", "Phone2", "Address"];
-
     private void EnsureAllowed()
     {
         // Checked here too: background exports run later with the requester's current permissions (review M7).
-        if (!ctx.HasPermission(PermissionKeys.SettingsManage) && !ctx.HasPermission(PermissionKeys.UsersManage)) throw Fail.Forbidden();
+        if (!ctx.HasPermission(PlatformPermissionKeys.SettingsManage) && !ctx.HasPermission(PlatformPermissionKeys.UsersManage)) throw Fail.Forbidden();
     }
 
     /// <summary>The stored values may be shown to company administrators (settings.manage) who ask for them (DT-188).</summary>
-    private bool Technical(AuditLogQuery q) => q.Technical && ctx.HasPermission(PermissionKeys.SettingsManage);
+    private bool Technical(AuditLogQuery q) => q.Technical && ctx.HasPermission(PlatformPermissionKeys.SettingsManage);
 
     private IQueryable<AuditLog> Filter(AuditLogQuery q)
     {
@@ -55,19 +47,23 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
             .Where(a => a.CompanyId == companyId || (a.CompanyId == null && a.TenantId == tenantId && (a.EntityType == null || TenantTypes.Contains(a.EntityType))));
         if (!string.IsNullOrWhiteSpace(q.User))
         {
-            var pid = support.Decode<User>(q.User) ?? throw Fail.Field("user", ErrorCodes.ValidationFormat, new FieldRef("user"));
+            var pid = support.Decode<User>(q.User) ?? throw Fail.Field("user", SharedErrorCodes.ValidationFormat, new FieldRef("user"));
             // The acting user among the filtered users, as the former navigation AuditLog.User did (DT-323).
             query = query.Where(a => db.Set<User>().Any(u => u.Id == a.UserId && u.PublicId == pid));
         }
         if (!string.IsNullOrWhiteSpace(q.Action)) query = query.Where(a => a.Action == q.Action);
         if (!string.IsNullOrWhiteSpace(q.EntityType)) query = query.Where(a => a.EntityType == q.EntityType);
         // A journal entry and its lines are one event (item 6): lines saved with an entry are shown inside it, unless lines are asked for.
-        if (q.EntityType != EntryLine)
-            query = query.Where(a => a.EntityType != EntryLine
-                || !db.Set<AuditLog>().Any(j => j.EntityType == JournalEntry && j.CompanyId == a.CompanyId && j.OccurredAt == a.OccurredAt));
+        foreach (var lines in _words.Providers.Select(p => p.Lines).OfType<AuditLines>())
+        {
+            var (entryType, lineType) = (lines.EntryType, lines.LineType);
+            if (q.EntityType != lineType)
+                query = query.Where(a => a.EntityType != lineType
+                    || !db.Set<AuditLog>().Any(j => j.EntityType == entryType && j.CompanyId == a.CompanyId && j.OccurredAt == a.OccurredAt));
+        }
         if (q.From is DateOnly from) query = query.Where(a => a.OccurredAt >= from.ToDateTime(TimeOnly.MinValue));
         if (q.To is DateOnly to) query = query.Where(a => a.OccurredAt < to.AddDays(1).ToDateTime(TimeOnly.MinValue));
-        if (MasterDataSupport.SearchText(q.Q) is { } text) query = query.Where(a => ((a.NewValues != null && a.NewValues.Contains(text)) || (a.OldValues != null && a.OldValues.Contains(text)))
+        if (TextNormalizer.SearchText(q.Q) is { } text) query = query.Where(a => ((a.NewValues != null && a.NewValues.Contains(text)) || (a.OldValues != null && a.OldValues.Contains(text)))
             // Erased personal data cannot be found again through the text of the log (SEC-19).
             && !db.Set<AuditLog>().Any(e => e.Action == ErasedRecords.EraseAction && e.EntityType == a.EntityType && e.EntityId == a.EntityId));
         return query;
@@ -100,8 +96,8 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
             .Select(u => new { id = support.Token<User>(u.PublicId), name = u.FullName }).ToList();
         return new
         {
-            entityTypes = types.Select(t => new { id = t, name = AuditVocabulary.Entity(t).Title.In(en) }).OrderBy(t => t.name, StringComparer.CurrentCulture).ToList(),
-            actions = actions.Select(a => new { id = a, name = AuditVocabulary.Action(a).Label.In(en) }).OrderBy(a => a.name, StringComparer.CurrentCulture).ToList(),
+            entityTypes = types.Select(t => new { id = t, name = _words.Entity(t).Title.In(en) }).OrderBy(t => t.name, StringComparer.CurrentCulture).ToList(),
+            actions = actions.Select(a => new { id = a, name = _words.Action(a).Label.In(en) }).OrderBy(a => a.name, StringComparer.CurrentCulture).ToList(),
             users,
         };
     }
@@ -139,7 +135,7 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
             .ToListAsync(ct).ConfigureAwait(false);
         var described = await describer.DescribeAsync(rows.Select(r => r.Row).ToList(), new DescribeOptions(CreateValues: true, LinkRecord: true), ct).ConfigureAwait(false);
         var erased = technical
-            ? await ErasedRecords.FindAsync(db, AuditVocabulary.PersonalFields, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null).Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct)
+            ? await ErasedRecords.FindAsync(db, _words.PersonalFields, rows.Where(r => r.Row.EntityType is not null && r.Row.EntityId is not null).Select(r => (r.Row.EntityType!, r.Row.EntityId!.Value)), ct)
                 .ConfigureAwait(false)
             : [];
         return rows.Zip(described, (r, d) => new AuditLogEntry(DateTime.SpecifyKind(r.Row.OccurredAt, DateTimeKind.Utc), d.User, r.Row.Action, r.Row.EntityType, d.Record,
@@ -150,16 +146,15 @@ public sealed class AuditLogService(IAppDbContext db, IRequestContext ctx, Maste
 
     /// <summary>
     /// The stored values as they are (technical details, DT-188): column names and raw values, old → new. Personal data stays masked the
-    /// same way as in the readable view (erased records, drivers without drv.view).
+    /// same way as in the readable view (erased records, and the fields a module masks for this reader such as drivers without drv.view).
     /// </summary>
     private List<AuditChange> Raw(AuditRow row, HashSet<(string Type, long Id)> erased)
     {
         var oldValues = Parse(row.OldValues);
         var newValues = Parse(row.NewValues);
-        var mask = row.EntityType == "TRN.Driver" && !ctx.HasPermission(PermissionKeys.DrvView);
         var isErased = row.EntityType is not null && row.EntityId is long id && erased.Contains((row.EntityType, id));
         return oldValues.Keys.Union(newValues.Keys).Where(k => !RawHidden.Contains(k))
-            .Select(k => (mask && DriverPersonal.Contains(k)) || (isErased && ErasedRecords.IsPersonal(AuditVocabulary.PersonalFields, row.EntityType, k))
+            .Select(k => _words.Any(p => p.Masks(row.EntityType, k)) || (isErased && ErasedRecords.IsPersonal(_words.PersonalFields, row.EntityType, k))
                 ? new AuditChange(k, ErasedRecords.Masked, ErasedRecords.Masked)
                 : new AuditChange(k, oldValues.GetValueOrDefault(k), newValues.GetValueOrDefault(k)))
             .ToList();

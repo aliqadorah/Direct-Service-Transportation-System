@@ -2,6 +2,7 @@ using DirectService.Shared.Infrastructure.Collaboration;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
+using DirectService.Platform.Application.Companies;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
@@ -31,8 +32,8 @@ internal static class CompanyEndpoints
         s.MapGet("/market", async (CompanySettingsService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetMarketAsync(ct).ConfigureAwait(false)));
         s.MapPut("/market", async (MarketSettingsRequest r, CompanySettingsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.UpdateMarketAsync(r, ct).ConfigureAwait(false)));
-        s.MapGet("/operations", async (CompanySettingsService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetOperationsAsync(ct).ConfigureAwait(false)));
-        s.MapPut("/operations", async (OperationSettingsRequest r, CompanySettingsService svc, CancellationToken ct) =>
+        s.MapGet("/operations", async (OperationSettingsService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetOperationsAsync(ct).ConfigureAwait(false)));
+        s.MapPut("/operations", async (OperationSettingsRequest r, OperationSettingsService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.UpdateOperationsAsync(r, ct).ConfigureAwait(false)));
         s.MapPost("/migration-complete", async (MigrationCompleteRequest r, CompanySettingsService svc, CancellationToken ct) =>
         { await svc.MarkMigrationCompleteAsync(r.Confirm, ct).ConfigureAwait(false); return TypedResults.NoContent(); });

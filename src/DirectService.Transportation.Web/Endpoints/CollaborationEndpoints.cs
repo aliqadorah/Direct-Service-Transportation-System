@@ -1,6 +1,7 @@
 using DirectService.Shared.Infrastructure.Collaboration;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Collaboration;
+using DirectService.Platform.Application.Audit;
 using DirectService.Platform.Application.Notifications;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Platform.Contracts.Collaboration;

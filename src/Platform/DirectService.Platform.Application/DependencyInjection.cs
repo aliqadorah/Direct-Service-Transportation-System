@@ -1,3 +1,4 @@
+using DirectService.Platform.Application.Audit;
 using DirectService.Platform.Application.Billing;
 using DirectService.Platform.Application.Companies;
 using DirectService.Platform.Application.Email;
@@ -22,12 +23,14 @@ public static class DependencyInjection
     {
         services.AddScoped<IUserNames, UserNames>();
         services.AddScoped<ICompanyInfo, CompanyInfo>();
+        services.AddScoped<CompanySettingsService>();   // profile, logo, market, numbering (Stage 2 session 14; registered by AddApplication before)
         services.AddSingleton<IErrorText, ErrorText>();
         services.AddScoped<RecordSupport>();
 
         // Identity, plans and subscription invoices (Stage 2 session 13; registered by AddApplication before, same lifetimes).
         services.AddScoped<AccessService>();
         services.AddScoped<GrantGuard>();
+        services.AddScoped<PersonalDataService>();   // users' personal data (Stage 2 session 14; registered by AddApplication before)
         services.AddScoped<SessionService>();
         services.AddScoped<AuthService>();
         services.AddScoped<TwoFactorSettingsService>();   // DT-210: 2FA management from the profile
@@ -58,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<SetupChecklistService>();
         services.AddScoped<DemoCompanyService>();
         services.AddScoped<CompanyExportService>();
+        services.AddScoped<AuditLogService>();
         services.AddScoped<IExportJobProvider, PlatformExportJobs>();   // the "company" export kind (Stage 2 session 14)
 
         // In-app notifications (Stage 2 session 14; registered by the module before, same lifetimes); a module adds its types, words and

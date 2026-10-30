@@ -6,6 +6,7 @@ using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Pipeline;
 using Microsoft.AspNetCore.Http.HttpResults;
+using DirectService.Platform.Application.Identity;
 using DirectService.Platform.Application.Staff;
 using DirectService.Platform.Application.Email;
 using DirectService.Platform.Application.Tenants;
@@ -118,7 +119,7 @@ internal static class PlatformEndpoints
         s.MapGet("/", async (SetupChecklistService svc, CancellationToken ct) => TypedResults.Ok(await svc.GetAsync(ct).ConfigureAwait(false))).RequireMember();
         s.MapPost("/{step}", async (string step, SetupMarkRequest r, SetupChecklistService svc, CancellationToken ct) =>
             TypedResults.Ok(await svc.MarkAsync(step, r.Done, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.SettingsManage);
-        company.MapPost("/drivers/{driver}/anonymise", async (string driver, ReasonRequest r, PersonalDataService svc, CancellationToken ct) =>
+        company.MapPost("/drivers/{driver}/anonymise", async (string driver, ReasonRequest r, DriverPersonalDataService svc, CancellationToken ct) =>
         {
             await svc.AnonymiseDriverAsync(driver, r.Reason, ct).ConfigureAwait(false);
             return TypedResults.NoContent();

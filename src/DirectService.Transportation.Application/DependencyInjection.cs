@@ -42,7 +42,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantDataEraser, Modules.TransportationDataEraser>();
         services.AddSingleton<IPermissionCatalog, Modules.TransportationPermissions>();
         services.AddScoped<INotificationTypeProvider, TransportationNotificationTypes>();   // words, links, set-up count (Stage 2 session 14)
-        services.AddScoped<CompanySettingsService>();
+        services.AddScoped<OperationSettingsService>();   // the operations section of the company settings (Stage 2 session 14)
         services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
 
@@ -152,11 +152,10 @@ public static class DependencyInjection
         services.AddScoped<IDemoDataContributor, Modules.TransportationDemoData>();
         services.AddScoped<ISetupStepProvider, Modules.TransportationSetupSteps>();
         services.AddScoped<IHealthFigureSource, Modules.TransportationHealthFigures>();
-        services.AddScoped<PersonalDataService>();
+        services.AddScoped<DriverPersonalDataService>();   // drivers' personal data (users: the platform's PersonalDataService, Stage 2 session 14)
 
         // Collaboration (B11)
         services.AddScoped<ISearchProvider, TransportationSearch>();
-        services.AddScoped<AuditLogService>();
         services.AddScoped<IExportJobProvider, TransportationExportJobs>();
         services.AddSingleton(new ExportOptions { ReportPermission = Contracts.Security.PermissionKeys.ReportsView });
         services.AddScoped<SupplierBillPostingHandler>();

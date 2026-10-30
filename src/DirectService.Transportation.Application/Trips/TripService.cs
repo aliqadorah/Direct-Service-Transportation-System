@@ -54,7 +54,7 @@ public sealed record TripDraft(
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
     IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, IStandardFields fields, ICustomFields customFields,
-    CompanySettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, AuditTrail audit, DirectService.Platform.Contracts.Modules.IPlanLimitCheck? limits = null)
+    OperationSettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, AuditTrail audit, DirectService.Platform.Contracts.Modules.IPlanLimitCheck? limits = null)
 {
     /// <summary>Trips saved this month must fit the plan (P-07); viewing and exporting are never limited (BR-013).</summary>
     internal Task EnsureTripLimitAsync(int adding, CancellationToken ct) =>

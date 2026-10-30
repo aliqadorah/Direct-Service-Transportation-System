@@ -26,7 +26,7 @@ public sealed record InvoiceCompany(decimal TaxRate, bool TaxInclusive, int Deci
 /// (FR-041); void with reversal, number kept and trips released (FR-045, FR-046); list with filters and totals (FR-047); view (FR-048).
 /// </summary>
 public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, CompanySettingsService settings, TripService trips, EInvoicing.EInvoiceService einvoice)
+    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, OperationSettingsService settings, TripService trips, EInvoicing.EInvoiceService einvoice)
 {
     public const string EntityType = "TRN.Invoice";
     public const string SourceType = "Invoice";

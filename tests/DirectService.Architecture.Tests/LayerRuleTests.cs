@@ -172,10 +172,9 @@ public sealed class LayerRuleTests
         Assert.True(more.Count == 0, "Transportation.Application uses more of Platform.Application (DT-343): " + string.Join(", ", more));
     }
 
-    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343; end of Stage 2 session 13: eight, session 14 step 1: two, step 2: one, which goes with the personal-data service); remove entries as they go.</summary>
+    /// <summary>The Platform.Application types Transportation.Application may still use (DT-343; end of Stage 2 session 13: eight, session 14 step 1: two, step 2: one, step 3: none); remove entries as they go.</summary>
     private static readonly string[] StillUsedOfPlatformApplication =
     [
-        "DirectService.Platform.Application.Identity.GrantGuard",                   // PersonalDataService
     ];
 
     [Fact]
