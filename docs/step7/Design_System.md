@@ -9,7 +9,7 @@ _11 Oct 2026. Built from the approved step 6 board (`docs/step6/`, direction **A
 | Design system, shell and client services (since Stage 2 session 15) | `src/Shared/DirectService.Shared.UI`; platform screens and layouts in `src/Platform/DirectService.Platform.UI` |
 | Design tokens | `Shared.UI/wwwroot/css/tokens.css` (served at `/css/tokens.css`: the library's static web assets have the base path "/", DT-368) |
 | Component styles (board class names, logical properties, RTL + LTR) | `Shared.UI/wwwroot/css/app.css` |
-| Brand fonts (one copy, SIL OFL 1.1) | `assets/fonts/*.woff2` → served at `/fonts/…` (`Shared.UI/wwwroot/css/fonts.css`) and embedded in printouts (`SharedKernel/Printing/BrandFonts.cs`) |
+| Brand fonts (one copy, SIL OFL 1.1; licences in `assets/fonts`) | `src/Shared/DirectService.Shared.UI/wwwroot/fonts/*.woff2` → served at `/fonts/…` (`Shared.UI/wwwroot/css/fonts.css`) and embedded in printouts (`SharedKernel/Printing/BrandFonts.cs`) |
 | Icons (sprite from the board + 9 additions) | `Shared.UI/wwwroot/img/icons.svg` |
 | Browser helpers (focus trap, shortcuts, outside click, device preferences) | `Shared.UI/wwwroot/js/ui.js` (ES module, no inline script); `theme.js` before the first paint |
 | Components | `Shared.UI/Ui/` (primitives, feedback, forms, grid), `Shared.UI/Layout/` (shell); platform layouts in `Platform.UI/Layout/` |

@@ -28,6 +28,15 @@ public sealed class SecurityAndBrowserTests
 
     private static string Source(string relative) => File.ReadAllText(Path.Combine(Golden.RepoRoot, relative));
 
+    private static readonly string[] FontScripts = ["arabic", "latin"];
+    private static readonly int[] FontWeights = [400, 500, 600, 700];
+    private static readonly string[] UiProjects =
+    [
+        "src/DirectService.Transportation.Web.Client/DirectService.Transportation.Web.Client.csproj",
+        "src/Shared/DirectService.Shared.UI/DirectService.Shared.UI.csproj",
+        "src/Platform/DirectService.Platform.UI/DirectService.Platform.UI.csproj",
+    ];
+
     [Fact]
     public void Data_protection_application_name_purposes_and_key_folder_are_unchanged()
     {
@@ -137,12 +146,23 @@ public sealed class SecurityAndBrowserTests
     {
         // Stage 2 session 15 (DT-368): the files live in Shared.UI, whose static web assets have the base path "/" (not _content/…), so
         // css/app.css, js/ui.js, img/icons.svg … keep their URLs and fingerprints; the browser app keeps only its JS initializer (E-21).
+        // Session 16 (DT-374): the brand fonts are real files there too (fonts/*.woff2, same URLs); a file linked into a wwwroot from another
+        // folder is served with an empty body by dotnet run (the development manifest looks for it in the project's own wwwroot).
         var www = Path.Combine(Golden.RepoRoot, "src", "Shared", "DirectService.Shared.UI", "wwwroot");
+        string[] fonts =
+        [
+            .. FontScripts.SelectMany(s => FontWeights.Select(w => $"fonts/ibm-plex-sans-arabic-{s}-{w}-normal.woff2")),
+            .. FontWeights.Select(w => $"fonts/inter-latin-{w}-normal.woff2"),
+        ];
         string[] urls = ["css/app.css", "css/fonts.css", "css/tokens.css", "img/icons.svg", "img/logo.png", "js/theme.js", "js/ui.js"];
-        Assert.Equal(urls, Directory.EnumerateFiles(www, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(www, f).Replace('\\', '/')).Order(StringComparer.Ordinal));
+        Assert.Equal(urls.Concat(fonts).Order(StringComparer.Ordinal), Directory.EnumerateFiles(www, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(www, f).Replace('\\', '/')).Order(StringComparer.Ordinal));
         Assert.Contains("<StaticWebAssetBasePath>/</StaticWebAssetBasePath>", Source("src/Shared/DirectService.Shared.UI/DirectService.Shared.UI.csproj"), StringComparison.Ordinal);
+        var fontsCss = Source("src/Shared/DirectService.Shared.UI/wwwroot/css/fonts.css");
+        foreach (var f in fonts) Assert.Contains($"url(\"../{f}\")", fontsCss, StringComparison.Ordinal);
         var clientWww = Path.Combine(Golden.RepoRoot, "src", "DirectService.Transportation.Web.Client", "wwwroot");
         Assert.Equal(["DirectService.Transportation.Web.Client.lib.module.js"], Directory.EnumerateFiles(clientWww, "*", SearchOption.AllDirectories).Select(Path.GetFileName));
+        foreach (var project in UiProjects)
+            Assert.DoesNotContain("Link=\"wwwroot", Source(project), StringComparison.Ordinal);
         var page = Source("src/DirectService.Transportation.Web/Components/App.razor");
         foreach (var u in urls.Where(u => u != "img/icons.svg" && u != "js/ui.js")) Assert.Contains($"@Assets[\"{u}\"]", page, StringComparison.Ordinal);
     }

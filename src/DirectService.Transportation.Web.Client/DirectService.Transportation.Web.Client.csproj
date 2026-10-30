@@ -28,11 +28,6 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
-  <!-- Brand fonts bundled locally (PRD UX-07, open issue B6): one copy in assets/fonts, served from wwwroot/fonts. -->
-  <ItemGroup>
-    <Content Include="..\..\assets\fonts\*.woff2" Link="wwwroot\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="Never" />
-  </ItemGroup>
-
   <!-- The component gallery (/design, DT-140) and its sample data are not part of release builds. -->
   <ItemGroup Condition="'$(Configuration)' == 'Release'">
     <Content Remove="Pages\DesignGallery.razor" />

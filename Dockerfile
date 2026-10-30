@@ -12,7 +12,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props DirectService.Transportation.slnx ./
 COPY src/ src/
-# Brand fonts embedded in the printouts and served to the UI (the projects reference ../../assets/fonts).
+# The logo embedded in the system e-mails (Platform.Infrastructure references ../../../assets/logo.png); the brand fonts are in Shared.UI/wwwroot/fonts.
 COPY assets/ assets/
 RUN dotnet publish src/DirectService.Transportation.Web/DirectService.Transportation.Web.csproj -c Release -o /app --nologo
 
