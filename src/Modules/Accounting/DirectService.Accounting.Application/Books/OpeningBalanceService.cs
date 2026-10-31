@@ -1,11 +1,10 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Opening balances (acc.acct.setup; FR-110, 8.6 "Opening balances", G-04). Openings are kept on the accounts
@@ -45,7 +44,7 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
             var field = $"lines[{i}]";
             v.Check(id is not null && !ids.ContainsKey(id.Value), field + ".accountId")
              .Check(Money.IsValidAmount(l.Debit, decimals) && Money.IsValidAmount(l.Credit, decimals) && !(l.Debit > 0 && l.Credit > 0),
-                 field + ".debit", ErrorCodes.ValidationRange);
+                 field + ".debit", SharedErrorCodes.ValidationRange);
             if (id is not null) ids.TryAdd(id.Value, l);
         }
         v.ThrowIfInvalid();
@@ -57,7 +56,7 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
             var l = ids[a.PublicId];
             if (l.Debit == a.OpeningDebit && l.Credit == a.OpeningCredit) continue;
             if (!a.IsPostable || (a.Status != AccountingCodes.Active && (l.Debit > 0 || l.Credit > 0)))
-                throw Fail.Rule(ErrorCodes.AccountNotPostable, a.Code);
+                throw Fail.Rule(AccountingErrorCodes.AccountNotPostable, a.Code);
             a.OpeningDebit = l.Debit;
             a.OpeningCredit = l.Credit;
             changes.SetAction(a, "OpeningBalance");
@@ -72,7 +71,7 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
         ArgumentNullException.ThrowIfNull(r);
         var previous = await CurrentOpeningEntryAsync(tracked: true, ct).ConfigureAwait(false);
         var date = r.EntryDate ?? previous?.EntryDate;
-        if (date is null) throw Fail.Field("entryDate", ErrorCodes.ValidationRequired, new FieldRef("entryDate"));
+        if (date is null) throw Fail.Field("entryDate", SharedErrorCodes.ValidationRequired, new FieldRef("entryDate"));
 
         var accounts = await db.Set<Account>().AsNoTracking().Where(a => a.OpeningDebit > 0 || a.OpeningCredit > 0)
             .OrderBy(a => a.Code).ToListAsync(ct).ConfigureAwait(false);
@@ -81,12 +80,12 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
         if (difference != 0)
         {
             if (!await engine.IsSetupOpenAsync(ct).ConfigureAwait(false))
-                throw Fail.Rule(ErrorCodes.OpeningUnbalanced, Money.Format(difference)); // after setup: refused (FR-110)
+                throw Fail.Rule(AccountingErrorCodes.OpeningUnbalanced, Money.Format(difference)); // after setup: refused (FR-110)
             lines.Add(difference > 0
-                ? PostingLine.CreditKey(PostingKeys.OpeningBalanceDifference, difference)
-                : PostingLine.DebitKey(PostingKeys.OpeningBalanceDifference, -difference));
+                ? PostingLine.CreditKey(AccountingPostingKeys.OpeningBalanceDifference, difference)
+                : PostingLine.DebitKey(AccountingPostingKeys.OpeningBalanceDifference, -difference));
         }
-        if (lines.Count == 0 && previous is null) throw Fail.Rule(ErrorCodes.OpeningEmpty);
+        if (lines.Count == 0 && previous is null) throw Fail.Rule(AccountingErrorCodes.OpeningEmpty);
 
         await db.InTransactionAsync(async c =>
         {
@@ -105,7 +104,7 @@ public sealed class OpeningBalanceService(IAppDbContext db, PostingEngine engine
     /// <summary>Balance (debit − credit) of the opening-difference account; the warning shows while it is not 0.000 (FR-110).</summary>
     public async Task<decimal> DifferenceBalanceAsync(CancellationToken ct)
     {
-        var accountId = await db.Set<PostingKeyMapping>().AsNoTracking().Where(m => m.PostingKey == PostingKeys.OpeningBalanceDifference)
+        var accountId = await db.Set<PostingKeyMapping>().AsNoTracking().Where(m => m.PostingKey == AccountingPostingKeys.OpeningBalanceDifference)
             .Select(m => (long?)m.AccountId).SingleOrDefaultAsync(ct).ConfigureAwait(false);
         if (accountId is null) return 0;
         return await db.Set<EntryLine>().AsNoTracking().Where(l => l.AccountId == accountId)

@@ -1,11 +1,10 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Account mapping (core.settings.manage; FR-092 … FR-095): every posting key with its account and status
@@ -13,7 +12,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// old → new by the interceptor (AccountId change on acc.PostingKeyMappings).
 /// </summary>
 public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IUrlTokenService tokens, IChangeContext changes,
-    OpeningBalanceService openings, PendingPostingService pending, IRequestContext ctx)
+    OpeningBalanceService openings, IPostingKeyCatalog keys, IRequestContext ctx)
 {
     public const string Mapped = "Mapped";
     public const string Missing = "Missing";
@@ -23,7 +22,7 @@ public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IU
         var setupOpen = await engine.IsSetupOpenAsync(ct).ConfigureAwait(false);
         var mappings = await db.Set<PostingKeyMapping>().AsNoTracking().Include(m => m.Account)
             .ToDictionaryAsync(m => m.PostingKey, ct).ConfigureAwait(false);
-        return PostingKeys.All.Select(d =>
+        return keys.All.Select(d =>
         {
             var m = mappings.GetValueOrDefault(d.Key);
             return new PostingKeyResponse(d.Key, d.NameAr, d.NameEn, !d.RequiredOnlyDuringSetup || setupOpen,
@@ -35,13 +34,13 @@ public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IU
     public async Task<PostingKeyResponse> SetAsync(string postingKey, PostingKeyRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var definition = PostingKeys.Find(postingKey) ?? throw Fail.NotFound();
-        var accountPublicId = tokens.Decode<Account>(r.AccountId) ?? throw Fail.Field("accountId", ErrorCodes.ValidationRequired, new FieldRef("accountId"));
+        var definition = keys.All.FirstOrDefault(d => d.Key == postingKey) ?? throw Fail.NotFound();
+        var accountPublicId = tokens.Decode<Account>(r.AccountId) ?? throw Fail.Field("accountId", SharedErrorCodes.ValidationRequired, new FieldRef("accountId"));
         var account = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == accountPublicId)
             .Select(a => new { a.Id, a.Code, a.Status, a.IsPostable, HasChildren = a.Children.Any() })
             .SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? throw Fail.NotFound();
         if (account.Status != AccountingCodes.Active || !account.IsPostable || account.HasChildren)
-            throw Fail.RuleOn("accountId", ErrorCodes.AccountNotPostable, account.Code); // FR-093
+            throw Fail.RuleOn("accountId", AccountingErrorCodes.AccountNotPostable, account.Code); // FR-093
 
         var mapping = await db.Set<PostingKeyMapping>().SingleOrDefaultAsync(m => m.PostingKey == definition.Key, ct).ConfigureAwait(false);
         if (mapping is null)
@@ -63,6 +62,6 @@ public sealed class PostingKeyService(IAppDbContext db, PostingEngine engine, IU
         var missing = await engine.MissingKeysAsync(ct).ConfigureAwait(false);
         var difference = await openings.DifferenceBalanceAsync(ct).ConfigureAwait(false);
         return new AccountingStatusResponse(missing.Count == 0, missing, difference != 0, difference,
-            await pending.CountAsync(ct).ConfigureAwait(false), PostingKeys.Names(missing, ctx.Language));
+            await db.Set<PendingPosting>().AsNoTracking().CountAsync(p => p.ResolvedAt == null, ct).ConfigureAwait(false), keys.Names(missing, ctx.Language));
     }
 }

@@ -71,6 +71,12 @@ public static class PostingKeys
 /// <summary>The engine's view of the posting keys (<see cref="IPostingKeyCatalog"/>): <see cref="PostingKeys"/> in the PRD order (Stage 3 session 4a).</summary>
 public sealed class PostingKeyCatalog : IPostingKeyCatalog
 {
+    public IReadOnlyList<DirectService.Accounting.Contracts.Posting.PostingKeyDef> All { get; } = PostingKeys.All
+        .Select(d => new DirectService.Accounting.Contracts.Posting.PostingKeyDef(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, ChartTemplate.Mapping.GetValueOrDefault(d.Key)))
+        .ToList();
+
+    public IReadOnlyList<string> Names(IEnumerable<string> keys, string? language) => PostingKeys.Names(keys, language);
+
     public IEnumerable<string> Required(bool setupOpen) => PostingKeys.Required(setupOpen);
 
     public string NameList(IEnumerable<string> keys, string? language) => PostingKeys.NameList(keys, language);

@@ -1,8 +1,9 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Collaboration;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>Refuses activity in a closed period (BR-036, FR-133), across operations and accounting.</summary>
 public sealed class PeriodGuard(IAppDbContext db) : IPeriodGuard
@@ -13,6 +14,6 @@ public sealed class PeriodGuard(IAppDbContext db) : IPeriodGuard
         var closed = await db.Set<DirectService.Accounting.Domain.Acc.Period>().AsNoTracking()
             .AnyAsync(p => p.PeriodMonth == month && p.Status == "Closed", ct).ConfigureAwait(false);
         if (closed)
-            throw Fail.Rule(ErrorCodes.PeriodClosed, date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), month);
+            throw Fail.Rule(AccountingErrorCodes.PeriodClosed, date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), month);
     }
 }

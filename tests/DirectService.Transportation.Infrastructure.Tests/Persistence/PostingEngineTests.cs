@@ -64,7 +64,7 @@ public sealed class PostingEngineTests(DatabaseFixture db)
     }
 
     private static PostingEngine Engine(MasterDbContext ctx, DataScope scope, TestTenant t) =>
-        new(ctx, new NumberingService(ctx, scope), new PeriodGuard(ctx), new PostingKeyCatalog(), Request(t), new ChangeContext(), TimeProvider.System);
+        new(ctx, new NumberingService(ctx, scope), new DirectService.Accounting.Application.Books.PeriodGuard(ctx), new PostingKeyCatalog(), Request(t), new ChangeContext(), TimeProvider.System);
 
     private static RequestContext Request(TestTenant t) =>
         new() { TenantId = t.TenantId, CompanyId = t.CompanyId, UserId = t.UserId, Language = "en" };

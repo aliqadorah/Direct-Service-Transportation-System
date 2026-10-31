@@ -48,7 +48,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationTypeProvider, TransportationNotificationTypes>();   // words, links, set-up count (Stage 2 session 14)
         services.AddScoped<OperationSettingsService>();   // the operations section of the company settings (Stage 2 session 14)
         services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
-        services.AddScoped<IPeriodGuard, PeriodGuard>();
+        services.AddScoped<DirectService.Accounting.Contracts.Modules.IPeriodCloseCheck, DraftInvoicesCloseCheck>();   // draft invoices keep a month open (Stage 3 session 6)
         services.AddSingleton<IPostingKeyCatalog, PostingKeyCatalog>();   // the engine's key list in the PRD order (Stage 3 session 4a)
 
         // Accounting core (B2); the posting engine and the posting contract are registered by Accounting (AddAccountingApplication, session 4a).
@@ -57,10 +57,7 @@ public static class DependencyInjection
         services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleTrn));
         services.AddScoped<PartyResolver>();
         services.AddScoped<ChartOfAccountsService>();
-        services.AddScoped<OpeningBalanceService>();
-        services.AddScoped<PostingKeyService>();
         services.AddScoped<CashBankService>();
-        services.AddScoped<PeriodService>();
         services.AddScoped<JournalService>();
         services.AddScoped<JournalDraftService>();
         services.AddScoped<JournalTemplateService>();

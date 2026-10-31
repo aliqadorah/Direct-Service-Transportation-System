@@ -60,6 +60,12 @@ public interface IPeriodGuard
 /// </summary>
 public interface IPostingKeyCatalog
 {
+    /// <summary>Every key in the PRD order (the account-mapping screen, Stage 3 session 6).</summary>
+    IReadOnlyList<PostingKeyDef> All { get; }
+
+    /// <summary>The users' names of the keys in a language; an unknown key is kept as it is.</summary>
+    IReadOnlyList<string> Names(IEnumerable<string> keys, string? language);
+
     /// <summary>Keys that must be mapped before automatic posting and invoicing (FR-094); the opening-difference key only during setup.</summary>
     IEnumerable<string> Required(bool setupOpen);
 
