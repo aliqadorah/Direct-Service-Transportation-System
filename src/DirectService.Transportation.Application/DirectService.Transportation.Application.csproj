@@ -5,6 +5,8 @@
   <ItemGroup>
     <Using Include="DirectService.SharedKernel" />
     <Using Include="DirectService.Shared.Contracts" />
+    <!-- TEMPORARY (Stage 3 session 4a, with the Accounting.Application reference below): the posting engine, its codes and keys. -->
+    <Using Include="DirectService.Accounting.Application.Posting" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DirectService.Transportation.Domain\DirectService.Transportation.Domain.csproj" />
@@ -15,6 +17,9 @@
     <!-- TEMPORARY (Stage 3 session 3, DT-391): the accounting entities, until the transport code reaches them only through the Accounting
          contracts (Stage 3 session 16). Pinned by LayerRuleTests.StillUsedOfAccountingDomain, which may only shrink. -->
     <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Domain\DirectService.Accounting.Domain.csproj" />
+    <!-- TEMPORARY (Stage 3 session 4a): the posting engine and its codes, until the documents post through the contract (sessions 4b-5) and
+         the accounting services move (sessions 6-12). Pinned by LayerRuleTests.StillUsedOfAccountingApplication, which may only shrink. -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Application\DirectService.Accounting.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

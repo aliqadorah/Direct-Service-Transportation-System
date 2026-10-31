@@ -65,4 +65,7 @@ public static class SharedErrorCodes
 
     // A record still referenced (master data, accounts, plans; Stage 2 session 13).
     public const string RecordInUse = "record.inUse";
+
+    // An archived record chosen where an active one is needed (the posting engine's cost centres, Stage 3 session 4a).
+    public const string RecordArchived = "record.archived";
 }

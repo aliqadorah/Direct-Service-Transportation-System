@@ -9,6 +9,9 @@
     <ProjectReference Include="..\Shared\DirectService.Shared.Contracts\DirectService.Shared.Contracts.csproj" />
     <!-- Browser-safe like Shared.Contracts: the platform's problem codes and permission keys, named by ErrorCodes / PermissionKeys (Stage 2 session 13). -->
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+    <!-- Only the constants of AccountingErrorCodes / AccountingPermissionKeys (another module's Contracts, browser-safe; Stage 3 session 4a,
+         the DT-310 pattern). Private: the browser app receives the Accounting contracts through Accounting.UI only. -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Contracts\DirectService.Accounting.Contracts.csproj" PrivateAssets="all" />
     <!-- Only the constants of SharedErrorCodes (compiled into this assembly as values). Private, so the browser app never receives
          SharedKernel or EF Core through the contracts (DT-288, DT-310). -->
     <ProjectReference Include="..\Shared\DirectService.SharedKernel\DirectService.SharedKernel.csproj" PrivateAssets="all" />

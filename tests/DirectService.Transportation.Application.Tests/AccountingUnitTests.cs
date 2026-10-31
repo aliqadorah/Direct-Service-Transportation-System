@@ -1,3 +1,4 @@
+using DirectService.Accounting.Application.Posting;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Common;
 

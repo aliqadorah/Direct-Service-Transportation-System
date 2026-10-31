@@ -1,4 +1,5 @@
 using System.Globalization;
+using DirectService.Accounting.Contracts.Errors;
 using DirectService.Platform.Contracts.Errors;
 using DirectService.SharedKernel;
 
@@ -330,7 +331,8 @@ public static class ErrorCatalog
 /// <summary>
 /// Problem codes returned in the problem-details "code" field. The codes of the shared building blocks are defined once in
 /// <see cref="SharedErrorCodes"/> (SharedKernel) and named here under the same names (DT-310); the platform's codes likewise in
-/// <see cref="PlatformErrorCodes"/> (Platform.Contracts, Stage 2 session 13).
+/// <see cref="PlatformErrorCodes"/> (Platform.Contracts, Stage 2 session 13) and the posting engine's in <see cref="AccountingErrorCodes"/> (Accounting.Contracts,
+/// Stage 3 session 4a).
 /// </summary>
 public static class ErrorCodes
 {
@@ -348,7 +350,7 @@ public static class ErrorCodes
     public const string DuplicateKey = SharedErrorCodes.DuplicateKey;
     public const string PlanLimitReached = PlatformErrorCodes.PlanLimitReached;
     public const string LockHeld = SharedErrorCodes.LockHeld;
-    public const string PeriodClosed = "period.closed";
+    public const string PeriodClosed = AccountingErrorCodes.PeriodClosed;
     public const string RateLimited = SharedErrorCodes.RateLimited;
     public const string SignInFailed = PlatformErrorCodes.SignInFailed;
     public const string SignInLocked = PlatformErrorCodes.SignInLocked;
@@ -382,13 +384,13 @@ public static class ErrorCodes
     public const string ApArDeductionNotAllowed = "apar.deductionNotAllowed";
     public const string ApArDeductionKeyMissing = "apar.deductionKeyMissing";
     public const string TemplateNameTaken = "template.nameTaken";
-    public const string JournalUnbalancedWithTax = "journal.unbalancedWithTax";
-    public const string TaxAccountRequired = "journal.taxAccountRequired";
-    public const string TaxAccountInvalid = "journal.taxAccountInvalid";
-    public const string TaxCodeInactive = "journal.taxCodeInactive";
-    public const string TaxCodeInUse = "taxCode.inUse";
-    public const string TaxAccountControl = "account.taxControl";
-    public const string TaxAccountNoGroup = "account.taxNoGroup";
+    public const string JournalUnbalancedWithTax = AccountingErrorCodes.JournalUnbalancedWithTax;
+    public const string TaxAccountRequired = AccountingErrorCodes.TaxAccountRequired;
+    public const string TaxAccountInvalid = AccountingErrorCodes.TaxAccountInvalid;
+    public const string TaxCodeInactive = AccountingErrorCodes.TaxCodeInactive;
+    public const string TaxCodeInUse = AccountingErrorCodes.TaxCodeInUse;
+    public const string TaxAccountControl = AccountingErrorCodes.TaxAccountControl;
+    public const string TaxAccountNoGroup = AccountingErrorCodes.TaxAccountNoGroup;
     public const string BudgetDuplicateLine = "budget.duplicateLine";
     public const string BudgetOverlap = "budget.overlap";
     public const string BudgetAccountType = "budget.accountType";
@@ -431,25 +433,25 @@ public static class ErrorCodes
     public const string ServerError = SharedErrorCodes.ServerError;
 
     public const string RecordInUse = SharedErrorCodes.RecordInUse;
-    public const string RecordArchived = "record.archived";
+    public const string RecordArchived = SharedErrorCodes.RecordArchived;
     public const string AccountHasChildren = "account.hasChildren";
     public const string AccountParentInUse = "account.parentInUse";
     public const string AccountTypeMismatch = "account.typeMismatch";
     public const string AccountCycle = "account.cycle";
     public const string AccountMapped = "account.linked";
     public const string AccountActiveChildren = "account.activeChildren";
-    public const string AccountNotPostable = "account.notPostable";
+    public const string AccountNotPostable = AccountingErrorCodes.AccountNotPostable;
     public const string AccountNotAsset = "account.notAsset";
     public const string AccountLinkTaken = "account.linkTaken";
-    public const string ControlPartyRequired = "journal.partyRequired";
-    public const string ControlPartyMismatch = "journal.partyMismatch";
+    public const string ControlPartyRequired = AccountingErrorCodes.ControlPartyRequired;
+    public const string ControlPartyMismatch = AccountingErrorCodes.ControlPartyMismatch;
     public const string ChartNotEmpty = "chart.notEmpty";
-    public const string JournalUnbalanced = "journal.unbalanced";
-    public const string JournalLineAmount = "journal.lineAmount";
-    public const string JournalMinLines = "journal.minLines";
-    public const string JournalNotManual = "journal.notManual";
-    public const string JournalNotPosted = "journal.notPosted";
-    public const string PostingKeysMissing = "posting.keysMissing";
+    public const string JournalUnbalanced = AccountingErrorCodes.JournalUnbalanced;
+    public const string JournalLineAmount = AccountingErrorCodes.JournalLineAmount;
+    public const string JournalMinLines = AccountingErrorCodes.JournalMinLines;
+    public const string JournalNotManual = AccountingErrorCodes.JournalNotManual;
+    public const string JournalNotPosted = AccountingErrorCodes.JournalNotPosted;
+    public const string PostingKeysMissing = AccountingErrorCodes.PostingKeysMissing;
     public const string OpeningUnbalanced = "opening.unbalanced";
     public const string OpeningEmpty = "opening.empty";
     public const string PeriodAlreadyClosed = "period.alreadyClosed";
@@ -465,8 +467,8 @@ public static class ErrorCodes
     public const string ImportDuplicate = SharedErrorCodes.ImportDuplicate;
     public const string ImportUnknown = "import.unknown";
     public const string ImportInvalid = "import.invalid";
-    public const string PendingNoHandler = "pending.noHandler";
-    public const string JournalIsReversal = "journal.isReversal";
+    public const string PendingNoHandler = AccountingErrorCodes.PendingNoHandler;
+    public const string JournalIsReversal = AccountingErrorCodes.JournalIsReversal;
 
     public const string BuiltInFixed = "masters.builtInFixed";
     public const string FieldCore = SharedErrorCodes.FieldCore;

@@ -20,7 +20,7 @@ public static class PermissionKeys
     public const string DrvAdvance = "trn.drv.advance";
     public const string DrvSettle = "trn.drv.settle";
     public const string JeView = "acc.je.view";
-    public const string JeExport = "acc.je.export";
+    public const string JeExport = DirectService.Accounting.Contracts.Security.AccountingPermissionKeys.JeExport;
     public const string AcctView = "acc.acct.view";
     public const string AcctPost = "acc.acct.post";
     public const string AcctApar = "acc.acct.apar";

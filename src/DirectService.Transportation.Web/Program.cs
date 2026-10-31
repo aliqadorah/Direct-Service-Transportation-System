@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using DirectService.Accounting.Application;
 using DirectService.Accounting.Infrastructure;
 using DirectService.Platform.Application;
 using DirectService.Platform.Infrastructure;
@@ -23,6 +24,7 @@ var config = builder.Configuration;
 
 // ---------------------------------------------------------------- services
 builder.Services.AddApplication();
+builder.Services.AddAccountingApplication();   // after the Transportation application: the posting-key providers keep their order (TRN, ACC)
 builder.Services.AddPlatformApplication();
 // Accounting first: its model contributor is applied before Transportation's, whose foreign keys to acc.* tables name its entity types.
 builder.Services.AddAccountingInfrastructure();

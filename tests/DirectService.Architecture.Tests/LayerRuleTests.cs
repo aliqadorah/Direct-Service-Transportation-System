@@ -139,6 +139,7 @@ public sealed class LayerRuleTests
 
     private const string PlatformDomain = "DirectService.Platform.Domain";
     private const string AccountingDomain = "DirectService.Accounting.Domain";
+    private const string AccountingApplication = "DirectService.Accounting.Application";
 
     /// <summary>The Platform types a module may use: the anchors of exception E-1 (K-09), for foreign-key mapping only.</summary>
     private static readonly string[] Anchors = ["Tenant", "Company", "User"];
@@ -183,7 +184,8 @@ public sealed class LayerRuleTests
         Only("DirectService.Transportation.Application",
             r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
                 or "DirectService.Accounting.Contracts"
-                or AccountingDomain,   // TEMPORARY (Stage 3 session 3, DT-391): pinned by StillUsedOfAccountingDomain below
+                or AccountingDomain        // TEMPORARY (Stage 3 session 3, DT-391): pinned by StillUsedOfAccountingDomain below
+                or AccountingApplication,  // TEMPORARY (Stage 3 session 4a, DT-397): pinned by StillUsedOfAccountingApplication below
             "a module's Application references its own Domain and Contracts, SharedKernel, Platform.Contracts and other modules' Contracts");
         // The compiled assembly too (a reference could also come in through another project).
         var platform = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
@@ -243,6 +245,42 @@ public sealed class LayerRuleTests
     ];
 
     [Fact]
+    public void Transportation_uses_only_the_pinned_accounting_services_DT397()
+    {
+        // TEMPORARY (Stage 3 session 4a, DT-397): Transportation.Application references Accounting.Application while the documents still call
+        // the posting engine (sessions 4b-5) and the accounting services are in the transport projects (sessions 6-12). The transport domain
+        // uses nothing of it; the transport application and infrastructure use exactly the types listed: a new use fails, and so does a listed
+        // type no longer used, so the list can only shrink. The host is the composition root (design a.2) and is not pinned.
+        Assert.Empty(TypesUsedBy(typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly, AccountingApplication));
+        var used = new[]
+            {
+                typeof(DirectService.Transportation.Application.DependencyInjection).Assembly,
+                typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly,
+            }
+            .SelectMany(a => TypesUsedBy(a, AccountingApplication)).Distinct().Order(StringComparer.Ordinal).ToList();
+        var more = used.Except(StillUsedOfAccountingApplication, StringComparer.Ordinal).ToList();
+        Assert.True(more.Count == 0, "The transport code uses more of Accounting.Application (DT-397): " + string.Join(", ", more));
+        var gone = StillUsedOfAccountingApplication.Except(used, StringComparer.Ordinal).ToList();
+        Assert.True(gone.Count == 0, "No longer used, remove from StillUsedOfAccountingApplication: " + string.Join(", ", gone));
+    }
+
+    /// <summary>The Accounting.Application types the transport module still uses (DT-397, end of Stage 3 session 4a); remove entries as they go.</summary>
+    private static readonly string[] StillUsedOfAccountingApplication =
+    [
+        // 10 at the start (session 4a): the documents post through the engine, the accounting services use its codes, keys and helpers
+        "DirectService.Accounting.Application.Posting.AccountingCodes",
+        "DirectService.Accounting.Application.Posting.AccountingPostingAdapter",   // ContractPostingSourceHandler (until session 4b)
+        "DirectService.Accounting.Application.Posting.AccountingPostingKeys",
+        "DirectService.Accounting.Application.Posting.IPeriodGuard",
+        "DirectService.Accounting.Application.Posting.IPostingKeyCatalog",
+        "DirectService.Accounting.Application.Posting.JournalTax",
+        "DirectService.Accounting.Application.Posting.PostingEngine",
+        "DirectService.Accounting.Application.Posting.PostingLine",
+        "DirectService.Accounting.Application.Posting.PostingParty",
+        "DirectService.Accounting.Application.Posting.PostingRequest",
+    ];
+
+    [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
     {
         // Exception E-1 (design a.2, owner decision K-09): a module's Domain, Application and Infrastructure may use Tenant, Company and
@@ -252,8 +290,9 @@ public sealed class LayerRuleTests
         var application = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly;
         var infrastructure = typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly;
         var accountingDomain = typeof(DirectService.Accounting.Domain.Acc.JournalEntry).Assembly;
+        var accountingApplication = typeof(DirectService.Accounting.Application.DependencyInjection).Assembly;
         var accountingInfrastructure = typeof(DirectService.Accounting.Infrastructure.Persistence.AccountingModelContributor).Assembly;
-        foreach (var assembly in new[] { domain, application, infrastructure, accountingDomain, accountingInfrastructure })
+        foreach (var assembly in new[] { domain, application, infrastructure, accountingDomain, accountingApplication, accountingInfrastructure })
         {
             var used = PlatformTypesUsedBy(assembly);
             Assert.NotEmpty(used);   // the reader works: the User navigations and their mapping
@@ -325,6 +364,29 @@ public sealed class LayerRuleTests
         }
         var shared = typeof(SharedErrorCodes).GetFields().Where(f => f.IsLiteral).Select(f => (string)f.GetValue(null)!).ToHashSet(StringComparer.Ordinal);
         Assert.DoesNotContain(platform, f => shared.Contains((string)f.GetValue(null)!));
+    }
+
+    [Fact]
+    public void Every_accounting_error_code_is_in_the_error_catalog_under_the_same_name()
+    {
+        // Stage 3 session 4a (DT-396, the DT-310 pattern): the posting engine's codes are defined once (AccountingErrorCodes) and ErrorCodes names
+        // them; the catalogue holds both messages; no value is also a shared or platform code. Likewise the permission key and notification type
+        // the engine uses.
+        var catalog = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes);
+        var accounting = typeof(DirectService.Accounting.Contracts.Errors.AccountingErrorCodes).GetFields().Where(f => f.IsLiteral).ToList();
+        Assert.Equal(19, accounting.Count);
+        foreach (var f in accounting)
+        {
+            var value = (string)f.GetValue(null)!;
+            Assert.Equal(value, (string?)catalog.GetField(f.Name)?.GetValue(null));
+            Assert.True(DirectService.Transportation.Contracts.Errors.ErrorCatalog.IsKnown(value), $"{value} has no messages");
+        }
+        var others = typeof(SharedErrorCodes).GetFields().Concat(typeof(DirectService.Platform.Contracts.Errors.PlatformErrorCodes).GetFields())
+            .Where(f => f.IsLiteral).Select(f => (string)f.GetValue(null)!).ToHashSet(StringComparer.Ordinal);
+        Assert.DoesNotContain(accounting, f => others.Contains((string)f.GetValue(null)!));
+        Assert.Equal(DirectService.Accounting.Contracts.Security.AccountingPermissionKeys.JeExport, DirectService.Transportation.Contracts.Security.PermissionKeys.JeExport);
+        Assert.Equal(DirectService.Accounting.Contracts.Security.AccountingNotificationTypes.PostingFailed,
+            DirectService.Transportation.Application.Collaboration.TransportationNotificationTypes.PostingFailed);
     }
 
     [Fact]

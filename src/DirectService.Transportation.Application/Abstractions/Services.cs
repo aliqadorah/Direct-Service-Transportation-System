@@ -15,9 +15,3 @@ public interface IMonthlyRateLock
 {
     Task<IReadOnlyList<LockedMonthlyRate>> ReadAsync(IReadOnlyCollection<string> months, long? loadingSiteId, CancellationToken ct);
 }
-
-/// <summary>Refuses activity dated in a closed period (BR-036, FR-133).</summary>
-public interface IPeriodGuard
-{
-    Task EnsureOpenAsync(DateOnly date, CancellationToken ct);
-}

@@ -20,7 +20,7 @@ public sealed class TransportationNotificationTypes(IAppDbContext db, IRequestCo
 {
     public const string EInvoiceRejected = "EINV.Rejected";
     public const string EInvoiceSetupError = "EINV.SetupError";
-    public const string PostingFailed = "ACC.PostingFailed";
+    public const string PostingFailed = DirectService.Accounting.Contracts.Security.AccountingNotificationTypes.PostingFailed;
 
     public IReadOnlyCollection<string> Types => TransportationNotificationTexts.Types;
 

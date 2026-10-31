@@ -23,12 +23,13 @@ public sealed partial class FieldLabelTests
     private static partial Regex Hole();
 
     // The server code that names fields; the Shared projects hold the engines moved out of Application (Stage 2 session 6, DT-311), the
-    // Platform projects the identity and platform services (Stage 2 session 13).
+    // Platform projects the identity and platform services (Stage 2 session 13), Accounting.Application the posting engine (Stage 3 session 4a).
     private static readonly string[] ServerProjects =
     [
         "DirectService.Transportation.Application", "DirectService.Transportation.Web",
         Path.Combine("Shared", "DirectService.SharedKernel"), Path.Combine("Shared", "DirectService.Shared.Infrastructure"),
         Path.Combine("Platform", "DirectService.Platform.Application"), Path.Combine("Platform", "DirectService.Platform.Infrastructure"),
+        Path.Combine("Modules", "Accounting", "DirectService.Accounting.Application"),
     ];
 
     private static string Root()

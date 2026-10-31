@@ -11,7 +11,9 @@ namespace DirectService.Architecture.Tests;
 /// anchor types (E-1, K-09; what the module may use of it is checked by <see cref="LayerRuleTests"/>). The general rule of the start guide —
 /// everyone may use Shared (of its own layer) and Platform.Contracts — is part of the table, not an exception. One temporary reference besides
 /// them (Stage 3 session 3, DT-391, gone by session 16): Transportation.Application → Accounting.Domain, the accounting entities the transport
-/// code still uses, each named by <see cref="LayerRuleTests"/> (StillUsedOfAccountingDomain).
+/// code still uses, each named by <see cref="LayerRuleTests"/> (StillUsedOfAccountingDomain); and a second (Stage 3 session 4a, DT-397):
+/// Transportation.Application → Accounting.Application, the posting engine and its codes, named by StillUsedOfAccountingApplication. A module's
+/// Contracts may name another module's constants through a private reference (DT-396, the DT-310 pattern).
 /// </summary>
 public sealed class ModuleRuleTests
 {
@@ -23,6 +25,7 @@ public sealed class ModuleRuleTests
     private const string PlatformContracts = "DirectService.Platform.Contracts";
     private const string PlatformDomain = "DirectService.Platform.Domain";
     private const string AccountingDomain = "DirectService.Accounting.Domain";
+    private const string AccountingApplication = "DirectService.Accounting.Application";
 
     private static readonly string[] Layers = ["Domain", "Contracts", "Application", "Infrastructure", "UI"];
 
@@ -78,7 +81,9 @@ public sealed class ModuleRuleTests
         {
             "Domain" => reference == Kernel,
             "Contracts" => reference == SharedContracts || reference == PlatformContracts && p.Owner != "Platform"
-                || reference == Kernel && Projects[project].Single(x => x.Name == Kernel).Private,       // WASM-safe (DT-310)
+                || reference == Kernel && Projects[project].Single(x => x.Name == Kernel).Private        // WASM-safe (DT-310)
+                || r.Layer == "Contracts" && r.IsModule && r.Owner != p.Owner && p.IsModule
+                   && Projects[project].Single(x => x.Name == reference).Private,                      // another module's constants (DT-396)
             "Application" => reference == own + "Domain" || reference == own + "Contracts" || common
                 || r.Layer == "Contracts" && r.IsModule,                                               // other modules' Contracts
             "Infrastructure" => reference == own + "Application" || reference == SharedInfrastructure || common,
@@ -91,9 +96,12 @@ public sealed class ModuleRuleTests
         project == SharedUi && reference == PlatformContracts
         || reference == PlatformDomain && KindOf(project) is { Layer: "Domain", IsModule: true };
 
-    /// <summary>TEMPORARY (Stage 3 session 3, DT-391): the transport code still uses accounting entities until session 16.</summary>
+    /// <summary>
+    /// TEMPORARY: the transport code still uses accounting entities until session 16 (Stage 3 session 3, DT-391) and the posting engine and
+    /// its codes until the documents post through the contract and the accounting services have moved (Stage 3 session 4a, DT-397).
+    /// </summary>
     private static bool IsTemporaryAccountingDomainReference(string project, string reference) =>
-        project == "DirectService.Transportation.Application" && reference == AccountingDomain;
+        project == "DirectService.Transportation.Application" && reference is AccountingDomain or AccountingApplication;
 
     [Fact]
     public void Every_project_reference_follows_design_a2_except_DT367_and_E1()
@@ -129,7 +137,8 @@ public sealed class ModuleRuleTests
         {
             var owner = KindOf(project).Owner;
             var foreign = Reach(project).Where(r => r != project && KindOf(r) is { IsModule: true } k && k.Owner != owner && k.Layer != "Contracts")
-                .Where(r => !(owner == "Transportation" && r == AccountingDomain && Reach(project).Contains("DirectService.Transportation.Application")))   // DT-391, temporary
+                .Where(r => !(owner == "Transportation" && r is AccountingDomain or AccountingApplication
+                    && Reach(project).Contains("DirectService.Transportation.Application")))   // DT-391, DT-397, temporary
                 .ToList();
             Assert.True(foreign.Count == 0, $"{project} reaches another module's {string.Join(", ", foreign)}");
         }

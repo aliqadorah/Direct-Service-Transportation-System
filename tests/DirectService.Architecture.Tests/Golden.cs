@@ -78,6 +78,8 @@ internal static class Golden
         typeof(DirectService.Transportation.Contracts.Security.PermissionKeys).Assembly,
         typeof(AuditableEntity).Assembly,   // SharedKernel
         typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly,
+        typeof(DirectService.Accounting.Application.DependencyInjection).Assembly,   // the posting engine and its codes (Stage 3 session 4a)
+        typeof(DirectService.Accounting.Contracts.Errors.AccountingErrorCodes).Assembly,
     ];
 
     /// <summary>A type found by its simple name in the application assemblies (namespaces change in Stages 2–4, names do not).</summary>

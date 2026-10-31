@@ -1,13 +1,12 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Contracts.Security;
 using DirectService.Accounting.Domain.Acc;
+using DirectService.Platform.Contracts.Collaboration;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Posting;
 
 /// <summary>A party on a posting line, by internal id (validated by the caller): module TRN/ACC + type + id.</summary>
 public sealed record PostingParty(string Module, string Type, long Id);
@@ -43,8 +42,8 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 /// centre and reference, linked to it (TaxForLineId); the entry must balance with the tax lines.</item>
 /// </list>
 /// </summary>
-public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IRequestContext ctx,
-    IChangeContext changes, TimeProvider clock, DirectService.Platform.Contracts.Collaboration.IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null)
+public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IPostingKeyCatalog keyCatalog, IRequestContext ctx,
+    IChangeContext changes, TimeProvider clock, IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null)
 {
     public const int DescriptionMax = 500;
 
@@ -70,14 +69,14 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     {
         var setupOpen = await IsSetupOpenAsync(ct).ConfigureAwait(false);
         var mapped = await db.Set<PostingKeyMapping>().AsNoTracking().Select(m => m.PostingKey).ToListAsync(ct).ConfigureAwait(false);
-        return PostingKeys.Required(setupOpen).Where(k => !mapped.Contains(k)).ToList();
+        return keyCatalog.Required(setupOpen).Where(k => !mapped.Contains(k)).ToList();
     }
 
     /// <summary>Refuses automatic posting and invoicing while a required key is unmapped (FR-094).</summary>
     public async Task EnsurePostingReadyAsync(CancellationToken ct)
     {
         var missing = await MissingKeysAsync(ct).ConfigureAwait(false);
-        if (missing.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.NameList(missing, ctx.Language));   // names, not codes (DT-224)
+        if (missing.Count > 0) throw Fail.Rule(AccountingErrorCodes.PostingKeysMissing, keyCatalog.NameList(missing, ctx.Language));   // names, not codes (DT-224)
     }
 
     public async Task<int> CurrencyDecimalsAsync(CancellationToken ct) =>
@@ -99,7 +98,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         var reference = TextNormalizer.CleanText(request.Reference);
         new Validator().Require("description", description).MaxLength("description", description, DescriptionMax)
             .MaxLength("reference", reference, ReferenceMax).ThrowIfInvalid();
-        if (request.Lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
+        if (request.Lines.Count < 2) throw Fail.Rule(AccountingErrorCodes.JournalMinLines);
 
         var automatic = !request.IsManual && request.SourceType != AccountingCodes.SourceOpening;
         if (automatic) await EnsurePostingReadyAsync(ct).ConfigureAwait(false);
@@ -109,7 +108,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         var mapping = await db.Set<PostingKeyMapping>().AsNoTracking().Where(m => keys.Contains(m.PostingKey))
             .ToDictionaryAsync(m => m.PostingKey, m => m.AccountId, ct).ConfigureAwait(false);
         var unmapped = keys.Where(k => !mapping.ContainsKey(k)).ToList();
-        if (unmapped.Count > 0) throw Fail.Rule(ErrorCodes.PostingKeysMissing, PostingKeys.NameList(unmapped, ctx.Language));
+        if (unmapped.Count > 0) throw Fail.Rule(AccountingErrorCodes.PostingKeysMissing, keyCatalog.NameList(unmapped, ctx.Language));
 
         var resolved = request.Lines.Select(l => l with { AccountId = l.PostingKey is null ? l.AccountId : mapping[l.PostingKey] }).ToList();
         var accountIds = resolved.Select(l => l.AccountId ?? 0).Distinct().ToList();
@@ -140,25 +139,25 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             var l = resolved[i];
             var lineNo = i + 1;
             var amountsOk = (l.Debit > 0) != (l.Credit > 0) && Money.IsValidAmount(l.Debit, decimals) && Money.IsValidAmount(l.Credit, decimals);
-            if (!amountsOk) throw Fail.Rule(ErrorCodes.JournalLineAmount, lineNo);
+            if (!amountsOk) throw Fail.Rule(AccountingErrorCodes.JournalLineAmount, lineNo);
             if (l.AccountId is not long accountId || !accounts.TryGetValue(accountId, out var account))
-                throw Fail.Rule(ErrorCodes.AccountNotPostable, "#" + lineNo);
+                throw Fail.Rule(AccountingErrorCodes.AccountNotPostable, "#" + lineNo);
             if (account.Status != AccountingCodes.Active || !account.IsPostable || account.HasChildren)
-                throw Fail.Rule(ErrorCodes.AccountNotPostable, account.Code);
+                throw Fail.Rule(AccountingErrorCodes.AccountNotPostable, account.Code);
             if (l.CostCentreId is long cc && (!costCentres.TryGetValue(cc, out var centre) || centre.Status != AccountingCodes.Active))
-                throw Fail.Rule(ErrorCodes.RecordArchived, costCentres.TryGetValue(cc, out var c2) ? c2.Code : "#" + lineNo);
+                throw Fail.Rule(SharedErrorCodes.RecordArchived, costCentres.TryGetValue(cc, out var c2) ? c2.Code : "#" + lineNo);
             if (account.IsControlAccount)
             {
                 // FR-106 / G-17: control-account lines name a party matching the account's party type. The opening entry
                 // carries account-level openings, which have no party (DT-24).
                 if (l.Party is null && request.SourceType != AccountingCodes.SourceOpening)
-                    throw Fail.Rule(ErrorCodes.ControlPartyRequired, lineNo, account.Code, account.ControlPartyType);
+                    throw Fail.Rule(AccountingErrorCodes.ControlPartyRequired, lineNo, account.Code, account.ControlPartyType);
                 if (l.Party is not null && !PartyMatches(account.ControlPartyType, l.Party, apArRoles))
-                    throw Fail.Rule(ErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
+                    throw Fail.Rule(AccountingErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
             }
-            if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", ErrorCodes.ValidationRange, new FieldRef("note"));
+            if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", SharedErrorCodes.ValidationRange, new FieldRef("note"));
             if (TextNormalizer.CleanText(l.Reference) is { Length: > ReferenceMax })
-                throw Fail.Field($"lines[{i}].reference", ErrorCodes.ValidationRange, new FieldRef($"lines[{i}].reference"));
+                throw Fail.Field($"lines[{i}].reference", SharedErrorCodes.ValidationRange, new FieldRef($"lines[{i}].reference"));
             totalDebit += l.Debit;
             totalCredit += l.Credit;
             if (l.TaxCodeId is long taxCodeId)
@@ -173,15 +172,15 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         {
             // With tax the message names the tax on each side: it is added on the same side as its line (DT-255).
             if (taxDebit + taxCredit > 0)
-                throw Fail.Rule(ErrorCodes.JournalUnbalancedWithTax, Money.Format(totalDebit), Money.Format(taxDebit), Money.Format(totalCredit), Money.Format(taxCredit));
-            throw Fail.Rule(ErrorCodes.JournalUnbalanced, Money.Format(totalDebit), Money.Format(totalCredit));
+                throw Fail.Rule(AccountingErrorCodes.JournalUnbalancedWithTax, Money.Format(totalDebit), Money.Format(taxDebit), Money.Format(totalCredit), Money.Format(taxCredit));
+            throw Fail.Rule(AccountingErrorCodes.JournalUnbalanced, Money.Format(totalDebit), Money.Format(totalCredit));
         }
-        if (totalDebit > Money.MaxAmount) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines")); // entry totals are DECIMAL(18,3)
+        if (totalDebit > Money.MaxAmount) throw Fail.Field("lines", SharedErrorCodes.ValidationRange, new FieldRef("lines")); // entry totals are DECIMAL(18,3)
 
         // The number lock serialises posting per company; the period is checked again after it, so a period closed
         // concurrently (PeriodService takes the same lock) is always seen (BR-036).
         await periods.EnsureOpenAsync(request.EntryDate, ct).ConfigureAwait(false);
-        var number = await numbering.NextAsync(DocumentTypes.JournalEntry, ct).ConfigureAwait(false);
+        var number = await numbering.NextAsync(AccountingDocumentTypes.JournalEntry, ct).ConfigureAwait(false);
         await periods.EnsureOpenAsync(request.EntryDate, ct).ConfigureAwait(false);
 
         var entry = new JournalEntry
@@ -309,8 +308,8 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             if (first && notifications is not null && ctx.CompanyId is long companyId)
             {
                 // FR-190: the users who retry postings (je.export) learn that an entry waits.
-                await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, Contracts.Security.PermissionKeys.JeExport, ct).ConfigureAwait(false), companyId,
-                    Collaboration.TransportationNotificationTypes.PostingFailed, new Dictionary<string, string?> { ["description"] = request.Description }, "/ledger/pending-postings", ct)
+                await notifications.NotifyAsync(await notifications.HoldersAsync(companyId, AccountingPermissionKeys.JeExport, ct).ConfigureAwait(false), companyId,
+                    AccountingNotificationTypes.PostingFailed, new Dictionary<string, string?> { ["description"] = request.Description }, "/ledger/pending-postings", ct)
                     .ConfigureAwait(false);
             }
             return null;
@@ -326,12 +325,12 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     {
         ArgumentNullException.ThrowIfNull(original);
         RequireTransaction();
-        if (original.Status != AccountingCodes.Posted) throw Fail.Rule(ErrorCodes.JournalNotPosted, original.Number);
+        if (original.Status != AccountingCodes.Posted) throw Fail.Rule(AccountingErrorCodes.JournalNotPosted, original.Number);
         var lines = await db.Set<EntryLine>().AsNoTracking().Where(l => l.JournalEntryId == original.Id).OrderBy(l => l.LineNo)
             .ToListAsync(ct).ConfigureAwait(false);
 
         await periods.EnsureOpenAsync(original.EntryDate, ct).ConfigureAwait(false);
-        var number = await numbering.NextAsync(DocumentTypes.JournalEntry, ct).ConfigureAwait(false);
+        var number = await numbering.NextAsync(AccountingDocumentTypes.JournalEntry, ct).ConfigureAwait(false);
         await periods.EnsureOpenAsync(original.EntryDate, ct).ConfigureAwait(false);
 
         var reversal = new JournalEntry
@@ -410,13 +409,13 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     {
         var field = $"lines[{i}]";
         var lineNo = i + 1;
-        if (!codes.TryGetValue(taxCodeId, out var code)) throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
-        if (code.Status != AccountingCodes.Active) throw Fail.Field(field + ".taxCodeId", ErrorCodes.TaxCodeInactive, lineNo, code.Code);
+        if (!codes.TryGetValue(taxCodeId, out var code)) throw Fail.Field(field + ".taxCodeId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+        if (code.Status != AccountingCodes.Active) throw Fail.Field(field + ".taxCodeId", AccountingErrorCodes.TaxCodeInactive, lineNo, code.Code);
         var amount = JournalTax.Amount(l.Debit + l.Credit, code.Rate, decimals);
         if (code.Rate == 0) return (code, amount, null);
-        if (l.TaxAccountId is not long id) throw Fail.Field(field + ".taxAccountId", ErrorCodes.TaxAccountRequired, lineNo, code.Code);
+        if (l.TaxAccountId is not long id) throw Fail.Field(field + ".taxAccountId", AccountingErrorCodes.TaxAccountRequired, lineNo, code.Code);
         if (!accounts.TryGetValue(id, out var a) || !a.IsTaxAccount || a.IsControlAccount || a.Status != AccountingCodes.Active || !a.IsPostable || a.HasChildren)
-            throw Fail.Field(field + ".taxAccountId", ErrorCodes.TaxAccountInvalid, lineNo, a?.Code ?? "#" + lineNo);
+            throw Fail.Field(field + ".taxAccountId", AccountingErrorCodes.TaxAccountInvalid, lineNo, a?.Code ?? "#" + lineNo);
         return (code, amount, id);
     }
 
@@ -438,7 +437,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
     /// The reason stored for users (SR-B2-04): a generic bilingual message with a reference; the exception itself is
     /// logged on the server under that reference and never shown.
     /// </summary>
-    internal static string TechnicalReason(Exception ex, ILogger? logger)
+    public static string TechnicalReason(Exception ex, ILogger? logger)
     {
         var reference = Guid.NewGuid().ToString("N")[..10];
         if (logger is not null) LogTechnicalFailure(logger, ex, reference);

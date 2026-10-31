@@ -52,7 +52,7 @@ public static class DocumentTypes
     public const string Advance = "TRN.Advance";
     public const string Settlement = "TRN.Settlement";
     public const string PartnerPayment = "TRN.PartnerPayment";
-    public const string JournalEntry = "ACC.JournalEntry";
+    public const string JournalEntry = AccountingDocumentTypes.JournalEntry;
     public const string SupplierBill = "ACC.SupplierBill";
     public const string Receivable = "ACC.Receivable";
     public const string ApArPayment = "ACC.ApArPayment";

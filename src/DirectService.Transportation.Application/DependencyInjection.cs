@@ -42,15 +42,12 @@ public static class DependencyInjection
         services.AddScoped<OperationSettingsService>();   // the operations section of the company settings (Stage 2 session 14)
         services.AddSingleton<IErrorTextProvider, TransportationErrorTexts>();
         services.AddScoped<IPeriodGuard, PeriodGuard>();
+        services.AddSingleton<IPostingKeyCatalog, PostingKeyCatalog>();   // the engine's key list in the PRD order (Stage 3 session 4a)
 
-        // Accounting core and posting engine (B2)
-        services.AddScoped<PostingEngine>();
+        // Accounting core (B2); the posting engine and the posting contract are registered by Accounting (AddAccountingApplication, session 4a).
         services.AddScoped<PostingSources>();
         services.AddScoped<PendingPostingService>();
-        // The posting contract of design c over the engine (Stage 3 session 2); no document uses it yet (sessions 4–5 switch them).
-        services.AddScoped<DirectService.Accounting.Contracts.Posting.IAccountingPosting, AccountingPostingAdapter>();
         services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleTrn));
-        services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleAcc));
         services.AddScoped<PartyResolver>();
         services.AddScoped<ChartOfAccountsService>();
         services.AddScoped<OpeningBalanceService>();
