@@ -10,6 +10,8 @@
     <ProjectReference Include="..\DirectService.Transportation.Domain\DirectService.Transportation.Domain.csproj" />
     <ProjectReference Include="..\DirectService.Transportation.Contracts\DirectService.Transportation.Contracts.csproj" />
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
+    <!-- Another module's Contracts (design a.2): the accounting posting contract (Stage 3 session 2). -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Contracts\DirectService.Accounting.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

@@ -409,6 +409,8 @@ public interface IPostingKeyProvider
 }
 ```
 
+**As built (Stage 3 session 2, DT-383):** the contract is in `src/Modules/Accounting/DirectService.Accounting.Contracts/Posting/AccountingPosting.cs`. It differs from the sketch above in four points. `PostedEntry` is `(JournalEntryId, Number, Token)`: `PostOrPendAsync` returns null while the entry waits. `ReverseAsync` returns null when the document has no posted entry. `IPostingSourceHandler.DescribeAsync` is set-based (many ids → `PostingSourceInfo`). `PostingKeyDef` is `(Key, NameAr, NameEn, RequiredOnlyDuringSetup, Optional, TemplateAccountCode)`. The party and source contracts are in `Parties/` and `Modules/` (first form). The contract suite is `tests/DirectService.Accounting.Tests/PostingContractTests.cs`.
+
 **Same-transaction guarantee (NFR-04).**
 - Every module uses the one scoped `MasterDbContext` (section d), so the document, its entry, the number, the audit rows and the queue rows commit in one `SaveChanges`/transaction.
 - `PostAsync`, `PostOrPendAsync` and `ReverseAsync` throw if there is no ambient transaction. This is today's `RequireTransaction()`, unchanged.

@@ -173,10 +173,12 @@ public sealed class LayerRuleTests
     public void Module_application_references_its_domain_and_contracts_and_the_platform_contracts()
     {
         // Design a.2, without exception since Stage 2 session 14 (the temporary Platform.Application reference of DT-343 is gone): the module
-        // reaches the platform services through Platform.Contracts (notifier, plan limit, contribution interfaces).
+        // reaches the platform services through Platform.Contracts (notifier, plan limit, contribution interfaces) and other modules through their
+        // Contracts (the accounting posting contract since Stage 3 session 2).
         Only("DirectService.Transportation.Application",
-            r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel,
-            "a module's Application references its own Domain and Contracts, SharedKernel and Platform.Contracts");
+            r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
+                or "DirectService.Accounting.Contracts",
+            "a module's Application references its own Domain and Contracts, SharedKernel, Platform.Contracts and other modules' Contracts");
         // The compiled assembly too (a reference could also come in through another project).
         var platform = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
             .Where(n => n.StartsWith("DirectService.Platform.", StringComparison.Ordinal) && n is not PlatformDomain and not "DirectService.Platform.Contracts").ToList();
