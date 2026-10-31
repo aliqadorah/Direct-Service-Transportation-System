@@ -772,7 +772,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var gapEntryIds = gapLines.Select(g => g.JournalEntryId).Distinct().ToList();
         var entries = await db.Set<JournalEntry>().AsNoTracking().Where(e => gapEntryIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
         bool Matches(Account a, string? module, string? type, long? id) =>
-            module is not null && type is not null && id is long pid && PostingEngine.PartyMatches(a.ControlPartyType, new PostingParty(module, type, pid), roles);
+            module is not null && type is not null && id is long pid && DirectService.Accounting.Contracts.Posting.PostingRules.PartyMatches(a.ControlPartyType, module, type, pid, roles);
 
         var result = new List<ReconciliationRow>();
         foreach (var a in controls)

@@ -17,7 +17,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// draft budget in one transaction and is logged in cfg.ImportBatches. Month columns are matched by English or Arabic month names (both the
 /// Levantine and the Egyptian forms) or by number (1–12, M01–M12).
 /// </summary>
-public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, ISpreadsheetService sheets, MasterDataSupport support, PostingEngine engine,
+public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, ISpreadsheetService sheets, MasterDataSupport support, DirectService.Accounting.Contracts.Posting.IAccountingPosting posting,
     BudgetService budgets, IUrlTokenService tokens, IErrorText errorText)
 {
     private static readonly string[] AccountAliases = ["Account code", "AccountCode", "Account", "رمز الحساب", "الحساب"];
@@ -113,7 +113,7 @@ public sealed class BudgetImportService(IAppDbContext db, IRequestContext ctx, I
         ImportParse.RequireColumns(sheet, (account, AccountAliases[0]));
         if (months.All(m => m < 0)) throw Fail.Rule(ErrorCodes.ImportMissingColumn, MonthNames[0].En);
 
-        var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
+        var decimals = await posting.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var accounts = await db.Set<Account>().AsNoTracking().Select(a => new { a.Id, a.Code, a.AccountType, a.ParentId }).ToListAsync(ct).ConfigureAwait(false);
         var byCode = accounts.ToDictionary(a => a.Code, StringComparer.OrdinalIgnoreCase);
         var parentOf = accounts.ToDictionary(a => a.Id, a => a.ParentId);

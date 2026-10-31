@@ -169,8 +169,8 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         var reference = TextNormalizer.CleanText(r.Reference);
         var input = r.Lines ?? [];
         new Validator()
-            .MaxLength("description", description, PostingEngine.DescriptionMax)
-            .MaxLength("reference", reference, PostingEngine.ReferenceMax)
+            .MaxLength("description", description, DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax)
+            .MaxLength("reference", reference, DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
             .Check(input.Count <= 500, "lines", ErrorCodes.ValidationRange)
             .Check(description is not null || input.Count > 0, "description", ErrorCodes.ValidationRequired)
             .ThrowIfInvalid();
@@ -199,7 +199,7 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
             var party = l.Party is { Type: not null } && !string.IsNullOrEmpty(l.Party.Id)
                 ? await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false) : null;
             var lineReference = TextNormalizer.CleanText(l.Reference);
-            if (lineReference is { Length: > PostingEngine.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
             (long Id, decimal Rate)? code = null;
             if (!string.IsNullOrEmpty(l.TaxCodeId))
                 code = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && rates.TryGetValue(tg, out var c) ? c

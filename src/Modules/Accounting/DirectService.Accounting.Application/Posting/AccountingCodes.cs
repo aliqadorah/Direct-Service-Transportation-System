@@ -1,3 +1,5 @@
+using DirectService.Accounting.Contracts.Posting;
+
 namespace DirectService.Accounting.Application.Posting;
 
 /// <summary>Stored codes used by the accounting tables (design CHECK lists).</summary>
@@ -17,17 +19,17 @@ public static class AccountingCodes
     /// <summary>A journal draft in the journal list (revision 6; acc.JournalDrafts, never an entry status).</summary>
     public const string Draft = "Draft";
 
-    public const string ModuleTrn = "TRN";
-    public const string ModuleAcc = "ACC";
+    public const string ModuleTrn = PartyCodes.ModuleTrn;
+    public const string ModuleAcc = PartyCodes.ModuleAcc;
 
     public const string SourceManual = "Manual";
     public const string SourceOpening = "Opening";
 
     /// <summary>EntryLine.PartyType values: TRN Customer/Driver/Partner, ACC ApArParty.</summary>
-    public const string PartyCustomer = "Customer";
-    public const string PartyDriver = "Driver";
-    public const string PartyPartner = "Partner";
-    public const string PartyApAr = "ApArParty";
+    public const string PartyCustomer = PartyCodes.Customer;
+    public const string PartyDriver = PartyCodes.Driver;
+    public const string PartyPartner = PartyCodes.Partner;
+    public const string PartyApAr = PartyCodes.ApArParty;
 
     /// <summary>Calendar month code YYYY-MM of a date (design convention CHAR(7)).</summary>
     public static string Month(DateOnly date) => date.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);

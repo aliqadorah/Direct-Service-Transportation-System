@@ -81,7 +81,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         new Validator()
             .Check(r.EntryDate is not null, "entryDate", ErrorCodes.ValidationRequired)
             .Require("description", r.Description)
-            .MaxLength("reference", TextNormalizer.CleanText(r.Reference), PostingEngine.ReferenceMax)
+            .MaxLength("reference", TextNormalizer.CleanText(r.Reference), DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
             .Check(lines.Count <= 500, "lines", ErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         if (lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);

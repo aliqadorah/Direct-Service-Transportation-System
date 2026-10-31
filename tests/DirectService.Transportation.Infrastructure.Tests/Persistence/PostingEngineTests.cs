@@ -75,6 +75,14 @@ public sealed class PostingEngineTests(DatabaseFixture db)
         PostingLine.CreditKey(PostingKeys.DriverPayable, amount, new PostingParty("TRN", "Driver", driverId)),
     ]);
 
+    /// <summary>The same wage entry as the contract's document (what a handler rebuilds).</summary>
+    private static DirectService.Accounting.Contracts.Posting.PostingDocument WageDocument(decimal amount, long driverId = 1) =>
+        new(new("TRN", "Trip", 1001), Day, "Trip TRP wage", null,
+        [
+            DirectService.Accounting.Contracts.Posting.PostingLineSpec.DebitKey(PostingKeys.DriverWageExpense, amount),
+            DirectService.Accounting.Contracts.Posting.PostingLineSpec.CreditKey(PostingKeys.DriverPayable, amount, new("TRN", "Driver", driverId)),
+        ]);
+
     [Fact]
     public async Task A_balanced_entry_posts_with_the_next_journal_number_and_its_lines()
     {
@@ -249,7 +257,7 @@ public sealed class PostingEngineTests(DatabaseFixture db)
         var posting = new AccountingPostingAdapter(ctx, engine, new NumberingService(ctx, scope), tokens);   // the retry posts through the contract (Stage 3 session 4b)
         var none = new PendingPostingService(ctx, posting, new PostingSources([]), tokens, Request(l.Tenant), TimeProvider.System);
         Assert.False(await none.RetryAsync(pending.Id, Ct));
-        var handler = new TripHandler(WageEntry(50).ToDocument());
+        var handler = new TripHandler(WageDocument(50));
         var service = new PendingPostingService(ctx, posting, new PostingSources([handler]), tokens, Request(l.Tenant), TimeProvider.System);
         Assert.True(await service.RetryAsync(pending.Id, Ct));
         var resolved = await ctx.Set<PendingPosting>().AsNoTracking().SingleAsync(Ct);

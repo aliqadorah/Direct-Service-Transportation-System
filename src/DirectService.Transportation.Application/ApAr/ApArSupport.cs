@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Common;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ public abstract class ApArPostingHandler<T>(IAppDbContext db, IUrlTokenService t
 /// <summary>Reversal of an AP/AR posting on void (BR-035): the posted entry is reversed, a waiting pending posting closed.</summary>
 internal static class ApArPosting
 {
-    public static Task ReverseAsync(IAppDbContext db, PostingEngine posting, ICashDocument d, string sourceType, string description, CancellationToken ct) =>
+    public static Task ReverseAsync(IAppDbContext db, IAccountingPosting posting, ICashDocument d, string sourceType, string description, CancellationToken ct) =>
         CashPosting.ReverseAsync(db, posting, d, sourceType, description, ct, AccountingCodes.ModuleAcc);
 
     /// <summary>Pending flag of a source document of module ACC.</summary>

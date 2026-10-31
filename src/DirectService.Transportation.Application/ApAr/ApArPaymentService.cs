@@ -9,6 +9,7 @@ using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// reason restores the balance (FR-127).
 /// </summary>
 public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
+    IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArPayment";
     public const string SourceType = "ApArPayment";
@@ -56,7 +57,7 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleAcc, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 // The payment number serialises payments of the company; the document is read again under it and saved with its row
                 // version, so a return racing the payment ends in 409 (DT-95).
@@ -73,7 +74,7 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
                 var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name })
                     .SingleAsync(c).ConfigureAwait(false);
                 var entry = await posting.PostOrPendAsync(BuildEntry(payment, doc, party.ControlAccountId, party.Name, money.AccountId), c).ConfigureAwait(false);
-                payment.JournalEntryId = entry?.Id;
+                payment.JournalEntryId = entry?.JournalEntryId;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
         }
@@ -91,18 +92,18 @@ public sealed class ApArPaymentService(IAppDbContext db, IRequestContext ctx, Ma
     }
 
     /// <summary>Payment: Dr supplier control (party), Cr cash/bank. Collection: Dr cash/bank, Cr customer control (party).</summary>
-    public PostingRequest BuildEntry(ApArPayment p, ApArDocument doc, long controlAccountId, string partyName, long moneyAccountId)
+    public PostingDocument BuildEntry(ApArPayment p, ApArDocument doc, long controlAccountId, string partyName, long moneyAccountId)
     {
         ArgumentNullException.ThrowIfNull(p);
         ArgumentNullException.ThrowIfNull(doc);
-        var party = new PostingParty(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, doc.PartyId);
+        var party = new PartyRef(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, doc.PartyId);
         var bill = doc.DocumentKind == ApArCodes.SupplierBill;
         var text = (bill ? (En ? "Payment " : "دفعة ") : (En ? "Collection " : "تحصيل ")) + p.Number + " · " + doc.Number + " · " + partyName;
-        IReadOnlyList<PostingLine> lines = bill
-            ? [new PostingLine(null, controlAccountId, p.Amount, 0, null, party), CashSupport.Credit(moneyAccountId, p.Amount)]
-            : [CashSupport.Debit(moneyAccountId, p.Amount), new PostingLine(null, controlAccountId, 0, p.Amount, null, party)];
-        return new PostingRequest(p.PaymentDate, text.Length > PostingEngine.DescriptionMax ? text[..PostingEngine.DescriptionMax] : text, AccountingCodes.ModuleAcc,
-            SourceType, p.Id, false, lines);
+        IReadOnlyList<PostingLineSpec> lines = bill
+            ? [new PostingLineSpec(null, controlAccountId, p.Amount, 0, null, party), CashSupport.Credit(moneyAccountId, p.Amount)]
+            : [CashSupport.Debit(moneyAccountId, p.Amount), new PostingLineSpec(null, controlAccountId, 0, p.Amount, null, party)];
+        return PostingEntry.Of(p.PaymentDate, text.Length > PostingRules.DescriptionMax ? text[..PostingRules.DescriptionMax] : text, AccountingCodes.ModuleAcc,
+            SourceType, p.Id, lines);
     }
 
     /// <summary>Void (FR-127): reason, reversal dated like the payment, the document's balance restored, number kept.</summary>
@@ -236,7 +237,7 @@ public sealed class ApArPaymentPostingHandler(IAppDbContext db, IUrlTokenService
 
     protected override string VoidCode => ErrorCodes.ApArPaymentIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(ApArPayment p, CancellationToken ct)
+    protected override async Task<PostingDocument?> EntryAsync(ApArPayment p, CancellationToken ct)
     {
         var doc = await _db.Set<ApArDocument>().AsNoTracking().SingleAsync(d => d.Id == p.DocumentId, ct).ConfigureAwait(false);
         var party = await _db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(x => x.Id == doc.PartyId).Select(x => new { x.ControlAccountId, x.Name }).SingleAsync(ct).ConfigureAwait(false);

@@ -10,6 +10,7 @@ using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,7 +24,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// control account. Receivable returns are e-invoiced as credit notes when their document is (D-15). Void by reversal with a reason.
 /// </summary>
 public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
+    IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArReturn";
     public const string SourceType = "ApArReturn";
@@ -56,7 +57,7 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleAcc, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 ret.Number = await numbering.NextAsync(Configuration.DocumentTypes.ApArReturn, c).ConfigureAwait(false);
                 await db.Set<ApArDocument>().Entry(doc).ReloadAsync(c).ConfigureAwait(false);
@@ -90,7 +91,7 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
                 db.Set<ApArReturn>().Add(ret);
                 if (await support.SaveCreateAsync<ApArReturn>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
                 var entry = await posting.PostOrPendAsync(await ApArReturnEntry.BuildAsync(db, this, ret, doc, c).ConfigureAwait(false), c).ConfigureAwait(false);
-                ret.JournalEntryId = entry?.Id;
+                ret.JournalEntryId = entry?.JournalEntryId;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
                 if (doc.DocumentKind == ApArCodes.Receivable) await einvoice.QueueApArReturnAsync(ret.Id, doc.Id, c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
@@ -113,27 +114,27 @@ public sealed class ApArReturnService(IAppDbContext db, IRequestContext ctx, Mas
     /// deductions" (the returned deduction share), Cr the line accounts (amount split by line amounts) and sales tax input; receivable return —
     /// Dr the line accounts and sales tax output, Cr the customer's control account.
     /// </summary>
-    public PostingRequest BuildEntry(ApArReturn ret, ApArDocument doc, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName, int decimals)
+    public PostingDocument BuildEntry(ApArReturn ret, ApArDocument doc, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName, int decimals)
     {
         ArgumentNullException.ThrowIfNull(ret);
         ArgumentNullException.ThrowIfNull(doc);
         ArgumentNullException.ThrowIfNull(lines);
-        var party = new PostingParty(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, doc.PartyId);
+        var party = new PartyRef(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, doc.PartyId);
         var bill = doc.DocumentKind == ApArCodes.SupplierBill;
         var shares = EInvoiceDocumentBuilder.Split(ret.Amount, lines.Select(l => l.Amount).ToList(), decimals);
-        var result = new List<PostingLine>();
-        if (bill) result.Add(new PostingLine(null, controlAccountId, ret.Total, 0, null, party));
-        if (bill && ret.Deduction > 0) result.Add(PostingLine.DebitKey(PostingKeys.SupplierDeductions, ret.Deduction));
+        var result = new List<PostingLineSpec>();
+        if (bill) result.Add(new PostingLineSpec(null, controlAccountId, ret.Total, 0, null, party));
+        if (bill && ret.Deduction > 0) result.Add(PostingLineSpec.DebitKey(PostingKeys.SupplierDeductions, ret.Deduction));
         for (var i = 0; i < lines.Count; i++)
         {
             if (shares[i] == 0) continue;
-            result.Add(bill ? new PostingLine(null, lines[i].AccountId, 0, shares[i], lines[i].CostCentreId) : new PostingLine(null, lines[i].AccountId, shares[i], 0, lines[i].CostCentreId));
+            result.Add(bill ? new PostingLineSpec(null, lines[i].AccountId, 0, shares[i], lines[i].CostCentreId) : new PostingLineSpec(null, lines[i].AccountId, shares[i], 0, lines[i].CostCentreId));
         }
-        if (ret.Tax > 0) result.Add(bill ? PostingLine.CreditKey(PostingKeys.SalesTaxInput, ret.Tax) : PostingLine.DebitKey(PostingKeys.SalesTaxOutput, ret.Tax));
-        if (!bill) result.Add(new PostingLine(null, controlAccountId, 0, ret.Total, null, party));
+        if (ret.Tax > 0) result.Add(bill ? PostingLineSpec.CreditKey(PostingKeys.SalesTaxInput, ret.Tax) : PostingLineSpec.DebitKey(PostingKeys.SalesTaxOutput, ret.Tax));
+        if (!bill) result.Add(new PostingLineSpec(null, controlAccountId, 0, ret.Total, null, party));
         var text = (En ? "Return " : "مرتجع ") + ret.Number + " · " + doc.Number + " · " + partyName;
-        return new PostingRequest(ret.ReturnDate, text.Length > PostingEngine.DescriptionMax ? text[..PostingEngine.DescriptionMax] : text, AccountingCodes.ModuleAcc,
-            SourceType, ret.Id, false, result);
+        return PostingEntry.Of(ret.ReturnDate, text.Length > PostingRules.DescriptionMax ? text[..PostingRules.DescriptionMax] : text, AccountingCodes.ModuleAcc,
+            SourceType, ret.Id, result);
     }
 
     /// <summary>Void (FR-127): reason; refused once accepted by e-invoicing; reversal dated like the return; the document's balance restored.</summary>
@@ -264,7 +265,7 @@ internal static class ReturnsReader
 
 internal static class ApArReturnEntry
 {
-    public static async Task<PostingRequest> BuildAsync(IAppDbContext db, ApArReturnService returns, ApArReturn ret, ApArDocument doc, CancellationToken ct)
+    public static async Task<PostingDocument> BuildAsync(IAppDbContext db, ApArReturnService returns, ApArReturn ret, ApArDocument doc, CancellationToken ct)
     {
         var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == doc.Id).OrderBy(l => l.Id).ToListAsync(ct).ConfigureAwait(false);
         var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == doc.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);
@@ -282,7 +283,7 @@ public sealed class ApArReturnPostingHandler(IAppDbContext db, IUrlTokenService 
 
     protected override string VoidCode => ErrorCodes.ApArReturnIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(ApArReturn r, CancellationToken ct)
+    protected override async Task<PostingDocument?> EntryAsync(ApArReturn r, CancellationToken ct)
     {
         var doc = await _db.Set<ApArDocument>().AsNoTracking().SingleAsync(d => d.Id == r.DocumentId, ct).ConfigureAwait(false);
         return await ApArReturnEntry.BuildAsync(_db, returns, r, doc, ct).ConfigureAwait(false);

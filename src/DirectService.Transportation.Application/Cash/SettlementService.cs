@@ -7,6 +7,7 @@ using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// (<see cref="PreviousBalances"/>); a settlement may settle only that balance (no trips, no advances).
 /// </summary>
 public sealed class SettlementService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, TripService trips, PreviousBalances previous)
+    INumberingService numbering, IAccountingPosting posting, TripService trips, PreviousBalances previous)
 {
     public const string EntityType = "TRN.Settlement";
     public const string SourceType = "Settlement";
@@ -109,7 +110,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 // The settlement number serialises settlements; the open items are read under it (BR-031: one active settlement per item).
                 stl.Number = await numbering.NextAsync(Configuration.DocumentTypes.Settlement, c).ConfigureAwait(false);
@@ -173,7 +174,7 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
                 if (request is not null)
                 {
                     var entry = await posting.PostOrPendAsync(request, c).ConfigureAwait(false);
-                    stl.JournalEntryId = entry?.Id;
+                    stl.JournalEntryId = entry?.JournalEntryId;
                     await db.SaveChangesAsync(c).ConfigureAwait(false);
                 }
             }, ct).ConfigureAwait(false);
@@ -234,23 +235,23 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
     /// driver's repayment; driver advances are credited only with what leaves them (settled advances − the carried rest, which stays). DT-276:
     /// the previous balance is cleared on the accounts of its manual / opening lines with the driver (<see cref="PreviousBalances.Lines"/>).
     /// </summary>
-    public PostingRequest? BuildEntry(Settlement s, long moneyAccountId, decimal accruedGross, IReadOnlyList<PreviousBalances.Open> previousItems)
+    public PostingDocument? BuildEntry(Settlement s, long moneyAccountId, decimal accruedGross, IReadOnlyList<PreviousBalances.Open> previousItems)
     {
         ArgumentNullException.ThrowIfNull(s);
         ArgumentNullException.ThrowIfNull(previousItems);
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, s.DriverId);
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, s.DriverId);
         var lines = PreviousBalances.Lines(previousItems, party).ToList();
         if (s.GrossWages == 0 && s.AdvancesTotal == 0 && s.DeductionsTotal == 0 && lines.Count == 0) return null;
-        if (accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverPayable, accruedGross, party));
-        if (s.GrossWages - accruedGross > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverWageExpense, s.GrossWages - accruedGross, party));
+        if (accruedGross > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.DriverPayable, accruedGross, party));
+        if (s.GrossWages - accruedGross > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.DriverWageExpense, s.GrossWages - accruedGross, party));
         // Deductions above the wages can leave more on driver advances than was settled (a debit then).
         var advances = s.AdvancesTotal - s.CarriedForward;
-        if (advances > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DriverAdvances, advances, party));
-        if (advances < 0) lines.Add(PostingLine.DebitKey(PostingKeys.DriverAdvances, -advances, party));
-        if (s.DeductionsTotal > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DriverDeductions, s.DeductionsTotal, party));
+        if (advances > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.DriverAdvances, advances, party));
+        if (advances < 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.DriverAdvances, -advances, party));
+        if (s.DeductionsTotal > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.DriverDeductions, s.DeductionsTotal, party));
         if (s.NetPayable > 0) lines.Add(CashSupport.Credit(moneyAccountId, s.NetPayable));
         if (s.RepaidAmount > 0) lines.Add(CashSupport.Debit(moneyAccountId, s.RepaidAmount));
-        return new PostingRequest(s.SettlementDate, (cash.En ? "Driver settlement " : "تسوية سائق ") + s.Number, AccountingCodes.ModuleTrn, SourceType, s.Id, false, lines);
+        return PostingEntry.Of(s.SettlementDate, (cash.En ? "Driver settlement " : "تسوية سائق ") + s.Number, AccountingCodes.ModuleTrn, SourceType, s.Id, lines);
     }
 
     /// <summary>The accrued part of a stored settlement's gross (pending-posting retries).</summary>
@@ -385,7 +386,7 @@ public sealed class SettlementPostingHandler(IAppDbContext db, IUrlTokenService 
 
     protected override string VoidCode => ErrorCodes.SettlementIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(Settlement d, CancellationToken ct) =>
+    protected override async Task<PostingDocument?> EntryAsync(Settlement d, CancellationToken ct) =>
         settlements.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), await settlements.AccruedGrossAsync(d, ct).ConfigureAwait(false),
             await previous.OfDocumentAsync(d.Id, null, ct).ConfigureAwait(false));
 }

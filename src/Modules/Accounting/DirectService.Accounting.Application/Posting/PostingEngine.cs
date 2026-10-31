@@ -1,4 +1,5 @@
 using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Contracts.Security;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Contracts.Collaboration;
@@ -45,11 +46,6 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IPostingKeyCatalog keyCatalog, IRequestContext ctx,
     IChangeContext changes, TimeProvider clock, IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null)
 {
-    public const int DescriptionMax = 500;
-
-    /// <summary>Reference / المرجع of an entry (revision 6).</summary>
-    public const int ReferenceMax = 100;
-    public const int NoteMax = 300;
     private const string Savepoint = "before_posting";
 
     // ------------------------------------------------------------ readiness (FR-094)
@@ -96,8 +92,8 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
         var decimals = await CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var description = TextNormalizer.CleanText(request.Description);
         var reference = TextNormalizer.CleanText(request.Reference);
-        new Validator().Require("description", description).MaxLength("description", description, DescriptionMax)
-            .MaxLength("reference", reference, ReferenceMax).ThrowIfInvalid();
+        new Validator().Require("description", description).MaxLength("description", description, PostingRules.DescriptionMax)
+            .MaxLength("reference", reference, PostingRules.ReferenceMax).ThrowIfInvalid();
         if (request.Lines.Count < 2) throw Fail.Rule(AccountingErrorCodes.JournalMinLines);
 
         var automatic = !request.IsManual && request.SourceType != AccountingCodes.SourceOpening;
@@ -152,11 +148,11 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                 // carries account-level openings, which have no party (DT-24).
                 if (l.Party is null && request.SourceType != AccountingCodes.SourceOpening)
                     throw Fail.Rule(AccountingErrorCodes.ControlPartyRequired, lineNo, account.Code, account.ControlPartyType);
-                if (l.Party is not null && !PartyMatches(account.ControlPartyType, l.Party, apArRoles))
+                if (l.Party is not null && !PostingRules.PartyMatches(account.ControlPartyType, l.Party.Module, l.Party.Type, l.Party.Id, apArRoles))
                     throw Fail.Rule(AccountingErrorCodes.ControlPartyMismatch, lineNo, account.Code, account.ControlPartyType);
             }
-            if (l.Note is { Length: > NoteMax }) throw Fail.Field("note", SharedErrorCodes.ValidationRange, new FieldRef("note"));
-            if (TextNormalizer.CleanText(l.Reference) is { Length: > ReferenceMax })
+            if (l.Note is { Length: > PostingRules.NoteMax }) throw Fail.Field("note", SharedErrorCodes.ValidationRange, new FieldRef("note"));
+            if (TextNormalizer.CleanText(l.Reference) is { Length: > PostingRules.ReferenceMax })
                 throw Fail.Field($"lines[{i}].reference", SharedErrorCodes.ValidationRange, new FieldRef($"lines[{i}].reference"));
             totalDebit += l.Debit;
             totalCredit += l.Credit;
@@ -232,7 +228,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
                     Debit = l.Debit > 0 ? t.Amount : 0,
                     Credit = l.Debit > 0 ? 0 : t.Amount,
                     CostCentreId = l.CostCentreId,
-                    Note = Truncate(JournalTax.Note(t.Code.NameAr, t.Code.NameEn, t.Code.Code, i + 1), NoteMax),
+                    Note = Truncate(JournalTax.Note(t.Code.NameAr, t.Code.NameEn, t.Code.Code, i + 1), PostingRules.NoteMax),
                     Reference = line.Reference,
                     TaxCodeId = t.Code.Id,
                     TaxRate = t.Code.Rate,
@@ -338,7 +334,7 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             Number = number,
             EntryDate = original.EntryDate,
             PeriodMonth = original.PeriodMonth,
-            Description = Truncate(description, DescriptionMax),
+            Description = Truncate(description, PostingRules.DescriptionMax),
             Reference = original.Reference,
             SourceModule = original.SourceModule,
             SourceType = original.SourceType,
@@ -418,17 +414,6 @@ public sealed partial class PostingEngine(IAppDbContext db, INumberingService nu
             throw Fail.Field(field + ".taxAccountId", AccountingErrorCodes.TaxAccountInvalid, lineNo, a?.Code ?? "#" + lineNo);
         return (code, amount, id);
     }
-
-    /// <summary>G-17: Customer = TRN customer or ACC party with role Customer; Supplier = ACC party with role Supplier; Driver/Partner = TRN.</summary>
-    public static bool PartyMatches(string? controlType, PostingParty party, IReadOnlyDictionary<long, string> apArRoles) => controlType switch
-    {
-        "Customer" => party is { Module: AccountingCodes.ModuleTrn, Type: AccountingCodes.PartyCustomer }
-                      || (party is { Module: AccountingCodes.ModuleAcc, Type: AccountingCodes.PartyApAr } && apArRoles.GetValueOrDefault(party.Id) == "Customer"),
-        "Supplier" => party is { Module: AccountingCodes.ModuleAcc, Type: AccountingCodes.PartyApAr } && apArRoles.GetValueOrDefault(party.Id) == "Supplier",
-        "Driver" => party is { Module: AccountingCodes.ModuleTrn, Type: AccountingCodes.PartyDriver },
-        "Partner" => party is { Module: AccountingCodes.ModuleTrn, Type: AccountingCodes.PartyPartner },
-        _ => false,
-    };
 
     private Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction RequireTransaction() =>
         db.Database.CurrentTransaction ?? throw new InvalidOperationException("Posting must run inside the document's transaction (NFR-04).");

@@ -23,7 +23,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// save keeps only lines with an amount. The cost centre is only a filter of that screen — the budget stays company-wide; lines per cost
 /// centre or on a parent account made earlier (copy by cost centre, import) are kept and still counted.
 /// </summary>
-public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, PostingEngine engine, IChangeContext changes,
+public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, DirectService.Accounting.Contracts.Posting.IAccountingPosting posting, IChangeContext changes,
     IAuditDescriber describer)
 {
     public const string EntityType = "ACC.Budget";
@@ -340,7 +340,7 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
     private async Task<List<(long AccountId, long? CostCentreId, decimal[] Months)>> ResolveLinesAsync(IReadOnlyList<BudgetLineRequest> input, CancellationToken ct)
     {
         if (input.Count > MaxLines) throw Fail.Field("lines", ErrorCodes.ValidationRange, new FieldRef("lines"));
-        var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
+        var decimals = await posting.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var accounts = await AccountsAsync(ct).ConfigureAwait(false);
         var byPublic = accounts.ToDictionary(a => a.Value.PublicId, a => a.Key);
         var centres = await db.Set<CostCentre>().AsNoTracking().ToDictionaryAsync(c => c.PublicId, c => c.Id, ct).ConfigureAwait(false);
@@ -379,7 +379,7 @@ public sealed class BudgetService(IAppDbContext db, IRequestContext ctx, MasterD
     /// </summary>
     internal async Task<List<(long AccountId, long? CostCentreId, decimal[] Months)>> FromActualsAsync(int year, decimal percent, bool byCostCentre, CancellationToken ct)
     {
-        var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
+        var decimals = await posting.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
         var sums = await db.Set<EntryLine>().AsNoTracking()

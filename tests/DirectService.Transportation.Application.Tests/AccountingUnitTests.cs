@@ -98,7 +98,7 @@ public sealed class AccountingUnitTests
     {
         var roles = new Dictionary<long, string>();
         if (role is not null) roles[7] = role;
-        Assert.Equal(expected, PostingEngine.PartyMatches(controlType, new PostingParty(module, partyType, 7), roles));
+        Assert.Equal(expected, DirectService.Accounting.Contracts.Posting.PostingRules.PartyMatches(controlType, module, partyType, 7, roles));
     }
 
     [Theory]

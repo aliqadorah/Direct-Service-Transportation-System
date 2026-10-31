@@ -129,8 +129,8 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
         new Validator()
             .Require("name", name)
             .MaxLength("name", name, NameMax)
-            .MaxLength("description", description, PostingEngine.DescriptionMax)
-            .MaxLength("reference", reference, PostingEngine.ReferenceMax)
+            .MaxLength("description", description, DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax)
+            .MaxLength("reference", reference, DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
             .Check(input.Count is > 0 and <= MaxLines, "lines", input.Count == 0 ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         if (await db.Set<JournalTemplate>().AnyAsync(x => x.Name == name && x.Id != self, ct).ConfigureAwait(false))
@@ -155,7 +155,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
             var note = TextNormalizer.CleanText(l.Note);
             if (note is { Length: > 500 }) throw Fail.Field(field + ".note", ErrorCodes.ValidationRange, new FieldRef(field + ".note"));
             var lineReference = TextNormalizer.CleanText(l.Reference);
-            if (lineReference is { Length: > PostingEngine.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
             long? taxCodeId = null, taxAccountId = null;
             if (!string.IsNullOrEmpty(l.TaxCodeId))
                 taxCodeId = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && taxCodes.TryGetValue(tg, out var tc) ? tc

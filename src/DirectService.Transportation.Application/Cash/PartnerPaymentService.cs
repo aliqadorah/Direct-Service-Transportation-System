@@ -7,6 +7,7 @@ using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// only the rest of a payment / repayment counts for the partner's trips (<see cref="TripPart"/>, DT-271 coverage).
 /// </summary>
 public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter, AuditTrail audit, PreviousBalances previous)
+    INumberingService numbering, IAccountingPosting posting, ISpreadsheetService sheets, IReportExporter exporter, AuditTrail audit, PreviousBalances previous)
 {
     public const string EntityType = "TRN.PartnerPayment";
     public const string SourceType = "PartnerPayment";
@@ -99,7 +100,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 payment.Number = await numbering.NextAsync(Configuration.DocumentTypes.PartnerPayment, c).ConfigureAwait(false);
                 // Under the number lock: the balance cannot change through another payment meanwhile (FR-085).
@@ -130,7 +131,7 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
                 if (await support.SaveCreateAsync<PartnerPayment>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
                 previous.Add(items, null, payment.Id);
                 var entry = await posting.PostOrPendAsync(BuildEntry(payment, money.AccountId, items), c).ConfigureAwait(false);
-                payment.JournalEntryId = entry?.Id;
+                payment.JournalEntryId = entry?.JournalEntryId;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
         }
@@ -193,23 +194,23 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
     /// bank, Cr partner payable with the partner. DT-277: partner payable takes only the trip part (amount ∓ previous balance); the previous
     /// balance is cleared on the accounts of its manual / opening lines with the partner (<see cref="PreviousBalances.Lines"/>).
     /// </summary>
-    public PostingRequest BuildEntry(PartnerPayment p, long moneyAccountId, IReadOnlyList<PreviousBalances.Open> previousItems)
+    public PostingDocument BuildEntry(PartnerPayment p, long moneyAccountId, IReadOnlyList<PreviousBalances.Open> previousItems)
     {
         ArgumentNullException.ThrowIfNull(p);
         ArgumentNullException.ThrowIfNull(previousItems);
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, p.PartnerId);
-        var lines = new List<PostingLine>();
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, p.PartnerId);
+        var lines = new List<PostingLineSpec>();
         if (p.Kind == CashCodes.Repayment)
         {
             if (p.Amount > 0) lines.Add(CashSupport.Debit(moneyAccountId, p.Amount));
-            if (p.Amount + p.PreviousBalance > 0) lines.Add(PostingLine.CreditKey(PostingKeys.PartnerPayable, p.Amount + p.PreviousBalance, party));
+            if (p.Amount + p.PreviousBalance > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.PartnerPayable, p.Amount + p.PreviousBalance, party));
             lines.AddRange(PreviousBalances.Lines(previousItems, party));
-            return new PostingRequest(p.PaymentDate, (cash.En ? "Partner repayment " : "سداد من شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false, lines);
+            return PostingEntry.Of(p.PaymentDate, (cash.En ? "Partner repayment " : "سداد من شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, lines);
         }
-        if (p.Amount - p.PreviousBalance > 0) lines.Add(PostingLine.DebitKey(PostingKeys.PartnerPayable, p.Amount - p.PreviousBalance, party));
+        if (p.Amount - p.PreviousBalance > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.PartnerPayable, p.Amount - p.PreviousBalance, party));
         lines.AddRange(PreviousBalances.Lines(previousItems, party));
         if (p.Amount > 0) lines.Add(CashSupport.Credit(moneyAccountId, p.Amount));
-        return new PostingRequest(p.PaymentDate, (cash.En ? "Partner payment " : "دفعة شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, false, lines);
+        return PostingEntry.Of(p.PaymentDate, (cash.En ? "Partner payment " : "دفعة شريك ") + p.Number, AccountingCodes.ModuleTrn, SourceType, p.Id, lines);
     }
 
     // ============================================================ reads
@@ -298,6 +299,6 @@ public sealed class PartnerPaymentPostingHandler(IAppDbContext db, IUrlTokenServ
 
     protected override string VoidCode => ErrorCodes.PartnerPaymentIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(PartnerPayment d, CancellationToken ct) =>
+    protected override async Task<PostingDocument?> EntryAsync(PartnerPayment d, CancellationToken ct) =>
         payments.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), await previous.OfDocumentAsync(null, d.Id, ct).ConfigureAwait(false));
 }

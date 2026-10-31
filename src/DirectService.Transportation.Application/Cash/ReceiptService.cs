@@ -9,6 +9,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// customer; void with reason (reversal, invoice balance restored, number kept); list with filters, totals and export.
 /// </summary>
 public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
+    INumberingService numbering, IAccountingPosting posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "TRN.Receipt";
     public const string SourceType = "Receipt";
@@ -71,7 +72,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 // The receipt number serialises receipts of the company; the invoice is read again under it.
                 receipt.Number = await numbering.NextAsync(Configuration.DocumentTypes.Receipt, c).ConfigureAwait(false);
@@ -91,7 +92,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
                 db.Set<Receipt>().Add(receipt);
                 if (await support.SaveCreateAsync<Receipt>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
                 var entry = await posting.PostOrPendAsync(BuildEntry(receipt, money.AccountId, InvoiceText(allocations.Select(a => a.Invoice.Number))), c).ConfigureAwait(false);
-                receipt.JournalEntryId = entry?.Id;
+                receipt.JournalEntryId = entry?.JournalEntryId;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
         }
@@ -154,13 +155,13 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
     }
 
     /// <summary>Receipt entry (8.6): Dr cash / bank, Cr trade receivables with the customer.</summary>
-    public PostingRequest BuildEntry(Receipt r, long moneyAccountId, string? invoiceNumber)
+    public PostingDocument BuildEntry(Receipt r, long moneyAccountId, string? invoiceNumber)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, r.CustomerId);
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, r.CustomerId);
         var text = (cash.En ? "Receipt " : "سند قبض ") + r.Number + (invoiceNumber is null ? string.Empty : " · " + invoiceNumber);
-        return new PostingRequest(r.ReceiptDate, text, AccountingCodes.ModuleTrn, SourceType, r.Id, false,
-            [CashSupport.Debit(moneyAccountId, r.Amount), PostingLine.CreditKey(PostingKeys.TradeReceivables, r.Amount, party)]);
+        return PostingEntry.Of(r.ReceiptDate, text, AccountingCodes.ModuleTrn, SourceType, r.Id,
+            [CashSupport.Debit(moneyAccountId, r.Amount), PostingLineSpec.CreditKey(PostingKeys.TradeReceivables, r.Amount, party)]);
     }
 
     // ============================================================ reads (FR-071)
@@ -289,24 +290,24 @@ public sealed class ReceiptPostingHandler(IAppDbContext db, IUrlTokenService tok
 
     protected override string VoidCode => ErrorCodes.ReceiptIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(Receipt d, CancellationToken ct)
+    protected override async Task<PostingDocument?> EntryAsync(Receipt d, CancellationToken ct)
     {
         var numbers = await _db.Set<ReceiptAllocation>().Where(a => a.ReceiptId == d.Id).OrderBy(a => a.Invoice.InvoiceDate).Select(a => a.Invoice.Number).ToListAsync(ct).ConfigureAwait(false);
         return receipts.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false), ReceiptService.InvoiceText(numbers));
     }
 }
 
-/// <summary>Reversal of cash documents on void or edit (BR-035): the posted entry is reversed; a waiting pending posting is closed.</summary>
+/// <summary>
+/// Reversal of cash documents on void or edit (BR-035): the posted entry is reversed through the posting contract, found by the document as its
+/// source (none when it is no longer posted; Stage 3 session 5); a waiting pending posting is closed.
+/// </summary>
 internal static class CashPosting
 {
-    public static async Task ReverseAsync(IAppDbContext db, PostingEngine posting, ICashDocument d, string sourceType, string description, CancellationToken ct,
+    public static async Task ReverseAsync(IAppDbContext db, IAccountingPosting posting, ICashDocument d, string sourceType, string description, CancellationToken ct,
         string module = AccountingCodes.ModuleTrn)
     {
-        if (d.JournalEntryId is long entryId)
-        {
-            var entry = await db.Set<JournalEntry>().SingleAsync(e => e.Id == entryId, ct).ConfigureAwait(false);
-            if (entry.Status == AccountingCodes.Posted) await posting.ReverseAsync(entry, description, null, ct).ConfigureAwait(false);
-        }
+        if (d.JournalEntryId is not null)
+            await posting.ReverseAsync(new DocumentRef(module, sourceType, d.Id), description, null, ct).ConfigureAwait(false);
         foreach (var p in await db.Set<PendingPosting>().Where(p => p.SourceModule == module && p.SourceType == sourceType && p.SourceId == d.Id && p.ResolvedAt == null)
                      .ToListAsync(ct).ConfigureAwait(false))
             p.ResolvedAt = DateTime.UtcNow;

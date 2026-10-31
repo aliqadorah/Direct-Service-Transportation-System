@@ -7,6 +7,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,7 @@ namespace DirectService.Transportation.Application.Cash;
 /// old → new; void with reason (reversal, number kept), refused once settled (BR-032).
 /// </summary>
 public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, CashSupport cash, IChangeContext changes, IRecordLockGuard locks, IPeriodGuard periods,
-    INumberingService numbering, PostingEngine posting, ISpreadsheetService sheets, IReportExporter exporter)
+    INumberingService numbering, IAccountingPosting posting, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "TRN.Advance";
     public const string SourceType = "Advance";
@@ -55,7 +56,7 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(x.Date, c).ConfigureAwait(false);
                 advance.Number = await numbering.NextAsync(Configuration.DocumentTypes.Advance, c).ConfigureAwait(false);
                 db.Set<Advance>().Add(advance);
@@ -157,17 +158,17 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
     private async Task PostAsync(Advance a, long moneyAccountId, CancellationToken ct)
     {
         var entry = await posting.PostOrPendAsync(BuildEntry(a, moneyAccountId), ct).ConfigureAwait(false);
-        a.JournalEntryId = entry?.Id;
+        a.JournalEntryId = entry?.JournalEntryId;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>Advance entry (8.6): Dr driver advances with the driver, Cr cash / bank.</summary>
-    public PostingRequest BuildEntry(Advance a, long moneyAccountId)
+    public PostingDocument BuildEntry(Advance a, long moneyAccountId)
     {
         ArgumentNullException.ThrowIfNull(a);
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, a.DriverId);
-        return new PostingRequest(a.AdvanceDate, (cash.En ? "Driver advance " : "سلفة سائق ") + a.Number, AccountingCodes.ModuleTrn, SourceType, a.Id, false,
-            [PostingLine.DebitKey(PostingKeys.DriverAdvances, a.Amount, party), CashSupport.Credit(moneyAccountId, a.Amount)]);
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, a.DriverId);
+        return PostingEntry.Of(a.AdvanceDate, (cash.En ? "Driver advance " : "سلفة سائق ") + a.Number, AccountingCodes.ModuleTrn, SourceType, a.Id,
+            [PostingLineSpec.DebitKey(PostingKeys.DriverAdvances, a.Amount, party), CashSupport.Credit(moneyAccountId, a.Amount)]);
     }
 
     // ============================================================ reads
@@ -262,6 +263,6 @@ public sealed class AdvancePostingHandler(IAppDbContext db, IUrlTokenService tok
 
     protected override string VoidCode => ErrorCodes.AdvanceIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(Advance d, CancellationToken ct) =>
+    protected override async Task<PostingDocument?> EntryAsync(Advance d, CancellationToken ct) =>
         advances.BuildEntry(d, await cash.AccountIdAsync(d.CashBoxId, d.BankAccountId, ct).ConfigureAwait(false));
 }

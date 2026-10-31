@@ -110,9 +110,9 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             else if (closed.Contains(AccountingCodes.Month(dt)))
                 p.Add(s.RowNumber, reference, ErrorCodes.PeriodClosed, dt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), AccountingCodes.Month(dt));
             var description = TextNormalizer.CleanText(s[desc]);
-            if (description is null || description.Length > PostingEngine.DescriptionMax) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("description"), s[desc]);
+            if (description is null || description.Length > DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("description"), s[desc]);
             var entryReference = referenceCol < 0 ? null : TextNormalizer.CleanText(s[referenceCol]);
-            if (entryReference is { Length: > PostingEngine.ReferenceMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("reference"), entryReference[..20]);
+            if (entryReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("reference"), entryReference[..20]);
 
             long? accountId = null;
             var code = TextNormalizer.CleanCode(s[account]);
@@ -152,15 +152,15 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             if (acc is { IsControlAccount: true })
             {
                 if (postingParty is null && !p.Has(s.RowNumber)) p.Add(s.RowNumber, reference, ErrorCodes.ControlPartyRequired, s.RowNumber, acc.Code, acc.ControlPartyType);
-                else if (postingParty is not null && !PostingEngine.PartyMatches(acc.ControlPartyType, postingParty, apArRoles))
+                else if (postingParty is not null && !DirectService.Accounting.Contracts.Posting.PostingRules.PartyMatches(acc.ControlPartyType, postingParty.Module, postingParty.Type, postingParty.Id, apArRoles))
                     p.Add(s.RowNumber, reference, ErrorCodes.ControlPartyMismatch, s.RowNumber, acc.Code, acc.ControlPartyType);
             }
             var noteText = TextNormalizer.CleanText(s[note]);
-            if (noteText is { Length: > PostingEngine.NoteMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("note"), noteText[..20]);
+            if (noteText is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.NoteMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("note"), noteText[..20]);
 
             // DT-254 / DT-255: line reference, tax code and tax account (labels from FieldLabels).
             var lineReference = TextNormalizer.CleanText(s[lineReferenceCol]);
-            if (lineReference is { Length: > PostingEngine.ReferenceMax })
+            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax })
                 p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, new FieldRef("lineReference"), lineReference[..20]);
             long? taxCodeId = null, taxAccountId = null;
             decimal tax = 0;

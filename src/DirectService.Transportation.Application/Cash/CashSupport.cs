@@ -6,6 +6,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Trn;
@@ -92,7 +93,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
         ? await db.Set<CashBox>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(b => b.Id == box).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false)
         : await db.Set<BankAccount>().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(b => b.Id == bankAccountId).Select(b => b.AccountId).SingleAsync(ct).ConfigureAwait(false);
 
-    public static PostingLine Debit(long accountId, decimal amount) => new(null, accountId, amount, 0);
+    public static PostingLineSpec Debit(long accountId, decimal amount) => new(null, accountId, amount, 0);
 
     /// <summary>A payment method's name in the reader's language (Carried: a settlement's rest, DT-228).</summary>
     public static string MethodName(bool en, string method) => method switch
@@ -107,7 +108,7 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
     public static string RepaidText(bool en, decimal amount, string method, string? reference) =>
         (en ? "Repaid by driver: " : "سدّده السائق: ") + Money.Format(amount) + " (" + MethodName(en, method) + (string.IsNullOrEmpty(reference) ? string.Empty : ", " + reference) + ")";
 
-    public static PostingLine Credit(long accountId, decimal amount) => new(null, accountId, 0, amount);
+    public static PostingLineSpec Credit(long accountId, decimal amount) => new(null, accountId, 0, amount);
 
     /// <summary>The cash box or bank account shown on a document.</summary>
     public MoneyAccountRef Account(Guid? cashBoxPid, string? cashBoxName, Guid? bankPid, string? bankName) => cashBoxPid is Guid c
@@ -172,12 +173,12 @@ public abstract class CashPostingHandler<T>(IAppDbContext db, IUrlTokenService t
 
     protected abstract string VoidCode { get; }
 
-    protected abstract Task<PostingRequest?> EntryAsync(T document, CancellationToken ct);
+    protected abstract Task<PostingDocument?> EntryAsync(T document, CancellationToken ct);
 
     public async Task<DirectService.Accounting.Contracts.Posting.PostingDocument?> RebuildAsync(long sourceId, CancellationToken ct)
     {
         var d = await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == sourceId, ct).ConfigureAwait(false);
-        return d is null || d.JournalEntryId is not null || d.Status == CashCodes.Void ? null : (await EntryAsync(d, ct).ConfigureAwait(false))?.ToDocument();
+        return d is null || d.JournalEntryId is not null || d.Status == CashCodes.Void ? null : await EntryAsync(d, ct).ConfigureAwait(false);
     }
 
     public async Task AttachAsync(long sourceId, long journalEntryId, CancellationToken ct)

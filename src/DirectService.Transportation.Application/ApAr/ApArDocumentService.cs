@@ -11,6 +11,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
@@ -28,7 +29,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// and remaining amounts are maintained by payments and returns (FR-125, FR-126).
 /// </summary>
 public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes,
-    IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, PostingEngine posting, ChartOfAccountsService chart, ApArPartyService parties,
+    IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, ChartOfAccountsService chart, ApArPartyService parties,
     EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArDocument";
@@ -100,7 +101,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         {
             await db.InTransactionAsync(async c =>
             {
-                await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+                await posting.EnsureReadyAsync(AccountingCodes.ModuleAcc, c).ConfigureAwait(false);
                 await periods.EnsureOpenAsync(date, c).ConfigureAwait(false);
                 doc.Number = await numbering.NextAsync(ApArRules.Sequence(k), c).ConfigureAwait(false);
                 party ??= await parties.ForCustomerAsync(customer!, c).ConfigureAwait(false);
@@ -108,7 +109,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
                 db.Set<ApArDocument>().Add(doc);
                 if (await support.SaveCreateAsync<ApArDocument>(clientId, c).ConfigureAwait(false) is { } other) throw new RacedCreate(other);
                 var entry = await posting.PostOrPendAsync(BuildEntry(doc, doc.Lines.ToList(), party.ControlAccountId, party.Name), c).ConfigureAwait(false);
-                doc.JournalEntryId = entry?.Id;
+                doc.JournalEntryId = entry?.JournalEntryId;
                 await db.SaveChangesAsync(c).ConfigureAwait(false);
                 if (k == ApArCodes.Receivable) await einvoice.QueueApArDocumentAsync(doc.Id, c).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
@@ -184,28 +185,28 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
     /// control account with the party (the payable, after deductions) and, for deductions (revision 6), Cr "Supplier deductions";
     /// receivable — Dr the customer's control account with the party, Cr each line and sales tax output.
     /// </summary>
-    public PostingRequest BuildEntry(ApArDocument d, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName)
+    public PostingDocument BuildEntry(ApArDocument d, IReadOnlyList<ApArDocumentLine> lines, long controlAccountId, string partyName)
     {
         ArgumentNullException.ThrowIfNull(d);
         ArgumentNullException.ThrowIfNull(lines);
-        var party = new PostingParty(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, d.PartyId);
+        var party = new PartyRef(AccountingCodes.ModuleAcc, AccountingCodes.PartyApAr, d.PartyId);
         var bill = d.DocumentKind == ApArCodes.SupplierBill;
-        var result = new List<PostingLine>();
-        if (!bill) result.Add(new PostingLine(null, controlAccountId, d.Total, 0, null, party));
+        var result = new List<PostingLineSpec>();
+        if (!bill) result.Add(new PostingLineSpec(null, controlAccountId, d.Total, 0, null, party));
         foreach (var l in lines)
-            result.Add(bill ? new PostingLine(null, l.AccountId, l.Amount, 0, l.CostCentreId, null, Note(l.Description)) : new PostingLine(null, l.AccountId, 0, l.Amount, l.CostCentreId, null, Note(l.Description)));
-        if (d.Tax > 0) result.Add(bill ? PostingLine.DebitKey(PostingKeys.SalesTaxInput, d.Tax) : PostingLine.CreditKey(PostingKeys.SalesTaxOutput, d.Tax));
-        if (bill) result.Add(new PostingLine(null, controlAccountId, 0, d.Total, null, party));
-        if (bill && d.Deduction > 0) result.Add(PostingLine.CreditKey(PostingKeys.SupplierDeductions, d.Deduction));
+            result.Add(bill ? new PostingLineSpec(null, l.AccountId, l.Amount, 0, l.CostCentreId, null, Note(l.Description)) : new PostingLineSpec(null, l.AccountId, 0, l.Amount, l.CostCentreId, null, Note(l.Description)));
+        if (d.Tax > 0) result.Add(bill ? PostingLineSpec.DebitKey(PostingKeys.SalesTaxInput, d.Tax) : PostingLineSpec.CreditKey(PostingKeys.SalesTaxOutput, d.Tax));
+        if (bill) result.Add(new PostingLineSpec(null, controlAccountId, 0, d.Total, null, party));
+        if (bill && d.Deduction > 0) result.Add(PostingLineSpec.CreditKey(PostingKeys.SupplierDeductions, d.Deduction));
         // The deduction is in the text, so the supplier's account statement shows it on the bill's line (revision 6).
         var text = (bill ? (En ? "Supplier bill " : "فاتورة مورد ") : (En ? "Receivable document " : "مستند مدين ")) + d.Number + " · " + partyName
             + (d.Reference is null ? string.Empty : " · " + d.Reference)
             + (d.Deduction > 0 ? (En ? " · deduction " : " · خصم ") + Money.Format(d.Deduction) : string.Empty);
-        return new PostingRequest(d.DocumentDate, text.Length > PostingEngine.DescriptionMax ? text[..PostingEngine.DescriptionMax] : text, AccountingCodes.ModuleAcc,
-            d.DocumentKind, d.Id, false, result);
+        return PostingEntry.Of(d.DocumentDate, text.Length > PostingRules.DescriptionMax ? text[..PostingRules.DescriptionMax] : text, AccountingCodes.ModuleAcc,
+            d.DocumentKind, d.Id, result);
     }
 
-    private static string Note(string text) => text.Length <= PostingEngine.NoteMax ? text : text[..PostingEngine.NoteMax];
+    private static string Note(string text) => text.Length <= PostingRules.NoteMax ? text : text[..PostingRules.NoteMax];
 
     /// <summary>Void (FR-127, acct.apar): reason; refused with active payments or returns, in a closed period, or once accepted by e-invoicing.</summary>
     public async Task<ApArDocumentDetails> VoidAsync(string kind, string token, CashVoidRequest r, CancellationToken ct)
@@ -382,7 +383,7 @@ public sealed class SupplierBillPostingHandler(IAppDbContext db, IUrlTokenServic
 
     protected override string VoidCode => ErrorCodes.ApArDocumentIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(ApArDocument d, CancellationToken ct) => await ApArDocumentEntry.BuildAsync(_db, documents, d, ct).ConfigureAwait(false);
+    protected override async Task<PostingDocument?> EntryAsync(ApArDocument d, CancellationToken ct) => await ApArDocumentEntry.BuildAsync(_db, documents, d, ct).ConfigureAwait(false);
 }
 
 /// <summary>Pending-posting retries of receivable documents.</summary>
@@ -394,12 +395,12 @@ public sealed class ReceivablePostingHandler(IAppDbContext db, IUrlTokenService 
 
     protected override string VoidCode => ErrorCodes.ApArDocumentIsVoid;
 
-    protected override async Task<PostingRequest?> EntryAsync(ApArDocument d, CancellationToken ct) => await ApArDocumentEntry.BuildAsync(_db, documents, d, ct).ConfigureAwait(false);
+    protected override async Task<PostingDocument?> EntryAsync(ApArDocument d, CancellationToken ct) => await ApArDocumentEntry.BuildAsync(_db, documents, d, ct).ConfigureAwait(false);
 }
 
 internal static class ApArDocumentEntry
 {
-    public static async Task<PostingRequest> BuildAsync(IAppDbContext db, ApArDocumentService documents, ApArDocument d, CancellationToken ct)
+    public static async Task<PostingDocument> BuildAsync(IAppDbContext db, ApArDocumentService documents, ApArDocument d, CancellationToken ct)
     {
         var lines = await db.Set<ApArDocumentLine>().AsNoTracking().Where(l => l.DocumentId == d.Id).OrderBy(l => l.Id).ToListAsync(ct).ConfigureAwait(false);
         var party = await db.Set<ApArParty>().AsNoTracking().IgnoreQueryFilters([Accounting.QueryFilterNames.SoftDelete]).Where(p => p.Id == d.PartyId).Select(p => new { p.ControlAccountId, p.Name }).SingleAsync(ct).ConfigureAwait(false);

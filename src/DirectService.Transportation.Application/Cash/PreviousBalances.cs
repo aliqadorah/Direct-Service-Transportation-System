@@ -3,6 +3,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -103,7 +104,7 @@ public sealed class PreviousBalances(IAppDbContext db, MasterDataSupport support
     /// Entry lines that clear the settled amounts, per account with the party: Dr what was owed to the party (it is paid now), Cr what the party
     /// owed (it is deducted or repaid now). Accounts whose amounts cancel out get no line.
     /// </summary>
-    public static IEnumerable<PostingLine> Lines(IEnumerable<Open> amounts, PostingParty party) =>
+    public static IEnumerable<PostingLineSpec> Lines(IEnumerable<Open> amounts, PartyRef party) =>
         amounts.GroupBy(a => a.AccountId).Select(g => (Account: g.Key, Amount: g.Sum(a => a.Amount))).Where(x => x.Amount != 0).OrderBy(x => x.Account)
-            .Select(x => x.Amount > 0 ? new PostingLine(null, x.Account, x.Amount, 0, null, party) : new PostingLine(null, x.Account, 0, -x.Amount, null, party));
+            .Select(x => x.Amount > 0 ? new PostingLineSpec(null, x.Account, x.Amount, 0, null, party) : new PostingLineSpec(null, x.Account, 0, -x.Amount, null, party));
 }
