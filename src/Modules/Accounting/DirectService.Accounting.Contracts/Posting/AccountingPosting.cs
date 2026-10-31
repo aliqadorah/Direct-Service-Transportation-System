@@ -16,7 +16,14 @@ public sealed record PostingLineSpec(
     decimal Debit, decimal Credit,
     long? CostCentreId = null, PartyRef? Party = null,
     string? Note = null, string? Reference = null,
-    long? TaxCodeId = null, long? TaxAccountId = null);
+    long? TaxCodeId = null, long? TaxAccountId = null)
+{
+    /// <summary>A debit of a posting key (Stage 3 session 4b, like the engine's <c>PostingLine.DebitKey</c>).</summary>
+    public static PostingLineSpec DebitKey(string key, decimal amount, PartyRef? party = null) => new(key, null, amount, 0, null, party);
+
+    /// <summary>A credit of a posting key.</summary>
+    public static PostingLineSpec CreditKey(string key, decimal amount, PartyRef? party = null) => new(key, null, 0, amount, null, party);
+}
 
 /// <summary>The entry of a document (FR-097): dated like the document (BR-034), with its description, reference and lines.</summary>
 public sealed record PostingDocument(DocumentRef Source, DateOnly EntryDate, string Description, string? Reference, IReadOnlyList<PostingLineSpec> Lines);

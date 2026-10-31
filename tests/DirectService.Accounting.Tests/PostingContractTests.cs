@@ -26,7 +26,7 @@ public sealed class PostingContractFactory : ApiFactory
         builder.ConfigureServices(s =>
         {
             // Today's registration of a contract handler (with its bridge to the pending postings); moves with the engine in session 4.
-            DirectService.Transportation.Application.Accounting.PostingContractRegistration.AddPostingSourceHandler<ContractTestDocuments>(s);
+            DirectService.Accounting.Application.DependencyInjection.AddPostingSourceHandler<ContractTestDocuments>(s);
             s.ConfigureDbContext<MasterDbContext>(o => o.AddInterceptors(FailingEntryInsert.Instance));
         });
     }

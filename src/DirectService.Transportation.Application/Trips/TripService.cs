@@ -12,6 +12,7 @@ using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Accounting.Domain.Cfg;
 using DirectService.Platform.Domain;
@@ -53,7 +54,7 @@ public sealed record TripDraft(
 /// (FR-008); quick-entry defaults (FR-007); history (FR-015).
 /// </summary>
 public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, PostingEngine posting, PricingResolver pricing, IStandardFields fields, ICustomFields customFields,
+    IPeriodGuard periods, IAccountingPosting posting, PricingResolver pricing, IStandardFields fields, ICustomFields customFields,
     OperationSettingsService settings, IMonthlyRateLock rateLock, INumberingService numbering, AuditTrail audit, DirectService.Platform.Contracts.Modules.IPlanLimitCheck? limits = null)
 {
     /// <summary>Trips saved this month must fit the plan (P-07); viewing and exporting are never limited (BR-013).</summary>
@@ -493,7 +494,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
     /// The entry a trip posts: own/external fleet with wage accrual on → driver wage expense / driver payable (party driver);
     /// partner trip → partner cost expense / partner payable (party partner), always. Null when nothing is due (accrual off, or 0).
     /// </summary>
-    public PostingRequest? BuildEntry(Trip t, bool accrueDriverWage)
+    public PostingDocument? BuildEntry(Trip t, bool accrueDriverWage)
     {
         ArgumentNullException.ThrowIfNull(t);
         if (t.Status == Void) return null;
@@ -501,15 +502,18 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         if (t.PartnerId is long partnerId)
         {
             if (t.PartnerCost <= 0) return null;
-            var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, partnerId);
-            return new PostingRequest(t.TripDate, description, AccountingCodes.ModuleTrn, SourceType, t.Id, false,
-                [PostingLine.DebitKey(PostingKeys.PartnerCostExpense, t.PartnerCost), PostingLine.CreditKey(PostingKeys.PartnerPayable, t.PartnerCost, party)]);
+            var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyPartner, partnerId);
+            return new PostingDocument(Source(t), t.TripDate, description, null,
+                [PostingLineSpec.DebitKey(PostingKeys.PartnerCostExpense, t.PartnerCost), PostingLineSpec.CreditKey(PostingKeys.PartnerPayable, t.PartnerCost, party)]);
         }
         if (!accrueDriverWage || t.DriverWage <= 0) return null;
-        var driver = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, t.DriverId);
-        return new PostingRequest(t.TripDate, description, AccountingCodes.ModuleTrn, SourceType, t.Id, false,
-            [PostingLine.DebitKey(PostingKeys.DriverWageExpense, t.DriverWage), PostingLine.CreditKey(PostingKeys.DriverPayable, t.DriverWage, driver)]);
+        var driver = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyDriver, t.DriverId);
+        return new PostingDocument(Source(t), t.TripDate, description, null,
+            [PostingLineSpec.DebitKey(PostingKeys.DriverWageExpense, t.DriverWage), PostingLineSpec.CreditKey(PostingKeys.DriverPayable, t.DriverWage, driver)]);
     }
+
+    /// <summary>The trip as the source of its entry (TRN / Trip / id; stored values, design e).</summary>
+    private static DocumentRef Source(Trip t) => new(AccountingCodes.ModuleTrn, SourceType, t.Id);
 
     internal async Task PostAsync(Trip t, TripSettings s, CancellationToken ct)
     {
@@ -522,7 +526,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
             return;
         }
         var entry = await posting.PostOrPendAsync(request, ct).ConfigureAwait(false);
-        t.JournalEntryId = entry?.Id;
+        t.JournalEntryId = entry?.JournalEntryId;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         if (entry is not null) await ResolvePendingAsync(t.Id, ct).ConfigureAwait(false);
     }
@@ -530,9 +534,9 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
     /// <summary>Reverses the trip's posted entry (edit or void, BR-035); a waiting pending posting needs no reversal.</summary>
     private async Task ReverseEntryAsync(Trip t, string description, CancellationToken ct)
     {
-        if (t.JournalEntryId is not long entryId) return;
-        var entry = await db.Set<JournalEntry>().SingleAsync(e => e.Id == entryId, ct).ConfigureAwait(false);
-        if (entry.Status == AccountingCodes.Posted) await posting.ReverseAsync(entry, description, null, ct).ConfigureAwait(false);
+        if (t.JournalEntryId is null) return;
+        // The trip's posted entry, found by its source (Stage 3 session 4b); none when it is no longer posted.
+        await posting.ReverseAsync(Source(t), description, null, ct).ConfigureAwait(false);
         t.JournalEntryId = null;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }

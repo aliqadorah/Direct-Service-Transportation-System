@@ -246,15 +246,16 @@ public sealed class PostingEngineTests(DatabaseFixture db)
 
         // Retry: no handler registered → stays pending with the reason; with the document's handler → posted and linked.
         var tokens = new UrlTokenService(Options.Create(new UrlTokenOptions { Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
-        var none = new PendingPostingService(ctx, engine, new PostingSources([]), tokens, Request(l.Tenant), TimeProvider.System);
+        var posting = new AccountingPostingAdapter(ctx, engine, new NumberingService(ctx, scope), tokens);   // the retry posts through the contract (Stage 3 session 4b)
+        var none = new PendingPostingService(ctx, posting, new PostingSources([]), tokens, Request(l.Tenant), TimeProvider.System);
         Assert.False(await none.RetryAsync(pending.Id, Ct));
-        var handler = new TripHandler(WageEntry(50));
-        var service = new PendingPostingService(ctx, engine, new PostingSources([handler]), tokens, Request(l.Tenant), TimeProvider.System);
+        var handler = new TripHandler(WageEntry(50).ToDocument());
+        var service = new PendingPostingService(ctx, posting, new PostingSources([handler]), tokens, Request(l.Tenant), TimeProvider.System);
         Assert.True(await service.RetryAsync(pending.Id, Ct));
         var resolved = await ctx.Set<PendingPosting>().AsNoTracking().SingleAsync(Ct);
         Assert.NotNull(resolved.ResolvedAt);
         Assert.Equal(3, resolved.Attempts);
-        Assert.Equal("JV-00001", handler.Attached?.Number);
+        Assert.Equal("JV-00001", await ctx.Set<JournalEntry>().AsNoTracking().Where(e => e.Id == handler.Attached).Select(e => e.Number).SingleAsync(Ct));
     }
 
     /// <summary>Simulates a technical database failure on the journal insert.</summary>
@@ -272,20 +273,21 @@ public sealed class PostingEngineTests(DatabaseFixture db)
         }
     }
 
-    private sealed class TripHandler(PostingRequest request) : IPostingSourceHandler
+    private sealed class TripHandler(DirectService.Accounting.Contracts.Posting.PostingDocument document) : DirectService.Accounting.Contracts.Posting.IPostingSourceHandler
     {
-        public JournalEntry? Attached { get; private set; }
-        public string SourceModule => "TRN";
-        public string SourceType => "Trip";
-        public Task<PostingRequest?> BuildAsync(long sourceId, CancellationToken ct) => Task.FromResult<PostingRequest?>(request);
+        public long? Attached { get; private set; }
+        public string Module => "TRN";
+        public string Type => "Trip";
+        public Task<DirectService.Accounting.Contracts.Posting.PostingDocument?> RebuildAsync(long sourceId, CancellationToken ct) =>
+            Task.FromResult<DirectService.Accounting.Contracts.Posting.PostingDocument?>(document);
 
-        public Task AttachAsync(long sourceId, JournalEntry entry, CancellationToken ct)
+        public Task AttachAsync(long sourceId, long journalEntryId, CancellationToken ct)
         {
-            Attached = entry;
+            Attached = journalEntryId;
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyDictionary<long, Contracts.Accounting.SourceDocumentRef>> DescribeAsync(IReadOnlyCollection<long> sourceIds, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyDictionary<long, Contracts.Accounting.SourceDocumentRef>>(new Dictionary<long, Contracts.Accounting.SourceDocumentRef>());
+        public Task<IReadOnlyDictionary<long, DirectService.Accounting.Contracts.Posting.PostingSourceInfo>> DescribeAsync(IReadOnlyCollection<long> sourceIds, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyDictionary<long, DirectService.Accounting.Contracts.Posting.PostingSourceInfo>>(new Dictionary<long, DirectService.Accounting.Contracts.Posting.PostingSourceInfo>());
     }
 }

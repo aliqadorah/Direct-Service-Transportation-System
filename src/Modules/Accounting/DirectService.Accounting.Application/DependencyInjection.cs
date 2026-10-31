@@ -19,4 +19,12 @@ public static class DependencyInjection
         services.AddSingleton<IPostingKeyProvider, AccountingPostingKeyProvider>();
         return services;
     }
+
+    /// <summary>Registers a module's handler of the posting contract (one per Module + Type; Stage 3 session 2, here since session 4b).</summary>
+    public static IServiceCollection AddPostingSourceHandler<THandler>(this IServiceCollection services) where THandler : class, IPostingSourceHandler
+    {
+        services.AddScoped<THandler>();
+        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<THandler>());
+        return services;
+    }
 }

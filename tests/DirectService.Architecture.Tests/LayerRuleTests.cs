@@ -264,12 +264,12 @@ public sealed class LayerRuleTests
         Assert.True(gone.Count == 0, "No longer used, remove from StillUsedOfAccountingApplication: " + string.Join(", ", gone));
     }
 
-    /// <summary>The Accounting.Application types the transport module still uses (DT-397, end of Stage 3 session 4a); remove entries as they go.</summary>
+    /// <summary>The Accounting.Application types the transport module still uses (DT-397, end of Stage 3 session 4b); remove entries as they go.</summary>
     private static readonly string[] StillUsedOfAccountingApplication =
     [
-        // 10 at the start (session 4a): the documents post through the engine, the accounting services use its codes, keys and helpers
+        // 10 at the start (session 4a); 9 after session 4b (trips, invoices, credit notes and the pending-posting retry use the contract):
+        // the other documents still post through the engine (session 5), the accounting services use its codes, keys and helpers (6-12)
         "DirectService.Accounting.Application.Posting.AccountingCodes",
-        "DirectService.Accounting.Application.Posting.AccountingPostingAdapter",   // ContractPostingSourceHandler (until session 4b)
         "DirectService.Accounting.Application.Posting.AccountingPostingKeys",
         "DirectService.Accounting.Application.Posting.IPeriodGuard",
         "DirectService.Accounting.Application.Posting.IPostingKeyCatalog",

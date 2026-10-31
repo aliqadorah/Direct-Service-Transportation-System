@@ -20,6 +20,13 @@ namespace DirectService.Transportation.Application;
 
 public static class DependencyInjection
 {
+    /// <summary>A document type's handler of the posting contract (pending-posting retries, source links; Stage 3 session 4b).</summary>
+    private static void AddPostingHandler<THandler>(IServiceCollection services) where THandler : class, DirectService.Accounting.Contracts.Posting.IPostingSourceHandler
+    {
+        services.AddScoped<THandler>();
+        services.AddScoped<DirectService.Accounting.Contracts.Posting.IPostingSourceHandler>(sp => sp.GetRequiredService<THandler>());
+    }
+
     /// <summary>Registers the application layer (use-case services and request-scoped context).</summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
@@ -93,18 +100,15 @@ public static class DependencyInjection
         services.AddScoped<TripImportService>();
         services.AddScoped<IImportTemplateProvider, Imports.TransportationImportTemplates>();
         services.AddScoped<TripExportService>();
-        services.AddScoped<TripPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<TripPostingHandler>());
+        AddPostingHandler<TripPostingHandler>(services);
 
         // Invoicing and credit notes (B6)
         services.AddScoped<InvoiceService>();
         services.AddScoped<CreditNoteService>();
         services.AddScoped<InvoiceLayoutService>();
         services.AddScoped<InvoicePrintService>();
-        services.AddScoped<InvoicePostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<InvoicePostingHandler>());
-        services.AddScoped<CreditNotePostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<CreditNotePostingHandler>());
+        AddPostingHandler<InvoicePostingHandler>(services);
+        AddPostingHandler<CreditNotePostingHandler>(services);
 
         // E-invoicing (B7)
         services.AddScoped<EInvoiceSettingsService>();
@@ -120,14 +124,10 @@ public static class DependencyInjection
         services.AddScoped<PartnerPaymentService>();
         services.AddScoped<AccountStatementService>();
         services.AddScoped<VoucherPrintService>();
-        services.AddScoped<ReceiptPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ReceiptPostingHandler>());
-        services.AddScoped<AdvancePostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<AdvancePostingHandler>());
-        services.AddScoped<SettlementPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SettlementPostingHandler>());
-        services.AddScoped<PartnerPaymentPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<PartnerPaymentPostingHandler>());
+        AddPostingHandler<ReceiptPostingHandler>(services);
+        AddPostingHandler<AdvancePostingHandler>(services);
+        AddPostingHandler<SettlementPostingHandler>(services);
+        AddPostingHandler<PartnerPaymentPostingHandler>(services);
 
         // AP/AR, financial reports and maintenance (B9)
         services.AddScoped<ApArPartyService>();
@@ -156,14 +156,10 @@ public static class DependencyInjection
         services.AddScoped<ISearchProvider, TransportationSearch>();
         services.AddScoped<IExportJobProvider, TransportationExportJobs>();
         services.AddSingleton(new ExportOptions { ReportPermission = Contracts.Security.PermissionKeys.ReportsView });
-        services.AddScoped<SupplierBillPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<SupplierBillPostingHandler>());
-        services.AddScoped<ReceivablePostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ReceivablePostingHandler>());
-        services.AddScoped<ApArPaymentPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ApArPaymentPostingHandler>());
-        services.AddScoped<ApArReturnPostingHandler>();
-        services.AddScoped<IPostingSourceHandler>(sp => sp.GetRequiredService<ApArReturnPostingHandler>());
+        AddPostingHandler<SupplierBillPostingHandler>(services);
+        AddPostingHandler<ReceivablePostingHandler>(services);
+        AddPostingHandler<ApArPaymentPostingHandler>(services);
+        AddPostingHandler<ApArReturnPostingHandler>(services);
         return services;
     }
 }

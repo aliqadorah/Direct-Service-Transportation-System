@@ -10,6 +10,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
@@ -26,7 +27,7 @@ public sealed record InvoiceCompany(decimal TaxRate, bool TaxInclusive, int Deci
 /// (FR-041); void with reversal, number kept and trips released (FR-045, FR-046); list with filters and totals (FR-047); view (FR-048).
 /// </summary>
 public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, OperationSettingsService settings, TripService trips, EInvoicing.EInvoiceService einvoice)
+    IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, OperationSettingsService settings, TripService trips, EInvoicing.EInvoiceService einvoice)
 {
     public const string EntityType = "TRN.Invoice";
     public const string SourceType = "Invoice";
@@ -318,7 +319,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     /// </summary>
     private async Task ApproveCoreAsync(Invoice inv, CancellationToken ct)
     {
-        await posting.EnsurePostingReadyAsync(ct).ConfigureAwait(false);
+        await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, ct).ConfigureAwait(false);
         if (inv.Total <= 0) throw Fail.Rule(ErrorCodes.InvoiceTotalZero);
         await periods.EnsureOpenAsync(inv.InvoiceDate, ct).ConfigureAwait(false);
         var tripLines = await db.Set<InvoiceLine>().AsNoTracking().Where(l => l.InvoiceId == inv.Id && l.TripId != null).Select(l => l.TripId!.Value).ToListAsync(ct).ConfigureAwait(false);
@@ -339,7 +340,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
         }
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         var entry = await posting.PostOrPendAsync(BuildEntry(inv)!, ct).ConfigureAwait(false);
-        inv.JournalEntryId = entry?.Id;
+        inv.JournalEntryId = entry?.JournalEntryId;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         await einvoice.QueueInvoiceAsync(inv, ct).ConfigureAwait(false);
     }
@@ -374,11 +375,10 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
             inv.RemainingAmount = 0;
             changes.SetAction(inv, "Void", why);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            if (inv.JournalEntryId is long entryId)
+            // The invoice's posted entry, found by its source (Stage 3 session 4b); none when it is no longer posted.
+            if (inv.JournalEntryId is not null)
             {
-                var entry = await db.Set<JournalEntry>().SingleAsync(e => e.Id == entryId, c).ConfigureAwait(false);
-                if (entry.Status == AccountingCodes.Posted)
-                    await posting.ReverseAsync(entry, $"{(En ? "Void of invoice" : "إلغاء الفاتورة")} {inv.Number}", null, c).ConfigureAwait(false);
+                await posting.ReverseAsync(Source(inv), $"{(En ? "Void of invoice" : "إلغاء الفاتورة")} {inv.Number}", null, c).ConfigureAwait(false);
             }
             await ResolvePendingAsync(SourceType, inv.Id, c).ConfigureAwait(false);
             await ReleaseTripsAsync(inv, null, "RemovedFromInvoice", c).ConfigureAwait(false);
@@ -409,18 +409,21 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
     /// Invoice entry: Dr trade receivables (total, party customer), Dr discount allowed (discount); Cr transport revenue (subtotal),
     /// Cr other revenue (fees), Cr sales tax output (tax). Manual invoices use the same keys.
     /// </summary>
-    public PostingRequest? BuildEntry(Invoice inv)
+    public PostingDocument? BuildEntry(Invoice inv)
     {
         ArgumentNullException.ThrowIfNull(inv);
         if (inv.Status is InvoiceCodes.Draft or InvoiceCodes.Void || inv.Number is null) return null;
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, inv.CustomerId);
-        var lines = new List<PostingLine> { PostingLine.DebitKey(PostingKeys.TradeReceivables, inv.Total, party) };
-        if (inv.Discount > 0) lines.Add(PostingLine.DebitKey(PostingKeys.DiscountAllowed, inv.Discount));
-        if (inv.Subtotal > 0) lines.Add(PostingLine.CreditKey(PostingKeys.TransportRevenue, inv.Subtotal));
-        if (inv.ExtraFees > 0) lines.Add(PostingLine.CreditKey(PostingKeys.OtherRevenue, inv.ExtraFees));
-        if (inv.Tax > 0) lines.Add(PostingLine.CreditKey(PostingKeys.SalesTaxOutput, inv.Tax));
-        return new PostingRequest(inv.InvoiceDate, $"{(En ? "Invoice" : "فاتورة")} {inv.Number}", AccountingCodes.ModuleTrn, SourceType, inv.Id, false, lines);
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, inv.CustomerId);
+        var lines = new List<PostingLineSpec> { PostingLineSpec.DebitKey(PostingKeys.TradeReceivables, inv.Total, party) };
+        if (inv.Discount > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.DiscountAllowed, inv.Discount));
+        if (inv.Subtotal > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.TransportRevenue, inv.Subtotal));
+        if (inv.ExtraFees > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.OtherRevenue, inv.ExtraFees));
+        if (inv.Tax > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.SalesTaxOutput, inv.Tax));
+        return new PostingDocument(Source(inv), inv.InvoiceDate, $"{(En ? "Invoice" : "فاتورة")} {inv.Number}", null, lines);
     }
+
+    /// <summary>The invoice as the source of its entry (TRN / Invoice / id; stored values, design e).</summary>
+    internal static DocumentRef Source(Invoice inv) => new(AccountingCodes.ModuleTrn, SourceType, inv.Id);
 
     // ============================================================ reads
 

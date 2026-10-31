@@ -155,35 +155,42 @@ public sealed class CashSupport(IAppDbContext db, IRequestContext ctx, MasterDat
     };
 }
 
-/// <summary>Pending-posting retries and journal links shared by the cash documents (FR-101).</summary>
-public abstract class CashPostingHandler<T>(IAppDbContext db, IUrlTokenService tokens) : IPostingSourceHandler where T : class, ICashDocument
+/// <summary>
+/// Pending-posting retries and journal links shared by the cash documents (FR-101), as handlers of the posting contract (Stage 3 session 4b;
+/// the documents' services still build the engine's request until they switch in session 5).
+/// </summary>
+public abstract class CashPostingHandler<T>(IAppDbContext db, IUrlTokenService tokens) : DirectService.Accounting.Contracts.Posting.IPostingSourceHandler
+    where T : class, ICashDocument
 {
     public virtual string SourceModule => AccountingCodes.ModuleTrn;
 
     public abstract string SourceType { get; }
 
+    string DirectService.Accounting.Contracts.Posting.IPostingSourceHandler.Module => SourceModule;
+
+    string DirectService.Accounting.Contracts.Posting.IPostingSourceHandler.Type => SourceType;
+
     protected abstract string VoidCode { get; }
 
     protected abstract Task<PostingRequest?> EntryAsync(T document, CancellationToken ct);
 
-    public async Task<PostingRequest?> BuildAsync(long sourceId, CancellationToken ct)
+    public async Task<DirectService.Accounting.Contracts.Posting.PostingDocument?> RebuildAsync(long sourceId, CancellationToken ct)
     {
         var d = await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == sourceId, ct).ConfigureAwait(false);
-        return d is null || d.JournalEntryId is not null || d.Status == CashCodes.Void ? null : await EntryAsync(d, ct).ConfigureAwait(false);
+        return d is null || d.JournalEntryId is not null || d.Status == CashCodes.Void ? null : (await EntryAsync(d, ct).ConfigureAwait(false))?.ToDocument();
     }
 
-    public async Task AttachAsync(long sourceId, JournalEntry entry, CancellationToken ct)
+    public async Task AttachAsync(long sourceId, long journalEntryId, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(entry);
         var d = await db.Set<T>().SingleAsync(x => x.Id == sourceId, ct).ConfigureAwait(false);
         // A retry racing a void or an edit must not leave an entry on a void document or a second entry.
         if (d.Status == CashCodes.Void) throw Fail.Rule(VoidCode, d.Number);
         if (d.JournalEntryId is not null) throw new AppException(ErrorCodes.ConcurrencyConflict, 409);
-        d.JournalEntryId = entry.Id;
+        d.JournalEntryId = journalEntryId;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyDictionary<long, SourceDocumentRef>> DescribeAsync(IReadOnlyCollection<long> sourceIds, CancellationToken ct) =>
+    public async Task<IReadOnlyDictionary<long, DirectService.Accounting.Contracts.Posting.PostingSourceInfo>> DescribeAsync(IReadOnlyCollection<long> sourceIds, CancellationToken ct) =>
         (await db.Set<T>().AsNoTracking().Where(d => sourceIds.Contains(d.Id)).Select(d => new { d.Id, d.PublicId, d.Number }).ToListAsync(ct).ConfigureAwait(false))
-        .ToDictionary(d => d.Id, d => new SourceDocumentRef(SourceModule, SourceType, tokens.Encode<T>(d.PublicId), d.Number));
+        .ToDictionary(d => d.Id, d => new DirectService.Accounting.Contracts.Posting.PostingSourceInfo(d.Number, tokens.Encode<T>(d.PublicId)));
 }

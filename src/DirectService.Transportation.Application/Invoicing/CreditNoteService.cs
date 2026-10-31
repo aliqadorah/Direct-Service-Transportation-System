@@ -8,6 +8,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Trips;
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ namespace DirectService.Transportation.Application.Invoicing;
 /// unless a trip was invoiced again or the period is closed.
 /// </summary>
 public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks,
-    IPeriodGuard periods, INumberingService numbering, PostingEngine posting, InvoiceService invoices, EInvoicing.EInvoiceService einvoice)
+    IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, InvoiceService invoices, EInvoicing.EInvoiceService einvoice)
 {
     public const string EntityType = "TRN.CreditNote";
     public const string SourceType = "CreditNote";
@@ -51,7 +52,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
         {
             await db.InTransactionAsync(async c =>
         {
-            await posting.EnsurePostingReadyAsync(c).ConfigureAwait(false);
+            await posting.EnsureReadyAsync(AccountingCodes.ModuleTrn, c).ConfigureAwait(false);
             await periods.EnsureOpenAsync(cn.CreditDate, c).ConfigureAwait(false);
             var (picked, t) = await PlanAsync(inv, r.Lines!, company.Decimals, c).ConfigureAwait(false);
 
@@ -78,7 +79,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             changes.SetAction(inv, "CreditNote", cn.Number);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             var entry = await posting.PostOrPendAsync(BuildEntry(cn, inv)!, c).ConfigureAwait(false);
-            cn.JournalEntryId = entry?.Id;
+            cn.JournalEntryId = entry?.JournalEntryId;
             await db.SaveChangesAsync(c).ConfigureAwait(false);
             // Submitted once the invoice is accepted (FR-064, 9.8).
             await einvoice.QueueCreditNoteAsync(cn, c).ConfigureAwait(false);
@@ -200,11 +201,10 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
             InvoiceService.Rebalance(inv);
             changes.SetAction(inv, "CreditNoteVoided", cn.Number);
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            if (cn.JournalEntryId is long entryId)
+            // The credit note's posted entry, found by its source (Stage 3 session 4b); none when it is no longer posted.
+            if (cn.JournalEntryId is not null)
             {
-                var entry = await db.Set<JournalEntry>().SingleAsync(e => e.Id == entryId, c).ConfigureAwait(false);
-                if (entry.Status == AccountingCodes.Posted)
-                    await posting.ReverseAsync(entry, $"{(En ? "Void of credit note" : "إلغاء الإشعار الدائن")} {cn.Number}", null, c).ConfigureAwait(false);
+                await posting.ReverseAsync(Source(cn), $"{(En ? "Void of credit note" : "إلغاء الإشعار الدائن")} {cn.Number}", null, c).ConfigureAwait(false);
             }
             await invoices.ResolvePendingAsync(SourceType, cn.Id, c).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
@@ -212,20 +212,23 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
     }
 
     /// <summary>Mirror of the invoice entry for the returned share (8.6): Dr transport revenue, other revenue, sales tax output; Cr discount allowed, trade receivables.</summary>
-    public PostingRequest? BuildEntry(CreditNote cn, Invoice inv)
+    public PostingDocument? BuildEntry(CreditNote cn, Invoice inv)
     {
         ArgumentNullException.ThrowIfNull(cn);
         ArgumentNullException.ThrowIfNull(inv);
         if (cn.Status != InvoiceCodes.Posted) return null;
-        var party = new PostingParty(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, cn.CustomerId);
-        var lines = new List<PostingLine>();
-        if (cn.Subtotal > 0) lines.Add(PostingLine.DebitKey(PostingKeys.TransportRevenue, cn.Subtotal));
-        if (cn.FeesShare > 0) lines.Add(PostingLine.DebitKey(PostingKeys.OtherRevenue, cn.FeesShare));
-        if (cn.Tax > 0) lines.Add(PostingLine.DebitKey(PostingKeys.SalesTaxOutput, cn.Tax));
-        if (cn.DiscountShare > 0) lines.Add(PostingLine.CreditKey(PostingKeys.DiscountAllowed, cn.DiscountShare));
-        lines.Add(PostingLine.CreditKey(PostingKeys.TradeReceivables, cn.Total, party));
-        return new PostingRequest(cn.CreditDate, $"{(En ? "Credit note" : "إشعار دائن")} {cn.Number} · {inv.Number}", AccountingCodes.ModuleTrn, SourceType, cn.Id, false, lines);
+        var party = new PartyRef(AccountingCodes.ModuleTrn, AccountingCodes.PartyCustomer, cn.CustomerId);
+        var lines = new List<PostingLineSpec>();
+        if (cn.Subtotal > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.TransportRevenue, cn.Subtotal));
+        if (cn.FeesShare > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.OtherRevenue, cn.FeesShare));
+        if (cn.Tax > 0) lines.Add(PostingLineSpec.DebitKey(PostingKeys.SalesTaxOutput, cn.Tax));
+        if (cn.DiscountShare > 0) lines.Add(PostingLineSpec.CreditKey(PostingKeys.DiscountAllowed, cn.DiscountShare));
+        lines.Add(PostingLineSpec.CreditKey(PostingKeys.TradeReceivables, cn.Total, party));
+        return new PostingDocument(Source(cn), cn.CreditDate, $"{(En ? "Credit note" : "إشعار دائن")} {cn.Number} · {inv.Number}", null, lines);
     }
+
+    /// <summary>The credit note as the source of its entry (TRN / CreditNote / id; stored values, design e).</summary>
+    private static DocumentRef Source(CreditNote cn) => new(AccountingCodes.ModuleTrn, SourceType, cn.Id);
 
     private sealed class RacedCreate(CreditNote existing) : Exception
     {

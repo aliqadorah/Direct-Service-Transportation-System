@@ -3,36 +3,21 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
+using Contract = DirectService.Accounting.Contracts.Posting;
 
 namespace DirectService.Transportation.Application.Accounting;
 
 /// <summary>
-/// A module's financial document type that posts automatic entries (8.6). Registered by each document module
-/// (trips B5, invoices B6, cash documents B8, AP/AR B9) so pending postings can be retried and entries can link
-/// back to their source (FR-097, FR-101, FR-102).
+/// The handlers of the posting contract (<see cref="Contract.IPostingSourceHandler"/>) by module and type: each document module (trips B5,
+/// invoices B6, cash documents B8, AP/AR B9) registers one per document type so pending postings can be retried and entries can link back to
+/// their source (FR-097, FR-101, FR-102). The module's own handler interface gave way to the contract's in Stage 3 session 4b.
 /// </summary>
-public interface IPostingSourceHandler
+public sealed class PostingSources(IEnumerable<Contract.IPostingSourceHandler> handlers)
 {
-    string SourceModule { get; }
-    string SourceType { get; }
+    private readonly Dictionary<(string, string), Contract.IPostingSourceHandler> _byType =
+        handlers.ToDictionary(h => (h.Module, h.Type));
 
-    /// <summary>The entry the document should post now, or null when it no longer needs one (e.g. voided meanwhile).</summary>
-    Task<PostingRequest?> BuildAsync(long sourceId, CancellationToken ct);
-
-    /// <summary>Links the posted entry to the document (its JournalEntryId).</summary>
-    Task AttachAsync(long sourceId, JournalEntry entry, CancellationToken ct);
-
-    /// <summary>Number and URL token of each document, for links from the journal.</summary>
-    Task<IReadOnlyDictionary<long, SourceDocumentRef>> DescribeAsync(IReadOnlyCollection<long> sourceIds, CancellationToken ct);
-}
-
-/// <summary>The registered <see cref="IPostingSourceHandler"/>s by module and type.</summary>
-public sealed class PostingSources(IEnumerable<IPostingSourceHandler> handlers)
-{
-    private readonly Dictionary<(string, string), IPostingSourceHandler> _byType =
-        handlers.ToDictionary(h => (h.SourceModule, h.SourceType));
-
-    public IPostingSourceHandler? Find(string module, string? type) =>
+    public Contract.IPostingSourceHandler? Find(string module, string? type) =>
         type is not null && _byType.TryGetValue((module, type), out var h) ? h : null;
 
     /// <summary>Source document links for a set of (module, type, id) triples.</summary>
@@ -46,7 +31,7 @@ public sealed class PostingSources(IEnumerable<IPostingSourceHandler> handlers)
             if (handler is null) continue;
             var ids = group.Select(s => s.Id!.Value).Distinct().ToList();
             foreach (var (id, doc) in await handler.DescribeAsync(ids, ct).ConfigureAwait(false))
-                result[(group.Key.Module, group.Key.Item2, id)] = doc;
+                result[(group.Key.Module, group.Key.Item2, id)] = new SourceDocumentRef(handler.Module, handler.Type, doc.Token, doc.Number);
         }
         return result;
     }
@@ -57,7 +42,7 @@ public sealed class PostingSources(IEnumerable<IPostingSourceHandler> handlers)
 /// background worker. A retry posts in its own transaction; business refusals and technical failures keep the row
 /// open with the new reason and attempt count.
 /// </summary>
-public sealed class PendingPostingService(IAppDbContext db, PostingEngine engine, PostingSources sources, IUrlTokenService tokens,
+public sealed class PendingPostingService(IAppDbContext db, Contract.IAccountingPosting posting, PostingSources sources, IUrlTokenService tokens,
     IRequestContext ctx, TimeProvider clock, Microsoft.Extensions.Logging.ILogger<PendingPostingService>? log = null)
 {
     public async Task<IReadOnlyList<PendingPostingResponse>> ListAsync(CancellationToken ct)
@@ -106,11 +91,12 @@ public sealed class PendingPostingService(IAppDbContext db, PostingEngine engine
                 if (p is null) return;
                 var handler = sources.Find(p.SourceModule, p.SourceType);
                 if (handler is null) throw Fail.Rule(ErrorCodes.PendingNoHandler);
-                var request = await handler.BuildAsync(p.SourceId, c).ConfigureAwait(false);
-                if (request is not null)
+                // The handler rebuilds the document's entry; it posts through the contract (Stage 3 session 4b).
+                var document = await handler.RebuildAsync(p.SourceId, c).ConfigureAwait(false);
+                if (document is not null)
                 {
-                    var entry = await engine.PostAsync(request, c).ConfigureAwait(false);
-                    await handler.AttachAsync(p.SourceId, entry, c).ConfigureAwait(false);
+                    var entry = await posting.PostAsync(document, c).ConfigureAwait(false);
+                    await handler.AttachAsync(p.SourceId, entry.JournalEntryId, c).ConfigureAwait(false);
                 }
                 p.Attempts++;
                 p.LastAttemptAt = clock.GetUtcNow().UtcDateTime;
