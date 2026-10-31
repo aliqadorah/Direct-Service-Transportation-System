@@ -1,13 +1,11 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Accounting.Domain.Cfg;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Chart of accounts import/export (FR-109, ADR-13): Excel with separate debit and credit opening-balance columns.
@@ -70,7 +68,7 @@ public sealed class ChartImportService(IAppDbContext db, ISpreadsheetService she
     public async Task<ImportResult> ImportAsync(Stream content, string fileName, long length, CancellationToken ct)
     {
         var (rows, preview) = await AnalyseAsync(content, fileName, length, ct).ConfigureAwait(false);
-        if (preview.RejectedRows > 0) throw Fail.Rule(ErrorCodes.ImportHasErrors, preview.RejectedRows);
+        if (preview.RejectedRows > 0) throw Fail.Rule(SharedErrorCodes.ImportHasErrors, preview.RejectedRows);
         var parentCodes = rows.Where(r => r.ParentCode is not null).Select(r => r.ParentCode!).ToHashSet(StringComparer.Ordinal);
 
         var batch = await db.InTransactionAsync(async c =>
@@ -134,19 +132,19 @@ public sealed class ChartImportService(IAppDbContext db, ISpreadsheetService she
             var t = typeText is null ? null : TypeNames.GetValueOrDefault(TextNormalizer.Key(typeText));
             var postableValue = postable < 0 ? null : ImportParse.Bool(s[postable]);
             var controlType = TextNormalizer.CleanCode(s[control]);
-            if (c is null || !ChartOfAccountsService.IsCode(c)) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("code"), s[code]);
-            else if (!seen.Add(c) || existing.ContainsKey(c)) p.Add(s.RowNumber, c, ErrorCodes.ImportDuplicate, c);
+            if (c is null || !ChartOfAccountsService.IsCode(c)) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("code"), s[code]);
+            else if (!seen.Add(c) || existing.ContainsKey(c)) p.Add(s.RowNumber, c, SharedErrorCodes.ImportDuplicate, c);
             var nAr = TextNormalizer.CleanText(s[nameAr]);
-            if (nAr is null || nAr.Length > 200) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("nameAr"), s[nameAr]);
+            if (nAr is null || nAr.Length > 200) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("nameAr"), s[nameAr]);
             var nEn = TextNormalizer.CleanText(s[nameEn]);
-            if (nEn is { Length: > 200 }) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("nameEn"), nEn);
-            if (t is null) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("type"), typeText);
-            if (postable >= 0 && s[postable] is not null && postableValue is null) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("postable"), s[postable]);
-            if (!ImportParse.TryAmount(s[debit], decimals, out var d)) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("debit"), s[debit]);
-            if (!ImportParse.TryAmount(s[credit], decimals, out var cr)) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("credit"), s[credit]);
-            if (d > 0 && cr > 0) p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("debit"), $"{d} / {cr}");
+            if (nEn is { Length: > 200 }) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("nameEn"), nEn);
+            if (t is null) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("type"), typeText);
+            if (postable >= 0 && s[postable] is not null && postableValue is null) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("postable"), s[postable]);
+            if (!ImportParse.TryAmount(s[debit], decimals, out var d)) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("debit"), s[debit]);
+            if (!ImportParse.TryAmount(s[credit], decimals, out var cr)) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("credit"), s[credit]);
+            if (d > 0 && cr > 0) p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("debit"), $"{d} / {cr}");
             if (controlType is not null && !AccountingCodes.ControlPartyTypes.Contains(controlType))
-                p.Add(s.RowNumber, c, ErrorCodes.ImportInvalid, Label("control"), controlType);
+                p.Add(s.RowNumber, c, SharedErrorCodes.ImportInvalid, Label("control"), controlType);
             rows.Add(new Row(s.RowNumber, c, nAr, nEn, t, TextNormalizer.CleanCode(s[parent]), postableValue, d, cr,
                 controlType is not null && AccountingCodes.ControlPartyTypes.Contains(controlType) ? controlType : null));
         }
@@ -171,18 +169,18 @@ public sealed class ChartImportService(IAppDbContext db, ISpreadsheetService she
                 else if (existing.TryGetValue(r.ParentCode, out var chartParent))
                 {
                     parentType = chartParent.AccountType;
-                    if (chartParent.Status != AccountingCodes.Active) p.Add(r.RowNumber, r.Code, ErrorCodes.RecordArchived, r.ParentCode);
-                    else if (referenced.Contains(r.ParentCode)) p.Add(r.RowNumber, r.Code, ErrorCodes.AccountParentInUse, r.ParentCode);
+                    if (chartParent.Status != AccountingCodes.Active) p.Add(r.RowNumber, r.Code, SharedErrorCodes.RecordArchived, r.ParentCode);
+                    else if (referenced.Contains(r.ParentCode)) p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountParentInUse, r.ParentCode);
                 }
-                else p.Add(r.RowNumber, r.Code, ErrorCodes.ImportUnknown, Label("parent"), r.ParentCode);
+                else p.Add(r.RowNumber, r.Code, SharedErrorCodes.ImportUnknown, Label("parent"), r.ParentCode);
                 if (parentType is not null && r.Type is not null && parentType != r.Type)
-                    p.Add(r.RowNumber, r.Code, ErrorCodes.AccountTypeMismatch, parentType);
-                if (r.ParentCode == r.Code || HasCycle(r, inFile)) p.Add(r.RowNumber, r.Code, ErrorCodes.AccountCycle);
+                    p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountTypeMismatch, parentType);
+                if (r.ParentCode == r.Code || HasCycle(r, inFile)) p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountCycle);
             }
             var hasChildren = r.Code is not null && parentsInFile.Contains(r.Code);
-            if (hasChildren && r.Postable == true) p.Add(r.RowNumber, r.Code, ErrorCodes.AccountHasChildren, r.Code);
-            if (hasChildren && (r.Debit > 0 || r.Credit > 0)) p.Add(r.RowNumber, r.Code, ErrorCodes.AccountParentInUse, r.Code);
-            if (r.Postable == false && (r.Debit > 0 || r.Credit > 0)) p.Add(r.RowNumber, r.Code, ErrorCodes.AccountNotPostable, r.Code);
+            if (hasChildren && r.Postable == true) p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountHasChildren, r.Code);
+            if (hasChildren && (r.Debit > 0 || r.Credit > 0)) p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountParentInUse, r.Code);
+            if (r.Postable == false && (r.Debit > 0 || r.Credit > 0)) p.Add(r.RowNumber, r.Code, AccountingErrorCodes.AccountNotPostable, r.Code);
         }
         var preview = p.Preview(rows.Select(r => (r.RowNumber, r.Code)).ToList());
         // Parents first so navigation fix-up and inserts follow the tree.

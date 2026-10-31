@@ -1,13 +1,11 @@
-using System.Text.RegularExpressions;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Modules;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Chart of accounts (acc.acct.setup to change, acc.acct.view to read; FR-107, FR-108, FR-093): tree with add, edit,
@@ -15,7 +13,8 @@ namespace DirectService.Transportation.Application.Accounting;
 /// template (D-10). Rules: a child has its parent's type; only leaf accounts are postable; an account that carries
 /// entries, openings or links cannot receive children or stop being postable; a mapped account cannot be deactivated.
 /// </summary>
-public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, IRequestContext ctx, IPostingKeyCatalog keys)
+public sealed class ChartOfAccountsService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, IRequestContext ctx, IPostingKeyCatalog keys)
+    : IChartOfAccountsSetup
 {
     // ------------------------------------------------------------ queries
 
@@ -59,7 +58,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         }
         var type = r.AccountType ?? parent?.AccountType;
         new Validator().Check(type is not null && AccountingCodes.AccountTypes.Contains(type), "accountType").ThrowIfInvalid();
-        if (parent is not null && parent.AccountType != type) throw Fail.RuleOn("accountType", ErrorCodes.AccountTypeMismatch, parent.AccountType);
+        if (parent is not null && parent.AccountType != type) throw Fail.RuleOn("accountType", AccountingErrorCodes.AccountTypeMismatch, parent.AccountType);
         var (isControl, partyType) = ValidateControl(r);
         var plGroup = ValidateProfitLossGroup(r, type!);
         await EnsureUniqueCodeAsync(code, null, ct).ConfigureAwait(false);
@@ -96,16 +95,16 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
             if (a.ParentId is long pid)
             {
                 var parentType = await db.Set<Account>().Where(x => x.Id == pid).Select(x => x.AccountType).SingleAsync(ct).ConfigureAwait(false);
-                if (parentType != type) throw Fail.RuleOn("accountType", ErrorCodes.AccountTypeMismatch, parentType);
+                if (parentType != type) throw Fail.RuleOn("accountType", AccountingErrorCodes.AccountTypeMismatch, parentType);
             }
-            if (hasChildren) throw Fail.RuleOn("accountType", ErrorCodes.AccountHasChildren, a.Code);
+            if (hasChildren) throw Fail.RuleOn("accountType", AccountingErrorCodes.AccountHasChildren, a.Code);
             await EnsureNoEntriesAsync(a, ct).ConfigureAwait(false);
         }
-        if (r.IsPostable && !a.IsPostable && hasChildren) throw Fail.RuleOn("isPostable", ErrorCodes.AccountHasChildren, a.Code);
+        if (r.IsPostable && !a.IsPostable && hasChildren) throw Fail.RuleOn("isPostable", AccountingErrorCodes.AccountHasChildren, a.Code);
         if (!r.IsPostable && a.IsPostable)
         {
             var uses = await UsesAsync(a, ct).ConfigureAwait(false);
-            if (uses.Count > 0) throw Fail.Rule(ErrorCodes.RecordInUse, Describe(uses));
+            if (uses.Count > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, Describe(uses));
         }
         if (isControl != a.IsControlAccount || partyType != a.ControlPartyType)
             await EnsureNoEntriesAsync(a, ct).ConfigureAwait(false); // party rules apply to every line of the account
@@ -137,9 +136,9 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
             var parentOf = await db.Set<Account>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.ParentId, ct).ConfigureAwait(false);
             for (long? cursor = parent.Id; cursor is long id; cursor = parentOf.GetValueOrDefault(id))
             {
-                if (id == a.Id) throw Fail.Rule(ErrorCodes.AccountCycle);
+                if (id == a.Id) throw Fail.Rule(AccountingErrorCodes.AccountCycle);
             }
-            if (parent.AccountType != a.AccountType) throw Fail.Rule(ErrorCodes.AccountTypeMismatch, parent.AccountType);
+            if (parent.AccountType != a.AccountType) throw Fail.Rule(AccountingErrorCodes.AccountTypeMismatch, parent.AccountType);
             await EnsureCanHaveChildrenAsync(parent, ct).ConfigureAwait(false);
         }
         db.ExpectRowVersion(a, r.RowVersion);
@@ -161,10 +160,10 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         var linked = await db.Set<PostingKeyMapping>().AnyAsync(m => m.AccountId == a.Id, ct).ConfigureAwait(false)
             || await db.Set<CashBox>().AnyAsync(c => c.AccountId == a.Id && c.Status == AccountingCodes.Active, ct).ConfigureAwait(false)
             || await db.Set<BankAccount>().AnyAsync(b => b.AccountId == a.Id && b.Status == AccountingCodes.Active, ct).ConfigureAwait(false);
-        if (linked) throw Fail.Rule(ErrorCodes.AccountMapped, a.Code);
-        if (a.OpeningDebit > 0 || a.OpeningCredit > 0) throw Fail.Rule(ErrorCodes.RecordInUse, Describe([("OpeningBalance", 1)]));
+        if (linked) throw Fail.Rule(AccountingErrorCodes.AccountMapped, a.Code);
+        if (a.OpeningDebit > 0 || a.OpeningCredit > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, Describe([("OpeningBalance", 1)]));
         if (await db.Set<Account>().AnyAsync(x => x.ParentId == a.Id && x.Status == AccountingCodes.Active, ct).ConfigureAwait(false))
-            throw Fail.Rule(ErrorCodes.AccountActiveChildren, a.Code);
+            throw Fail.Rule(AccountingErrorCodes.AccountActiveChildren, a.Code);
         db.ExpectRowVersion(a, rowVersion);
         a.Status = AccountingCodes.Archived;
         changes.SetAction(a, "Deactivate");
@@ -178,7 +177,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
         if (a.ParentId is long pid)
         {
             var parent = await db.Set<Account>().AsNoTracking().SingleAsync(x => x.Id == pid, ct).ConfigureAwait(false);
-            if (parent.Status != AccountingCodes.Active) throw Fail.Rule(ErrorCodes.RecordArchived, parent.Code);
+            if (parent.Status != AccountingCodes.Active) throw Fail.Rule(SharedErrorCodes.RecordArchived, parent.Code);
         }
         db.ExpectRowVersion(a, rowVersion);
         a.Status = AccountingCodes.Active;
@@ -191,12 +190,12 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
     public async Task DeleteAsync(string token, string? reason, CancellationToken ct)
     {
         var why = TextNormalizer.CleanText(reason);
-        if (why is null) throw Fail.Field("reason", ErrorCodes.ReasonRequired);
+        if (why is null) throw Fail.Field("reason", SharedErrorCodes.ReasonRequired);
         var a = await FindAsync(token, tracked: true, ct).ConfigureAwait(false);
         var uses = await UsesAsync(a, ct).ConfigureAwait(false);
         var children = await db.Set<Account>().CountAsync(x => x.ParentId == a.Id, ct).ConfigureAwait(false);
         if (children > 0) uses.Insert(0, ("SubAccounts", children));
-        if (uses.Count > 0) throw Fail.Rule(ErrorCodes.RecordInUse, Describe(uses));
+        if (uses.Count > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, Describe(uses));
         a.DeleteReason = why.Length <= 500 ? why : why[..500];
         db.Set<Account>().Remove(a);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -205,7 +204,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
     /// <summary>Creates the approved transport template (D-10) in an empty chart: accounts, main cash box, posting-key mapping.</summary>
     public async Task<ChartTemplateResult> ApplyTemplateAsync(CancellationToken ct)
     {
-        if (await db.Set<Account>().AnyAsync(ct).ConfigureAwait(false)) throw Fail.Conflict(ErrorCodes.ChartNotEmpty);
+        if (await db.Set<Account>().AnyAsync(ct).ConfigureAwait(false)) throw Fail.Conflict(AccountingErrorCodes.ChartNotEmpty);
         return await db.InTransactionAsync(async c =>
         {
             var created = new Dictionary<string, Account>(StringComparer.Ordinal);
@@ -280,7 +279,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
                     parent = candidate;
                     break;
                 }
-                if (parent is null || code is null) throw Fail.Rule(ErrorCodes.TaxAccountNoGroup, TypeName(d.Type));
+                if (parent is null || code is null) throw Fail.Rule(AccountingErrorCodes.TaxAccountNoGroup, TypeName(d.Type));
                 if (parent.IsPostable)
                 {
                     parent.IsPostable = false; // FR-108: an account with children is not postable
@@ -331,20 +330,20 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
 
     private async Task EnsureCanHaveChildrenAsync(Account parent, CancellationToken ct)
     {
-        if (parent.Status != AccountingCodes.Active) throw Fail.Rule(ErrorCodes.RecordArchived, parent.Code);
-        if ((await UsesAsync(parent, ct).ConfigureAwait(false)).Count > 0) throw Fail.Rule(ErrorCodes.AccountParentInUse, parent.Code);
+        if (parent.Status != AccountingCodes.Active) throw Fail.Rule(SharedErrorCodes.RecordArchived, parent.Code);
+        if ((await UsesAsync(parent, ct).ConfigureAwait(false)).Count > 0) throw Fail.Rule(AccountingErrorCodes.AccountParentInUse, parent.Code);
     }
 
     private async Task EnsureNoEntriesAsync(Account a, CancellationToken ct)
     {
         var lines = await db.Set<EntryLine>().CountAsync(l => l.AccountId == a.Id, ct).ConfigureAwait(false);
-        if (lines > 0) throw Fail.Rule(ErrorCodes.RecordInUse, Describe([("EntryLines", lines)]));
+        if (lines > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, Describe([("EntryLines", lines)]));
     }
 
     private async Task EnsureUniqueCodeAsync(string code, long? exceptId, CancellationToken ct)
     {
         if (await db.Set<Account>().AnyAsync(a => a.Code == code && a.Id != exceptId, ct).ConfigureAwait(false))
-            throw Fail.Conflict(ErrorCodes.DuplicateKey, code);
+            throw Fail.Conflict(SharedErrorCodes.DuplicateKey, code);
     }
 
     private static (string Code, string NameAr, string? NameEn) ValidateBasics(AccountRequest r)
@@ -364,14 +363,14 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
     private static string? ValidateProfitLossGroup(AccountRequest r, string type)
     {
         var group = string.IsNullOrWhiteSpace(r.ProfitLossGroup) ? null : r.ProfitLossGroup.Trim();
-        if (group is not null && !ProfitLossGroups.For(type).Contains(group)) throw Fail.Field("profitLossGroup", ErrorCodes.ValidationFormat, new FieldRef("profitLossGroup"));
+        if (group is not null && !ProfitLossGroups.For(type).Contains(group)) throw Fail.Field("profitLossGroup", SharedErrorCodes.ValidationFormat, new FieldRef("profitLossGroup"));
         return group;
     }
 
     private static (bool IsControl, string? PartyType) ValidateControl(AccountRequest r)
     {
         // DT-256: a tax account carries the automatic tax lines, which have no party.
-        if (r.IsTaxAccount && r.IsControlAccount) throw Fail.RuleOn("isTaxAccount", ErrorCodes.TaxAccountControl);
+        if (r.IsTaxAccount && r.IsControlAccount) throw Fail.RuleOn("isTaxAccount", AccountingErrorCodes.TaxAccountControl);
         if (!r.IsControlAccount) return (false, null);
         new Validator().Check(r.ControlPartyType is not null && AccountingCodes.ControlPartyTypes.Contains(r.ControlPartyType), "controlPartyType")
             .ThrowIfInvalid();
@@ -379,10 +378,7 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
     }
 
     /// <summary>Account codes: 1–30 letters, digits, dot, dash or underscore (VARCHAR(30)).</summary>
-    public static bool IsCode(string code) => CodePattern().IsMatch(code);
-
-    [GeneratedRegex("^[A-Za-z0-9._-]{1,30}$")]
-    private static partial Regex CodePattern();
+    public static bool IsCode(string code) => AccountingCodeRule.IsCode(code);
 
     internal string Describe(IEnumerable<(string Type, int Count)> uses) =>
         string.Join(ctx.Language == "en" ? ", " : "، ", uses.Select(u => $"{UseName(u.Type)} ({u.Count})"));

@@ -20,7 +20,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// Transport customers are offered as receivable parties: a receivable for a transport customer uses its linked accounting party, created
 /// and linked on first use (DT-101).
 /// </summary>
-public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks, ChartOfAccountsService chart, IRequestContext ctx)
+public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support, IChangeContext changes, IRecordLockGuard locks, IUrlTokenService tokens, IRequestContext ctx)
 {
     public const string EntityType = "ACC.ApArParty";
 
@@ -226,7 +226,7 @@ public sealed class ApArPartyService(IAppDbContext db, MasterDataSupport support
             .ToLookup(c => c.ApArPartyId!.Value, c => new Ref(support.Token<Customer>(c.PublicId), c.Name));
         var byId = rows.ToDictionary(p => p.Id);
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).Select(p => new ApArPartyResponse(support.Token<ApArParty>(p.PublicId), p.PartyRole, p.Name, p.TaxNumber,
-            p.Phone, p.Address, chart.Ref(p.ControlAccount), p.PaymentTermsDays, p.Status, balances.GetValueOrDefault(p.Id), customers[p.Id].ToList(),
+            p.Phone, p.Address, tokens.AccountRefOf(p.ControlAccount), p.PaymentTermsDays, p.Status, balances.GetValueOrDefault(p.Id), customers[p.Id].ToList(),
             DateTime.SpecifyKind(p.CreatedAt, DateTimeKind.Utc), Convert.ToBase64String(p.RowVersion))).ToList();
     }
 }

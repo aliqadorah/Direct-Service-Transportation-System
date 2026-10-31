@@ -1,3 +1,5 @@
+using DirectService.Accounting.Contracts.Accounting;
+
 namespace DirectService.Accounting.Contracts.Modules;
 
 // First form of the remaining contribution contracts of design c / j (Stage 3 session 2). Nothing implements or calls them yet; the session
@@ -48,4 +50,21 @@ public interface IChartTemplateExtension
     IReadOnlyList<ChartTemplateAccount> Accounts { get; }
 
     IReadOnlyDictionary<string, string> Mapping { get; }
+}
+
+/// <summary>The chart of accounts as another module uses it (Stage 3 session 6c): the approved template for a new or demo company.</summary>
+public interface IChartOfAccountsSetup
+{
+    /// <summary>Creates the template in an empty chart: accounts, main cash box, posting-key mapping (refused when the chart has accounts).</summary>
+    Task<ChartTemplateResult> ApplyTemplateAsync(CancellationToken ct);
+}
+
+/// <summary>A record type that refers to an accounting record, and how many of them (the "in use" message of a delete, BR-040).</summary>
+public sealed record RecordUse(string Type, int Count);
+
+/// <summary>A module's documents that use a cash box or bank account (the delete check of cash boxes and bank accounts, Stage 3 session 6c).</summary>
+public interface IMoneyAccountUseSource
+{
+    /// <summary>The module's uses of the cash box or bank account, in the module's order; only the record types with a count above 0.</summary>
+    Task<IReadOnlyList<RecordUse>> UsesAsync(long? cashBoxId, long? bankAccountId, CancellationToken ct);
 }

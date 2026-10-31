@@ -30,7 +30,7 @@ namespace DirectService.Transportation.Application.ApAr;
 /// and remaining amounts are maintained by payments and returns (FR-125, FR-126).
 /// </summary>
 public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, CashSupport cash, IChangeContext changes,
-    IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, ChartOfAccountsService chart, ApArPartyService parties,
+    IRecordLockGuard locks, IPeriodGuard periods, INumberingService numbering, IAccountingPosting posting, IUrlTokenService tokens, ApArPartyService parties,
     EInvoiceService einvoice, ISpreadsheetService sheets, IReportExporter exporter)
 {
     public const string EntityType = "ACC.ApArDocument";
@@ -348,7 +348,7 @@ public sealed class ApArDocumentService(IAppDbContext db, IRequestContext ctx, M
         foreach (var x in returnIds) returns.Add(await ReturnsReader.ResponseAsync(db, support, x, ct).ConfigureAwait(false));
         var today = await support.TodayAsync(ct).ConfigureAwait(false);
         return new ApArDocumentDetails(ToResponse(row, today),
-            lines.Select(l => new ApArLineResponse(support.Token<ApArDocumentLine>(l.PublicId), l.Description, chart.Ref(l.Account), l.Amount, l.TaxRate,
+            lines.Select(l => new ApArLineResponse(support.Token<ApArDocumentLine>(l.PublicId), l.Description, tokens.AccountRefOf(l.Account), l.Amount, l.TaxRate,
                 l.CostCentre is null ? null : new Ref(support.Token<CostCentre>(l.CostCentre.PublicId), l.CostCentre.Code + " " + l.CostCentre.Name), l.Deduction)).ToList(),
             payments, returns, await cash.WordsAsync(row.D.Total, ct).ConfigureAwait(false), await support.HistoryAsync(EntityType, id, ct).ConfigureAwait(false));
     }

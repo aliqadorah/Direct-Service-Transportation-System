@@ -103,7 +103,7 @@ public sealed class TaxCodeService(IAppDbContext db, IUrlTokenService tokens, IC
         var nameAr = TextNormalizer.CleanText(r.NameAr);
         var nameEn = TextNormalizer.CleanText(r.NameEn);
         new Validator()
-            .Require("code", code).Check(code is null || ChartOfAccountsService.IsCode(code), "code")
+            .Require("code", code).Check(code is null || AccountingCodeRule.IsCode(code), "code")
             .Check(r.Rate is not null, "rate", ErrorCodes.ValidationRequired)
             .Check(r.Rate is null || (r.Rate is >= 0 and <= 100 && decimal.Round(r.Rate.Value, 2) == r.Rate), "rate", ErrorCodes.ValidationRange)
             .Require("nameAr", nameAr).MaxLength("nameAr", nameAr, NameMax)

@@ -19,3 +19,18 @@ public interface ICompanyInfo
 
 /// <summary>A user as shown by the shared engines: the URL token of the user and the full name.</summary>
 public sealed record NamedUser(string Token, string FullName);
+
+/// <summary>The company's calendar for the services of every module (Stage 3 session 6c).</summary>
+public static class CompanyCalendar
+{
+    /// <summary>Today in the current company's time zone (the server's UTC date when the company has none or it is unknown).</summary>
+    public static async Task<DateOnly> TodayAsync(this ICompanyInfo company, TimeProvider clock, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(company);
+        ArgumentNullException.ThrowIfNull(clock);
+        var zone = await company.TimeZoneAsync(ct).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        if (zone is not null && TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var tz)) now = TimeZoneInfo.ConvertTime(now, tz);
+        return DateOnly.FromDateTime(now.DateTime);
+    }
+}

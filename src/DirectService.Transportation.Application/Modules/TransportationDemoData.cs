@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Modules;
 using System.Globalization;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
@@ -31,7 +32,7 @@ namespace DirectService.Transportation.Application.Modules;
 /// sites, own-fleet and partner drivers, tariffs, this month's driver rates, trips, an approved invoice and a receipt (<see cref="IDemoDataContributor"/>,
 /// moved unchanged out of <see cref="DemoCompanyService"/>, DT-346).
 /// </summary>
-public sealed class TransportationDemoData(IAppDbContext db, IUrlTokenService tokens, ChartOfAccountsService chart, CustomerService customers, PartnerService partners,
+public sealed class TransportationDemoData(IAppDbContext db, IUrlTokenService tokens, IChartOfAccountsSetup chart, CustomerService customers, PartnerService partners,
     MaterialService materials, LoadingSiteService loadingSites, UnloadingSiteService unloadingSites, OwnershipTypeService ownershipTypes, DriverService drivers,
     TariffService tariffs, MonthlyRateService rates, TripService trips, InvoiceService invoices, ReceiptService receipts, MasterDataSupport support) : IDemoDataContributor
 {

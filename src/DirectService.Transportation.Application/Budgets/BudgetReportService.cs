@@ -1,3 +1,4 @@
+using DirectService.Transportation.Application.Common;
 using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
@@ -19,7 +20,7 @@ namespace DirectService.Transportation.Application.Budgets;
 /// financial reports, in the natural direction of the account. Variance = Actual − Budget; favourable / unfavourable per
 /// <see cref="BudgetMath.Status"/>. Excel / PDF through the report exporter.
 /// </summary>
-public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport support, LedgerReportService ledger, ChartOfAccountsService chart, IReportExporter exporter)
+public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport support, LedgerReportService ledger, IUrlTokenService tokens, IReportExporter exporter)
 {
     public static readonly IReadOnlyList<string> Modes = ["month", "ytd", "year"];
 
@@ -64,7 +65,7 @@ public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport supp
         {
             var n = tree[id];
             var own = new List<BudgetVsActualRow>();
-            var token = chart.Ref(n.Account).Id;
+            var token = tokens.AccountRefOf(n.Account).Id;
             decimal b = budgets.GetValueOrDefault(id), a = actuals.GetValueOrDefault(id);
             foreach (var child in n.Children.OrderBy(c => tree[c].Account.Code, StringComparer.Ordinal))
             {
@@ -75,7 +76,7 @@ public sealed class BudgetReportService(IAppDbContext db, MasterDataSupport supp
             if (b != 0 || a != 0 || budgets.ContainsKey(id))
             {
                 var type = n.Account.AccountType;
-                into.Add(new BudgetVsActualRow(chart.Ref(n.Account), type, n.Depth, own.Count > 0, parentToken, b, a, BudgetMath.Variance(b, a),
+                into.Add(new BudgetVsActualRow(tokens.AccountRefOf(n.Account), type, n.Depth, own.Count > 0, parentToken, b, a, BudgetMath.Variance(b, a),
                     BudgetMath.VariancePercent(b, a), BudgetMath.Status(type, b, a)));
                 into.AddRange(own);
             }

@@ -1,18 +1,15 @@
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using System.Text.RegularExpressions;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Contracts.Errors;
+using DirectService.Accounting.Contracts.Modules;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Accounting.Domain.Cfg;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Trn;
+using DirectService.Platform.Contracts.Settings;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Cost centres (FR-131) and cash boxes / bank accounts (FR-129), acc.acct.setup. Each cash box and bank account has
@@ -20,7 +17,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// history but cannot be chosen on new documents; delete (soft) only while unreferenced (BR-040).
 /// </summary>
 public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, ChartOfAccountsService accounts, IRequestContext ctx,
-    MasterData.MasterDataSupport support)
+    ICompanyInfo company, TimeProvider clock, IEnumerable<IMoneyAccountUseSource> moduleUses)
 {
     // ============================================================ cost centres
 
@@ -35,7 +32,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
     public async Task<CostCentreResponse> CreateCostCentreAsync(CostCentreRequest r, CancellationToken ct)
     {
         var (code, name) = ValidateCostCentre(r);
-        if (await db.Set<CostCentre>().AnyAsync(c => c.Code == code, ct).ConfigureAwait(false)) throw Fail.Conflict(ErrorCodes.DuplicateKey, code);
+        if (await db.Set<CostCentre>().AnyAsync(c => c.Code == code, ct).ConfigureAwait(false)) throw Fail.Conflict(SharedErrorCodes.DuplicateKey, code);
         var c = new CostCentre { Code = code, Name = name };
         db.Set<CostCentre>().Add(c);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -47,7 +44,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var (code, name) = ValidateCostCentre(r);
         var c = await FindAsync<CostCentre>(token, ct).ConfigureAwait(false);
         if (code != c.Code && await db.Set<CostCentre>().AnyAsync(x => x.Code == code && x.Id != c.Id, ct).ConfigureAwait(false))
-            throw Fail.Conflict(ErrorCodes.DuplicateKey, code);
+            throw Fail.Conflict(SharedErrorCodes.DuplicateKey, code);
         db.ExpectRowVersion(c, r.RowVersion);
         c.Code = code;
         c.Name = name;
@@ -72,7 +69,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var uses = new List<(string, int)>();
         Add(uses, "EntryLines", await db.Set<EntryLine>().CountAsync(l => l.CostCentreId == c.Id, ct).ConfigureAwait(false));
         Add(uses, "ApArDocumentLines", await db.Set<ApArDocumentLine>().CountAsync(l => l.CostCentreId == c.Id, ct).ConfigureAwait(false));
-        if (uses.Count > 0) throw Fail.Rule(ErrorCodes.RecordInUse, accounts.Describe(uses));
+        if (uses.Count > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, accounts.Describe(uses));
         c.DeleteReason = why;
         db.Set<CostCentre>().Remove(c);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -84,7 +81,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var code = TextNormalizer.CleanCode(r.Code);
         var name = TextNormalizer.CleanText(r.Name);
         new Validator()
-            .Require("code", code).Check(code is null || ChartOfAccountsService.IsCode(code), "code")
+            .Require("code", code).Check(code is null || AccountingCodeRule.IsCode(code), "code")
             .Require("name", name).MaxLength("name", name, 150)
             .ThrowIfInvalid();
         return (code!, name!);
@@ -104,7 +101,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
             .Select(b => new { b.PublicId, b.Name, b.BankName }).ToListAsync(ct).ConfigureAwait(false);
         return new MoneyAccountOptions(boxes.Select(c => new MasterOption(tokens.Encode<CashBox>(c.PublicId), c.Name)).ToList(),
             banks.Select(b => new MasterOption(tokens.Encode<BankAccount>(b.PublicId), b.Name == b.BankName ? b.Name : b.BankName + " · " + b.Name)).ToList(),
-            await support.TodayAsync(ct).ConfigureAwait(false));
+            await company.TodayAsync(clock, ct).ConfigureAwait(false));
     }
 
     public async Task<IReadOnlyList<CashBoxResponse>> CashBoxesAsync(CancellationToken ct) =>
@@ -139,7 +136,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
     {
         var c = await FindAsync<CashBox>(token, ct).ConfigureAwait(false);
         var account = await db.Set<Account>().AsNoTracking().SingleAsync(a => a.Id == c.AccountId, ct).ConfigureAwait(false);
-        if (active && account.Status != AccountingCodes.Active) throw Fail.Rule(ErrorCodes.RecordArchived, account.Code);
+        if (active && account.Status != AccountingCodes.Active) throw Fail.Rule(SharedErrorCodes.RecordArchived, account.Code);
         db.ExpectRowVersion(c, rowVersion);
         c.Status = active ? AccountingCodes.Active : AccountingCodes.Archived;
         changes.SetAction(c, active ? "Restore" : "Archive");
@@ -152,12 +149,9 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var why = Reason(reason);
         var c = await FindAsync<CashBox>(token, ct).ConfigureAwait(false);
         var uses = new List<(string, int)>();
-        Add(uses, "Receipts", await db.Set<Receipt>().CountAsync(x => x.CashBoxId == c.Id, ct).ConfigureAwait(false));
-        Add(uses, "Advances", await db.Set<Advance>().CountAsync(x => x.CashBoxId == c.Id, ct).ConfigureAwait(false));
-        Add(uses, "Settlements", await db.Set<Settlement>().CountAsync(x => x.CashBoxId == c.Id, ct).ConfigureAwait(false));
-        Add(uses, "PartnerPayments", await db.Set<PartnerPayment>().CountAsync(x => x.CashBoxId == c.Id, ct).ConfigureAwait(false));
+        await AddModuleUsesAsync(uses, c.Id, null, ct).ConfigureAwait(false);
         Add(uses, "ApArPayments", await db.Set<ApArPayment>().CountAsync(x => x.CashBoxId == c.Id, ct).ConfigureAwait(false));
-        if (uses.Count > 0) throw Fail.Rule(ErrorCodes.RecordInUse, DescribeDocuments(uses));
+        if (uses.Count > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, DescribeDocuments(uses));
         c.DeleteReason = why;
         db.Set<CashBox>().Remove(c);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -196,7 +190,7 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
     {
         var b = await FindAsync<BankAccount>(token, ct).ConfigureAwait(false);
         var account = await db.Set<Account>().AsNoTracking().SingleAsync(a => a.Id == b.AccountId, ct).ConfigureAwait(false);
-        if (active && account.Status != AccountingCodes.Active) throw Fail.Rule(ErrorCodes.RecordArchived, account.Code);
+        if (active && account.Status != AccountingCodes.Active) throw Fail.Rule(SharedErrorCodes.RecordArchived, account.Code);
         db.ExpectRowVersion(b, rowVersion);
         b.Status = active ? AccountingCodes.Active : AccountingCodes.Archived;
         changes.SetAction(b, active ? "Restore" : "Archive");
@@ -209,12 +203,9 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var why = Reason(reason);
         var b = await FindAsync<BankAccount>(token, ct).ConfigureAwait(false);
         var uses = new List<(string, int)>();
-        Add(uses, "Receipts", await db.Set<Receipt>().CountAsync(x => x.BankAccountId == b.Id, ct).ConfigureAwait(false));
-        Add(uses, "Advances", await db.Set<Advance>().CountAsync(x => x.BankAccountId == b.Id, ct).ConfigureAwait(false));
-        Add(uses, "Settlements", await db.Set<Settlement>().CountAsync(x => x.BankAccountId == b.Id, ct).ConfigureAwait(false));
-        Add(uses, "PartnerPayments", await db.Set<PartnerPayment>().CountAsync(x => x.BankAccountId == b.Id, ct).ConfigureAwait(false));
+        await AddModuleUsesAsync(uses, null, b.Id, ct).ConfigureAwait(false);
         Add(uses, "ApArPayments", await db.Set<ApArPayment>().CountAsync(x => x.BankAccountId == b.Id, ct).ConfigureAwait(false));
-        if (uses.Count > 0) throw Fail.Rule(ErrorCodes.RecordInUse, DescribeDocuments(uses));
+        if (uses.Count > 0) throw Fail.Rule(SharedErrorCodes.RecordInUse, DescribeDocuments(uses));
         b.DeleteReason = why;
         db.Set<BankAccount>().Remove(b);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -230,8 +221,8 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
         var iban = TextNormalizer.CleanCode(r.Iban)?.Replace(" ", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
         var currency = TextNormalizer.CleanCode(r.CurrencyCode)?.ToUpperInvariant()
             ?? await db.Set<Company>().AsNoTracking().Where(c => c.Id == ctx.CompanyId).Select(c => c.CurrencyCode).SingleAsync(ct).ConfigureAwait(false);
-        var ibanPattern = await db.Set<CompanySetting>().AsNoTracking().Where(s => s.SettingKey == SettingKeys.IbanPattern)
-            .Select(s => s.SettingValue).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? SettingKeys.JordanIbanPattern;
+        var ibanPattern = await db.Set<CompanySetting>().AsNoTracking().Where(s => s.SettingKey == PlatformSettingKeys.IbanPattern)
+            .Select(s => s.SettingValue).SingleOrDefaultAsync(ct).ConfigureAwait(false) ?? PlatformSettingKeys.JordanIbanPattern;
         new Validator()
             .Require("name", name).MaxLength("name", name, 100)
             .Require("bankName", bankName).MaxLength("bankName", bankName, 100)
@@ -266,15 +257,15 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
     /// <summary>A postable, active asset leaf account not linked to another cash box or bank account (DT-25).</summary>
     private async Task<Account> LinkableAccountAsync(string? token, long? exceptCashBoxId, long? exceptBankId, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(token)) throw Fail.Field("accountId", ErrorCodes.ValidationRequired, new FieldRef("accountId"));
+        if (string.IsNullOrEmpty(token)) throw Fail.Field("accountId", SharedErrorCodes.ValidationRequired, new FieldRef("accountId"));
         var account = await accounts.FindAsync(token, tracked: false, ct).ConfigureAwait(false);
         var hasChildren = await db.Set<Account>().AnyAsync(a => a.ParentId == account.Id, ct).ConfigureAwait(false);
         if (account.Status != AccountingCodes.Active || !account.IsPostable || hasChildren)
-            throw Fail.RuleOn("accountId", ErrorCodes.AccountNotPostable, account.Code);
-        if (account.AccountType != "Asset" || account.IsControlAccount) throw Fail.RuleOn("accountId", ErrorCodes.AccountNotAsset);
+            throw Fail.RuleOn("accountId", AccountingErrorCodes.AccountNotPostable, account.Code);
+        if (account.AccountType != "Asset" || account.IsControlAccount) throw Fail.RuleOn("accountId", AccountingErrorCodes.AccountNotAsset);
         var taken = await db.Set<CashBox>().AnyAsync(c => c.AccountId == account.Id && c.Id != exceptCashBoxId, ct).ConfigureAwait(false)
             || await db.Set<BankAccount>().AnyAsync(b => b.AccountId == account.Id && b.Id != exceptBankId, ct).ConfigureAwait(false);
-        if (taken) throw Fail.RuleOn("accountId", ErrorCodes.AccountLinkTaken, account.Code);
+        if (taken) throw Fail.RuleOn("accountId", AccountingErrorCodes.AccountLinkTaken, account.Code);
         return account;
     }
 
@@ -293,8 +284,15 @@ public sealed partial class CashBankService(IAppDbContext db, IUrlTokenService t
 
     private static string Reason(string? reason)
     {
-        var why = TextNormalizer.CleanText(reason) ?? throw Fail.Field("reason", ErrorCodes.ReasonRequired);
+        var why = TextNormalizer.CleanText(reason) ?? throw Fail.Field("reason", SharedErrorCodes.ReasonRequired);
         return why.Length <= 500 ? why : why[..500];
+    }
+
+    /// <summary>The other modules' documents that use the cash box or bank account (transport receipts, advances, settlements, partner payments).</summary>
+    private async Task AddModuleUsesAsync(List<(string, int)> uses, long? cashBoxId, long? bankAccountId, CancellationToken ct)
+    {
+        foreach (var source in moduleUses)
+            uses.AddRange((await source.UsesAsync(cashBoxId, bankAccountId, ct).ConfigureAwait(false)).Select(u => (u.Type, u.Count)));
     }
 
     private static void Add(List<(string, int)> uses, string type, int count)

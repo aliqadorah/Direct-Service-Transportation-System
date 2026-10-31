@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Modules;
 using DirectService.Accounting.Application.Books;
 using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Posting;
@@ -24,6 +25,12 @@ public static class DependencyInjection
         services.AddScoped<PeriodService>();
         services.AddScoped<OpeningBalanceService>();
         services.AddScoped<PostingKeyService>();
+
+        // Chart of accounts with its template and import, cost centres, cash boxes and bank accounts (Stage 3 session 6c).
+        services.AddScoped<ChartOfAccountsService>();
+        services.AddScoped<IChartOfAccountsSetup>(sp => sp.GetRequiredService<ChartOfAccountsService>());
+        services.AddScoped<ChartImportService>();
+        services.AddScoped<CashBankService>();
         return services;
     }
 

@@ -1,4 +1,5 @@
-namespace DirectService.Transportation.Application.Accounting;
+using DirectService.Accounting.Application.Posting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Built-in transport chart of accounts (FR-107), approved by the owner on 8 Oct 2026 as drafted in

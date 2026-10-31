@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Modules;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Common;
@@ -29,7 +30,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Every deletion is a soft deletion (records flagged, excluded everywhere, kept in the database); refused in closed periods and for
 /// entries linked to documents. A JSON backup of the accounting data is offered first (also logged).
 /// </summary>
-public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, INumberingService numbering, ChartOfAccountsService chart, AuditTrail audit,
+public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, INumberingService numbering, IChartOfAccountsSetup chart, AuditTrail audit,
     IUrlTokenService tokens, TimeProvider clock)
 {
     public const string WordAr = "حذف";

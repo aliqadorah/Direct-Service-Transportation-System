@@ -1,3 +1,4 @@
+using DirectService.Transportation.Application.Common;
 using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
@@ -22,7 +23,7 @@ namespace DirectService.Transportation.Application.Ledger;
 /// dates; balances are debit − credit unless a statement shows them the natural way for the account type. Lines carry links to their
 /// entry and source document (FR-121). A cost-centre filter may be <c>none</c>: lines without a cost centre (DT-267).
 /// </summary>
-public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport support, ChartOfAccountsService chart, PartyResolver parties, PostingSources sources,
+public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport support, IUrlTokenService tokens, PartyResolver parties, PostingSources sources,
     CashSupport cash, IRequestContext ctx)
 {
     public const int MaxPageSize = 1000;
@@ -172,7 +173,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var partyRef = party is null ? null : (await parties.DescribeAsync([(party.Type, (long?)party.Id)], ct).ConfigureAwait(false)).GetValueOrDefault((party.Type, party.Id));
         var d = totals?.D ?? 0;
         var c = totals?.C ?? 0;
-        return new LedgerReport(chart.Ref(account), account.AccountType, partyRef, await CostCentreRefAsync(costCentreId, ct).ConfigureAwait(false), from, to, opening, d, c,
+        return new LedgerReport(tokens.AccountRefOf(account), account.AccountType, partyRef, await CostCentreRefAsync(costCentreId, ct).ConfigureAwait(false), from, to, opening, d, c,
             opening + d - c, new PagedResult<LedgerLine>(items, page, size, totals?.N ?? 0));
     }
 
@@ -195,7 +196,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         return (r, balance) => new LedgerLine(r.Date, new EntryLinkRef(support.Token<JournalEntry>(r.EntryPid), r.Number), r.Description,
             r.SourceType is not null && r.SourceId is long sid && docs.TryGetValue((r.Module, r.SourceType, sid), out var doc) ? doc
                 : r.SourceType is null ? null : new SourceDocumentRef(r.Module, r.SourceType, null, null),
-            chart.Ref(tree[r.AccountId].Account),
+            tokens.AccountRefOf(tree[r.AccountId].Account),
             r.PartyType is not null && r.PartyId is long pid && partyNames.TryGetValue((r.PartyType, pid), out var p) ? p : null,
             r.CcPid is Guid g ? new Ref(support.Token<CostCentre>(g), r.CcCode + " " + r.CcName) : null, r.Note, r.Debit, r.Credit, balance, r.Reference);
     }
@@ -292,7 +293,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             }).ToList();
             var d = own.Sum(r => r.Debit);
             var c = own.Sum(r => r.Credit);
-            result.Add(new AccountStatementSection(chart.Ref(tree[id].Account), tree[id].Account.AccountType, opening, d, c, opening + d - c, items));
+            result.Add(new AccountStatementSection(tokens.AccountRefOf(tree[id].Account), tree[id].Account.AccountType, opening, d, c, opening + d - c, items));
         }
         var partyRef = party is null ? null : (await parties.DescribeAsync([(party.Type, (long?)party.Id)], ct).ConfigureAwait(false)).GetValueOrDefault((party.Type, party.Id));
         return new AccountStatementsReport(from, to, partyRef, await CostCentreRefAsync(costCentreId, ct).ConfigureAwait(false), result,
@@ -334,7 +335,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 var n = tree[kv.Key];
                 var open = kv.Value.OD - kv.Value.OC;
                 var close = open + kv.Value.MD - kv.Value.MC;
-                return new TrialBalanceRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, Math.Max(open, 0), Math.Max(-open, 0),
+                return new TrialBalanceRow(tokens.AccountRefOf(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, Math.Max(open, 0), Math.Max(-open, 0),
                     kv.Value.MD, kv.Value.MC, Math.Max(close, 0), Math.Max(-close, 0));
             })
             .Where(r => q.HideZero == false || r.OpeningDebit != 0 || r.OpeningCredit != 0 || r.MovementDebit != 0 || r.MovementCredit != 0)
@@ -370,7 +371,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         {
             var n = tree[id];
             var children = n.Children.Where(sums.ContainsKey).OrderBy(c => tree[c].Account.Code, StringComparer.Ordinal).ToList();
-            var parent = n.Account.ParentId is long p && sums.ContainsKey(p) ? chart.Ref(tree[p].Account).Id : null;
+            var parent = n.Account.ParentId is long p && sums.ContainsKey(p) ? tokens.AccountRefOf(tree[p].Account).Id : null;
             // A row of the chosen level holds its whole subtree (rows of the level never contain one another).
             if (levelById.TryGetValue(id, out var own))
             {
@@ -378,7 +379,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 return;
             }
             var s = sums[id];
-            output.Add(new TrialBalanceRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, s[0], s[1], s[2], s[3], s[4], s[5], parent, true));
+            output.Add(new TrialBalanceRow(tokens.AccountRefOf(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, s[0], s[1], s[2], s[3], s[4], s[5], parent, true));
             foreach (var c in children) Walk(c);
         }
         foreach (var root in sums.Keys.Where(id => tree[id].Account.ParentId is not long p || !sums.ContainsKey(p)).OrderBy(id => tree[id].Account.Code, StringComparer.Ordinal))
@@ -405,7 +406,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             }
             if (a != 0 || c != 0)
             {
-                into.Add(new StatementRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, a, compare is null ? null : c));
+                into.Add(new StatementRow(tokens.AccountRefOf(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, a, compare is null ? null : c));
                 into.AddRange(own);
             }
             return (a, c);
@@ -574,7 +575,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 var c = mine && withCompare ? Compare(id) : 0;
                 var member = mine;
                 var own = new List<ProfitLossRow>();
-                var token = chart.Ref(n.Account).Id;
+                var token = tokens.AccountRefOf(n.Account).Id;
                 foreach (var child in n.Children.OrderBy(ch => tree[ch].Account.Code, StringComparer.Ordinal))
                 {
                     var (ca, cc, cm) = Walk(child, token, own);
@@ -585,7 +586,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 // Kept when it has an amount or rows below it (amounts of sub-accounts may cancel out), or when zero rows are shown.
                 if (a.Any(v => v != 0) || c != 0 || own.Count > 0 || (!hideZero && member))
                 {
-                    into.Add(new ProfitLossRow(chart.Ref(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, parentToken, a, a.Sum(), withCompare ? c : null));
+                    into.Add(new ProfitLossRow(tokens.AccountRefOf(n.Account), n.Account.AccountType, n.Depth, n.Children.Count == 0, parentToken, a, a.Sum(), withCompare ? c : null));
                     into.AddRange(own);
                 }
                 return (a, c, member);
@@ -731,8 +732,8 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         var ids = boxes.Select(b => b.AccountId).Concat(banks.Select(b => b.AccountId)).ToList();
         var balances = await db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= date)
             .GroupBy(l => l.AccountId).Select(g => new { g.Key, B = g.Sum(l => l.Debit - l.Credit) }).ToDictionaryAsync(x => x.Key, x => x.B, ct).ConfigureAwait(false);
-        return boxes.Select(b => new CashBankBalance(cash.Account(b.PublicId, b.Name, null, null), chart.Ref(b.Account), b.Status, balances.GetValueOrDefault(b.AccountId)))
-            .Concat(banks.Select(b => new CashBankBalance(cash.Account(null, null, b.PublicId, b.Name), chart.Ref(b.Account), b.Status, balances.GetValueOrDefault(b.AccountId))))
+        return boxes.Select(b => new CashBankBalance(cash.Account(b.PublicId, b.Name, null, null), tokens.AccountRefOf(b.Account), b.Status, balances.GetValueOrDefault(b.AccountId)))
+            .Concat(banks.Select(b => new CashBankBalance(cash.Account(null, null, b.PublicId, b.Name), tokens.AccountRefOf(b.Account), b.Status, balances.GetValueOrDefault(b.AccountId))))
             .ToList();
     }
 
@@ -815,7 +816,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
                 .Select(x => new DocumentGapEntry(x.Entry.EntryDate, new EntryLinkRef(support.Token<JournalEntry>(x.Entry.PublicId), x.Entry.Number), x.Entry.Description,
                     x.Entry.IsManual ? AccountingCodes.SourceManual : AccountingCodes.SourceOpening, x.Line.B)).ToList();
             var documentDifference = ledger - documents;
-            result.Add(new ReconciliationRow(chart.Ref(a), a.ControlPartyType ?? string.Empty, ledger, partySum, ledger - partySum,
+            result.Add(new ReconciliationRow(tokens.AccountRefOf(a), a.ControlPartyType ?? string.Empty, ledger, partySum, ledger - partySum,
                 matched.Where(g => g.B != 0).Select(g => (g.PartyType, g.PartyId)).Distinct().Count(), unmatched, documents, documentDifference,
                 rebuilt is not null, manual, opening, documentDifference - manual - opening, gapList));
         }

@@ -229,3 +229,15 @@ public sealed record JournalExportBatchResponse(
     string Id, string BatchNo, string PeriodFrom, string PeriodTo, string Format, int EntryCount, decimal TotalDebit, decimal TotalCredit,
     string ExportedBy, DateTime ExportedAt);
 
+
+/// <summary>
+/// The code rule of accounts, cost centres and tax codes: 1–30 letters, digits, dot, dash or underscore (VARCHAR(30)); with the contracts since
+/// Stage 3 session 6c, so the services that check it need no accounting service.
+/// </summary>
+public static partial class AccountingCodeRule
+{
+    public static bool IsCode(string code) => CodePattern().IsMatch(code);
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z0-9._-]{1,30}$")]
+    private static partial System.Text.RegularExpressions.Regex CodePattern();
+}

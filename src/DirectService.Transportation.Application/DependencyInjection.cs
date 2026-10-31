@@ -53,11 +53,10 @@ public static class DependencyInjection
 
         // Accounting core (B2); the posting engine and the posting contract are registered by Accounting (AddAccountingApplication, session 4a).
         services.AddScoped<PostingSources>();
+        services.AddScoped<DirectService.Accounting.Contracts.Modules.IMoneyAccountUseSource, Cash.MoneyAccountUses>();   // cash box / bank delete check (Stage 3 session 6c)
         services.AddScoped<PendingPostingService>();
         services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleTrn));
         services.AddScoped<PartyResolver>();
-        services.AddScoped<ChartOfAccountsService>();
-        services.AddScoped<CashBankService>();
         services.AddScoped<JournalService>();
         services.AddScoped<JournalDraftService>();
         services.AddScoped<JournalTemplateService>();
@@ -67,7 +66,6 @@ public static class DependencyInjection
         services.AddScoped<Budgets.BudgetImportService>();
         services.AddScoped<Budgets.BudgetReportService>();
         services.AddScoped<JournalExportService>();
-        services.AddScoped<ChartImportService>();
         services.AddScoped<JournalImportService>();
 
         // Master data and field configuration (B3)
