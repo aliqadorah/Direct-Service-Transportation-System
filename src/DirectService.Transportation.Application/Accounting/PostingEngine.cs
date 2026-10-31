@@ -2,7 +2,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

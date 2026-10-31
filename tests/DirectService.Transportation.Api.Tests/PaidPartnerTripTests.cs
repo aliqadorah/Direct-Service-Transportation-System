@@ -6,7 +6,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

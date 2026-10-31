@@ -11,8 +11,8 @@ using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Acc;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 

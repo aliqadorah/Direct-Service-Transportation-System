@@ -6,7 +6,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 

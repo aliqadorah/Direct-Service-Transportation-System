@@ -6,7 +6,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Web.Workers;
 using DirectService.Transportation.Infrastructure.EInvoicing;
 using Microsoft.EntityFrameworkCore;

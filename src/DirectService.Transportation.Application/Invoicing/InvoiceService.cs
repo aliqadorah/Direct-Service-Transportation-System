@@ -10,7 +10,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -428,7 +428,7 @@ public sealed class InvoiceService(IAppDbContext db, IRequestContext ctx, Master
 
     internal IQueryable<Row> Rows(IQueryable<Invoice> q) => q.Select(i => new Row(i, i.Customer.PublicId, i.Customer.Name,
         i.ApprovedByUser != null ? i.ApprovedByUser.FullName : null,
-        i.JournalEntry != null ? i.JournalEntry.PublicId : null, i.JournalEntry != null ? i.JournalEntry.Number : null,
+        db.Set<JournalEntry>().Where(z => z.Id == i.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == i.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == i.Id && p.ResolvedAt == null),
         db.Set<EInvoiceSubmission>().Where(s => s.InvoiceId == i.Id).OrderByDescending(s => s.Id).Select(s => s.Status).FirstOrDefault(),
         db.Set<InvoiceLine>().Count(l => l.InvoiceId == i.Id)));

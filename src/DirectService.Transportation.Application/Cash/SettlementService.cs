@@ -7,7 +7,7 @@ using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -317,9 +317,9 @@ public sealed class SettlementService(IAppDbContext db, MasterDataSupport suppor
         string? EntryNumber, bool Pending, Guid? CarriedPid = null, string? CarriedNumber = null);
 
     internal IQueryable<Row> Rows(IQueryable<Settlement> q) => q.Select(s => new Row(s, s.Driver.PublicId, s.Driver.FullName,
-        s.CashBox != null ? s.CashBox.PublicId : null, s.CashBox != null ? s.CashBox.Name : null,
-        s.BankAccount != null ? s.BankAccount.PublicId : null, s.BankAccount != null ? s.BankAccount.Name : null,
-        s.JournalEntry != null ? s.JournalEntry.PublicId : null, s.JournalEntry != null ? s.JournalEntry.Number : null,
+        db.Set<CashBox>().Where(z => z.Id == s.CashBoxId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<CashBox>().Where(z => z.Id == s.CashBoxId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<BankAccount>().Where(z => z.Id == s.BankAccountId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<BankAccount>().Where(z => z.Id == s.BankAccountId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<JournalEntry>().Where(z => z.Id == s.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == s.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == s.Id && p.ResolvedAt == null),
         db.Set<Advance>().Where(a => a.CarriedFromSettlementId == s.Id).Select(a => (Guid?)a.PublicId).FirstOrDefault(),
         db.Set<Advance>().Where(a => a.CarriedFromSettlementId == s.Id).Select(a => a.Number).FirstOrDefault()));

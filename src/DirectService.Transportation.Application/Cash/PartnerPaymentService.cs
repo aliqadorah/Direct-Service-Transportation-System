@@ -7,7 +7,7 @@ using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -218,9 +218,9 @@ public sealed class PartnerPaymentService(IAppDbContext db, MasterDataSupport su
         string? EntryNumber, bool Pending);
 
     internal IQueryable<Row> Rows(IQueryable<PartnerPayment> q) => q.Select(p => new Row(p, p.Partner.PublicId, p.Partner.Name,
-        p.CashBox != null ? p.CashBox.PublicId : null, p.CashBox != null ? p.CashBox.Name : null,
-        p.BankAccount != null ? p.BankAccount.PublicId : null, p.BankAccount != null ? p.BankAccount.Name : null,
-        p.JournalEntry != null ? p.JournalEntry.PublicId : null, p.JournalEntry != null ? p.JournalEntry.Number : null,
+        db.Set<CashBox>().Where(z => z.Id == p.CashBoxId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<CashBox>().Where(z => z.Id == p.CashBoxId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<BankAccount>().Where(z => z.Id == p.BankAccountId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<BankAccount>().Where(z => z.Id == p.BankAccountId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<JournalEntry>().Where(z => z.Id == p.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == p.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(x => x.SourceModule == AccountingCodes.ModuleTrn && x.SourceType == SourceType && x.SourceId == p.Id && x.ResolvedAt == null)));
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<PartnerPayment, object?>>> SortFields =

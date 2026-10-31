@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Platform\DirectService.Platform.Infrastructure\DirectService.Platform.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Accounting\DirectService.Accounting.Infrastructure\DirectService.Accounting.Infrastructure.csproj" />
     <ProjectReference Include="..\..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -3,8 +3,8 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Acc;
+using DirectService.Accounting.Domain.Cfg;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.EInvoicing;

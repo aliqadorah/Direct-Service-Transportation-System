@@ -3,7 +3,7 @@ using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,7 +42,7 @@ public sealed class PreviousBalances(IAppDbContext db, MasterDataSupport support
         var lines = await PartyLines(db, partyType, upTo).Where(l => l.PartyId == partyId && l.JournalEntry.Status == AccountingCodes.Posted && l.JournalEntry.ReversesEntryId == null)
             .GroupBy(l => new { l.JournalEntryId, l.AccountId }).Select(g => new { g.Key.JournalEntryId, g.Key.AccountId, A = g.Sum(l => l.Credit - l.Debit) })
             .ToListAsync(ct).ConfigureAwait(false);
-        var settled = await Settled(partyType, partyId).Where(i => i.JournalEntry.EntryDate <= upTo)
+        var settled = await Settled(partyType, partyId).Where(i => db.Set<JournalEntry>().Any(j => j.Id == i.JournalEntryId && j.EntryDate <= upTo))
             .GroupBy(i => new { i.JournalEntryId, i.AccountId }).Select(g => new { g.Key.JournalEntryId, g.Key.AccountId, A = g.Sum(i => i.Amount) })
             .ToListAsync(ct).ConfigureAwait(false);
         return lines.Select(l => new Open(l.JournalEntryId, l.AccountId, l.A))

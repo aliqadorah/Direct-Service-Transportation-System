@@ -1,6 +1,6 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using DirectService.Shared.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

@@ -5,7 +5,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.MasterData;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,7 +34,9 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
     public async Task<PagedResult<CustomerResponse>> ListAsync(MasterListQuery q, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(q);
-        return await MasterDataSupport.PageAsync(MasterDataSupport.Sort(Filter(q), q.Sort, SortFields, "name"), q.Page, q.PageSize, ToResponse, ct).ConfigureAwait(false);
+        var page = await MasterDataSupport.PageAsync(MasterDataSupport.Sort(Filter(q), q.Sort, SortFields, "name"), q.Page, q.PageSize, c => c, ct).ConfigureAwait(false);
+        var parties = await PartiesAsync(page.Items, ct).ConfigureAwait(false);
+        return new PagedResult<CustomerResponse>(page.Items.Select(c => ToResponse(c, parties)).ToList(), page.Page, page.PageSize, page.TotalCount);
     }
 
     internal async Task<IReadOnlyList<Customer>> AllAsync(MasterListQuery q, CancellationToken ct) =>
@@ -42,7 +44,7 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
 
     private IQueryable<Customer> Filter(MasterListQuery q)
     {
-        var query = MasterDataSupport.WithStatus(db.Set<Customer>().AsNoTracking().Include(c => c.ApArParty), q.Status);
+        var query = MasterDataSupport.WithStatus(db.Set<Customer>().AsNoTracking(), q.Status);
         if (MasterDataSupport.SearchText(q.Q) is { } text)
         {
             var compact = MasterDataSupport.Compact(text) ?? text;
@@ -62,7 +64,7 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
     public async Task<CustomerProfile> ProfileAsync(string token, CancellationToken ct)
     {
         var c = await LoadAsync(token, ct).ConfigureAwait(false);
-        return new CustomerProfile(ToResponse(c), await ReferencesAsync(c.Id, ct).ConfigureAwait(false),
+        return new CustomerProfile(ToResponse(c, await PartiesAsync([c], ct).ConfigureAwait(false)), await ReferencesAsync(c.Id, ct).ConfigureAwait(false),
             await support.HistoryAsync(EntityType, c.Id, ct).ConfigureAwait(false));
     }
 
@@ -208,14 +210,26 @@ public sealed class CustomerService(IAppDbContext db, MasterDataSupport support,
     private async Task<Customer> LoadAsync(string token, CancellationToken ct)
     {
         var c = await support.FindAsync<Customer>(token, ct).ConfigureAwait(false);
-        return await db.Set<Customer>().AsNoTracking().Include(x => x.ApArParty).SingleAsync(x => x.Id == c.Id, ct).ConfigureAwait(false);
+        return await db.Set<Customer>().AsNoTracking().SingleAsync(x => x.Id == c.Id, ct).ConfigureAwait(false);
     }
 
-    private async Task<CustomerResponse> ResponseAsync(long id, CancellationToken ct) =>
-        ToResponse(await db.Set<Customer>().AsNoTracking().Include(x => x.ApArParty).SingleAsync(x => x.Id == id, ct).ConfigureAwait(false));
+    private async Task<CustomerResponse> ResponseAsync(long id, CancellationToken ct)
+    {
+        var c = await db.Set<Customer>().AsNoTracking().SingleAsync(x => x.Id == id, ct).ConfigureAwait(false);
+        return ToResponse(c, await PartiesAsync([c], ct).ConfigureAwait(false));
+    }
 
-    internal CustomerResponse ToResponse(Customer c) =>
+    /// <summary>The linked accounting parties of <paramref name="customers"/> by id (the customer holds only ApArPartyId, Stage 3 session 3).</summary>
+    private async Task<Dictionary<long, (Guid PublicId, string Name)>> PartiesAsync(IEnumerable<Customer> customers, CancellationToken ct)
+    {
+        var ids = customers.Where(c => c.ApArPartyId != null).Select(c => c.ApArPartyId!.Value).Distinct().ToList();
+        if (ids.Count == 0) return [];
+        return await db.Set<ApArParty>().AsNoTracking().Where(p => ids.Contains(p.Id)).Select(p => new { p.Id, p.PublicId, p.Name })
+            .ToDictionaryAsync(p => p.Id, p => (p.PublicId, p.Name), ct).ConfigureAwait(false);
+    }
+
+    private CustomerResponse ToResponse(Customer c, Dictionary<long, (Guid PublicId, string Name)> parties) =>
         new(support.Token<Customer>(c.PublicId), c.Name, c.TaxNumber, c.RegistrationNo, c.Phone, c.Email, c.Address, c.City, c.ContactPerson,
-            c.PaymentTermsDays, c.ApArParty is null ? null : new Ref(support.Token<ApArParty>(c.ApArParty.PublicId), c.ApArParty.Name),
+            c.PaymentTermsDays, c.ApArPartyId is { } party && parties.TryGetValue(party, out var p) ? new Ref(support.Token<ApArParty>(p.PublicId), p.Name) : null,
             c.Status, c.Notes, CustomFieldValues.Read(c.CustomValues), Convert.ToBase64String(c.RowVersion));
 }

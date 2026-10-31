@@ -1,11 +1,11 @@
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Audit;
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Acc;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Platform.Domain;
-using DirectService.Transportation.Domain.Core;
+using DirectService.Accounting.Domain.Core;
 using DirectService.Transportation.Domain.Trn;
 using DirectService.Shared.Infrastructure.Audit;
 using DirectService.Shared.Infrastructure.Configuration;

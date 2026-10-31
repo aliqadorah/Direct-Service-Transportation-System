@@ -145,20 +145,6 @@ internal sealed class PreviousBalanceItemConfiguration : IEntityTypeConfiguratio
             .IsRequired(false)
             .HasConstraintName("FK_TRN_PreviousBalanceItems_TRN_PartnerPayments_PartnerPaymentId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(true)
-            .HasConstraintName("FK_TRN_PreviousBalanceItems_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.Account)
-            .WithMany()
-            .HasForeignKey(e => e.AccountId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(true)
-            .HasConstraintName("FK_TRN_PreviousBalanceItems_Accounts_AccountId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(e => e.TenantId)

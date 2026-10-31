@@ -6,7 +6,7 @@ using DirectService.Platform.Application.Companies;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Web.Pipeline;
 
 namespace DirectService.Transportation.Web.Endpoints;

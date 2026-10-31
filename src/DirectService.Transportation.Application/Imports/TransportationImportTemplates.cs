@@ -4,7 +4,7 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Col = DirectService.SharedKernel.ImportTemplateColumn;
@@ -218,7 +218,7 @@ public sealed class TransportationImportTemplates(IAppDbContext db, IRequestCont
     private async Task<List<Col>> JournalAsync(DateOnly today, bool debitLine, CancellationToken ct)
     {
         var type = debitLine ? "Expense" : "Asset";
-        var code = await db.Set<Domain.Acc.Account>().AsNoTracking().Where(a => a.AccountType == type && a.IsPostable && !a.IsControlAccount && a.Status == "Active" && !a.Children.Any())
+        var code = await db.Set<DirectService.Accounting.Domain.Acc.Account>().AsNoTracking().Where(a => a.AccountType == type && a.IsPostable && !a.IsControlAccount && a.Status == "Active" && !a.Children.Any())
             .OrderBy(a => a.Code).Select(a => a.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? (debitLine ? "5101" : "1101");
         return Journal(today, debitLine, code);
     }

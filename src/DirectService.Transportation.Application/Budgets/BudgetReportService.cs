@@ -6,7 +6,7 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Budgets;

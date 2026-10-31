@@ -6,7 +6,7 @@ using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

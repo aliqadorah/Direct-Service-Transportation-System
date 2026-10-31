@@ -112,7 +112,6 @@ public class Trip : AuditableEntity, ITenantScoped, ICompanyScoped
     public Partner? Partner { get; set; }
     public Invoice? Invoice { get; set; }
     public Settlement? Settlement { get; set; }
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
     public ImportBatch? ImportBatch { get; set; }
     /// <summary>How much of a partner trip the partner's payments cover (view, DT-271); none for other trips and voided ones.</summary>

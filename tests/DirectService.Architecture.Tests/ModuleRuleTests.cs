@@ -9,7 +9,9 @@ namespace DirectService.Architecture.Tests;
 /// (a new module's projects are checked the moment they exist). The rules are written without exceptions; the only references outside them
 /// must be exactly the two decided ones: Shared.UI → Platform.Contracts (owner decision DT-367) and a module Domain → Platform.Domain for the
 /// anchor types (E-1, K-09; what the module may use of it is checked by <see cref="LayerRuleTests"/>). The general rule of the start guide —
-/// everyone may use Shared (of its own layer) and Platform.Contracts — is part of the table, not an exception.
+/// everyone may use Shared (of its own layer) and Platform.Contracts — is part of the table, not an exception. One temporary reference besides
+/// them (Stage 3 session 3, DT-391, gone by session 16): Transportation.Application → Accounting.Domain, the accounting entities the transport
+/// code still uses, each named by <see cref="LayerRuleTests"/> (StillUsedOfAccountingDomain).
 /// </summary>
 public sealed class ModuleRuleTests
 {
@@ -20,6 +22,7 @@ public sealed class ModuleRuleTests
     private const string SharedUi = "DirectService.Shared.UI";
     private const string PlatformContracts = "DirectService.Platform.Contracts";
     private const string PlatformDomain = "DirectService.Platform.Domain";
+    private const string AccountingDomain = "DirectService.Accounting.Domain";
 
     private static readonly string[] Layers = ["Domain", "Contracts", "Application", "Infrastructure", "UI"];
 
@@ -88,11 +91,16 @@ public sealed class ModuleRuleTests
         project == SharedUi && reference == PlatformContracts
         || reference == PlatformDomain && KindOf(project) is { Layer: "Domain", IsModule: true };
 
+    /// <summary>TEMPORARY (Stage 3 session 3, DT-391): the transport code still uses accounting entities until session 16.</summary>
+    private static bool IsTemporaryAccountingDomainReference(string project, string reference) =>
+        project == "DirectService.Transportation.Application" && reference == AccountingDomain;
+
     [Fact]
     public void Every_project_reference_follows_design_a2_except_DT367_and_E1()
     {
         var outside = Projects.SelectMany(p => p.Value.Where(r => !Allowed(p.Key, r.Name)).Select(r => (Project: p.Key, Reference: r.Name))).ToList();
-        var undecided = outside.Where(x => !IsDecidedException(x.Project, x.Reference)).Select(x => $"{x.Project} → {x.Reference}").ToList();
+        var undecided = outside.Where(x => !IsDecidedException(x.Project, x.Reference) && !IsTemporaryAccountingDomainReference(x.Project, x.Reference))
+            .Select(x => $"{x.Project} → {x.Reference}").ToList();
         Assert.True(undecided.Count == 0, "References outside design a.2: " + string.Join("; ", undecided));
         // Both exceptions are in use today (the test would otherwise not notice that one silently became a different reference).
         Assert.Contains((SharedUi, PlatformContracts), outside);
@@ -120,7 +128,9 @@ public sealed class ModuleRuleTests
         foreach (var project in Projects.Keys.Where(p => KindOf(p).IsModule))
         {
             var owner = KindOf(project).Owner;
-            var foreign = Reach(project).Where(r => r != project && KindOf(r) is { IsModule: true } k && k.Owner != owner && k.Layer != "Contracts").ToList();
+            var foreign = Reach(project).Where(r => r != project && KindOf(r) is { IsModule: true } k && k.Owner != owner && k.Layer != "Contracts")
+                .Where(r => !(owner == "Transportation" && r == AccountingDomain && Reach(project).Contains("DirectService.Transportation.Application")))   // DT-391, temporary
+                .ToList();
             Assert.True(foreign.Count == 0, $"{project} reaches another module's {string.Join(", ", foreign)}");
         }
     }

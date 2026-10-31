@@ -9,7 +9,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -143,7 +143,7 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
     }
 
     /// <summary>Reverses the posted entry of a cash document, or closes its waiting pending posting (shared by the cash services).</summary>
-    internal async Task ReverseAsync(Domain.Common.ICashDocument d, string description, CancellationToken ct) =>
+    internal async Task ReverseAsync(ICashDocument d, string description, CancellationToken ct) =>
         await CashPosting.ReverseAsync(db, posting, d, SourceType, description, ct).ConfigureAwait(false);
 
     /// <summary>The invoice numbers of a receipt for its entry text: up to three, then "…".</summary>
@@ -170,9 +170,9 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
 
     private IQueryable<Row> Rows(IQueryable<Receipt> q) => q.Select(r => new Row(r, r.Customer.PublicId, r.Customer.Name,
         r.Invoice != null ? r.Invoice.PublicId : null, r.Invoice != null ? r.Invoice.Number : null,
-        r.CashBox != null ? r.CashBox.PublicId : null, r.CashBox != null ? r.CashBox.Name : null,
-        r.BankAccount != null ? r.BankAccount.PublicId : null, r.BankAccount != null ? r.BankAccount.Name : null,
-        r.JournalEntry != null ? r.JournalEntry.PublicId : null, r.JournalEntry != null ? r.JournalEntry.Number : null,
+        db.Set<CashBox>().Where(z => z.Id == r.CashBoxId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<CashBox>().Where(z => z.Id == r.CashBoxId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<BankAccount>().Where(z => z.Id == r.BankAccountId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<BankAccount>().Where(z => z.Id == r.BankAccountId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<JournalEntry>().Where(z => z.Id == r.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == r.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == r.Id && p.ResolvedAt == null)));
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<Receipt, object?>>> SortFields = new Dictionary<string, Expression<Func<Receipt, object?>>>(StringComparer.Ordinal)
@@ -197,12 +197,12 @@ public sealed class ReceiptService(IAppDbContext db, MasterDataSupport support, 
         if (!string.IsNullOrWhiteSpace(q.CashBox))
         {
             var g = support.Decode<CashBox>(q.CashBox) ?? throw Fail.Field("cashBox", ErrorCodes.ValidationFormat, new FieldRef("cashBox"));
-            query = query.Where(r => r.CashBox != null && r.CashBox.PublicId == g);
+            query = query.Where(r => db.Set<CashBox>().Any(z => z.Id == r.CashBoxId && z.PublicId == g));
         }
         if (!string.IsNullOrWhiteSpace(q.BankAccount))
         {
             var g = support.Decode<BankAccount>(q.BankAccount) ?? throw Fail.Field("bankAccount", ErrorCodes.ValidationFormat, new FieldRef("bankAccount"));
-            query = query.Where(r => r.BankAccount != null && r.BankAccount.PublicId == g);
+            query = query.Where(r => db.Set<BankAccount>().Any(z => z.Id == r.BankAccountId && z.PublicId == g));
         }
         query = (q.Applied?.Trim().ToLowerInvariant()) switch
         {
@@ -299,7 +299,7 @@ public sealed class ReceiptPostingHandler(IAppDbContext db, IUrlTokenService tok
 /// <summary>Reversal of cash documents on void or edit (BR-035): the posted entry is reversed; a waiting pending posting is closed.</summary>
 internal static class CashPosting
 {
-    public static async Task ReverseAsync(IAppDbContext db, PostingEngine posting, Domain.Common.ICashDocument d, string sourceType, string description, CancellationToken ct,
+    public static async Task ReverseAsync(IAppDbContext db, PostingEngine posting, ICashDocument d, string sourceType, string description, CancellationToken ct,
         string module = AccountingCodes.ModuleTrn)
     {
         if (d.JournalEntryId is long entryId)

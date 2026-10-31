@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Application.Reports;

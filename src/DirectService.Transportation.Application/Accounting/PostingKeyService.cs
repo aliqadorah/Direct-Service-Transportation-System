@@ -1,7 +1,7 @@
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Accounting;

@@ -460,13 +460,6 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
             .IsRequired(false)
             .HasConstraintName("FK_TRN_Trips_TRN_Settlements_SettlementId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Trips_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

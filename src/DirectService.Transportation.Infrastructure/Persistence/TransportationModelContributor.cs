@@ -3,8 +3,8 @@ using Microsoft.EntityFrameworkCore;
 namespace DirectService.Transportation.Infrastructure.Persistence;
 
 /// <summary>
-/// This assembly's part of the composed <see cref="MasterDbContext"/> (platform design d): every entity configuration under
-/// Configurations (acc / trn, cfg.EInvoiceSettings and core.MaintenanceLogs, until they move to their modules) and the SQL functions of the
+/// This assembly's part of the composed <see cref="MasterDbContext"/> (platform design d): every trn entity configuration under
+/// Configurations, the foreign keys to acc tables by entity name (<see cref="CrossModuleRelationships"/>, Stage 3 session 3) and the SQL functions of the
 /// reports. Its permission rows are seeded by the Platform contributor from <see cref="Seed.ReferenceDataSeed"/> (Stage 2 session 11).
 /// </summary>
 public sealed class TransportationModelContributor : IModelContributor
@@ -13,6 +13,7 @@ public sealed class TransportationModelContributor : IModelContributor
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TransportationModelContributor).Assembly);
+        CrossModuleRelationships.Apply(modelBuilder);
         MapJsonFunctions(modelBuilder);
     }
 

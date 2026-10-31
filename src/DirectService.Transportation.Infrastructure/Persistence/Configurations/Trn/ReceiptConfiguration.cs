@@ -224,27 +224,6 @@ internal sealed class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
             .IsRequired(false)
             .HasConstraintName("FK_TRN_Receipts_TRN_Invoices_InvoiceId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.CashBox)
-            .WithMany()
-            .HasForeignKey(e => e.CashBoxId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Receipts_CashBoxes_CashBoxId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.BankAccount)
-            .WithMany()
-            .HasForeignKey(e => e.BankAccountId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Receipts_BankAccounts_BankAccountId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Receipts_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

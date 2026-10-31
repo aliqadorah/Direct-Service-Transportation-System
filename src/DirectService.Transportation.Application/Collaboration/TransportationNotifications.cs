@@ -4,7 +4,7 @@ using DirectService.Platform.Contracts.Modules;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Contracts.EInvoicing;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 

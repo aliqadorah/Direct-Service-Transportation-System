@@ -213,13 +213,6 @@ internal sealed class CreditNoteConfiguration : IEntityTypeConfiguration<CreditN
             .IsRequired(true)
             .HasConstraintName("FK_TRN_CreditNotes_TRN_Customers_CustomerId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_CreditNotes_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

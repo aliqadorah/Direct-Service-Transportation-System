@@ -65,7 +65,6 @@ public class Invoice : AuditableEntity, ITenantScoped, ICompanyScoped
     public DateTime? VoidedAt { get; set; }
     public Customer Customer { get; set; } = null!;
     public User? ApprovedByUser { get; set; }
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
 }

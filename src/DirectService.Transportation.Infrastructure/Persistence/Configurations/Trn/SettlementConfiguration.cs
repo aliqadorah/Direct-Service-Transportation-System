@@ -243,27 +243,6 @@ internal sealed class SettlementConfiguration : IEntityTypeConfiguration<Settlem
             .IsRequired(true)
             .HasConstraintName("FK_TRN_Settlements_TRN_Drivers_DriverId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.CashBox)
-            .WithMany()
-            .HasForeignKey(e => e.CashBoxId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Settlements_CashBoxes_CashBoxId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.BankAccount)
-            .WithMany()
-            .HasForeignKey(e => e.BankAccountId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Settlements_BankAccounts_BankAccountId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Settlements_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

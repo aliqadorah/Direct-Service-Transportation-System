@@ -12,6 +12,9 @@
     <ProjectReference Include="..\Platform\DirectService.Platform.Contracts\DirectService.Platform.Contracts.csproj" />
     <!-- Another module's Contracts (design a.2): the accounting posting contract (Stage 3 session 2). -->
     <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Contracts\DirectService.Accounting.Contracts.csproj" />
+    <!-- TEMPORARY (Stage 3 session 3, DT-391): the accounting entities, until the transport code reaches them only through the Accounting
+         contracts (Stage 3 session 16). Pinned by LayerRuleTests.StillUsedOfAccountingDomain, which may only shrink. -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Domain\DirectService.Accounting.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />

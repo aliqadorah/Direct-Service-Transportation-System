@@ -9,7 +9,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;

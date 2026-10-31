@@ -30,8 +30,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Acc = DirectService.Transportation.Domain.Acc;
-using Cfg = DirectService.Transportation.Domain.Cfg;
+using Acc = DirectService.Accounting.Domain.Acc;
+using Cfg = DirectService.Accounting.Domain.Cfg;
 using PlatformDomain = DirectService.Platform.Domain;
 using Trn = DirectService.Transportation.Domain.Trn;
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 
 namespace DirectService.Transportation.Application.Tests;

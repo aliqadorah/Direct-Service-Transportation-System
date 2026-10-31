@@ -49,10 +49,7 @@ public class Advance : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocu
     /// <summary>UTC time the record was voided.</summary>
     public DateTime? VoidedAt { get; set; }
     public Driver Driver { get; set; } = null!;
-    public CashBox? CashBox { get; set; }
-    public BankAccount? BankAccount { get; set; }
     public Settlement? Settlement { get; set; }
     public Settlement? CarriedFromSettlement { get; set; }
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
 }

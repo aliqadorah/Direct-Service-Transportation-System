@@ -217,20 +217,6 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
             .IsRequired(true)
             .HasConstraintName("FK_TRN_Advances_TRN_Drivers_DriverId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.CashBox)
-            .WithMany()
-            .HasForeignKey(e => e.CashBoxId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Advances_CashBoxes_CashBoxId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.BankAccount)
-            .WithMany()
-            .HasForeignKey(e => e.BankAccountId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Advances_BankAccounts_BankAccountId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.CarriedFromSettlement)
             .WithMany()
             .HasForeignKey(e => e.CarriedFromSettlementId)
@@ -244,13 +230,6 @@ internal sealed class AdvanceConfiguration : IEntityTypeConfiguration<Advance>
             .HasPrincipalKey(p => p.Id)
             .IsRequired(false)
             .HasConstraintName("FK_TRN_Advances_TRN_Settlements_SettlementId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Advances_JournalEntries_JournalEntryId")
             .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()

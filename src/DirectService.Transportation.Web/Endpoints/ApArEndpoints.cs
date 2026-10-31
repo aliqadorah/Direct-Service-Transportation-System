@@ -77,7 +77,7 @@ internal static class ApArEndpoints
             File(await svc.ReturnAsync(@return, format, ct).ConfigureAwait(false))).RequireAnyPermission(read);
         ret.MapGet("/{return}/e-invoice", async (string @return, ApArReturnService returns, EInvoiceService svc, Application.MasterData.MasterDataSupport support, CancellationToken ct) =>
         {
-            var x = await support.FindAsync<Domain.Acc.ApArReturn>(@return, ct).ConfigureAwait(false);
+            var x = await support.FindAsync<DirectService.Accounting.Domain.Acc.ApArReturn>(@return, ct).ConfigureAwait(false);
             return TypedResults.Ok(await svc.ForApArAsync(null, x.Id, ct).ConfigureAwait(false));
         }).RequireAnyPermission(read);
         ret.MapPost("/", async (ApArReturnRequest req, ApArReturnService svc, CancellationToken ct) =>

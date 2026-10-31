@@ -45,7 +45,6 @@ public class CreditNote : AuditableEntity, ITenantScoped, ICompanyScoped
     public DateTime? VoidedAt { get; set; }
     public Invoice Invoice { get; set; } = null!;
     public Customer Customer { get; set; } = null!;
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
     public ICollection<CreditNoteLine> Lines { get; set; } = new List<CreditNoteLine>();
 }

@@ -8,7 +8,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Ledger;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.Ledger;
@@ -762,7 +762,7 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
             .ToListAsync(ct).ConfigureAwait(false);
         // DT-276 / DT-277: what settlements and partner payments settled of those lines — their entries clear it on the same account (owed to the
         // party → debit), so a settled manual / opening amount is no longer a documents difference.
-        var settledLines = await db.Set<Domain.Trn.PreviousBalanceItem>().AsNoTracking().Where(i => ids.Contains(i.AccountId) && i.JournalEntry.EntryDate <= asOf
+        var settledLines = await db.Set<Domain.Trn.PreviousBalanceItem>().AsNoTracking().Where(i => ids.Contains(i.AccountId) && db.Set<JournalEntry>().Any(j => j.Id == i.JournalEntryId && j.EntryDate <= asOf)
                 && ((i.Settlement != null && i.Settlement.Status == "Active" && i.Settlement.SettlementDate <= asOf)
                     || (i.PartnerPayment != null && i.PartnerPayment.Status == "Active" && i.PartnerPayment.PaymentDate <= asOf)))
             .GroupBy(i => new { i.AccountId, i.JournalEntryId }).Select(g => new GapLine(g.Key.AccountId, g.Key.JournalEntryId, g.Sum(i => i.Amount)))

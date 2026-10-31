@@ -10,7 +10,7 @@ using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 

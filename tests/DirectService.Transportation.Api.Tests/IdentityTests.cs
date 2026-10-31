@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using DirectService.Platform.Contracts.Identity;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;

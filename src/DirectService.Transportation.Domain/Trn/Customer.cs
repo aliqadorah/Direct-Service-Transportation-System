@@ -39,5 +39,4 @@ public class Customer : AuditableEntity, ITenantScoped, ICompanyScoped, IArchiva
     public string? Notes { get; set; }
     /// <summary>Values of admin-defined custom fields, as a JSON object keyed by FieldKey (definitions in cfg.CustomFieldDefinitions).</summary>
     public string? CustomValues { get; set; }
-    public ApArParty? ApArParty { get; set; }
 }

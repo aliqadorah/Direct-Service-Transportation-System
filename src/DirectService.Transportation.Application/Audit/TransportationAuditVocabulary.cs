@@ -4,7 +4,7 @@ using DirectService.Shared.Contracts;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using static DirectService.SharedKernel.AuditWords;
 using static DirectService.Transportation.Application.Audit.AuditVocabulary;
 

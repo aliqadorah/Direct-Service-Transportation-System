@@ -28,6 +28,4 @@ public class PreviousBalanceItem : AuditableEntity, ITenantScoped, ICompanyScope
     public decimal Amount { get; set; }
     public Settlement? Settlement { get; set; }
     public PartnerPayment? PartnerPayment { get; set; }
-    public JournalEntry JournalEntry { get; set; } = null!;
-    public Account Account { get; set; } = null!;
 }

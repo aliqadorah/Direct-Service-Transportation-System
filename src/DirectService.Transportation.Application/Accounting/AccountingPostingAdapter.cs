@@ -1,5 +1,5 @@
 using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Contract = DirectService.Accounting.Contracts.Posting;

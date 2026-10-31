@@ -10,7 +10,7 @@ using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DirectService.Transportation.Application.ApAr;

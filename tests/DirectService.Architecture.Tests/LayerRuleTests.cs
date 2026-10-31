@@ -121,6 +121,7 @@ public sealed class LayerRuleTests
         // A module's Domain may also reference Platform.Domain, for the anchor types only (exception E-1, checked below).
         var domains = Projects.Keys.Where(p => p.EndsWith(".Domain", StringComparison.Ordinal)).ToList();
         Assert.Contains("DirectService.Transportation.Domain", domains);
+        Assert.Contains(AccountingDomain, domains);
         Assert.Contains(PlatformDomain, domains);
         foreach (var p in domains)
             Only(p, r => r == Kernel || (r == PlatformDomain && p != PlatformDomain), "a Domain project references SharedKernel only (a module's also Platform.Domain, E-1)");
@@ -128,12 +129,16 @@ public sealed class LayerRuleTests
         var compiled = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
             .Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
         Assert.True(compiled.All(n => n is Kernel or PlatformDomain), "The compiled Transportation domain references " + string.Join(", ", compiled));
+        compiled = typeof(DirectService.Accounting.Domain.Acc.JournalEntry).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
+            .Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
+        Assert.True(compiled.All(n => n is Kernel or PlatformDomain), "The compiled Accounting domain references " + string.Join(", ", compiled));
         compiled = typeof(DirectService.Platform.Domain.User).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
             .Where(n => n.StartsWith("DirectService.", StringComparison.Ordinal)).ToList();
         Assert.True(compiled.All(n => n == Kernel), "The compiled Platform domain references " + string.Join(", ", compiled));
     }
 
     private const string PlatformDomain = "DirectService.Platform.Domain";
+    private const string AccountingDomain = "DirectService.Accounting.Domain";
 
     /// <summary>The Platform types a module may use: the anchors of exception E-1 (K-09), for foreign-key mapping only.</summary>
     private static readonly string[] Anchors = ["Tenant", "Company", "User"];
@@ -177,13 +182,65 @@ public sealed class LayerRuleTests
         // Contracts (the accounting posting contract since Stage 3 session 2).
         Only("DirectService.Transportation.Application",
             r => r is "DirectService.Transportation.Domain" or "DirectService.Transportation.Contracts" or "DirectService.Platform.Contracts" or Kernel
-                or "DirectService.Accounting.Contracts",
+                or "DirectService.Accounting.Contracts"
+                or AccountingDomain,   // TEMPORARY (Stage 3 session 3, DT-391): pinned by StillUsedOfAccountingDomain below
             "a module's Application references its own Domain and Contracts, SharedKernel, Platform.Contracts and other modules' Contracts");
         // The compiled assembly too (a reference could also come in through another project).
         var platform = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name!)
             .Where(n => n.StartsWith("DirectService.Platform.", StringComparison.Ordinal) && n is not PlatformDomain and not "DirectService.Platform.Contracts").ToList();
         Assert.True(platform.Count == 0, "The compiled Transportation.Application references " + string.Join(", ", platform));
     }
+
+    [Fact]
+    public void Transportation_uses_only_the_pinned_accounting_entities_DT391()
+    {
+        // TEMPORARY (Stage 3 session 3, DT-391): Transportation.Application references Accounting.Domain until the transport code reaches
+        // accounting only through Accounting.Contracts (Stage 3 session 16). The transport entities hold ids only (no accounting type), and the
+        // module and the host may use exactly the accounting types listed: a new use fails, and so does a listed type no longer used, so the
+        // list can only shrink.
+        var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
+        Assert.Empty(TypesUsedBy(domain, AccountingDomain));
+        var used = new[]
+            {
+                typeof(DirectService.Transportation.Application.DependencyInjection).Assembly,
+                typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly,
+                typeof(DirectService.Transportation.Web.Security.AuthSchemes).Assembly,
+            }
+            .SelectMany(a => TypesUsedBy(a, AccountingDomain)).Distinct().Order(StringComparer.Ordinal).ToList();
+        var more = used.Except(StillUsedOfAccountingDomain, StringComparer.Ordinal).ToList();
+        Assert.True(more.Count == 0, "The transport code uses more of Accounting.Domain (DT-391): " + string.Join(", ", more));
+        var gone = StillUsedOfAccountingDomain.Except(used, StringComparer.Ordinal).ToList();
+        Assert.True(gone.Count == 0, "No longer used, remove from StillUsedOfAccountingDomain: " + string.Join(", ", gone));
+    }
+
+    /// <summary>The Accounting.Domain types the transport module and the host still use (DT-391, end of Stage 3 session 3); remove entries as they go.</summary>
+    private static readonly string[] StillUsedOfAccountingDomain =
+    [
+        // all 23 at the start: the accounting services, endpoints and workers are still in the transport projects (sessions 4-15)
+        "DirectService.Accounting.Domain.Acc.Account",
+        "DirectService.Accounting.Domain.Acc.ApArDocument",
+        "DirectService.Accounting.Domain.Acc.ApArDocumentLine",
+        "DirectService.Accounting.Domain.Acc.ApArEInvoiceSubmission",
+        "DirectService.Accounting.Domain.Acc.ApArParty",
+        "DirectService.Accounting.Domain.Acc.ApArPayment",
+        "DirectService.Accounting.Domain.Acc.ApArReturn",
+        "DirectService.Accounting.Domain.Acc.BankAccount",
+        "DirectService.Accounting.Domain.Acc.Budget",
+        "DirectService.Accounting.Domain.Acc.BudgetLine",
+        "DirectService.Accounting.Domain.Acc.CashBox",
+        "DirectService.Accounting.Domain.Acc.CostCentre",
+        "DirectService.Accounting.Domain.Acc.EntryLine",
+        "DirectService.Accounting.Domain.Acc.JournalDraft",
+        "DirectService.Accounting.Domain.Acc.JournalEntry",
+        "DirectService.Accounting.Domain.Acc.JournalExportBatch",
+        "DirectService.Accounting.Domain.Acc.JournalTemplate",
+        "DirectService.Accounting.Domain.Acc.PendingPosting",
+        "DirectService.Accounting.Domain.Acc.Period",
+        "DirectService.Accounting.Domain.Acc.PostingKeyMapping",
+        "DirectService.Accounting.Domain.Acc.TaxCode",
+        "DirectService.Accounting.Domain.Cfg.EInvoiceSettings",
+        "DirectService.Accounting.Domain.Core.MaintenanceLog",
+    ];
 
     [Fact]
     public void Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1()
@@ -194,7 +251,9 @@ public sealed class LayerRuleTests
         var domain = typeof(DirectService.Transportation.Domain.Trn.Trip).Assembly;
         var application = typeof(DirectService.Transportation.Application.DependencyInjection).Assembly;
         var infrastructure = typeof(DirectService.Transportation.Infrastructure.Persistence.TransportationModelContributor).Assembly;
-        foreach (var assembly in new[] { domain, application, infrastructure })
+        var accountingDomain = typeof(DirectService.Accounting.Domain.Acc.JournalEntry).Assembly;
+        var accountingInfrastructure = typeof(DirectService.Accounting.Infrastructure.Persistence.AccountingModelContributor).Assembly;
+        foreach (var assembly in new[] { domain, application, infrastructure, accountingDomain, accountingInfrastructure })
         {
             var used = PlatformTypesUsedBy(assembly);
             Assert.NotEmpty(used);   // the reader works: the User navigations and their mapping
@@ -208,7 +267,7 @@ public sealed class LayerRuleTests
 
         // In a module's Domain an anchor appears only as a navigation property of an entity, mapped to a foreign key in the model.
         var model = Golden.Model;
-        foreach (var type in domain.GetTypes())
+        foreach (var type in domain.GetTypes().Concat(accountingDomain.GetTypes()))
         {
             foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
                 .Where(p => p.PropertyType.Assembly.GetName().Name == PlatformDomain))

@@ -8,7 +8,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Platform;
 using DirectService.Platform.Contracts.Tenants;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

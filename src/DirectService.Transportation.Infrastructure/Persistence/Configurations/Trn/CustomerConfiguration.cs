@@ -195,13 +195,6 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .HasFilter("[IsDeleted] = 0 AND [Status] = 'Active'");
         builder.HasIndex(new[] { "ApArPartyId" }, "IX_TRN_Customers_ApArPartyId");
 
-        builder.HasOne(e => e.ApArParty)
-            .WithMany()
-            .HasForeignKey(e => e.ApArPartyId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Customers_ApArParties_ApArPartyId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(e => e.TenantId)

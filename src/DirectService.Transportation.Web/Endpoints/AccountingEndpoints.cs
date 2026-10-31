@@ -48,7 +48,7 @@ internal static class AccountingEndpoints
             TypedResults.Ok(await svc.GetAsync(account, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{account}/history", async (string account, Application.MasterData.MasterDataSupport support, CancellationToken ct) =>
         {
-            var a = await support.FindAsync<Domain.Acc.Account>(account, ct).ConfigureAwait(false);
+            var a = await support.FindAsync<DirectService.Accounting.Domain.Acc.Account>(account, ct).ConfigureAwait(false);
             return TypedResults.Ok(await support.HistoryAsync("ACC.Account", a.Id, ct).ConfigureAwait(false));
         }).RequirePermission(PermissionKeys.AcctView);
         g.MapPost("/", async (AccountRequest r, ChartOfAccountsService svc, CancellationToken ct) =>
@@ -179,7 +179,7 @@ internal static class AccountingEndpoints
             TypedResults.Ok(await svc.GetAsync(entry, automaticOnly: false, ct).ConfigureAwait(false))).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}/history", async (string entry, Application.MasterData.MasterDataSupport support, CancellationToken ct) =>
         {
-            var e = await support.FindAsync<Domain.Acc.JournalEntry>(entry, ct).ConfigureAwait(false);
+            var e = await support.FindAsync<DirectService.Accounting.Domain.Acc.JournalEntry>(entry, ct).ConfigureAwait(false);
             return TypedResults.Ok(await support.HistoryAsync(JournalService.EntityType, e.Id, ct).ConfigureAwait(false));
         }).RequirePermission(PermissionKeys.AcctView);
         g.MapGet("/{entry}/voucher", async (string entry, JournalService svc, CancellationToken ct) =>

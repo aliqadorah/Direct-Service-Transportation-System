@@ -1,5 +1,5 @@
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Acc;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 

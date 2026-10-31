@@ -230,27 +230,6 @@ internal sealed class PartnerPaymentConfiguration : IEntityTypeConfiguration<Par
             .IsRequired(true)
             .HasConstraintName("FK_TRN_PartnerPayments_TRN_Partners_PartnerId")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.CashBox)
-            .WithMany()
-            .HasForeignKey(e => e.CashBoxId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_PartnerPayments_CashBoxes_CashBoxId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.BankAccount)
-            .WithMany()
-            .HasForeignKey(e => e.BankAccountId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_PartnerPayments_BankAccounts_BankAccountId")
-            .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_PartnerPayments_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

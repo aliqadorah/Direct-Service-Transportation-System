@@ -7,7 +7,7 @@ using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -177,9 +177,9 @@ public sealed class AdvanceService(IAppDbContext db, MasterDataSupport support, 
 
     private IQueryable<Row> Rows(IQueryable<Advance> q) => q.Select(a => new Row(a, a.Driver.PublicId, a.Driver.FullName,
         a.Settlement != null ? a.Settlement.PublicId : null, a.Settlement != null ? a.Settlement.Number : null,
-        a.CashBox != null ? a.CashBox.PublicId : null, a.CashBox != null ? a.CashBox.Name : null,
-        a.BankAccount != null ? a.BankAccount.PublicId : null, a.BankAccount != null ? a.BankAccount.Name : null,
-        a.JournalEntry != null ? a.JournalEntry.PublicId : null, a.JournalEntry != null ? a.JournalEntry.Number : null,
+        db.Set<CashBox>().Where(z => z.Id == a.CashBoxId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<CashBox>().Where(z => z.Id == a.CashBoxId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<BankAccount>().Where(z => z.Id == a.BankAccountId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<BankAccount>().Where(z => z.Id == a.BankAccountId).Select(z => z.Name).FirstOrDefault(),
+        db.Set<JournalEntry>().Where(z => z.Id == a.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == a.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == a.Id && p.ResolvedAt == null),
         a.CarriedFromSettlement != null ? a.CarriedFromSettlement.PublicId : null, a.CarriedFromSettlement != null ? a.CarriedFromSettlement.Number : null));
 

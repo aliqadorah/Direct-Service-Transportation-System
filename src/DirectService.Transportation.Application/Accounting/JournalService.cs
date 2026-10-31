@@ -4,7 +4,7 @@ using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 

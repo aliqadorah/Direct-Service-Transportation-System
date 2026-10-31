@@ -58,8 +58,5 @@ public class PartnerPayment : AuditableEntity, ITenantScoped, ICompanyScoped, IC
     /// <summary>UTC time the record was voided.</summary>
     public DateTime? VoidedAt { get; set; }
     public Partner Partner { get; set; } = null!;
-    public CashBox? CashBox { get; set; }
-    public BankAccount? BankAccount { get; set; }
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
 }

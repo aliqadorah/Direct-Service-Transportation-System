@@ -8,7 +8,7 @@ using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -237,7 +237,7 @@ public sealed class CreditNoteService(IAppDbContext db, IRequestContext ctx, Mas
     internal sealed record Row(CreditNote C, Guid InvoicePid, string? InvoiceNumber, Guid CustomerPid, string CustomerName, Guid? EntryPid, string? EntryNumber, bool Pending, string? EStatus);
 
     private IQueryable<Row> Rows(IQueryable<CreditNote> q) => q.Select(c => new Row(c, c.Invoice.PublicId, c.Invoice.Number, c.Customer.PublicId, c.Customer.Name,
-        c.JournalEntry != null ? c.JournalEntry.PublicId : null, c.JournalEntry != null ? c.JournalEntry.Number : null,
+        db.Set<JournalEntry>().Where(z => z.Id == c.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == c.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == c.Id && p.ResolvedAt == null),
         db.Set<EInvoiceSubmission>().Where(s => s.CreditNoteId == c.Id).OrderByDescending(s => s.Id).Select(s => s.Status).FirstOrDefault()));
 

@@ -4,7 +4,7 @@ using DirectService.Transportation.Application.Collaboration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Platform;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
@@ -56,7 +56,7 @@ public sealed class TransportationDataEraser(IAppDbContext db) : ITenantDataEras
         await db.Set<Partner>().IgnoreQueryFilters(none).Where(p => p.TenantId == tenantId)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.ContactPerson, (string?)null).SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
             .ConfigureAwait(false);
-        await db.Set<Domain.Acc.ApArParty>().IgnoreQueryFilters(none).Where(p => p.TenantId == tenantId)
+        await db.Set<DirectService.Accounting.Domain.Acc.ApArParty>().IgnoreQueryFilters(none).Where(p => p.TenantId == tenantId)
             .ExecuteUpdateAsync(u => u.SetProperty(x => x.Phone, (string?)null).SetProperty(x => x.Address, (string?)null).SetProperty(x => x.UpdatedAt, now), ct)
             .ConfigureAwait(false);
     }
@@ -91,10 +91,10 @@ public sealed class TransportationHealthFigures(IAppDbContext db) : IHealthFigur
         string[] all = ["Tenant", "Company", "SoftDelete"];
         var month = monthStartUtc;
         var trips = await db.Set<Trip>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(t => !t.IsDeleted && t.CreatedAt >= month, ct).ConfigureAwait(false);
-        var pending = await db.Set<Domain.Acc.PendingPosting>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(p => p.ResolvedAt == null && !p.IsDeleted, ct).ConfigureAwait(false);
+        var pending = await db.Set<DirectService.Accounting.Domain.Acc.PendingPosting>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(p => p.ResolvedAt == null && !p.IsDeleted, ct).ConfigureAwait(false);
         var einv = await db.Set<EInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
             .ConfigureAwait(false)
-            + await db.Set<Domain.Acc.ApArEInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
+            + await db.Set<DirectService.Accounting.Domain.Acc.ApArEInvoiceSubmission>().AsNoTracking().IgnoreQueryFilters(all).CountAsync(s => !s.IsDeleted && (s.Status == "Queued" || s.Status == "Rejected"), ct)
                 .ConfigureAwait(false);
         return new Dictionary<string, int>(StringComparer.Ordinal) { [HealthMeasures.Trips] = trips, [HealthMeasures.PendingPostings] = pending, [HealthMeasures.EInvoices] = einv };
     }

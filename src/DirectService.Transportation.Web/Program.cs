@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using DirectService.Accounting.Infrastructure;
 using DirectService.Platform.Application;
 using DirectService.Platform.Infrastructure;
 using DirectService.Transportation.Application;
@@ -23,6 +24,8 @@ var config = builder.Configuration;
 // ---------------------------------------------------------------- services
 builder.Services.AddApplication();
 builder.Services.AddPlatformApplication();
+// Accounting first: its model contributor is applied before Transportation's, whose foreign keys to acc.* tables name its entity types.
+builder.Services.AddAccountingInfrastructure();
 builder.Services.AddInfrastructure(config);
 builder.Services.AddPlatformInfrastructure(config);
 builder.Services.AddOptions<AppOptions>().Bind(config.GetSection(AppOptions.Section));

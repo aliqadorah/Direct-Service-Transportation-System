@@ -47,9 +47,6 @@ public class Receipt : AuditableEntity, ITenantScoped, ICompanyScoped, ICashDocu
     public DateTime? VoidedAt { get; set; }
     public Customer Customer { get; set; } = null!;
     public Invoice? Invoice { get; set; }
-    public CashBox? CashBox { get; set; }
-    public BankAccount? BankAccount { get; set; }
-    public JournalEntry? JournalEntry { get; set; }
     public User? VoidedByUser { get; set; }
     /// <summary>The invoices the receipt is applied to (revision 6); the rest of the amount is on account.</summary>
     public ICollection<ReceiptAllocation> Allocations { get; set; } = new List<ReceiptAllocation>();

@@ -26,7 +26,7 @@ namespace DirectService.Database.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Account", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.Account", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -212,7 +212,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocument", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArDocument", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -440,7 +440,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocumentLine", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArDocumentLine", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -578,7 +578,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArEInvoiceSubmission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArEInvoiceSubmission", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -765,7 +765,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArParty", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArParty", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -923,7 +923,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArPayment", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArPayment", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1125,7 +1125,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArReturn", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArReturn", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1309,7 +1309,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.BankAccount", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.BankAccount", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1460,7 +1460,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CashBox", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.CashBox", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1579,7 +1579,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CostCentre", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.CostCentre", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1700,7 +1700,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.EntryLine", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.EntryLine", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -1868,7 +1868,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalEntry", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.JournalEntry", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2091,7 +2091,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalExportBatch", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.JournalExportBatch", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2254,7 +2254,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.PendingPosting", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.PendingPosting", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2400,7 +2400,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Period", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.Period", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2533,7 +2533,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.PostingKeyMapping", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.PostingKeyMapping", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2642,7 +2642,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.CompanySetting", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.CompanySetting", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2752,7 +2752,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.CustomFieldDefinition", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.CustomFieldDefinition", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -2933,7 +2933,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.DashboardPin", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.DashboardPin", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3066,7 +3066,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.EInvoiceSettings", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.EInvoiceSettings", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3225,7 +3225,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.ImportBatch", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.ImportBatch", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3377,7 +3377,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.NumberSequence", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.NumberSequence", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3501,7 +3501,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.RecordLock", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.RecordLock", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3627,7 +3627,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.SavedReport", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.SavedReport", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3758,7 +3758,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.StandardFieldConfig", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.StandardFieldConfig", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -3893,7 +3893,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.TableColumnView", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.TableColumnView", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4011,7 +4011,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Announcement", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Announcement", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4119,7 +4119,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.AuditLog", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.AuditLog", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4206,7 +4206,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Company", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Company", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4418,7 +4418,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Invitation", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Invitation", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4554,7 +4554,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.MaintenanceLog", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.MaintenanceLog", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4615,7 +4615,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Notification", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Notification", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -4742,7 +4742,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Permission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Permission", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5124,7 +5124,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Plan", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Plan", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5305,7 +5305,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Role", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Role", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5408,7 +5408,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.RolePermission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.RolePermission", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5509,7 +5509,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SubscriptionInvoice", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.SubscriptionInvoice", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5666,7 +5666,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SupportAccessGrant", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.SupportAccessGrant", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5796,7 +5796,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Tenant", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Tenant", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -5972,7 +5972,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.TermsAcceptance", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.TermsAcceptance", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -6088,7 +6088,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.User", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.User", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -6324,7 +6324,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserCompanyRole", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserCompanyRole", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -6432,7 +6432,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserRecoveryCode", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserRecoveryCode", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -6537,7 +6537,7 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserSession", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserSession", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -10758,41 +10758,41 @@ namespace DirectService.Database.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Account", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.Account", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Accounts_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Accounts_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Accounts_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Parent")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Parent")
                         .WithMany("Children")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Accounts_Accounts_ParentId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Accounts_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -10801,54 +10801,54 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocument", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArDocument", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocuments_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocuments_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocuments_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocuments_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArParty", "Party")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArParty", "Party")
                         .WithMany()
                         .HasForeignKey("PartyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocuments_ApArParties_PartyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocuments_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocuments_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -10861,55 +10861,55 @@ namespace DirectService.Database.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocumentLine", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArDocumentLine", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocumentLines_Accounts_AccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocumentLines_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CostCentre", "CostCentre")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CostCentre", "CostCentre")
                         .WithMany()
                         .HasForeignKey("CostCentreId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocumentLines_CostCentres_CostCentreId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocumentLines_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArDocumentLines_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArDocument", "Document")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArDocument", "Document")
                         .WithMany("Lines")
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocumentLines_ApArDocuments_DocumentId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArDocumentLines_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -10922,47 +10922,47 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Document");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArEInvoiceSubmission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArEInvoiceSubmission", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArDocument", "ApArDocument")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArDocument", "ApArDocument")
                         .WithMany()
                         .HasForeignKey("ApArDocumentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_ApArDocuments_ApArDocumentId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArReturn", "ApArReturn")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArReturn", "ApArReturn")
                         .WithMany()
                         .HasForeignKey("ApArReturnId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_ApArReturns_ApArReturnId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArEInvoiceSubmissions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -10973,42 +10973,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("ApArReturn");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArParty", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArParty", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArParties_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "ControlAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "ControlAccount")
                         .WithMany()
                         .HasForeignKey("ControlAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArParties_Accounts_ControlAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArParties_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArParties_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArParties_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11017,66 +11017,66 @@ namespace DirectService.Database.Migrations
                     b.Navigation("ControlAccount");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArPayment", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArPayment", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.BankAccount", "BankAccount")
                         .WithMany()
                         .HasForeignKey("BankAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_BankAccounts_BankAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_CashBoxes_CashBoxId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArPayments_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArDocument", "Document")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArDocument", "Document")
                         .WithMany()
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArPayments_ApArDocuments_DocumentId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArPayments_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArPayments_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11093,54 +11093,54 @@ namespace DirectService.Database.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArReturn", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArReturn", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArReturns_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArReturns_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArReturns_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArDocument", "Document")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArDocument", "Document")
                         .WithMany()
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArReturns_ApArDocuments_DocumentId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArReturns_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ApArReturns_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ApArReturns_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11153,42 +11153,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.BankAccount", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.BankAccount", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_BankAccounts_Accounts_AccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_BankAccounts_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_BankAccounts_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_BankAccounts_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_BankAccounts_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11197,42 +11197,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Account");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CashBox", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.CashBox", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CashBoxes_Accounts_AccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CashBoxes_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CashBoxes_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CashBoxes_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CashBoxes_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11241,90 +11241,90 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Account");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.CostCentre", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.CostCentre", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CostCentres_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CostCentres_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CostCentres_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CostCentres_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CostCentres_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.EntryLine", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.EntryLine", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EntryLines_Accounts_AccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EntryLines_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CostCentre", "CostCentre")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CostCentre", "CostCentre")
                         .WithMany()
                         .HasForeignKey("CostCentreId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EntryLines_CostCentres_CostCentreId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EntryLines_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EntryLines_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EntryLines_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EntryLines_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11337,59 +11337,59 @@ namespace DirectService.Database.Migrations
                     b.Navigation("JournalEntry");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalEntry", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.JournalEntry", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_JournalEntries_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalExportBatch", "ExportBatch")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalExportBatch", "ExportBatch")
                         .WithMany()
                         .HasForeignKey("ExportBatchId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_JournalExportBatches_ExportBatchId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "ReversedByEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "ReversedByEntry")
                         .WithMany()
                         .HasForeignKey("ReversedByEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_JournalEntries_ReversedByEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "ReversesEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "ReversesEntry")
                         .WithMany()
                         .HasForeignKey("ReversesEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_JournalEntries_ReversesEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_JournalEntries_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalEntries_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11404,42 +11404,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("VoidedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalExportBatch", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.JournalExportBatch", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_JournalExportBatches_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalExportBatches_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_JournalExportBatches_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ExportedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ExportedByUser")
                         .WithMany()
                         .HasForeignKey("ExportedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_JournalExportBatches_Users_ExportedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_JournalExportBatches_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11448,76 +11448,76 @@ namespace DirectService.Database.Migrations
                     b.Navigation("ExportedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.PendingPosting", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.PendingPosting", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_PendingPostings_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PendingPostings_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PendingPostings_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_PendingPostings_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PendingPostings_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Period", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.Period", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ClosedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ClosedByUser")
                         .WithMany()
                         .HasForeignKey("ClosedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Periods_Users_ClosedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Periods_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Periods_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Periods_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Periods_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11526,42 +11526,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("ClosedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.PostingKeyMapping", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.PostingKeyMapping", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.Account", "Account")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_PostingKeyMappings_Accounts_AccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_PostingKeyMappings_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PostingKeyMappings_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PostingKeyMappings_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_PostingKeyMappings_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11570,118 +11570,118 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Account");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.CompanySetting", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.CompanySetting", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CompanySettings_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CompanySettings_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CompanySettings_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CompanySettings_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CompanySettings_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.CustomFieldDefinition", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.CustomFieldDefinition", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CustomFieldDefinitions_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CustomFieldDefinitions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CustomFieldDefinitions_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_CustomFieldDefinitions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_CustomFieldDefinitions_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.DashboardPin", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.DashboardPin", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_DashboardPins_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_DashboardPins_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_DashboardPins_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Cfg.SavedReport", "SavedReport")
+                    b.HasOne("DirectService.Accounting.Domain.Cfg.SavedReport", "SavedReport")
                         .WithMany()
                         .HasForeignKey("SavedReportId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_DashboardPins_SavedReports_SavedReportId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_DashboardPins_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_DashboardPins_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11693,77 +11693,77 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.EInvoiceSettings", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.EInvoiceSettings", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EInvoiceSettings_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EInvoiceSettings_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EInvoiceSettings_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_EInvoiceSettings_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_EInvoiceSettings_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.ImportBatch", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.ImportBatch", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ImportBatches_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ImportBatches_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_ImportBatches_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ImportedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ImportedByUser")
                         .WithMany()
                         .HasForeignKey("ImportedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ImportBatches_Users_ImportedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_ImportBatches_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11772,76 +11772,76 @@ namespace DirectService.Database.Migrations
                     b.Navigation("ImportedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.NumberSequence", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.NumberSequence", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_NumberSequences_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_NumberSequences_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_NumberSequences_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_NumberSequences_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_NumberSequences_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.RecordLock", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.RecordLock", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_RecordLocks_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RecordLocks_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RecordLocks_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_RecordLocks_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RecordLocks_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11851,42 +11851,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.SavedReport", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.SavedReport", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SavedReports_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SavedReports_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SavedReports_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "OwnerUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "OwnerUser")
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SavedReports_Users_OwnerUserId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SavedReports_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11895,76 +11895,76 @@ namespace DirectService.Database.Migrations
                     b.Navigation("OwnerUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.StandardFieldConfig", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.StandardFieldConfig", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_StandardFieldConfigs_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_StandardFieldConfigs_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_StandardFieldConfigs_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_StandardFieldConfigs_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_StandardFieldConfigs_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Cfg.TableColumnView", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Cfg.TableColumnView", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TableColumnViews_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TableColumnViews_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TableColumnViews_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TableColumnViews_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TableColumnViews_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -11973,42 +11973,42 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Announcement", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Announcement", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Announcements_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Announcements_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Announcements_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.AuditLog", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.AuditLog", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_AuditLogs_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", "Tenant")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_AuditLogs_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12021,77 +12021,77 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Company", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Company", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Companies_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Companies_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Companies_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Companies_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Invitation", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Invitation", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Invitations_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Invitations_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Invitations_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "InvitedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "InvitedByUser")
                         .WithMany()
                         .HasForeignKey("InvitedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Invitations_Users_InvitedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Role", "Role")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Role", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Invitations_Roles_RoleId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Invitations_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12104,23 +12104,23 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.MaintenanceLog", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.MaintenanceLog", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_MaintenanceLogs_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", "Tenant")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_MaintenanceLogs_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12134,40 +12134,40 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Notification", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Notification", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Notifications_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Notifications_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Notifications_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Notifications_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Notifications_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12179,112 +12179,112 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Permission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Permission", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Permissions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Permissions_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Permissions_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Plan", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Plan", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Plans_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Plans_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Plans_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Role", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Role", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Roles_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Roles_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Roles_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Roles_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.RolePermission", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.RolePermission", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RolePermissions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RolePermissions_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Permission", "Permission")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Permission", "Permission")
                         .WithMany()
                         .HasForeignKey("PermissionId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_RolePermissions_Permissions_PermissionId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Role", "Role")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Role", "Role")
                         .WithMany("RolePermissions")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_RolePermissions_Roles_RoleId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_RolePermissions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12295,69 +12295,69 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SubscriptionInvoice", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.SubscriptionInvoice", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SubscriptionInvoices_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SubscriptionInvoices_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SubscriptionInvoices_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SubscriptionInvoices_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.SupportAccessGrant", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.SupportAccessGrant", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ApprovedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ApprovedByUser")
                         .WithMany()
                         .HasForeignKey("ApprovedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SupportAccessGrants_Users_ApprovedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SupportAccessGrants_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_SupportAccessGrants_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "RequestedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "RequestedByUser")
                         .WithMany()
                         .HasForeignKey("RequestedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SupportAccessGrants_Users_RequestedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_SupportAccessGrants_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12368,28 +12368,28 @@ namespace DirectService.Database.Migrations
                     b.Navigation("RequestedByUser");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Tenant", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Tenant", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Tenants_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Tenants_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Plan", "Plan")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Plan", "Plan")
                         .WithMany()
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_Tenants_Plans_PlanId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12398,34 +12398,34 @@ namespace DirectService.Database.Migrations
                     b.Navigation("Plan");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.TermsAcceptance", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.TermsAcceptance", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TermsAcceptances_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TermsAcceptances_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TermsAcceptances_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TermsAcceptances_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12435,33 +12435,33 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.User", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.User", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Users_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "DefaultCompany")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "DefaultCompany")
                         .WithMany()
                         .HasForeignKey("DefaultCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Users_Companies_DefaultCompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Users_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Users_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12470,48 +12470,48 @@ namespace DirectService.Database.Migrations
                     b.Navigation("DefaultCompany");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserCompanyRole", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserCompanyRole", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", "Company")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_UserCompanyRoles_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserCompanyRoles_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserCompanyRoles_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Role", "Role")
+                    b.HasOne("DirectService.Accounting.Domain.Core.Role", "Role")
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_UserCompanyRoles_Roles_RoleId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_UserCompanyRoles_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserCompanyRoles_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12525,33 +12525,33 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserRecoveryCode", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserRecoveryCode", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserRecoveryCodes_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserRecoveryCodes_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserRecoveryCodes_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserRecoveryCodes_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12561,33 +12561,33 @@ namespace DirectService.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.UserSession", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.UserSession", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserSessions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserSessions_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserSessions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_UserSessions_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "User")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12599,32 +12599,32 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Advance", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.BankAccount", "BankAccount")
                         .WithMany()
                         .HasForeignKey("BankAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_BankAccounts_BankAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_CashBoxes_CashBoxId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Advances_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12637,7 +12637,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Advances_TRN_Drivers_DriverId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12649,20 +12649,20 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_TRN_Settlements_SettlementId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Advances_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Advances_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12683,14 +12683,14 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.CreditNote", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNotes_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12703,7 +12703,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNotes_TRN_Customers_CustomerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12716,26 +12716,26 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNotes_TRN_Invoices_InvoiceId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_CreditNotes_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNotes_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_CreditNotes_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12752,14 +12752,14 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.CreditNoteLine", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNoteLines_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12772,7 +12772,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNoteLines_TRN_CreditNotes_CreditNoteId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12785,7 +12785,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_CreditNoteLines_TRN_InvoiceLines_InvoiceLineId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12798,7 +12798,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_CreditNoteLines_TRN_Trips_TripId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12813,39 +12813,39 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Customer", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.ApArParty", "ApArParty")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.ApArParty", "ApArParty")
                         .WithMany()
                         .HasForeignKey("ApArPartyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Customers_ApArParties_ApArPartyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Customers_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Customers_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Customers_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Customers_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12856,20 +12856,20 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Driver", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Drivers_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Drivers_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12888,14 +12888,14 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Drivers_TRN_Partners_PartnerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Drivers_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12908,14 +12908,14 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.EInvoiceSubmission", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_EInvoiceSubmissions_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12927,7 +12927,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_EInvoiceSubmissions_TRN_CreditNotes_CreditNoteId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12939,14 +12939,14 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_EInvoiceSubmissions_TRN_Invoices_InvoiceId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_EInvoiceSubmissions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12959,20 +12959,20 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Invoice", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ApprovedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ApprovedByUser")
                         .WithMany()
                         .HasForeignKey("ApprovedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Invoices_Users_ApprovedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Invoices_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -12985,32 +12985,32 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Invoices_TRN_Customers_CustomerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Invoices_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Invoices_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Invoices_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Invoices_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13027,33 +13027,33 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.InvoiceLayout", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_InvoiceLayouts_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_InvoiceLayouts_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_InvoiceLayouts_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_InvoiceLayouts_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13062,20 +13062,20 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.InvoiceLine", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_InvoiceLines_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_InvoiceLines_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13088,7 +13088,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_InvoiceLines_TRN_Invoices_InvoiceId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13101,7 +13101,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_InvoiceLines_TRN_Trips_TripId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13114,33 +13114,33 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.LoadingSite", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_LoadingSites_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_LoadingSites_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_LoadingSites_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_LoadingSites_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13149,33 +13149,33 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Material", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Materials_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Materials_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Materials_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Materials_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13184,20 +13184,20 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.MonthlySiteRate", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_MonthlySiteRates_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_MonthlySiteRates_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13210,14 +13210,14 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_MonthlySiteRates_TRN_LoadingSites_LoadingSiteId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_MonthlySiteRates_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13228,33 +13228,33 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.OwnershipType", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_OwnershipTypes_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_OwnershipTypes_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_OwnershipTypes_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_OwnershipTypes_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13263,33 +13263,33 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Partner", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Partners_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Partners_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Partners_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Partners_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13298,38 +13298,38 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.PartnerPayment", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.BankAccount", "BankAccount")
                         .WithMany()
                         .HasForeignKey("BankAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_PartnerPayments_BankAccounts_BankAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_PartnerPayments_CashBoxes_CashBoxId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_PartnerPayments_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_PartnerPayments_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_PartnerPayments_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13342,20 +13342,20 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_PartnerPayments_TRN_Partners_PartnerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_PartnerPayments_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_PartnerPayments_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13374,40 +13374,40 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.RateHistory", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "ChangedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "ChangedByUser")
                         .WithMany()
                         .HasForeignKey("ChangedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_RateHistory_Users_ChangedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_RateHistory_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_RateHistory_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_RateHistory_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_RateHistory_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13418,26 +13418,26 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Receipt", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.BankAccount", "BankAccount")
                         .WithMany()
                         .HasForeignKey("BankAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Receipts_BankAccounts_BankAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Receipts_CashBoxes_CashBoxId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Receipts_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13450,7 +13450,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Receipts_TRN_Customers_CustomerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13462,26 +13462,26 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Receipts_TRN_Invoices_InvoiceId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Receipts_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Receipts_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Receipts_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13502,32 +13502,32 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Settlement", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Acc.BankAccount", "BankAccount")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.BankAccount", "BankAccount")
                         .WithMany()
                         .HasForeignKey("BankAccountId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Settlements_BankAccounts_BankAccountId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.CashBox", "CashBox")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Settlements_CashBoxes_CashBoxId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Settlements_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Settlements_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13540,26 +13540,26 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Settlements_TRN_Drivers_DriverId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Settlements_JournalEntries_JournalEntryId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Settlements_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Settlements_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13578,20 +13578,20 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.SettlementDeduction", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_SettlementDeductions_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_SettlementDeductions_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13604,14 +13604,14 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_SettlementDeductions_TRN_Settlements_SettlementId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_SettlementDeductions_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13622,14 +13622,14 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Tariff", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Tariffs_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13641,7 +13641,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Tariffs_TRN_Customers_CustomerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13665,7 +13665,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Tariffs_TRN_Partners_PartnerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13678,7 +13678,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Tariffs_TRN_UnloadingSites_UnloadingSiteId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13697,14 +13697,14 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.Trip", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Trips_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13717,7 +13717,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Trips_TRN_Customers_CustomerId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13730,7 +13730,7 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Trips_TRN_Drivers_DriverId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Cfg.ImportBatch", "ImportBatch")
+                    b.HasOne("DirectService.Accounting.Domain.Cfg.ImportBatch", "ImportBatch")
                         .WithMany()
                         .HasForeignKey("ImportBatchId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13742,7 +13742,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Trips_TRN_Invoices_InvoiceId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Acc.JournalEntry", "JournalEntry")
+                    b.HasOne("DirectService.Accounting.Domain.Acc.JournalEntry", "JournalEntry")
                         .WithMany()
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13774,7 +13774,7 @@ namespace DirectService.Database.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Trips_TRN_Settlements_SettlementId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13788,13 +13788,13 @@ namespace DirectService.Database.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_TRN_Trips_TRN_UnloadingSites_UnloadingSiteId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_Trips_Users_UpdatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", "VoidedByUser")
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", "VoidedByUser")
                         .WithMany()
                         .HasForeignKey("VoidedBy")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -13825,55 +13825,55 @@ namespace DirectService.Database.Migrations
 
             modelBuilder.Entity("DirectService.Transportation.Domain.Trn.UnloadingSite", b =>
                 {
-                    b.HasOne("DirectService.Transportation.Domain.Core.Company", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_UnloadingSites_Companies_CompanyId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_UnloadingSites_Users_CreatedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("DeletedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_UnloadingSites_Users_DeletedBy");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.Tenant", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("FK_TRN_UnloadingSites_Tenants_TenantId");
 
-                    b.HasOne("DirectService.Transportation.Domain.Core.User", null)
+                    b.HasOne("DirectService.Accounting.Domain.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TRN_UnloadingSites_Users_UpdatedBy");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.Account", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.Account", b =>
                 {
                     b.Navigation("Children");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.ApArDocument", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.ApArDocument", b =>
                 {
                     b.Navigation("Lines");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Acc.JournalEntry", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Acc.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
                 });
 
-            modelBuilder.Entity("DirectService.Transportation.Domain.Core.Role", b =>
+            modelBuilder.Entity("DirectService.Accounting.Domain.Core.Role", b =>
                 {
                     b.Navigation("RolePermissions");
                 });

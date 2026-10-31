@@ -6,7 +6,7 @@ using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.Ledger;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
-using DirectService.Transportation.Domain.Acc;
+using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 using static DirectService.Transportation.Api.Tests.PartBSupport;
 

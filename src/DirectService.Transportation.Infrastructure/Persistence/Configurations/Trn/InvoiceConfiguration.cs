@@ -297,13 +297,6 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .IsRequired(false)
             .HasConstraintName("FK_TRN_Invoices_Users_ApprovedBy")
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(e => e.JournalEntry)
-            .WithMany()
-            .HasForeignKey(e => e.JournalEntryId)
-            .HasPrincipalKey(p => p.Id)
-            .IsRequired(false)
-            .HasConstraintName("FK_TRN_Invoices_JournalEntries_JournalEntryId")
-            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(e => e.VoidedByUser)
             .WithMany()
             .HasForeignKey(e => e.VoidedBy)

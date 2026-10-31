@@ -12,8 +12,8 @@ using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Pricing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
-using DirectService.Transportation.Domain.Acc;
-using DirectService.Transportation.Domain.Cfg;
+using DirectService.Accounting.Domain.Acc;
+using DirectService.Accounting.Domain.Cfg;
 using DirectService.Platform.Domain;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
@@ -558,7 +558,7 @@ public sealed class TripService(IAppDbContext db, IRequestContext ctx, MasterDat
         t.Partner != null ? t.Partner.PublicId : null, t.Partner != null ? t.Partner.Name : null,
         t.Invoice != null ? t.Invoice.PublicId : null, t.Invoice != null ? t.Invoice.Number : null,
         t.Settlement != null ? t.Settlement.PublicId : null, t.Settlement != null ? t.Settlement.Number : null,
-        t.JournalEntry != null ? t.JournalEntry.PublicId : null, t.JournalEntry != null ? t.JournalEntry.Number : null,
+        db.Set<JournalEntry>().Where(z => z.Id == t.JournalEntryId).Select(z => (Guid?)z.PublicId).FirstOrDefault(), db.Set<JournalEntry>().Where(z => z.Id == t.JournalEntryId).Select(z => z.Number).FirstOrDefault(),
         db.Set<PendingPosting>().Any(p => p.SourceModule == AccountingCodes.ModuleTrn && p.SourceType == SourceType && p.SourceId == t.Id && p.ResolvedAt == null)));
 
     private static readonly IReadOnlyDictionary<string, Expression<Func<Trip, object?>>> SortFields = new Dictionary<string, Expression<Func<Trip, object?>>>(StringComparer.Ordinal)

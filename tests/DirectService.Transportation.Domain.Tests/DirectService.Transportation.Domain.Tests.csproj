@@ -7,5 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DirectService.Transportation.Domain\DirectService.Transportation.Domain.csproj" />
+    <!-- The accounting entities moved to Accounting.Domain (Stage 3 session 3); their tests move to Accounting.Tests in session 16. -->
+    <ProjectReference Include="..\..\src\Modules\Accounting\DirectService.Accounting.Domain\DirectService.Accounting.Domain.csproj" />
   </ItemGroup>
 </Project>
