@@ -52,6 +52,7 @@ public static class DependencyInjection
         // Tax codes and journal templates (Stage 3 session 6c).
         services.AddScoped<TaxCodeService>();
         services.AddScoped<JournalTemplateService>();
+        services.AddScoped<MaintenanceService>();   // accounting maintenance (FR-135)
         return services;
     }
 

@@ -44,4 +44,13 @@ public static class AccountingErrorCodes
     public const string PeriodChecksPending = "period.checksPending";
     public const string PeriodNotClosed = "period.notClosed";
     public const string TemplateNameTaken = "template.nameTaken";
+
+    // The accounting maintenance (FR-135; Stage 3 session 6c).
+    public const string MaintenanceConfirmation = "maintenance.confirmation";
+    public const string MaintenanceClosedPeriod = "maintenance.closedPeriod";
+    public const string MaintenanceLinked = "maintenance.linked";
+    public const string MaintenanceNothing = "maintenance.nothing";
+    public const string MaintenanceChartInUse = "maintenance.chartInUse";
+    public const string MaintenanceResetBlocked = "maintenance.resetBlocked";
+    public const string MaintenanceRefused = "maintenance.refused";
 }

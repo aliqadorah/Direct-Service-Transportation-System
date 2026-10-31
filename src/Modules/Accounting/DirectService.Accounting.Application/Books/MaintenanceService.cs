@@ -1,18 +1,14 @@
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Accounting.Contracts.Modules;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
-using DirectService.Transportation.Domain.Common;
 using DirectService.Platform.Domain;
 using DirectService.Accounting.Domain.Core;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Maintenance zone (FR-135, FR-136, acct.maint). Four actions, each previewed first (counts and blockers), confirmed by typing the
@@ -31,7 +27,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// entries linked to documents. A JSON backup of the accounting data is offered first (also logged).
 /// </summary>
 public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, INumberingService numbering, IChartOfAccountsSetup chart, AuditTrail audit,
-    IUrlTokenService tokens, TimeProvider clock)
+    IUrlTokenService tokens, TimeProvider clock, IErrorText errorText)
 {
     public const string WordAr = "حذف";
     public const string WordEn = "DELETE";
@@ -81,15 +77,15 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
             case MaintenanceActions.DeleteEntries:
             {
                 var requested = r.EntryIds ?? [];
-                if (requested.Count == 0) throw Fail.Field("entryIds", ErrorCodes.ValidationRequired, new FieldRef("entryIds"));
-                if (requested.Count > 5000) throw Fail.Field("entryIds", ErrorCodes.ValidationRange, new FieldRef("entryIds"));
-                var pids = requested.Select(t => tokens.Decode<JournalEntry>(t) ?? throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, new FieldRef("entryIds"))).Distinct().ToList();
+                if (requested.Count == 0) throw Fail.Field("entryIds", SharedErrorCodes.ValidationRequired, new FieldRef("entryIds"));
+                if (requested.Count > 5000) throw Fail.Field("entryIds", SharedErrorCodes.ValidationRange, new FieldRef("entryIds"));
+                var pids = requested.Select(t => tokens.Decode<JournalEntry>(t) ?? throw Fail.Field("entryIds", SharedErrorCodes.ValidationFormat, new FieldRef("entryIds"))).Distinct().ToList();
                 var chosen = await entries.Where(e => pids.Contains(e.PublicId)).Select(e => new { e.Id, e.SourceId, e.SourceType, e.ReversesEntryId, e.ReversedByEntryId })
                     .ToListAsync(ct).ConfigureAwait(false);
-                if (chosen.Count != pids.Count) throw Fail.Field("entryIds", ErrorCodes.ValidationFormat, new FieldRef("entryIds"));
+                if (chosen.Count != pids.Count) throw Fail.Field("entryIds", SharedErrorCodes.ValidationFormat, new FieldRef("entryIds"));
                 // The opening entry belongs to the opening balances (cleared only by a full reset, review L6).
                 var linked = chosen.Count(e => e.SourceId != null || e.SourceType == AccountingCodes.SourceOpening);
-                if (linked > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceLinked, ctx.Language, linked));
+                if (linked > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceLinked, ctx.Language, linked));
                 // A reversal and the entry it reverses go together, so the remaining ledger still nets.
                 var set = chosen.Select(e => e.Id).ToHashSet();
                 foreach (var e in chosen)
@@ -103,7 +99,7 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
             case MaintenanceActions.DeleteAllEntries:
                 ids = await entries.Where(e => e.SourceId == null && e.SourceType != AccountingCodes.SourceOpening).Select(e => e.Id).ToListAsync(ct).ConfigureAwait(false);
                 linkedKept = linkedCount + await entries.CountAsync(e => e.SourceId == null && e.SourceType == AccountingCodes.SourceOpening, ct).ConfigureAwait(false);
-                if (ids.Count == 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceNothing, ctx.Language));
+                if (ids.Count == 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceNothing, ctx.Language));
                 break;
             case MaintenanceActions.ReplaceChart:
             {
@@ -111,24 +107,24 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
                 var pending = await db.Set<PendingPosting>().CountAsync(p => p.ResolvedAt == null, ct).ConfigureAwait(false);
                 var documents = await db.Set<ApArDocument>().CountAsync(ct).ConfigureAwait(false);
                 var partiesCount = await db.Set<ApArParty>().CountAsync(ct).ConfigureAwait(false);
-                if (entryCount > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceChartInUse, ctx.Language, Count(entryCount, "قيود", "journal entries")));
-                if (pending > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceChartInUse, ctx.Language, Count(pending, "ترحيلات معلّقة", "pending postings")));
-                if (documents > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceChartInUse, ctx.Language, Count(documents, "مستندات ذمم", "payable/receivable documents")));
-                if (partiesCount > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceChartInUse, ctx.Language, Count(partiesCount, "أطراف محاسبية", "accounting parties")));
+                if (entryCount > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceChartInUse, ctx.Language, Count(entryCount, "قيود", "journal entries")));
+                if (pending > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceChartInUse, ctx.Language, Count(pending, "ترحيلات معلّقة", "pending postings")));
+                if (documents > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceChartInUse, ctx.Language, Count(documents, "مستندات ذمم", "payable/receivable documents")));
+                if (partiesCount > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceChartInUse, ctx.Language, Count(partiesCount, "أطراف محاسبية", "accounting parties")));
                 counts["Accounts"] = await db.Set<Account>().CountAsync(ct).ConfigureAwait(false);
                 counts["PostingKeyMappings"] = await db.Set<PostingKeyMapping>().CountAsync(ct).ConfigureAwait(false);
                 counts["CashBoxes"] = await db.Set<CashBox>().CountAsync(ct).ConfigureAwait(false);
                 counts["BankAccounts"] = await db.Set<BankAccount>().CountAsync(ct).ConfigureAwait(false);
                 if (r.ChartSource is not null && r.ChartSource.Trim().ToLowerInvariant() is not ("template" or "empty"))
-                    throw Fail.Field("chartSource", ErrorCodes.ValidationFormat, new FieldRef("chartSource"));
+                    throw Fail.Field("chartSource", SharedErrorCodes.ValidationFormat, new FieldRef("chartSource"));
                 return new Plan(counts, 0, blockers, []);
             }
             case MaintenanceActions.Reset:
             {
-                if (linkedCount > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceResetBlocked, ctx.Language, Count(linkedCount, "قيود مرتبطة بمستندات", "entries linked to documents")));
-                if (closed.Count > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceResetBlocked, ctx.Language, (En ? "closed periods " : "فترات مغلقة ") + string.Join(", ", closed.Order(StringComparer.Ordinal))));
+                if (linkedCount > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceResetBlocked, ctx.Language, Count(linkedCount, "قيود مرتبطة بمستندات", "entries linked to documents")));
+                if (closed.Count > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceResetBlocked, ctx.Language, (En ? "closed periods " : "فترات مغلقة ") + string.Join(", ", closed.Order(StringComparer.Ordinal))));
                 var pending = await db.Set<PendingPosting>().CountAsync(p => p.ResolvedAt == null, ct).ConfigureAwait(false);
-                if (pending > 0) blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceResetBlocked, ctx.Language, Count(pending, "ترحيلات معلّقة", "pending postings")));
+                if (pending > 0) blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceResetBlocked, ctx.Language, Count(pending, "ترحيلات معلّقة", "pending postings")));
                 ids = await entries.Select(e => e.Id).ToListAsync(ct).ConfigureAwait(false);
                 counts["Periods"] = await db.Set<Period>().CountAsync(ct).ConfigureAwait(false);
                 counts["OpeningBalances"] = await db.Set<Account>().CountAsync(a => a.OpeningDebit != 0 || a.OpeningCredit != 0, ct).ConfigureAwait(false);
@@ -141,7 +137,7 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
         {
             var inClosed = await entries.Where(e => ids.Contains(e.Id) && closed.Contains(e.PeriodMonth)).Select(e => e.PeriodMonth).ToListAsync(ct).ConfigureAwait(false);
             if (inClosed.Count > 0)
-                blockers.Add(ErrorCatalog.Format(ErrorCodes.MaintenanceClosedPeriod, ctx.Language, inClosed.Count, string.Join(", ", inClosed.Distinct().Order(StringComparer.Ordinal))));
+                blockers.Add(errorText.Format(AccountingErrorCodes.MaintenanceClosedPeriod, ctx.Language, inClosed.Count, string.Join(", ", inClosed.Distinct().Order(StringComparer.Ordinal))));
         }
         counts["JournalEntries"] = ids.Count;
         counts["EntryLines"] = ids.Count == 0 ? 0 : await db.Set<EntryLine>().CountAsync(l => ids.Contains(l.JournalEntryId), ct).ConfigureAwait(false);
@@ -158,18 +154,18 @@ public sealed class MaintenanceService(IAppDbContext db, IRequestContext ctx, IN
         var name = Action(action);
         var typed = r.Confirmation?.Trim();
         if (!string.Equals(typed, WordAr, StringComparison.Ordinal) && !string.Equals(typed, WordEn, StringComparison.OrdinalIgnoreCase))
-            throw Fail.RuleOn("confirmation", ErrorCodes.MaintenanceConfirmation, Word);
+            throw Fail.RuleOn("confirmation", AccountingErrorCodes.MaintenanceConfirmation, Word);
         var reason = TextNormalizer.CleanText(r.Reason) ?? (En ? "Maintenance zone: " : "منطقة الصيانة: ") + name;
-        if (reason.Length > 450) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
+        if (reason.Length > 450) throw Fail.Field("reason", SharedErrorCodes.ValidationRange, new FieldRef("reason"));
         var now = clock.GetUtcNow().UtcDateTime;
         var user = UserId;
         Dictionary<string, int> counts = [];
         await db.InTransactionAsync(async c =>
         {
             // Postings take this lock for their number: none runs while the action is checked and applied (as closing a period, BR-036).
-            await numbering.LockAsync(DocumentTypes.JournalEntry, c).ConfigureAwait(false);
+            await numbering.LockAsync(AccountingDocumentTypes.JournalEntry, c).ConfigureAwait(false);
             var plan = await PlanAsync(action, r, c).ConfigureAwait(false);
-            if (plan.Blockers.Count > 0) throw Fail.Rule(ErrorCodes.MaintenanceRefused, string.Join(" · ", plan.Blockers));
+            if (plan.Blockers.Count > 0) throw Fail.Rule(AccountingErrorCodes.MaintenanceRefused, string.Join(" · ", plan.Blockers));
             counts = plan.Counts;
             var deleteReason = "Maintenance: " + reason;
             if (plan.EntryIds.Count > 0)

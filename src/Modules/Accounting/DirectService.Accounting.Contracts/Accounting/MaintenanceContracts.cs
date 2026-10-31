@@ -1,6 +1,4 @@
-using DirectService.Accounting.Contracts.Accounting;
-
-namespace DirectService.Transportation.Contracts.Accounting;
+namespace DirectService.Accounting.Contracts.Accounting;
 
 /// <summary>The four maintenance actions (FR-135) as used in the routes.</summary>
 public static class MaintenanceActions

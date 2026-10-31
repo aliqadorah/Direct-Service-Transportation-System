@@ -220,7 +220,7 @@ public sealed class LayerRuleTests
     [
         // all 23 at the start: the accounting services, endpoints and workers are still in the transport projects (sessions 4-15)
         // 22 after session 6c step 3 (journal export moved: JournalExportBatch)
-        // 21 after session 6c step 4 (journal templates moved: JournalTemplate)
+        // 20 after session 6c step 4 (journal templates and the maintenance moved: JournalTemplate, MaintenanceLog)
         "DirectService.Accounting.Domain.Acc.Account",
         "DirectService.Accounting.Domain.Acc.ApArDocument",
         "DirectService.Accounting.Domain.Acc.ApArDocumentLine",
@@ -241,7 +241,6 @@ public sealed class LayerRuleTests
         "DirectService.Accounting.Domain.Acc.PostingKeyMapping",
         "DirectService.Accounting.Domain.Acc.TaxCode",
         "DirectService.Accounting.Domain.Cfg.EInvoiceSettings",
-        "DirectService.Accounting.Domain.Core.MaintenanceLog",
     ];
 
     [Fact]
@@ -372,7 +371,7 @@ public sealed class LayerRuleTests
         // the engine uses.
         var catalog = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes);
         var accounting = typeof(DirectService.Accounting.Contracts.Errors.AccountingErrorCodes).GetFields().Where(f => f.IsLiteral).ToList();
-        Assert.Equal(34, accounting.Count);   // 19 of the engine (session 4a) + 15 of the services of session 6
+        Assert.Equal(41, accounting.Count);   // 19 of the engine (session 4a) + 15 of the services of session 6 + 7 of the maintenance (6c)
         foreach (var f in accounting)
         {
             var value = (string)f.GetValue(null)!;

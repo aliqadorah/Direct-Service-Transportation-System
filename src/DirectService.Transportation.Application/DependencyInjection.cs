@@ -126,7 +126,6 @@ public static class DependencyInjection
         services.AddScoped<AgeingService>();
         services.AddScoped<LedgerReportService>();
         services.AddScoped<LedgerReportExports>();
-        services.AddScoped<MaintenanceService>();
 
         // Reports and dashboard (B10)
         services.AddScoped<StandardReportService>();
