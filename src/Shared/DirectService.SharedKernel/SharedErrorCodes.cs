@@ -68,4 +68,9 @@ public static class SharedErrorCodes
 
     // An archived record chosen where an active one is needed (the posting engine's cost centres, Stage 3 session 4a).
     public const string RecordArchived = "record.archived";
+
+    // Import problems of every module (moved with the accounting imports, Stage 3 session 6).
+    public const string ImportHasErrors = "import.hasErrors";
+    public const string ImportInvalid = "import.invalid";
+    public const string ImportUnknown = "import.unknown";
 }

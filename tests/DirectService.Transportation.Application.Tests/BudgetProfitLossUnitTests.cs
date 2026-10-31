@@ -2,6 +2,7 @@ using DirectService.Accounting.Application.Posting;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Budgets;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 
 namespace DirectService.Transportation.Application.Tests;
 

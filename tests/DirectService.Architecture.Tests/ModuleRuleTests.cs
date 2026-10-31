@@ -13,7 +13,7 @@ namespace DirectService.Architecture.Tests;
 /// them (Stage 3 session 3, DT-391, gone by session 16): Transportation.Application → Accounting.Domain, the accounting entities the transport
 /// code still uses, each named by <see cref="LayerRuleTests"/> (StillUsedOfAccountingDomain); and a second (Stage 3 session 4a, DT-397):
 /// Transportation.Application → Accounting.Application, the posting engine and its codes, named by StillUsedOfAccountingApplication. A module's
-/// Contracts may name another module's constants through a private reference (DT-396, the DT-310 pattern).
+/// Contracts may use another module's Contracts (browser-safe both; DT-396, DT-407).
 /// </summary>
 public sealed class ModuleRuleTests
 {
@@ -82,8 +82,7 @@ public sealed class ModuleRuleTests
             "Domain" => reference == Kernel,
             "Contracts" => reference == SharedContracts || reference == PlatformContracts && p.Owner != "Platform"
                 || reference == Kernel && Projects[project].Single(x => x.Name == Kernel).Private        // WASM-safe (DT-310)
-                || r.Layer == "Contracts" && r.IsModule && r.Owner != p.Owner && p.IsModule
-                   && Projects[project].Single(x => x.Name == reference).Private,                      // another module's constants (DT-396)
+                || r.Layer == "Contracts" && r.IsModule && r.Owner != p.Owner && p.IsModule,           // another module's Contracts (DT-396, DT-407)
             "Application" => reference == own + "Domain" || reference == own + "Contracts" || common
                 || r.Layer == "Contracts" && r.IsModule,                                               // other modules' Contracts
             "Infrastructure" => reference == own + "Application" || reference == SharedInfrastructure || common,

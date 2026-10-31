@@ -1,5 +1,5 @@
 
-namespace DirectService.Transportation.Contracts.Accounting;
+namespace DirectService.Accounting.Contracts.Accounting;
 
 // Revision 6 part B (owner change request 15 Oct 2026): journal entry templates (نماذج القيود).
 

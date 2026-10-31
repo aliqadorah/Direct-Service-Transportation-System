@@ -4,6 +4,7 @@ using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Application.Pricing;
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;

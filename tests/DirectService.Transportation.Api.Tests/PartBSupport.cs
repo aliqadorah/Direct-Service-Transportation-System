@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Platform.Contracts.Identity;
 
 namespace DirectService.Transportation.Api.Tests;

@@ -249,7 +249,7 @@
         _busy = true;
         try
         {
-            var r = await Api.PostAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}/approve"), new DirectService.Transportation.Contracts.Accounting.StatusChangeRequest(_d!.Invoice.RowVersion));
+            var r = await Api.PostAsync<InvoiceDetails>(Api.C($"invoices/{Uri.EscapeDataString(Id)}/approve"), new DirectService.Accounting.Contracts.Accounting.StatusChangeRequest(_d!.Invoice.RowVersion));
             Toasts.Success(L.F("inv.approved", r.Invoice.Number ?? "", Fmt.Money(r.Invoice.Total)));
             await Load();
         }

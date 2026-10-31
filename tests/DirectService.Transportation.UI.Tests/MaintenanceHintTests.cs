@@ -1,4 +1,5 @@
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Web.Client.Pages.Accounting;
 
 namespace DirectService.Transportation.UI.Tests;

@@ -5,6 +5,7 @@ using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.Ledger;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Contracts.ApAr;
 using DirectService.Transportation.Contracts.Cash;
 using DirectService.Transportation.Contracts.EInvoicing;

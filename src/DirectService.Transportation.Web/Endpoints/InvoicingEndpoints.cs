@@ -1,6 +1,7 @@
 using DirectService.Transportation.Application.Invoicing;
 using DirectService.Transportation.Application.Reports;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Invoicing;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Pipeline;

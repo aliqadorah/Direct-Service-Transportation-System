@@ -1,5 +1,5 @@
 
-namespace DirectService.Transportation.Contracts.Accounting;
+namespace DirectService.Accounting.Contracts.Accounting;
 
 // Identifiers are always URL tokens (SEC-22); amounts are in the currency's major unit with its decimals (BR-020).
 
@@ -116,7 +116,7 @@ public sealed record CashBoxResponse(string Id, string Name, AccountRef Account,
 public sealed record CashBoxRequest(string? Name, string? AccountId, string? RowVersion);
 
 /// <summary>Active cash boxes and bank accounts (pick lists of cash documents).</summary>
-public sealed record MoneyAccountOptions(IReadOnlyList<MasterData.MasterOption> CashBoxes, IReadOnlyList<MasterData.MasterOption> BankAccounts, DateOnly Today);
+public sealed record MoneyAccountOptions(IReadOnlyList<MasterOption> CashBoxes, IReadOnlyList<MasterOption> BankAccounts, DateOnly Today);
 
 public sealed record BankAccountResponse(
     string Id, string Name, string BankName, string? AccountNumber, string? Iban, string CurrencyCode, AccountRef Account, string Status,

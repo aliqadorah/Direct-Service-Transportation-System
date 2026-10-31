@@ -15,9 +15,6 @@ public sealed record MasterListQuery(
     string? Q, string? Status, string? Sort, string? Fleet, string? OwnershipTypeId, string? PartnerId, string? Expiry,
     int Page = 1, int PageSize = 50);
 
-/// <summary>An active record offered in pick lists of forms (FR-162 "archived records hidden from new-entry lists", FR-167).</summary>
-public sealed record MasterOption(string Id, string Name);
-
 /// <summary>One referencing record type with its count (BR-040), e.g. ("Trips", "trips", 4).</summary>
 public sealed record ReferenceCount(string Type, string Label, int Count);
 

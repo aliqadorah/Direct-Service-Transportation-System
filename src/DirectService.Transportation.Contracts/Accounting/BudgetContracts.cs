@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Accounting;
 
 namespace DirectService.Transportation.Contracts.Accounting;
 

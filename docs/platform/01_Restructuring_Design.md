@@ -80,7 +80,7 @@ Where the API endpoints and workers live: each module's **Infrastructure** proje
 | Project kind | May reference |
 |---|---|
 | `*.Domain` | SharedKernel only |
-| `*.Contracts` | SharedKernel only (WASM-safe: no EF, no ASP.NET). A module's Contracts may also name **another module's constants** through a private reference (Stage 3 session 4a, DT-396: `ErrorCodes` / `PermissionKeys` of Transportation name `AccountingErrorCodes` / `AccountingPermissionKeys`, the DT-310 pattern) |
+| `*.Contracts` | SharedKernel only (WASM-safe: no EF, no ASP.NET). A module's Contracts may also use **another module's Contracts** (browser-safe both; Stage 3 sessions 4a / 6a, DT-396 / DT-407: `ErrorCodes` / `PermissionKeys` of Transportation name `AccountingErrorCodes` / `AccountingPermissionKeys`, the DT-310 pattern, and transport DTOs use accounting DTOs) |
 | `*.Application` | its own Domain and Contracts, SharedKernel, `Platform.Contracts`, **other modules' Contracts**. No exception since Stage 2 session 14 (the temporary Transportation.Application → Platform.Application reference of DT-343 is gone, DT-365; the compiled assembly is checked too). Test: `LayerRuleTests.Module_application_references_its_domain_and_contracts_and_the_platform_contracts` |
 | `*.Infrastructure` | its own Application, Shared.Infrastructure, ASP.NET Core framework. Exception E-1: `Platform.Domain` anchor types `Tenant`, `Company` and `User`, for **FK mapping only** (K-09); a module's Domain may hold them as foreign-key navigation properties (a.4, DT-338). Test: `LayerRuleTests.Modules_use_only_the_platform_anchor_types_for_foreign_keys_E1` |
 | `*.UI` | its own Contracts, `Platform.Contracts`, Shared.UI |

@@ -4,6 +4,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Contracts.Accounting;
 
+using DirectService.Accounting.Contracts.Accounting;
+
 namespace DirectService.Transportation.Api.Tests;
 
 /// <summary>

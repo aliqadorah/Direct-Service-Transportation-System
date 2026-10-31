@@ -1,5 +1,6 @@
 using DirectService.Transportation.Application.Trips;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Contracts.Trips;
 using DirectService.Transportation.Web.Pipeline;

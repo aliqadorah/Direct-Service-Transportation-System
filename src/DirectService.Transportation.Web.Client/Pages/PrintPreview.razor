@@ -78,7 +78,7 @@
         {
             if (Kind == "journal")
             {
-                _html = Pages.Accounting.VoucherHtml.Build(await Api.GetAsync<Contracts.Accounting.JournalVoucherResponse>(Api.C(Doc.Api)), L, Shell.DateFormat);
+                _html = Pages.Accounting.VoucherHtml.Build(await Api.GetAsync<DirectService.Accounting.Contracts.Accounting.JournalVoucherResponse>(Api.C(Doc.Api)), L, Shell.DateFormat);
                 _state = LoadState.Ready;
                 return;
             }

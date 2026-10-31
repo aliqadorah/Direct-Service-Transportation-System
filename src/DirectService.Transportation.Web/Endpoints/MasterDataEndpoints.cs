@@ -2,6 +2,7 @@ using DirectService.Shared.Infrastructure.Configuration;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Application.MasterData;
 using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Security;
 using DirectService.Transportation.Web.Pipeline;

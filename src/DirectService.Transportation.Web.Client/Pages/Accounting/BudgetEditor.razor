@@ -220,7 +220,7 @@
                 var accounts = await Api.GetAsync<IReadOnlyList<BudgetGridAccount>>(Api.C("accounting/budgets/grid-accounts"));
                 _ordered = BudgetGrid.TreeOrder(accounts);
                 _accountById = accounts.ToDictionary(a => a.Account.Id, StringComparer.Ordinal);
-                try { _centres = (await Api.GetAsync<IReadOnlyList<Md.MasterOption>>(Api.C("accounting/cost-centres/options"))).Select(c => new Option<string?>(c.Id, c.Name)).ToList(); }
+                try { _centres = (await Api.GetAsync<IReadOnlyList<MasterOption>>(Api.C("accounting/cost-centres/options"))).Select(c => new Option<string?>(c.Id, c.Name)).ToList(); }
                 catch (ApiException) { _centres = []; }
             }
             Show(await Api.GetAsync<BudgetResponse>(Api.C($"accounting/budgets/{Uri.EscapeDataString(Id)}")));

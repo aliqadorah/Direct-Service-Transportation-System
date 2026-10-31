@@ -374,7 +374,7 @@ public sealed class LayerRuleTests
         // the engine uses.
         var catalog = typeof(DirectService.Transportation.Contracts.Errors.ErrorCodes);
         var accounting = typeof(DirectService.Accounting.Contracts.Errors.AccountingErrorCodes).GetFields().Where(f => f.IsLiteral).ToList();
-        Assert.Equal(19, accounting.Count);
+        Assert.Equal(34, accounting.Count);   // 19 of the engine (session 4a) + 15 of the services of session 6
         foreach (var f in accounting)
         {
             var value = (string)f.GetValue(null)!;
