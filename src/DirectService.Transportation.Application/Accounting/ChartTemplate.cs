@@ -88,24 +88,12 @@ public static class ChartTemplate
         new("5299", "مصاريف أخرى", "Other expenses", "Expense", "52", null),
     ];
 
-    /// <summary>Default posting-key mapping (draft §2).</summary>
-    public static readonly IReadOnlyDictionary<string, string> Mapping = new Dictionary<string, string>
-    {
-        [PostingKeys.DriverWageExpense] = "5101",
-        [PostingKeys.DriverPayable] = "2102",
-        [PostingKeys.PartnerCostExpense] = "5102",
-        [PostingKeys.PartnerPayable] = "2103",
-        [PostingKeys.TradeReceivables] = "110301",
-        [PostingKeys.DiscountAllowed] = "4104",
-        [PostingKeys.TransportRevenue] = "4101",
-        [PostingKeys.OtherRevenue] = "4102",
-        [PostingKeys.SalesTaxOutput] = "2104",
-        [PostingKeys.SalesTaxInput] = "1105",
-        [PostingKeys.DriverAdvances] = "1104",
-        [PostingKeys.DriverDeductions] = "4103",
-        [PostingKeys.OpeningBalanceDifference] = "3103",
-        [PostingKeys.SupplierDeductions] = "4105",
-    };
+    /// <summary>
+    /// Default posting-key mapping (draft §2): every key's template account (<c>PostingKeyDef.TemplateAccountCode</c>, given with the key by its
+    /// product since Stage 3 session 6c), in the PRD order of the catalogue.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> Mapping(IPostingKeyCatalog catalog) =>
+        catalog.All.Where(k => k.TemplateAccountCode is not null).ToDictionary(k => k.Key, k => k.TemplateAccountCode!, StringComparer.Ordinal);
 
     /// <summary>An account is postable when no other template account names it as parent.</summary>
     public static bool IsLeaf(string code) => Accounts.All(a => a.ParentCode != code);

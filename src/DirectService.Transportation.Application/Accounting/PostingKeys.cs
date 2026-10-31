@@ -22,24 +22,28 @@ public static class PostingKeys
     public const string OpeningBalanceDifference = AccountingPostingKeys.OpeningBalanceDifference;
     public const string SupplierDeductions = AccountingPostingKeys.SupplierDeductions;
 
-    /// <summary>A posting key; an <paramref name="Optional"/> key is needed only by the documents that use it (never for "posting ready").</summary>
-    public sealed record Definition(string Key, string NameAr, string NameEn, bool RequiredOnlyDuringSetup, bool Optional = false);
+    /// <summary>
+    /// A posting key; an <paramref name="Optional"/> key is needed only by the documents that use it (never for "posting ready"). Its
+    /// <paramref name="TemplateAccountCode"/> is the chart template account it is mapped to (draft §2; with the key since Stage 3 session 6c).
+    /// </summary>
+    public sealed record Definition(string Key, string NameAr, string NameEn, bool RequiredOnlyDuringSetup, bool Optional = false,
+        string? TemplateAccountCode = null);
 
     /// <summary>All keys in the order of PRD 7.5.1.</summary>
     public static readonly IReadOnlyList<Definition> All =
     [
-        new(DriverWageExpense, "مصروف أجور السائقين", "Driver wage expense", false),
-        new(DriverPayable, "ذمم السائقين الدائنة", "Driver payable", false),
-        new(PartnerCostExpense, "مصروف تكلفة الشركاء", "Partner cost expense", false),
-        new(PartnerPayable, "ذمم الشركاء الدائنة", "Partner payable", false),
-        new(TradeReceivables, "ذمم العملاء", "Trade receivables", false),
-        new(DiscountAllowed, "الخصم المسموح به", "Discount allowed", false),
-        new(TransportRevenue, "إيرادات النقل", "Transport revenue", false),
-        new(OtherRevenue, "إيرادات أخرى (رسوم إضافية)", "Other revenue (extra fees)", false),
+        new(DriverWageExpense, "مصروف أجور السائقين", "Driver wage expense", false, TemplateAccountCode: "5101"),
+        new(DriverPayable, "ذمم السائقين الدائنة", "Driver payable", false, TemplateAccountCode: "2102"),
+        new(PartnerCostExpense, "مصروف تكلفة الشركاء", "Partner cost expense", false, TemplateAccountCode: "5102"),
+        new(PartnerPayable, "ذمم الشركاء الدائنة", "Partner payable", false, TemplateAccountCode: "2103"),
+        new(TradeReceivables, "ذمم العملاء", "Trade receivables", false, TemplateAccountCode: "110301"),
+        new(DiscountAllowed, "الخصم المسموح به", "Discount allowed", false, TemplateAccountCode: "4104"),
+        new(TransportRevenue, "إيرادات النقل", "Transport revenue", false, TemplateAccountCode: "4101"),
+        new(OtherRevenue, "إيرادات أخرى (رسوم إضافية)", "Other revenue (extra fees)", false, TemplateAccountCode: "4102"),
         Acc(SalesTaxOutput),
         Acc(SalesTaxInput),
-        new(DriverAdvances, "سلف السائقين", "Driver advances", false),
-        new(DriverDeductions, "خصومات السائقين", "Driver deductions", false),
+        new(DriverAdvances, "سلف السائقين", "Driver advances", false, TemplateAccountCode: "1104"),
+        new(DriverDeductions, "خصومات السائقين", "Driver deductions", false, TemplateAccountCode: "4103"),
         Acc(OpeningBalanceDifference),
         Acc(SupplierDeductions),
     ];
@@ -48,7 +52,7 @@ public static class PostingKeys
     private static Definition Acc(string key)
     {
         var d = AccountingPostingKeys.Get(key);
-        return new(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional);
+        return new(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, d.TemplateAccountCode);
     }
 
     public static Definition? Find(string? key) => All.FirstOrDefault(d => d.Key == key);
@@ -72,7 +76,7 @@ public static class PostingKeys
 public sealed class PostingKeyCatalog : IPostingKeyCatalog
 {
     public IReadOnlyList<DirectService.Accounting.Contracts.Posting.PostingKeyDef> All { get; } = PostingKeys.All
-        .Select(d => new DirectService.Accounting.Contracts.Posting.PostingKeyDef(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, ChartTemplate.Mapping.GetValueOrDefault(d.Key)))
+        .Select(d => new DirectService.Accounting.Contracts.Posting.PostingKeyDef(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, d.TemplateAccountCode))
         .ToList();
 
     public IReadOnlyList<string> Names(IEnumerable<string> keys, string? language) => PostingKeys.Names(keys, language);

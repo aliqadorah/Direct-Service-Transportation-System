@@ -65,15 +65,16 @@ public sealed class AccountingUnitTests
     [Fact]
     public void Template_maps_every_posting_key_to_a_leaf_account()
     {
-        Assert.Equal(PostingKeys.All.Select(k => k.Key).Order(), ChartTemplate.Mapping.Keys.Order());
-        foreach (var (key, code) in ChartTemplate.Mapping)
+        var mapping = ChartTemplate.Mapping(new PostingKeyCatalog());
+        Assert.Equal(PostingKeys.All.Select(k => k.Key).Order(), mapping.Keys.Order());
+        foreach (var (key, code) in mapping)
         {
             Assert.True(ChartTemplate.IsLeaf(code), $"{key} → {code} is not postable");
         }
         Assert.True(ChartTemplate.IsLeaf(ChartTemplate.MainCashBoxAccountCode));
         // Owner choices on the draft's points 1–3 (D-10)
-        Assert.Equal("4104", ChartTemplate.Mapping[PostingKeys.DiscountAllowed]);
-        Assert.Equal("4103", ChartTemplate.Mapping[PostingKeys.DriverDeductions]);
+        Assert.Equal("4104", mapping[PostingKeys.DiscountAllowed]);
+        Assert.Equal("4103", mapping[PostingKeys.DriverDeductions]);
         Assert.Equal("Asset", ChartTemplate.Accounts.Single(a => a.Code == "1203").Type);
     }
 

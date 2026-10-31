@@ -15,6 +15,6 @@ public sealed class ProductPostingKeys(string productCode) : Contract.IPostingKe
     public string ProductCode => productCode;
 
     public IReadOnlyList<Contract.PostingKeyDef> Keys { get; } = PostingKeys.All.Where(d => d.Key.StartsWith(productCode + ".", StringComparison.Ordinal))
-        .Select(d => new Contract.PostingKeyDef(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, ChartTemplate.Mapping.GetValueOrDefault(d.Key)))
+        .Select(d => new Contract.PostingKeyDef(d.Key, d.NameAr, d.NameEn, d.RequiredOnlyDuringSetup, d.Optional, d.TemplateAccountCode))
         .ToList();
 }

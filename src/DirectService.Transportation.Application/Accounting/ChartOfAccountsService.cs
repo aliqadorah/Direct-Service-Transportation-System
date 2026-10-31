@@ -15,7 +15,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// template (D-10). Rules: a child has its parent's type; only leaf accounts are postable; an account that carries
 /// entries, openings or links cannot receive children or stop being postable; a mapped account cannot be deactivated.
 /// </summary>
-public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, IRequestContext ctx)
+public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenService tokens, IChangeContext changes, IRequestContext ctx, IPostingKeyCatalog keys)
 {
     // ------------------------------------------------------------ queries
 
@@ -231,10 +231,11 @@ public sealed partial class ChartOfAccountsService(IAppDbContext db, IUrlTokenSe
                 db.Set<CashBox>().Add(new CashBox { Name = ChartTemplate.MainCashBoxNameAr, AccountId = created[ChartTemplate.MainCashBoxAccountCode].Id });
                 cashBoxes = 1;
             }
-            foreach (var (key, code) in ChartTemplate.Mapping)
+            var mapping = ChartTemplate.Mapping(keys);
+            foreach (var (key, code) in mapping)
                 db.Set<PostingKeyMapping>().Add(new PostingKeyMapping { PostingKey = key, AccountId = created[code].Id });
             await db.SaveChangesAsync(c).ConfigureAwait(false);
-            return new ChartTemplateResult(created.Count, cashBoxes, ChartTemplate.Mapping.Count);
+            return new ChartTemplateResult(created.Count, cashBoxes, mapping.Count);
         }, ct).ConfigureAwait(false);
     }
 
