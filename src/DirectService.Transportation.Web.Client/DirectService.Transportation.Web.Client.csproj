@@ -21,6 +21,8 @@
     <ProjectReference Include="..\Shared\DirectService.Shared.UI\DirectService.Shared.UI.csproj" />
     <!-- Platform pages, layouts and banners (Stage 2 session 15). -->
     <ProjectReference Include="..\Platform\DirectService.Platform.UI\DirectService.Platform.UI.csproj" />
+    <!-- Accounting pages (Stage 3; empty until session 14). -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.UI\DirectService.Accounting.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

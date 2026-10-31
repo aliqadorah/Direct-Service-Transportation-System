@@ -25,6 +25,7 @@ dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2007.severity = none
 
-# API tests: in-memory TestServer calls complete immediately; per-call cancellation tokens add noise.
-[tests/DirectService.Transportation.Api.Tests/**.cs]
+# API tests (and the posting snapshot of Accounting.Tests, which drives the same host): in-memory TestServer calls complete immediately;
+# per-call cancellation tokens add noise.
+[{tests/DirectService.Transportation.Api.Tests/**.cs,tests/DirectService.Accounting.Tests/**.cs}]
 dotnet_diagnostic.xUnit1051.severity = none

@@ -12,6 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Platform\DirectService.Platform.Infrastructure\DirectService.Platform.Infrastructure.csproj" />
     <ProjectReference Include="..\DirectService.Transportation.Infrastructure\DirectService.Transportation.Infrastructure.csproj" />
+    <!-- The Accounting module (Stage 3; empty projects from session 1, filled from session 2). -->
+    <ProjectReference Include="..\Modules\Accounting\DirectService.Accounting.Infrastructure\DirectService.Accounting.Infrastructure.csproj" />
     <!-- The migrations assembly (MasterDatabase.MigrationsAssembly): the start-up check applies / counts its migrations (DT-209). -->
     <ProjectReference Include="..\Hosts\DirectService.Database\DirectService.Database.csproj" />
     <ProjectReference Include="..\DirectService.Transportation.Web.Client\DirectService.Transportation.Web.Client.csproj" />

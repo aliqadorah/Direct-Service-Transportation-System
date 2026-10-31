@@ -10,6 +10,14 @@
   <Folder Name="/src/Hosts/">
     <Project Path="src/Hosts/DirectService.Database/DirectService.Database.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Accounting/">
+    <Project Path="src/Modules/Accounting/DirectService.Accounting.Application/DirectService.Accounting.Application.csproj" />
+    <Project Path="src/Modules/Accounting/DirectService.Accounting.Contracts/DirectService.Accounting.Contracts.csproj" />
+    <Project Path="src/Modules/Accounting/DirectService.Accounting.Domain/DirectService.Accounting.Domain.csproj" />
+    <Project Path="src/Modules/Accounting/DirectService.Accounting.Infrastructure/DirectService.Accounting.Infrastructure.csproj" />
+    <Project Path="src/Modules/Accounting/DirectService.Accounting.UI/DirectService.Accounting.UI.csproj" />
+  </Folder>
   <Folder Name="/src/Platform/">
     <Project Path="src/Platform/DirectService.Platform.Application/DirectService.Platform.Application.csproj" />
     <Project Path="src/Platform/DirectService.Platform.Contracts/DirectService.Platform.Contracts.csproj" />
@@ -24,6 +32,7 @@
     <Project Path="src/Shared/DirectService.SharedKernel/DirectService.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DirectService.Accounting.Tests/DirectService.Accounting.Tests.csproj" />
     <Project Path="tests/DirectService.Architecture.Tests/DirectService.Architecture.Tests.csproj" />
     <Project Path="tests/DirectService.Testing/DirectService.Testing.csproj" />
     <Project Path="tests/DirectService.Transportation.Api.Tests/DirectService.Transportation.Api.Tests.csproj" />

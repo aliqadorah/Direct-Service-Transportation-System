@@ -78,6 +78,9 @@ jobs:
             dotnet test --project tests/DirectService.Transportation.$p.Tests -c Release --no-build \
               --coverage --coverage-output-format cobertura --coverage-output $p.cobertura.xml
           done
+          # The Accounting module (Stage 3): the golden posting snapshot drives the host on its own database (same server as DST_API_TEST_DB).
+          dotnet test --project tests/DirectService.Accounting.Tests -c Release --no-build \
+            --coverage --coverage-output-format cobertura --coverage-output Accounting.cobertura.xml
 
       - name: Coverage files
         if: always()
