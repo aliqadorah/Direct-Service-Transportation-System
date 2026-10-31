@@ -6,7 +6,7 @@ using DirectService.Platform.UI.Pages.Settings;
 using DirectService.Shared.UI.Pages.Settings;
 using DirectService.Transportation.Web.Client.Ui;
 using DirectService.Shared.UI.Ui;
-using HistoryEntry = DirectService.Transportation.Contracts.MasterData.HistoryEntry;
+using HistoryEntry = DirectService.Shared.Contracts.History.HistoryEntry;
 
 namespace DirectService.Transportation.UI.Tests;
 

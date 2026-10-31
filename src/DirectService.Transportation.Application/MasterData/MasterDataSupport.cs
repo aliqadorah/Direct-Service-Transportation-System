@@ -7,6 +7,7 @@ using DirectService.Transportation.Application.Common;
 using DirectService.Transportation.Application.Configuration;
 using DirectService.Transportation.Contracts.Errors;
 using DirectService.Transportation.Contracts.MasterData;
+using DirectService.Shared.Contracts.History;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Accounting.Domain.Cfg;
 using DirectService.Transportation.Domain.Common;
@@ -181,20 +182,8 @@ public sealed class MasterDataSupport(IAppDbContext db, IUrlTokenService tokens,
     /// as a sentence in the reader's language with its labelled changes, a journal entry's lines and links to the documents it names
     /// (<see cref="IAuditDescriber"/>). Technical-only edits (e.g. the journal link set by a posting) are left out.
     /// </summary>
-    public async Task<IReadOnlyList<HistoryEntry>> HistoryAsync(string entityType, long entityId, CancellationToken ct)
-    {
-        var companyId = ctx.CompanyId;
-        var rows = await db.Set<AuditLog>().AsNoTracking()
-            .Where(a => a.CompanyId == companyId && a.EntityType == entityType && a.EntityId == entityId)
-            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id).Take(200)
-            .Select(a => new AuditRow(a.Id, a.OccurredAt, a.UserId, a.Action, a.EntityType, a.EntityId, a.OldValues, a.NewValues))
-            .ToListAsync(ct).ConfigureAwait(false);
-        var described = await describer.DescribeAsync(rows, new DescribeOptions(), ct).ConfigureAwait(false);
-        return described.Where(h => !h.IsTechnicalOnly)
-            .Select(h => new HistoryEntry(DateTime.SpecifyKind(h.Row.OccurredAt, DateTimeKind.Utc), h.User, h.Row.Action, h.Reason, h.Changes, h.Sentence, h.ActionLabel,
-                h.Lines.Count == 0 ? null : h.Lines, h.Links.Count == 0 ? null : h.Links))
-            .ToList();
-    }
+    public Task<IReadOnlyList<HistoryEntry>> HistoryAsync(string entityType, long entityId, CancellationToken ct) =>
+        new RecordHistory(db, ctx, describer).HistoryAsync(entityType, entityId, ct);
 
     // ------------------------------------------------------------ market formats and dates
 

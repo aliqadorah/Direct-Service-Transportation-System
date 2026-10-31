@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<CompanySettingsService>();   // profile, logo, market, numbering (Stage 2 session 14; registered by AddApplication before)
         services.AddSingleton<IErrorText, ErrorText>();
         services.AddScoped<RecordSupport>();
+        services.AddScoped<RecordHistory>();   // a record’s readable history for every module (Stage 3 session 6c)
 
         // Identity, plans and subscription invoices (Stage 2 session 13; registered by AddApplication before, same lifetimes).
         services.AddScoped<AccessService>();

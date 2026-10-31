@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using System.Text.Json;
 using DirectService.Transportation.Contracts.MasterData;
 

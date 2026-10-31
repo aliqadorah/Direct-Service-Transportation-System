@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using System.Linq.Expressions;
 using System.Text.RegularExpressions;
 using DirectService.Transportation.Application.Abstractions;

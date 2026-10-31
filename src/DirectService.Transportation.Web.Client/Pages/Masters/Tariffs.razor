@@ -89,7 +89,7 @@
     else
     {
         @* Readable like every record's history (DT-188): the API's sentence and labelled changes. *@
-        <RecordHistory Items="@(_history.Select(h => new DirectService.Transportation.Contracts.MasterData.HistoryEntry(h.At, h.User, h.Action, null, h.Changes,
+        <RecordHistory Items="@(_history.Select(h => new DirectService.Shared.Contracts.History.HistoryEntry(h.At, h.User, h.Action, null, h.Changes,
             h.Text ?? $"{HistAction(h.Action)} — {h.User ?? L["hist.system"]}")).ToList())" />
     }
         }

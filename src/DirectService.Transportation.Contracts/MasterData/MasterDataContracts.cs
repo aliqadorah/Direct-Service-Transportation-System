@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using System.Text.Json;
 using DirectService.Shared.Contracts;
 
@@ -21,15 +22,7 @@ public sealed record ReferenceCount(string Type, string Label, int Count);
 /// <summary>What refers to a record; <see cref="CanDelete"/> is false while anything does (FR-162).</summary>
 public sealed record ReferencesResponse(bool CanDelete, IReadOnlyList<ReferenceCount> References);
 
-/// <summary>
-/// A history entry of a record (FR-166), readable (owner feedback 14 Oct 2026, DT-188): <paramref name="Text"/> is the event as a sentence in
-/// the reader's language ("Ali Ali added the trip to draft invoice INV-00001"), <paramref name="ActionLabel"/> the action in words, the
-/// changes with field labels and formatted values (technical columns left out), <paramref name="Lines"/> the lines of a journal entry posted
-/// with it and <paramref name="Links"/> the documents it names (the screen opens them when the reader may see them).
-/// </summary>
-public sealed record HistoryEntry(DateTime At, string? User, string Action, string? Reason, IReadOnlyList<FieldChange> Changes,
-    string? Text = null, string? ActionLabel = null, IReadOnlyList<HistoryLine>? Lines = null, IReadOnlyList<HistoryLink>? Links = null);
-
+// HistoryEntry: Shared.Contracts (DirectService.Shared.Contracts.History, Stage 3 session 6c).
 // FieldChange, HistoryLine and HistoryLink: Shared.Contracts (the shared audit describer builds them, Stage 2 session 9).
 
 // ---------------------------------------------------------------- drivers with truck (FR-152 … FR-156)

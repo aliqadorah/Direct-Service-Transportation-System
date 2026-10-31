@@ -144,7 +144,7 @@
     private Md.ReferencesResponse? _refs;
     private TItem? _panelItem;
     private Md.ReferencesResponse? _panelRefs;
-    private IReadOnlyList<Md.HistoryEntry>? _panelHistory;
+    private IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>? _panelHistory;
 
     /// <summary>API collection under the company, e.g. "materials", "loading-sites".</summary>
     [Parameter, EditorRequired] public string Path { get; set; } = "";
@@ -295,7 +295,7 @@
         try
         {
             _panelRefs = await Api.GetAsync<Md.ReferencesResponse>(Api.C($"{Path}/{id}/references"));
-            _panelHistory = await Api.GetAsync<IReadOnlyList<Md.HistoryEntry>>(Api.C($"{Path}/{id}/history"));
+            _panelHistory = await Api.GetAsync<IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>>(Api.C($"{Path}/{id}/history"));
         }
         catch (ApiException e) { _panel = false; Toasts.Error(e.Problem.Detail ?? L["ui.loadFailed"]); }
     }

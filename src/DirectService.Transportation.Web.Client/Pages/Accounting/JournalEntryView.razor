@@ -67,7 +67,7 @@
 
 @code {
     private JournalEntryResponse? _e;
-    private IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>? _history;
+    private IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>? _history;
     private LoadState _state = LoadState.Loading;
     private string? _reference, _error;
     private bool _voiding, _busy;
@@ -88,7 +88,7 @@
             _history = null;
             if (Shell.Can(PermissionKeys.AcctView))
             {
-                try { _history = await Api.GetAsync<IReadOnlyList<DirectService.Transportation.Contracts.MasterData.HistoryEntry>>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}/history")); }
+                try { _history = await Api.GetAsync<IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>>(Api.C($"accounting/journal-entries/{Uri.EscapeDataString(Id)}/history")); }
                 catch (ApiException) { }
             }
             _state = LoadState.Ready;

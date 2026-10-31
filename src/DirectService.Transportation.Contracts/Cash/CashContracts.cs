@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Transportation.Contracts.Trips;
 

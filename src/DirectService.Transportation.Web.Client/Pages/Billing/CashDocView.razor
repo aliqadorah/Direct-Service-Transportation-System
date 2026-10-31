@@ -55,7 +55,7 @@
     [Parameter] public string? AmountLabel { get; set; }
     [Parameter] public string AmountInWords { get; set; } = "";
     [Parameter] public Contracts.Trips.DocRef? Entry { get; set; }
-    [Parameter] public IReadOnlyList<Contracts.MasterData.HistoryEntry> History { get; set; } = [];
+    [Parameter] public IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry> History { get; set; } = [];
     [Parameter] public string PrintHref { get; set; } = "";
     [Parameter] public bool CanVoid { get; set; }
     [Parameter] public string? VoidText { get; set; }

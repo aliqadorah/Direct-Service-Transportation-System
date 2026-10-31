@@ -178,7 +178,7 @@
     private string _type = BudgetGrid.TypePl;
     private string? _centre, _search, _yearlyText;
     private int _fillFrom;
-    private IReadOnlyList<Md.HistoryEntry>? _history;
+    private IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>? _history;
     private IReadOnlyList<string>? _extra;
     private ProblemValidator? _problems;
     private ErrorSummary? _summary;
@@ -454,7 +454,7 @@
     {
         _historyOpen = true;
         if (_b is null) return;
-        try { _history = await Api.GetAsync<IReadOnlyList<Md.HistoryEntry>>(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/history")); }
+        try { _history = await Api.GetAsync<IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry>>(Api.C($"accounting/budgets/{Uri.EscapeDataString(_b.Id)}/history")); }
         catch (ApiException) { _history = []; }
     }
 

@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Transportation.Contracts.Cash;

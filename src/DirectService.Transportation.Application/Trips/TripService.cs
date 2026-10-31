@@ -1,3 +1,4 @@
+using DirectService.Shared.Contracts.History;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Text.Json;

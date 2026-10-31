@@ -26,10 +26,10 @@ else
 }
 
 @code {
-    [Parameter, EditorRequired] public IReadOnlyList<Md.HistoryEntry> Items { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<DirectService.Shared.Contracts.History.HistoryEntry> Items { get; set; } = [];
 
     /// <summary>An entry without the API's sentence (an older server): "action — user".</summary>
-    private string Fallback(Md.HistoryEntry h)
+    private string Fallback(DirectService.Shared.Contracts.History.HistoryEntry h)
     {
         var action = h.ActionLabel ?? (L["hist." + h.Action] is var t && !t.StartsWith("hist.", StringComparison.Ordinal) ? t : h.Action);
         return $"{action} — {h.User ?? L["hist.system"]}";
