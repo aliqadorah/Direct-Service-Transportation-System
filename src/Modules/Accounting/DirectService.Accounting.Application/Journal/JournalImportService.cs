@@ -1,14 +1,13 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Application.Parties;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
+using DirectService.Accounting.Application.Books;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Accounting.Domain.Cfg;
-using DirectService.Transportation.Domain.Trn;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Journal;
 
 /// <summary>
 /// Manual journal import (acc.acct.post; FR-114). One row per line; rows with the same entry reference form one entry.
@@ -20,7 +19,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// tax and the entry must balance with the tax (DT-255).
 /// </summary>
 public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService sheets, IRequestContext ctx, IUrlTokenService tokens,
-    PostingEngine engine, IErrorText errorText)
+    PostingEngine engine, IErrorText errorText, PartyResolver parties)
 {
     public const string EntityType = "ACC.JournalEntry";
 
@@ -65,7 +64,7 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
     public async Task<ImportResult> ImportAsync(Stream content, string fileName, long length, CancellationToken ct)
     {
         var (entries, preview) = await AnalyseAsync(content, fileName, length, ct).ConfigureAwait(false);
-        if (preview.RejectedRows > 0) throw Fail.Rule(ErrorCodes.ImportHasErrors, preview.RejectedRows);
+        if (preview.RejectedRows > 0) throw Fail.Rule(SharedErrorCodes.ImportHasErrors, preview.RejectedRows);
         var batch = await db.InTransactionAsync(async c =>
         {
             foreach (var e in entries)
@@ -105,32 +104,32 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         foreach (var s in sheet.Rows)
         {
             var reference = TextNormalizer.CleanCode(s[refCol]);
-            if (reference is null) p.Add(s.RowNumber, null, ErrorCodes.ImportInvalid, Label("ref"), s[refCol]);
+            if (reference is null) p.Add(s.RowNumber, null, SharedErrorCodes.ImportInvalid, Label("ref"), s[refCol]);
             DateOnly? entryDate = ImportParse.TryDate(s[date], out var dt) ? dt : null;
-            if (entryDate is null) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("date"), s[date]);
+            if (entryDate is null) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("date"), s[date]);
             else if (closed.Contains(AccountingCodes.Month(dt)))
-                p.Add(s.RowNumber, reference, ErrorCodes.PeriodClosed, dt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), AccountingCodes.Month(dt));
+                p.Add(s.RowNumber, reference, AccountingErrorCodes.PeriodClosed, dt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), AccountingCodes.Month(dt));
             var description = TextNormalizer.CleanText(s[desc]);
-            if (description is null || description.Length > DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("description"), s[desc]);
+            if (description is null || description.Length > DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("description"), s[desc]);
             var entryReference = referenceCol < 0 ? null : TextNormalizer.CleanText(s[referenceCol]);
-            if (entryReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("reference"), entryReference[..20]);
+            if (entryReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("reference"), entryReference[..20]);
 
             long? accountId = null;
             var code = TextNormalizer.CleanCode(s[account]);
             var acc = code is null ? null : accounts.GetValueOrDefault(code);
-            if (acc is null) p.Add(s.RowNumber, reference, ErrorCodes.ImportUnknown, Label("account"), s[account]);
-            else if (acc.Status != AccountingCodes.Active || !acc.IsPostable || acc.HasChildren) p.Add(s.RowNumber, reference, ErrorCodes.AccountNotPostable, acc.Code);
+            if (acc is null) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportUnknown, Label("account"), s[account]);
+            else if (acc.Status != AccountingCodes.Active || !acc.IsPostable || acc.HasChildren) p.Add(s.RowNumber, reference, AccountingErrorCodes.AccountNotPostable, acc.Code);
             else accountId = acc.Id;
 
             var amountsOk = ImportParse.TryAmount(s[debit], decimals, out var d) & ImportParse.TryAmount(s[credit], decimals, out var cr);
-            if (!amountsOk || (d > 0) == (cr > 0)) p.Add(s.RowNumber, reference, ErrorCodes.JournalLineAmount, s.RowNumber);
+            if (!amountsOk || (d > 0) == (cr > 0)) p.Add(s.RowNumber, reference, AccountingErrorCodes.JournalLineAmount, s.RowNumber);
 
             long? centreId = null;
             var centreCode = TextNormalizer.CleanCode(s[centre]);
             if (centreCode is not null)
             {
-                if (!centres.TryGetValue(centreCode, out var cc)) p.Add(s.RowNumber, reference, ErrorCodes.ImportUnknown, Label("centre"), centreCode);
-                else if (cc.Status != AccountingCodes.Active) p.Add(s.RowNumber, reference, ErrorCodes.RecordArchived, centreCode);
+                if (!centres.TryGetValue(centreCode, out var cc)) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportUnknown, Label("centre"), centreCode);
+                else if (cc.Status != AccountingCodes.Active) p.Add(s.RowNumber, reference, SharedErrorCodes.RecordArchived, centreCode);
                 else centreId = cc.Id;
             }
 
@@ -140,36 +139,36 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             if (!string.IsNullOrWhiteSpace(typeText) || !string.IsNullOrWhiteSpace(partyText))
             {
                 var type = typeText is null ? null : PartyTypeNames.GetValueOrDefault(TextNormalizer.Key(typeText));
-                if (type is null) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("partyType"), typeText);
+                if (type is null) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("partyType"), typeText);
                 else if (partyKeys.TryGetValue((type, TextNormalizer.Key(partyText)), out var partyId) && partyId == Ambiguous)
-                    p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("party"), partyText + " (×2)");
+                    p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("party"), partyText + " (×2)");
                 else if (partyKeys.TryGetValue((type, TextNormalizer.Key(partyText)), out partyId))
                 {
                     var resolvedType = type == SupplierKey ? AccountingCodes.PartyApAr : type;
-                    postingParty = new PostingParty(PartyResolver.ModuleOf(resolvedType), resolvedType, partyId);
+                    postingParty = new PostingParty(parties.ModuleOf(resolvedType), resolvedType, partyId);
                 }
-                else p.Add(s.RowNumber, reference, ErrorCodes.ImportUnknown, Label("party"), partyText);
+                else p.Add(s.RowNumber, reference, SharedErrorCodes.ImportUnknown, Label("party"), partyText);
             }
             if (acc is { IsControlAccount: true })
             {
-                if (postingParty is null && !p.Has(s.RowNumber)) p.Add(s.RowNumber, reference, ErrorCodes.ControlPartyRequired, s.RowNumber, acc.Code, acc.ControlPartyType);
+                if (postingParty is null && !p.Has(s.RowNumber)) p.Add(s.RowNumber, reference, AccountingErrorCodes.ControlPartyRequired, s.RowNumber, acc.Code, acc.ControlPartyType);
                 else if (postingParty is not null && !DirectService.Accounting.Contracts.Posting.PostingRules.PartyMatches(acc.ControlPartyType, postingParty.Module, postingParty.Type, postingParty.Id, apArRoles))
-                    p.Add(s.RowNumber, reference, ErrorCodes.ControlPartyMismatch, s.RowNumber, acc.Code, acc.ControlPartyType);
+                    p.Add(s.RowNumber, reference, AccountingErrorCodes.ControlPartyMismatch, s.RowNumber, acc.Code, acc.ControlPartyType);
             }
             var noteText = TextNormalizer.CleanText(s[note]);
-            if (noteText is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.NoteMax }) p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, Label("note"), noteText[..20]);
+            if (noteText is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.NoteMax }) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, Label("note"), noteText[..20]);
 
             // DT-254 / DT-255: line reference, tax code and tax account (labels from FieldLabels).
             var lineReference = TextNormalizer.CleanText(s[lineReferenceCol]);
             if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax })
-                p.Add(s.RowNumber, reference, ErrorCodes.ImportInvalid, new FieldRef("lineReference"), lineReference[..20]);
+                p.Add(s.RowNumber, reference, SharedErrorCodes.ImportInvalid, new FieldRef("lineReference"), lineReference[..20]);
             long? taxCodeId = null, taxAccountId = null;
             decimal tax = 0;
             var taxCodeText = TextNormalizer.CleanCode(s[taxCodeCol]);
             if (taxCodeText is not null)
             {
-                if (!taxCodes.TryGetValue(taxCodeText, out var taxCode)) p.Add(s.RowNumber, reference, ErrorCodes.ImportUnknown, new FieldRef("taxCode"), taxCodeText);
-                else if (taxCode.Status != AccountingCodes.Active) p.Add(s.RowNumber, reference, ErrorCodes.TaxCodeInactive, s.RowNumber, taxCode.Code);
+                if (!taxCodes.TryGetValue(taxCodeText, out var taxCode)) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportUnknown, new FieldRef("taxCode"), taxCodeText);
+                else if (taxCode.Status != AccountingCodes.Active) p.Add(s.RowNumber, reference, AccountingErrorCodes.TaxCodeInactive, s.RowNumber, taxCode.Code);
                 else
                 {
                     taxCodeId = taxCode.Id;
@@ -178,10 +177,10 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
                     var taxAcc = taxAccountCode is null ? null : accounts.GetValueOrDefault(taxAccountCode);
                     // A 0 % code needs no tax account and makes no tax line.
                     if (taxCode.Rate == 0) taxAccountId = null;
-                    else if (taxAccountCode is null) p.Add(s.RowNumber, reference, ErrorCodes.TaxAccountRequired, s.RowNumber, taxCode.Code);
-                    else if (taxAcc is null) p.Add(s.RowNumber, reference, ErrorCodes.ImportUnknown, new FieldRef("taxAccount"), taxAccountCode);
+                    else if (taxAccountCode is null) p.Add(s.RowNumber, reference, AccountingErrorCodes.TaxAccountRequired, s.RowNumber, taxCode.Code);
+                    else if (taxAcc is null) p.Add(s.RowNumber, reference, SharedErrorCodes.ImportUnknown, new FieldRef("taxAccount"), taxAccountCode);
                     else if (!taxAcc.IsTaxAccount || taxAcc.IsControlAccount || taxAcc.Status != AccountingCodes.Active || !taxAcc.IsPostable || taxAcc.HasChildren)
-                        p.Add(s.RowNumber, reference, ErrorCodes.TaxAccountInvalid, s.RowNumber, taxAcc.Code);
+                        p.Add(s.RowNumber, reference, AccountingErrorCodes.TaxAccountInvalid, s.RowNumber, taxAcc.Code);
                     else taxAccountId = taxAcc.Id;
                 }
             }
@@ -195,8 +194,8 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
         {
             var first = group.First();
             foreach (var l in group.Skip(1).Where(l => l.Date != first.Date || l.Description != first.Description || (l.Reference is not null && l.Reference != first.Reference)))
-                p.Add(l.Row, l.Ref, ErrorCodes.ImportInvalid, Label("sameEntry"), l.Ref);
-            if (group.Count() < 2) p.Add(first.Row, first.Ref, ErrorCodes.JournalMinLines);
+                p.Add(l.Row, l.Ref, SharedErrorCodes.ImportInvalid, Label("sameEntry"), l.Ref);
+            if (group.Count() < 2) p.Add(first.Row, first.Ref, AccountingErrorCodes.JournalMinLines);
             // Balanced including the tax, which is added on the same side as its line (DT-255).
             var taxDr = group.Where(l => l.Debit > 0).Sum(l => l.Tax);
             var taxCr = group.Where(l => l.Debit == 0).Sum(l => l.Tax);
@@ -206,8 +205,8 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
             {
                 foreach (var l in group)
                 {
-                    if (taxDr + taxCr > 0) p.Add(l.Row, l.Ref, ErrorCodes.JournalUnbalancedWithTax, Money.Format(dr), Money.Format(taxDr), Money.Format(crTotal), Money.Format(taxCr));
-                    else p.Add(l.Row, l.Ref, ErrorCodes.JournalUnbalanced, Money.Format(dr), Money.Format(crTotal));
+                    if (taxDr + taxCr > 0) p.Add(l.Row, l.Ref, AccountingErrorCodes.JournalUnbalancedWithTax, Money.Format(dr), Money.Format(taxDr), Money.Format(crTotal), Money.Format(taxCr));
+                    else p.Add(l.Row, l.Ref, AccountingErrorCodes.JournalUnbalanced, Money.Format(dr), Money.Format(crTotal));
                 }
             }
             if (first.Date is DateOnly entryDate && first.Description is not null)
@@ -226,20 +225,10 @@ public sealed class JournalImportService(IAppDbContext db, ISpreadsheetService s
     {
         var map = new Dictionary<(string, string), long>();
         void Put(string type, string key, long id) => map[(type, key)] = map.TryGetValue((type, key), out var existing) && existing != id ? Ambiguous : id;
-        foreach (var c in await db.Set<Customer>().AsNoTracking().Where(x => x.Status != AccountingCodes.Archived).Select(x => new { x.Id, x.Name })
-                     .ToListAsync(ct).ConfigureAwait(false))
-            Put(AccountingCodes.PartyCustomer, TextNormalizer.Key(c.Name), c.Id);
-        foreach (var d in await db.Set<Driver>().AsNoTracking().Where(x => x.Status != AccountingCodes.Archived).Select(x => new { x.Id, x.NationalId })
-                     .ToListAsync(ct).ConfigureAwait(false))
-            Put(AccountingCodes.PartyDriver, TextNormalizer.Key(d.NationalId), d.Id);
-        foreach (var x in await db.Set<Partner>().AsNoTracking().Where(x => x.Status != AccountingCodes.Archived).Select(x => new { x.Id, x.Name })
-                     .ToListAsync(ct).ConfigureAwait(false))
-            Put(AccountingCodes.PartyPartner, TextNormalizer.Key(x.Name), x.Id);
-        foreach (var x in await db.Set<ApArParty>().AsNoTracking().Where(x => x.Status != AccountingCodes.Archived).Select(x => new { x.Id, x.Name, x.PartyRole })
-                     .ToListAsync(ct).ConfigureAwait(false))
+        foreach (var (type, k) in await parties.ImportKeysAsync(ct).ConfigureAwait(false))
         {
-            Put(AccountingCodes.PartyApAr, TextNormalizer.Key(x.Name), x.Id);
-            if (x.PartyRole == "Supplier") Put(SupplierKey, TextNormalizer.Key(x.Name), x.Id);
+            Put(type, TextNormalizer.Key(k.Key), k.Id);
+            if (type == AccountingCodes.PartyApAr && k.Role == "Supplier") Put(SupplierKey, TextNormalizer.Key(k.Key), k.Id);
         }
         return map;
     }

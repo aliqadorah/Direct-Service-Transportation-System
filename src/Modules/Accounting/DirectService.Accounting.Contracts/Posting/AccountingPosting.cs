@@ -97,3 +97,25 @@ public interface IPostingKeyProvider
 
     IReadOnlyList<PostingKeyDef> Keys { get; }
 }
+
+/// <summary>
+/// The source documents of entries as links (Stage 3 session 6c): each (module, type, id) triple with a handler of the contract becomes the
+/// document's link (type, token, number); triples without a handler are left out.
+/// </summary>
+public interface IPostingSourceLinks
+{
+    Task<Dictionary<(string Module, string Type, long Id), DirectService.Accounting.Contracts.Accounting.SourceDocumentRef>> DescribeAsync(
+        IEnumerable<(string Module, string? Type, long? Id)> sources, CancellationToken ct);
+}
+
+/// <summary>
+/// The void reasons of a module's documents (Stage 3 session 6c): the journal shows why an automatic entry of a voided document was reversed.
+/// Only documents that exist (query filters apply) are returned; a reason may be empty.
+/// </summary>
+public interface IDocumentVoidReasonSource
+{
+    /// <summary>The source types of entries (acc.JournalEntries.SourceType) the module answers for.</summary>
+    IReadOnlyList<string> Types { get; }
+
+    Task<IReadOnlyDictionary<long, string?>> VoidReasonsAsync(string type, IReadOnlyCollection<long> ids, CancellationToken ct);
+}

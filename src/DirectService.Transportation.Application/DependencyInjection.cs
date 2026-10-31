@@ -52,21 +52,16 @@ public static class DependencyInjection
         services.AddSingleton<IPostingKeyCatalog, PostingKeyCatalog>();   // the engine's key list in the PRD order (Stage 3 session 4a)
 
         // Accounting core (B2); the posting engine and the posting contract are registered by Accounting (AddAccountingApplication, session 4a).
-        services.AddScoped<PostingSources>();
+        services.AddScoped<DirectService.Accounting.Contracts.Parties.IPartyProvider, TransportPartyProvider>();   // customers, drivers, partners on entry lines (Stage 3 session 6c)
+        services.AddScoped<DirectService.Accounting.Contracts.Posting.IDocumentVoidReasonSource, TransportVoidReasons>();   // why a voided document's entry was reversed (Stage 3 session 6c)
         services.AddScoped<DirectService.Accounting.Contracts.Modules.IMoneyAccountUseSource, Cash.MoneyAccountUses>();   // cash box / bank delete check (Stage 3 session 6c)
-        services.AddScoped<PendingPostingService>();
         services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleTrn));
-        services.AddScoped<PartyResolver>();
-        services.AddScoped<JournalService>();
-        services.AddScoped<JournalDraftService>();
         services.AddScoped<JournalTemplateService>();
         services.AddScoped<TaxCodeService>();
         services.AddScoped<AccountingDashboardService>();
         services.AddScoped<Budgets.BudgetService>();
         services.AddScoped<Budgets.BudgetImportService>();
         services.AddScoped<Budgets.BudgetReportService>();
-        services.AddScoped<JournalExportService>();
-        services.AddScoped<JournalImportService>();
 
         // Master data and field configuration (B3)
         services.AddScoped<IFieldCatalogProvider, TransportationFieldCatalog>();

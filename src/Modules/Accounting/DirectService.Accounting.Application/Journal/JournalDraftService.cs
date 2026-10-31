@@ -1,14 +1,14 @@
+using DirectService.Accounting.Application.Parties;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
+using DirectService.Accounting.Application.Books;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Journal;
 
 /// <summary>
 /// Journal entry drafts (revision 6, owner change request 15 Oct 2026): "Save as draft" on the new journal entry screen. A draft has no JV
@@ -71,16 +71,16 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         db.ExpectRowVersion(draft, rowVersion);
         var lines = Read(draft.Lines);
         new Validator()
-            .Check(draft.EntryDate is not null, "entryDate", ErrorCodes.ValidationRequired)
+            .Check(draft.EntryDate is not null, "entryDate", SharedErrorCodes.ValidationRequired)
             .Require("description", draft.Description)
             .ThrowIfInvalid();
-        if (lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
+        if (lines.Count < 2) throw Fail.Rule(AccountingErrorCodes.JournalMinLines);
         var posting = new List<PostingLine>(lines.Count);
         for (var i = 0; i < lines.Count; i++)
         {
             var l = lines[i];
-            if (l.AccountId is null) throw Fail.Field($"lines[{i}].accountId", ErrorCodes.ValidationRequired, new FieldRef($"lines[{i}].accountId"));
-            var party = l.PartyType is not null && l.PartyId is long pid ? new PostingParty(PartyResolver.ModuleOf(l.PartyType), l.PartyType, pid) : null;
+            if (l.AccountId is null) throw Fail.Field($"lines[{i}].accountId", SharedErrorCodes.ValidationRequired, new FieldRef($"lines[{i}].accountId"));
+            var party = l.PartyType is not null && l.PartyId is long pid ? new PostingParty(parties.ModuleOf(l.PartyType), l.PartyType, pid) : null;
             posting.Add(new PostingLine(null, l.AccountId, l.Debit, l.Credit, l.CostCentreId, party, l.Note, l.Reference, l.TaxCodeId, l.TaxCodeId is null ? null : l.TaxAccountId));
         }
         var request = new PostingRequest(draft.EntryDate!.Value, draft.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true,
@@ -172,8 +172,8 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         new Validator()
             .MaxLength("description", description, DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax)
             .MaxLength("reference", reference, DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
-            .Check(input.Count <= 500, "lines", ErrorCodes.ValidationRange)
-            .Check(description is not null || input.Count > 0, "description", ErrorCodes.ValidationRequired)
+            .Check(input.Count <= 500, "lines", SharedErrorCodes.ValidationRange)
+            .Check(description is not null || input.Count > 0, "description", SharedErrorCodes.ValidationRequired)
             .ThrowIfInvalid();
         var lines = new List<DraftLine>(input.Count);
         var rates = await db.Set<TaxCode>().AsNoTracking().ToDictionaryAsync(t => t.PublicId, t => (t.Id, t.Rate), ct).ConfigureAwait(false);
@@ -183,34 +183,34 @@ public sealed class JournalDraftService(IAppDbContext db, PostingEngine engine, 
         {
             var l = input[i];
             var field = $"lines[{i}]";
-            if (l.Debit < 0 || l.Credit < 0) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
+            if (l.Debit < 0 || l.Credit < 0) throw Fail.Field(field + ".debit", SharedErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
             long? accountId = null, centreId = null;
             if (!string.IsNullOrEmpty(l.AccountId))
             {
-                var pid = tokens.Decode<Account>(l.AccountId) ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
+                var pid = tokens.Decode<Account>(l.AccountId) ?? throw Fail.Field(field + ".accountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
                 accountId = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == pid).Select(a => (long?)a.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                    ?? throw Fail.Field(field + ".accountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
+                    ?? throw Fail.Field(field + ".accountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
             }
             if (!string.IsNullOrEmpty(l.CostCentreId))
             {
-                var pid = tokens.Decode<CostCentre>(l.CostCentreId) ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
+                var pid = tokens.Decode<CostCentre>(l.CostCentreId) ?? throw Fail.Field(field + ".costCentreId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
                 centreId = await db.Set<CostCentre>().AsNoTracking().Where(c => c.PublicId == pid).Select(c => (long?)c.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                    ?? throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
+                    ?? throw Fail.Field(field + ".costCentreId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             }
             var party = l.Party is { Type: not null } && !string.IsNullOrEmpty(l.Party.Id)
                 ? await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false) : null;
             var lineReference = TextNormalizer.CleanText(l.Reference);
-            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", SharedErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
             (long Id, decimal Rate)? code = null;
             if (!string.IsNullOrEmpty(l.TaxCodeId))
                 code = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && rates.TryGetValue(tg, out var c) ? c
-                    : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+                    : throw Fail.Field(field + ".taxCodeId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
             long? taxAccountId = null;
             if (code is not null && !string.IsNullOrEmpty(l.TaxAccountId))
             {
-                var pid = tokens.Decode<Account>(l.TaxAccountId) ?? throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+                var pid = tokens.Decode<Account>(l.TaxAccountId) ?? throw Fail.Field(field + ".taxAccountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
                 taxAccountId = await db.Set<Account>().AsNoTracking().Where(a => a.PublicId == pid).Select(a => (long?)a.Id).SingleOrDefaultAsync(ct).ConfigureAwait(false)
-                    ?? throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+                    ?? throw Fail.Field(field + ".taxAccountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
             }
             lines.Add(new DraftLine(accountId, l.Debit, l.Credit, centreId, party?.Type, party?.Id, TextNormalizer.CleanText(l.Note), lineReference, code?.Id, taxAccountId));
             // Totals as they would post: with the tax of each line on its side (DT-255).

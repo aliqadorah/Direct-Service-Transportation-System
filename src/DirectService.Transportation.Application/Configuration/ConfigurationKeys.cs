@@ -57,7 +57,7 @@ public static class DocumentTypes
     public const string Receivable = "ACC.Receivable";
     public const string ApArPayment = "ACC.ApArPayment";
     public const string ApArReturn = "ACC.ApArReturn";
-    public const string JournalExport = "ACC.JournalExport";
+    public const string JournalExport = AccountingDocumentTypes.JournalExport;
 
     public static readonly IReadOnlyDictionary<string, string> DefaultPrefixes = new Dictionary<string, string>
     {

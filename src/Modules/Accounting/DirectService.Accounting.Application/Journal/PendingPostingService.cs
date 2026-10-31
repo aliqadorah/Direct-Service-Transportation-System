@@ -1,19 +1,19 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Contracts.Accounting;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
+using DirectService.Accounting.Application.Books;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 using Contract = DirectService.Accounting.Contracts.Posting;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Journal;
 
 /// <summary>
 /// The handlers of the posting contract (<see cref="Contract.IPostingSourceHandler"/>) by module and type: each document module (trips B5,
 /// invoices B6, cash documents B8, AP/AR B9) registers one per document type so pending postings can be retried and entries can link back to
 /// their source (FR-097, FR-101, FR-102). The module's own handler interface gave way to the contract's in Stage 3 session 4b.
 /// </summary>
-public sealed class PostingSources(IEnumerable<Contract.IPostingSourceHandler> handlers)
+public sealed class PostingSources(IEnumerable<Contract.IPostingSourceHandler> handlers) : Contract.IPostingSourceLinks
 {
     private readonly Dictionary<(string, string), Contract.IPostingSourceHandler> _byType =
         handlers.ToDictionary(h => (h.Module, h.Type));
@@ -44,7 +44,7 @@ public sealed class PostingSources(IEnumerable<Contract.IPostingSourceHandler> h
 /// open with the new reason and attempt count.
 /// </summary>
 public sealed class PendingPostingService(IAppDbContext db, Contract.IAccountingPosting posting, PostingSources sources, IUrlTokenService tokens,
-    IRequestContext ctx, TimeProvider clock, Microsoft.Extensions.Logging.ILogger<PendingPostingService>? log = null)
+    IRequestContext ctx, TimeProvider clock, IErrorText errorText, Microsoft.Extensions.Logging.ILogger<PendingPostingService>? log = null)
 {
     public async Task<IReadOnlyList<PendingPostingResponse>> ListAsync(CancellationToken ct)
     {
@@ -91,7 +91,7 @@ public sealed class PendingPostingService(IAppDbContext db, Contract.IAccounting
                 var p = await db.Set<PendingPosting>().SingleOrDefaultAsync(x => x.Id == pendingId && x.ResolvedAt == null, c).ConfigureAwait(false);
                 if (p is null) return;
                 var handler = sources.Find(p.SourceModule, p.SourceType);
-                if (handler is null) throw Fail.Rule(ErrorCodes.PendingNoHandler);
+                if (handler is null) throw Fail.Rule(AccountingErrorCodes.PendingNoHandler);
                 // The handler rebuilds the document's entry; it posts through the contract (Stage 3 session 4b).
                 var document = await handler.RebuildAsync(p.SourceId, c).ConfigureAwait(false);
                 if (document is not null)
@@ -108,7 +108,7 @@ public sealed class PendingPostingService(IAppDbContext db, Contract.IAccounting
         }
         catch (AppException ex)
         {
-            failure = ErrorCatalog.Format(ex.Code, ctx.Language, ex.Args);
+            failure = errorText.Format(ex.Code, ctx.Language, ex.Args);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -1,3 +1,4 @@
+using DirectService.Accounting.Application.Journal;
 using System.Data.Common;
 using System.Security.Cryptography;
 using DirectService.Accounting.Application.Posting;
@@ -255,10 +256,10 @@ public sealed class PostingEngineTests(DatabaseFixture db)
         // Retry: no handler registered → stays pending with the reason; with the document's handler → posted and linked.
         var tokens = new UrlTokenService(Options.Create(new UrlTokenOptions { Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
         var posting = new AccountingPostingAdapter(ctx, engine, new NumberingService(ctx, scope), tokens);   // the retry posts through the contract (Stage 3 session 4b)
-        var none = new PendingPostingService(ctx, posting, new PostingSources([]), tokens, Request(l.Tenant), TimeProvider.System);
+        var none = new PendingPostingService(ctx, posting, new PostingSources([]), tokens, Request(l.Tenant), TimeProvider.System, new DirectService.Platform.Application.Errors.ErrorText([new DirectService.Transportation.Application.Abstractions.TransportationErrorTexts()]));
         Assert.False(await none.RetryAsync(pending.Id, Ct));
         var handler = new TripHandler(WageDocument(50));
-        var service = new PendingPostingService(ctx, posting, new PostingSources([handler]), tokens, Request(l.Tenant), TimeProvider.System);
+        var service = new PendingPostingService(ctx, posting, new PostingSources([handler]), tokens, Request(l.Tenant), TimeProvider.System, new DirectService.Platform.Application.Errors.ErrorText([new DirectService.Transportation.Application.Abstractions.TransportationErrorTexts()]));
         Assert.True(await service.RetryAsync(pending.Id, Ct));
         var resolved = await ctx.Set<PendingPosting>().AsNoTracking().SingleAsync(Ct);
         Assert.NotNull(resolved.ResolvedAt);

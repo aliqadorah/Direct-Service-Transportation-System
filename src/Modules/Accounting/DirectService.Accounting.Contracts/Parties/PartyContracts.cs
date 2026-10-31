@@ -1,8 +1,9 @@
+using DirectService.Accounting.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Posting;
 
 namespace DirectService.Accounting.Contracts.Parties;
 
-// First form of the party and source contracts of design b / c (Stage 3 session 2). Nothing implements or calls them yet; the session that
+// First form of the party and source contracts of design b / c (Stage 3 session 2). IPartyProvider is implemented since session 6c; the session that
 // switches each use to its contract may refine its members (sessions 7, 8, 11 of the Stage 3 plan) and records the change as a DT row.
 
 /// <summary>What accounting shows of a party: its name, URL token, active flag and the control-account type its lines need (FR-106).</summary>
@@ -21,8 +22,40 @@ public interface IPartyProvider
     /// <summary>The parties of one type (set-based: one call per type and page).</summary>
     Task<IReadOnlyDictionary<long, PartyInfo>> DescribeAsync(string type, IReadOnlyCollection<long> ids, CancellationToken ct);
 
+    /// <summary>
+    /// A party of one type from its URL token (Stage 3 session 6c): its id and whether it may be chosen on new lines (not archived); null when
+    /// the token is not one of the company’s parties of that type.
+    /// </summary>
+    Task<PartyMatch?> FindAsync(string type, string? token, CancellationToken ct);
+
+    /// <summary>The parties of one type that may be chosen, by the natural key a spreadsheet names them with (DT-27; not normalised).</summary>
+    Task<IReadOnlyList<PartyKey>> ImportKeysAsync(string type, CancellationToken ct);
+
     /// <summary>Every party reference that is the same party (a transport customer and its linked accounting party), the given one included.</summary>
     Task<IReadOnlyList<PartyRef>> SamePartyAsync(PartyRef party, CancellationToken ct);
+}
+
+/// <summary>A party found by its token: its id and whether it may be chosen on new lines (not archived).</summary>
+public sealed record PartyMatch(long Id, bool IsActive);
+
+/// <summary>A party by its natural key for imports (name; national id for drivers), with its role when it has one (an accounting party).</summary>
+public sealed record PartyKey(long Id, string? Key, string? Role = null);
+
+/// <summary>
+/// The parties of every module as the reports show and filter them (Stage 3 session 6c): the party types in the providers’ order, the module of a
+/// type, the id of a party from its token and the display data of the parties of a set of lines.
+/// </summary>
+public interface IPartyLookup
+{
+    IReadOnlyList<string> Types { get; }
+
+    string ModuleOf(string type);
+
+    /// <summary>Internal id of a party of a given type from its token (filters only; null when not found).</summary>
+    Task<long?> IdOfAsync(string type, string? token, CancellationToken ct);
+
+    /// <summary>Display data (token + name) for the parties of a set of lines.</summary>
+    Task<Dictionary<(string Type, long Id), PartyResponse>> DescribeAsync(IEnumerable<(string? Type, long? Id)> parties, CancellationToken ct);
 }
 
 /// <summary>A customer or supplier of the shared register (acc.ApArParties, design b / K-07).</summary>

@@ -241,3 +241,9 @@ public static partial class AccountingCodeRule
     [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z0-9._-]{1,30}$")]
     private static partial System.Text.RegularExpressions.Regex CodePattern();
 }
+
+/// <summary>The default signature labels of printed vouchers and of a new company (accountant, finance manager); with the contracts since Stage 3 session 6c.</summary>
+public static class VoucherSignatures
+{
+    public static readonly IReadOnlyList<string> Default = ["المحاسب", "المدير المالي"];
+}

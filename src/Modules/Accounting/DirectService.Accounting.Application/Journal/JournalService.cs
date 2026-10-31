@@ -1,15 +1,14 @@
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.Platform;
-using DirectService.Transportation.Application.Reports;
-using DirectService.Transportation.Contracts.Accounting;
+using Contract = DirectService.Accounting.Contracts.Posting;
+using DirectService.Accounting.Application.Parties;
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
+using DirectService.Accounting.Application.Books;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Journal;
 
 /// <summary>
 /// Journal (PRD 7.5.3, 7.6.2): manual entries (acc.acct.post — create, edit = reverse + re-post per D-05, void by
@@ -18,7 +17,8 @@ namespace DirectService.Transportation.Application.Accounting;
 /// Automatic entries change only through their source document (FR-112).
 /// </summary>
 public sealed class JournalService(IAppDbContext db, PostingEngine engine, PartyResolver parties, PostingSources sources,
-    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, IReportExporter exporter, JournalDraftService drafts)
+    IUrlTokenService tokens, IRecordLockGuard locks, IRequestContext ctx, IReportExporter exporter, JournalDraftService drafts,
+    IEnumerable<Contract.IDocumentVoidReasonSource> voidSources)
 {
     public const string EntityType = "ACC.JournalEntry";
 
@@ -54,8 +54,8 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
     public async Task<JournalEntryResponse> VoidManualAsync(string token, VoidRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var reason = TextNormalizer.CleanText(r.Reason) ?? throw Fail.Field("reason", ErrorCodes.ReasonRequired);
-        if (reason.Length > 500) throw Fail.Field("reason", ErrorCodes.ValidationRange, new FieldRef("reason"));
+        var reason = TextNormalizer.CleanText(r.Reason) ?? throw Fail.Field("reason", SharedErrorCodes.ReasonRequired);
+        if (reason.Length > 500) throw Fail.Field("reason", SharedErrorCodes.ValidationRange, new FieldRef("reason"));
         var original = await FindManualAsync(token, ct).ConfigureAwait(false);
         await locks.EnsureNotLockedByOthersAsync(EntityType, original.Id, ct).ConfigureAwait(false);
         db.ExpectRowVersion(original, r.RowVersion);
@@ -67,10 +67,10 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
     {
         var publicId = tokens.Decode<JournalEntry>(token) ?? throw Fail.NotFound();
         var e = await db.Set<JournalEntry>().SingleOrDefaultAsync(x => x.PublicId == publicId, ct).ConfigureAwait(false) ?? throw Fail.NotFound();
-        if (!e.IsManual) throw Fail.Rule(ErrorCodes.JournalNotManual);
+        if (!e.IsManual) throw Fail.Rule(AccountingErrorCodes.JournalNotManual);
         // A reversal belongs to the entry it reverses; voiding it would bring the original back (CR-B2-01).
-        if (e.ReversesEntryId is not null) throw Fail.Rule(ErrorCodes.JournalIsReversal, e.Number);
-        if (e.Status != AccountingCodes.Posted) throw Fail.Rule(ErrorCodes.JournalNotPosted, e.Number);
+        if (e.ReversesEntryId is not null) throw Fail.Rule(AccountingErrorCodes.JournalIsReversal, e.Number);
+        if (e.Status != AccountingCodes.Posted) throw Fail.Rule(AccountingErrorCodes.JournalNotPosted, e.Number);
         return e;
     }
 
@@ -80,12 +80,12 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
         ArgumentNullException.ThrowIfNull(r);
         var lines = r.Lines ?? [];
         new Validator()
-            .Check(r.EntryDate is not null, "entryDate", ErrorCodes.ValidationRequired)
+            .Check(r.EntryDate is not null, "entryDate", SharedErrorCodes.ValidationRequired)
             .Require("description", r.Description)
             .MaxLength("reference", TextNormalizer.CleanText(r.Reference), DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
-            .Check(lines.Count <= 500, "lines", ErrorCodes.ValidationRange)
+            .Check(lines.Count <= 500, "lines", SharedErrorCodes.ValidationRange)
             .ThrowIfInvalid();
-        if (lines.Count < 2) throw Fail.Rule(ErrorCodes.JournalMinLines);
+        if (lines.Count < 2) throw Fail.Rule(AccountingErrorCodes.JournalMinLines);
 
         var accountIds = await IdsAsync<Account>(lines.Select(l => l.AccountId).Concat(lines.Select(l => l.TaxAccountId)), ct).ConfigureAwait(false);
         var centreIds = await IdsAsync<CostCentre>(lines.Select(l => l.CostCentreId), ct).ConfigureAwait(false);
@@ -96,20 +96,20 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             var l = lines[i];
             var field = $"lines[{i}]";
             if (l.AccountId is null || !accountIds.TryGetValue(l.AccountId, out var accountId))
-                throw Fail.Field(field + ".accountId", ErrorCodes.ValidationRequired, new FieldRef(field + ".accountId"));
+                throw Fail.Field(field + ".accountId", SharedErrorCodes.ValidationRequired, new FieldRef(field + ".accountId"));
             long? centreId = null;
             if (!string.IsNullOrEmpty(l.CostCentreId))
             {
-                if (!centreIds.TryGetValue(l.CostCentreId, out var cc)) throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
+                if (!centreIds.TryGetValue(l.CostCentreId, out var cc)) throw Fail.Field(field + ".costCentreId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
                 centreId = cc;
             }
             var party = await parties.ResolveAsync(l.Party, field + ".party", ct).ConfigureAwait(false);
             // DT-255: the tax code and tax account; the engine checks them (active code, tax account for a rate above 0 %) and adds the tax line.
             long? taxCodeId = null, taxAccountId = null;
             if (!string.IsNullOrEmpty(l.TaxCodeId))
-                taxCodeId = taxCodeIds.TryGetValue(l.TaxCodeId, out var tc) ? tc : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+                taxCodeId = taxCodeIds.TryGetValue(l.TaxCodeId, out var tc) ? tc : throw Fail.Field(field + ".taxCodeId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
             if (taxCodeId is not null && !string.IsNullOrEmpty(l.TaxAccountId))
-                taxAccountId = accountIds.TryGetValue(l.TaxAccountId, out var ta) ? ta : throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+                taxAccountId = accountIds.TryGetValue(l.TaxAccountId, out var ta) ? ta : throw Fail.Field(field + ".taxAccountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
             posting.Add(new PostingLine(null, accountId, l.Debit, l.Credit, centreId, party, l.Note, l.Reference, taxCodeId, taxAccountId));
         }
         return new PostingRequest(r.EntryDate!.Value, r.Description!, AccountingCodes.ModuleAcc, AccountingCodes.SourceManual, null, true, posting, r.Reference);
@@ -233,7 +233,7 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             .Check(q.PeriodFrom is null || AccountingCodes.IsMonth(q.PeriodFrom), "periodFrom")
             .Check(q.PeriodTo is null || AccountingCodes.IsMonth(q.PeriodTo), "periodTo")
             .Check(q.Status is null || q.Status is AccountingCodes.Posted or AccountingCodes.Reversed or AccountingCodes.Void or AccountingCodes.Draft or Cancelled, "status")
-            .Check(q.PartyType is null || PartyResolver.Types.Contains(q.PartyType), "partyType")
+            .Check(q.PartyType is null || parties.Types.Contains(q.PartyType), "partyType")
             .ThrowIfInvalid();
         var query = db.Set<JournalEntry>().AsNoTracking();
         if (automaticOnly) query = query.Where(e => !e.IsManual);
@@ -367,20 +367,20 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             var ids = g.Select(r => r.SourceId!.Value).Distinct().ToList();
             IQueryable<DocumentVoid>? q = g.Key switch
             {
-                "Trip" => db.Set<Domain.Trn.Trip>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "Invoice" => db.Set<Domain.Trn.Invoice>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "CreditNote" => db.Set<Domain.Trn.CreditNote>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "Receipt" => db.Set<Domain.Trn.Receipt>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "Advance" => db.Set<Domain.Trn.Advance>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "Settlement" => db.Set<Domain.Trn.Settlement>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
-                "PartnerPayment" => db.Set<Domain.Trn.PartnerPayment>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
                 "SupplierBill" or "Receivable" => db.Set<ApArDocument>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
                 "ApArPayment" => db.Set<ApArPayment>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
                 "ApArReturn" => db.Set<ApArReturn>().Where(x => ids.Contains(x.Id)).Select(x => new DocumentVoid(x.Id, x.VoidReason)),
                 _ => null,
             };
-            if (q is null) continue;
-            foreach (var d in await q.AsNoTracking().ToListAsync(ct).ConfigureAwait(false)) voids[(g.Key, d.Id)] = d.Reason;
+            if (q is not null)
+            {
+                foreach (var d in await q.AsNoTracking().ToListAsync(ct).ConfigureAwait(false)) voids[(g.Key, d.Id)] = d.Reason;
+            }
+            // The other modules' documents (trips, invoices, credit notes, receipts, advances, settlements, partner payments; Stage 3 session 6c).
+            else if (voidSources.FirstOrDefault(v => v.Types.Contains(g.Key)) is { } source)
+            {
+                foreach (var (id, reason) in await source.VoidReasonsAsync(g.Key, ids, ct).ConfigureAwait(false)) voids[(g.Key, id)] = reason;
+            }
         }
         foreach (var r in rows)
         {
@@ -406,6 +406,6 @@ public sealed class JournalService(IAppDbContext db, PostingEngine engine, Party
             entry.Lines, entry.TotalDebit, entry.TotalCredit, company.CurrencyCode,
             AmountInWords.Arabic(entry.TotalDebit, company.CurrencyCode, company.CurrencyDecimals),
             AmountInWords.English(entry.TotalDebit, company.CurrencyCode, company.CurrencyDecimals),
-            CompanyProvisioningService.DefaultSignatures, entry.Reference);
+            VoucherSignatures.Default, entry.Reference);
     }
 }

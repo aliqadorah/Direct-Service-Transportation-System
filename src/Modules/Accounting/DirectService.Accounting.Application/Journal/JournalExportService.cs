@@ -1,13 +1,12 @@
+using DirectService.Platform.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
+using DirectService.Accounting.Application.Books;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Configuration;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
 using DirectService.Accounting.Domain.Acc;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Journal;
 
 /// <summary>
 /// Journal export (acc.je.export; FR-104): the entries of a period range as a JSON or CSV batch for external accounting
@@ -33,14 +32,14 @@ public sealed class JournalExportService(IAppDbContext db, INumberingService num
     {
         ArgumentNullException.ThrowIfNull(r);
         // Allowed for suspended tenants (export stays available), but a read-only support session never writes (D-13, SR-B2-05).
-        if (ctx.IsSupportSession) throw new AppException(ErrorCodes.SupportReadOnly, 403);
+        if (ctx.IsSupportSession) throw new AppException(PlatformErrorCodes.SupportReadOnly, 403);
         var format = r.Format?.ToUpperInvariant();
         new Validator()
             .Check(AccountingCodes.IsMonth(r.PeriodFrom), "periodFrom")
             .Check(AccountingCodes.IsMonth(r.PeriodTo), "periodTo")
             .Check(format is "JSON" or "CSV", "format")
             .ThrowIfInvalid();
-        if (string.CompareOrdinal(r.PeriodFrom, r.PeriodTo) > 0) throw Fail.Field("periodTo", ErrorCodes.ValidationRange, new FieldRef("periodTo"));
+        if (string.CompareOrdinal(r.PeriodFrom, r.PeriodTo) > 0) throw Fail.Field("periodTo", SharedErrorCodes.ValidationRange, new FieldRef("periodTo"));
 
         var entries = await journal.ExportRowsAsync(new JournalQuery(r.PeriodFrom, r.PeriodTo, null, null, null, null, null, null, null, null),
             200_000, ct).ConfigureAwait(false);
@@ -50,7 +49,7 @@ public sealed class JournalExportService(IAppDbContext db, INumberingService num
 
         return await db.InTransactionAsync(async c =>
         {
-            var batchNo = await numbering.NextAsync(DocumentTypes.JournalExport, c).ConfigureAwait(false);
+            var batchNo = await numbering.NextAsync(AccountingDocumentTypes.JournalExport, c).ConfigureAwait(false);
             var batch = new JournalExportBatch
             {
                 BatchNo = batchNo, PeriodFrom = r.PeriodFrom!, PeriodTo = r.PeriodTo!, Format = format!, EntryCount = entries.Count,

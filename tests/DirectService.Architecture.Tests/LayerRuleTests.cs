@@ -219,6 +219,7 @@ public sealed class LayerRuleTests
     private static readonly string[] StillUsedOfAccountingDomain =
     [
         // all 23 at the start: the accounting services, endpoints and workers are still in the transport projects (sessions 4-15)
+        // 22 after session 6c step 3 (journal export moved: JournalExportBatch)
         "DirectService.Accounting.Domain.Acc.Account",
         "DirectService.Accounting.Domain.Acc.ApArDocument",
         "DirectService.Accounting.Domain.Acc.ApArDocumentLine",
@@ -234,7 +235,6 @@ public sealed class LayerRuleTests
         "DirectService.Accounting.Domain.Acc.EntryLine",
         "DirectService.Accounting.Domain.Acc.JournalDraft",
         "DirectService.Accounting.Domain.Acc.JournalEntry",
-        "DirectService.Accounting.Domain.Acc.JournalExportBatch",
         "DirectService.Accounting.Domain.Acc.JournalTemplate",
         "DirectService.Accounting.Domain.Acc.PendingPosting",
         "DirectService.Accounting.Domain.Acc.Period",
@@ -269,15 +269,14 @@ public sealed class LayerRuleTests
     [
         // 10 at the start (session 4a); 9 after session 4b (trips, invoices, credit notes and the pending-posting retry use the contract):
         // the other documents still post through the engine (session 5), the accounting services use its codes, keys and helpers (6-12)
+        // 7 after session 6c step 3 (the journal services moved: PostingLine, PostingRequest)
         "DirectService.Accounting.Application.Posting.AccountingCodes",
         "DirectService.Accounting.Application.Posting.AccountingPostingKeys",
         "DirectService.Accounting.Application.Posting.IPeriodGuard",
         "DirectService.Accounting.Application.Posting.IPostingKeyCatalog",
         "DirectService.Accounting.Application.Posting.JournalTax",
         "DirectService.Accounting.Application.Posting.PostingEngine",
-        "DirectService.Accounting.Application.Posting.PostingLine",
         "DirectService.Accounting.Application.Posting.PostingParty",
-        "DirectService.Accounting.Application.Posting.PostingRequest",
     ];
 
     [Fact]

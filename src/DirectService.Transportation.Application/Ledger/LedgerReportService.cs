@@ -1,3 +1,5 @@
+using DirectService.Accounting.Contracts.Posting;
+using DirectService.Accounting.Contracts.Parties;
 using DirectService.Transportation.Application.Common;
 using System.Globalization;
 using DirectService.Transportation.Application.Abstractions;
@@ -23,7 +25,7 @@ namespace DirectService.Transportation.Application.Ledger;
 /// dates; balances are debit − credit unless a statement shows them the natural way for the account type. Lines carry links to their
 /// entry and source document (FR-121). A cost-centre filter may be <c>none</c>: lines without a cost centre (DT-267).
 /// </summary>
-public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport support, IUrlTokenService tokens, PartyResolver parties, PostingSources sources,
+public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport support, IUrlTokenService tokens, IPartyLookup parties, IPostingSourceLinks sources,
     CashSupport cash, IRequestContext ctx)
 {
     public const int MaxPageSize = 1000;
@@ -145,9 +147,9 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         PostingParty? party = null;
         if (!string.IsNullOrWhiteSpace(q.PartyType) || !string.IsNullOrWhiteSpace(q.Party))
         {
-            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
+            if (q.PartyType is null || !parties.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
             var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
-            party = new PostingParty(PartyResolver.ModuleOf(q.PartyType), q.PartyType, pid);
+            party = new PostingParty(parties.ModuleOf(q.PartyType), q.PartyType, pid);
         }
 
         var lines = db.Set<EntryLine>().AsNoTracking().Where(l => ids.Contains(l.AccountId) && l.JournalEntry.EntryDate <= to);
@@ -228,9 +230,9 @@ public sealed class LedgerReportService(IAppDbContext db, MasterDataSupport supp
         PostingParty? party = null;
         if (!string.IsNullOrWhiteSpace(q.PartyType) || !string.IsNullOrWhiteSpace(q.Party))
         {
-            if (q.PartyType is null || !PartyResolver.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
+            if (q.PartyType is null || !parties.Types.Contains(q.PartyType)) throw Fail.Field("partyType", ErrorCodes.ValidationFormat, new FieldRef("partyType"));
             var pid = await parties.IdOfAsync(q.PartyType, q.Party, ct).ConfigureAwait(false) ?? throw Fail.Field("party", ErrorCodes.ValidationFormat, new FieldRef("party"));
-            party = new PostingParty(PartyResolver.ModuleOf(q.PartyType), q.PartyType, pid);
+            party = new PostingParty(parties.ModuleOf(q.PartyType), q.PartyType, pid);
         }
 
         // The accounts of the statement: chosen ones (as chosen), or the leaves of a code range / of the whole chart.

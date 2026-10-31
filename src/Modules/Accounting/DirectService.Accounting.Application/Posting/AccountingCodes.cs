@@ -46,6 +46,7 @@ public static class AccountingCodes
 public static class AccountingDocumentTypes
 {
     public const string JournalEntry = "ACC.JournalEntry";
+    public const string JournalExport = "ACC.JournalExport";
 }
 
 /// <summary>Refuses activity dated in a closed period (BR-036, FR-133).</summary>

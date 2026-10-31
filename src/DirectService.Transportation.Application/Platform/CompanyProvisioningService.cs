@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Accounting;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
@@ -23,7 +24,7 @@ public sealed class CompanyProvisioningService(IAppDbContext db, IDataScope scop
     /// <summary>Name of the built-in ownership type. Fixed (cannot be renamed, C-08); the UI translates it.</summary>
     public const string BuiltInOwnershipType = "Company";
 
-    public static readonly IReadOnlyList<string> DefaultSignatures = ["المحاسب", "المدير المالي"];
+    public static readonly IReadOnlyList<string> DefaultSignatures = VoucherSignatures.Default;
 
     /// <summary>Default annex columns (keys of <c>InvoiceLayoutService.BuiltInColumns</c>, FR-056).</summary>
     public static readonly IReadOnlyList<string> DefaultAnnexColumns =
