@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Posting;
 using DirectService.Transportation.Application.Abstractions;
 using DirectService.Transportation.Application.Accounting;
 using DirectService.Transportation.Application.Ledger;
@@ -24,7 +25,7 @@ namespace DirectService.Transportation.Application.Reports;
 /// real-time channel (B11).
 /// </summary>
 public sealed class DashboardService(IAppDbContext db, IRequestContext ctx, MasterDataSupport support, LedgerReportService ledger, MonthlyRateService rates,
-    PostingEngine posting, ISavedReportService saved, TimeProvider clock)
+    IPostingReadiness posting, ISavedReportService saved, TimeProvider clock)
 {
     private const string Active = "Active";
 

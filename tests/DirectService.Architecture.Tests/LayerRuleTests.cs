@@ -220,6 +220,7 @@ public sealed class LayerRuleTests
     [
         // all 23 at the start: the accounting services, endpoints and workers are still in the transport projects (sessions 4-15)
         // 22 after session 6c step 3 (journal export moved: JournalExportBatch)
+        // 21 after session 6c step 4 (journal templates moved: JournalTemplate)
         "DirectService.Accounting.Domain.Acc.Account",
         "DirectService.Accounting.Domain.Acc.ApArDocument",
         "DirectService.Accounting.Domain.Acc.ApArDocumentLine",
@@ -235,7 +236,6 @@ public sealed class LayerRuleTests
         "DirectService.Accounting.Domain.Acc.EntryLine",
         "DirectService.Accounting.Domain.Acc.JournalDraft",
         "DirectService.Accounting.Domain.Acc.JournalEntry",
-        "DirectService.Accounting.Domain.Acc.JournalTemplate",
         "DirectService.Accounting.Domain.Acc.PendingPosting",
         "DirectService.Accounting.Domain.Acc.Period",
         "DirectService.Accounting.Domain.Acc.PostingKeyMapping",
@@ -270,13 +270,12 @@ public sealed class LayerRuleTests
         // 10 at the start (session 4a); 9 after session 4b (trips, invoices, credit notes and the pending-posting retry use the contract):
         // the other documents still post through the engine (session 5), the accounting services use its codes, keys and helpers (6-12)
         // 7 after session 6c step 3 (the journal services moved: PostingLine, PostingRequest)
+        // 5 after session 6c step 4 (tax codes and templates moved; setup steps and dashboard through IPostingReadiness: PostingEngine, PostingParty)
         "DirectService.Accounting.Application.Posting.AccountingCodes",
         "DirectService.Accounting.Application.Posting.AccountingPostingKeys",
         "DirectService.Accounting.Application.Posting.IPeriodGuard",
         "DirectService.Accounting.Application.Posting.IPostingKeyCatalog",
         "DirectService.Accounting.Application.Posting.JournalTax",
-        "DirectService.Accounting.Application.Posting.PostingEngine",
-        "DirectService.Accounting.Application.Posting.PostingParty",
     ];
 
     [Fact]

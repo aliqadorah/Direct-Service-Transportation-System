@@ -1,3 +1,4 @@
+using DirectService.Accounting.Contracts.Posting;
 using System.Globalization;
 using System.Text.Json;
 using DirectService.Transportation.Application.Abstractions;
@@ -29,7 +30,7 @@ namespace DirectService.Transportation.Application.Modules;
 /// The steps of the setup checklist (5.4, P-08, G-10) worked out from Transportation and accounting data: market settings, chart of accounts,
 /// account mapping, master data, prices (<see cref="ISetupStepProvider"/>, moved unchanged out of <c>SetupChecklistService</c>, DT-346).
 /// </summary>
-public sealed class TransportationSetupSteps(IAppDbContext db, PostingEngine posting, MasterDataSupport support) : ISetupStepProvider
+public sealed class TransportationSetupSteps(IAppDbContext db, IPostingReadiness posting, MasterDataSupport support) : ISetupStepProvider
 {
     private const string Done = "Done";
     private const string InProgress = "InProgress";

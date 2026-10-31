@@ -44,7 +44,7 @@ public sealed record PostingRequest(DateOnly EntryDate, string Description, stri
 /// </list>
 /// </summary>
 public sealed partial class PostingEngine(IAppDbContext db, INumberingService numbering, IPeriodGuard periods, IPostingKeyCatalog keyCatalog, IRequestContext ctx,
-    IChangeContext changes, TimeProvider clock, IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null)
+    IChangeContext changes, TimeProvider clock, IUserNotifier? notifications = null, ILogger<PostingEngine>? log = null) : IPostingReadiness
 {
     private const string Savepoint = "before_posting";
 

@@ -56,8 +56,6 @@ public static class DependencyInjection
         services.AddScoped<DirectService.Accounting.Contracts.Posting.IDocumentVoidReasonSource, TransportVoidReasons>();   // why a voided document's entry was reversed (Stage 3 session 6c)
         services.AddScoped<DirectService.Accounting.Contracts.Modules.IMoneyAccountUseSource, Cash.MoneyAccountUses>();   // cash box / bank delete check (Stage 3 session 6c)
         services.AddSingleton<DirectService.Accounting.Contracts.Posting.IPostingKeyProvider>(new ProductPostingKeys(AccountingCodes.ModuleTrn));
-        services.AddScoped<JournalTemplateService>();
-        services.AddScoped<TaxCodeService>();
         services.AddScoped<AccountingDashboardService>();
         services.AddScoped<Budgets.BudgetService>();
         services.AddScoped<Budgets.BudgetImportService>();

@@ -119,3 +119,16 @@ public interface IDocumentVoidReasonSource
 
     Task<IReadOnlyDictionary<long, string?>> VoidReasonsAsync(string type, IReadOnlyCollection<long> ids, CancellationToken ct);
 }
+
+/// <summary>
+/// The company's posting readiness as the setup steps and the dashboard show it (FR-094, FR-110; Stage 3 session 6c): whether the initial setup
+/// is open and which required posting keys are not mapped yet.
+/// </summary>
+public interface IPostingReadiness
+{
+    /// <summary>True while the company is in initial setup / data migration: migration not marked complete and no period ever closed.</summary>
+    Task<bool> IsSetupOpenAsync(CancellationToken ct);
+
+    /// <summary>Required posting keys that are not mapped.</summary>
+    Task<IReadOnlyList<string>> MissingKeysAsync(CancellationToken ct);
+}

@@ -1,17 +1,13 @@
+using DirectService.Accounting.Contracts.Errors;
+using DirectService.Accounting.Application.Posting;
 using DirectService.Shared.Contracts.History;
 using System.Text.Json;
-using DirectService.Transportation.Application.Abstractions;
-using DirectService.Transportation.Application.Common;
-using DirectService.Transportation.Application.MasterData;
-using DirectService.Transportation.Contracts.Accounting;
 using DirectService.Accounting.Contracts.Accounting;
-using DirectService.Transportation.Contracts.Errors;
-using DirectService.Transportation.Contracts.MasterData;
 using DirectService.Accounting.Domain.Acc;
 using DirectService.Platform.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace DirectService.Transportation.Application.Accounting;
+namespace DirectService.Accounting.Application.Books;
 
 /// <summary>
 /// Journal entry templates (نماذج القيود; revision 6 part B, owner change request 15 Oct 2026): "Save as template" on the new journal entry
@@ -19,7 +15,7 @@ namespace DirectService.Transportation.Application.Accounting;
 /// fills a new entry, which the user edits and saves as a draft or posts as usual — every posting rule applies then. Templates are per
 /// company; renamed, edited and deleted from the templates list. No automatic or recurring posting.
 /// </summary>
-public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport support, IUrlTokenService tokens, PostingEngine engine)
+public sealed class JournalTemplateService(IAppDbContext db, RecordSupport records, RecordHistory history, IUrlTokenService tokens, PostingEngine engine)
 {
     public const string EntityType = "ACC.JournalTemplate";
     public const int NameMax = 100;
@@ -48,7 +44,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
 
     public async Task<JournalTemplateResponse> GetAsync(string token, CancellationToken ct)
     {
-        var t = await support.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
+        var t = await records.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
         var lines = Read(t.Lines);
         var accountIds = lines.Select(l => l.AccountId).Concat(lines.Where(l => l.TaxAccountId is not null).Select(l => l.TaxAccountId!.Value)).Distinct().ToList();
         var accounts = await db.Set<Account>().AsNoTracking().IgnoreQueryFilters([QueryFilterNames.SoftDelete]).Where(a => accountIds.Contains(a.Id))
@@ -68,8 +64,8 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
 
     public async Task<IReadOnlyList<HistoryEntry>> HistoryAsync(string token, CancellationToken ct)
     {
-        var t = await support.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
-        return await support.HistoryAsync(EntityType, t.Id, ct).ConfigureAwait(false);
+        var t = await records.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
+        return await history.HistoryAsync(EntityType, t.Id, ct).ConfigureAwait(false);
     }
 
     public async Task<JournalTemplateResponse> CreateAsync(JournalTemplateRequest r, CancellationToken ct)
@@ -85,7 +81,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
     public async Task<JournalTemplateResponse> UpdateAsync(string token, JournalTemplateRequest r, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(r);
-        var t = await support.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
+        var t = await records.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
         db.ExpectRowVersion(t, r.RowVersion);
         await FillAsync(t, r, t.Id, ct).ConfigureAwait(false);
         await SaveAsync(t, ct).ConfigureAwait(false);
@@ -94,7 +90,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
 
     public async Task DeleteAsync(string token, string? rowVersion, CancellationToken ct)
     {
-        var t = await support.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
+        var t = await records.FindAsync<JournalTemplate>(token, ct).ConfigureAwait(false);
         db.ExpectRowVersion(t, rowVersion);
         t.DeleteReason = "Template deleted";
         db.Set<JournalTemplate>().Remove(t);
@@ -111,7 +107,7 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
         {
             // Another user saved a template with this name at the same moment (UX_JournalTemplates_CompanyId_Name).
             if (await db.Set<JournalTemplate>().AsNoTracking().AnyAsync(x => x.Name == t.Name && x.Id != t.Id, ct).ConfigureAwait(false))
-                throw Fail.Field("name", ErrorCodes.TemplateNameTaken, t.Name);
+                throw Fail.Field("name", AccountingErrorCodes.TemplateNameTaken, t.Name);
             throw;
         }
     }
@@ -133,10 +129,10 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
             .MaxLength("name", name, NameMax)
             .MaxLength("description", description, DirectService.Accounting.Contracts.Posting.PostingRules.DescriptionMax)
             .MaxLength("reference", reference, DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax)
-            .Check(input.Count is > 0 and <= MaxLines, "lines", input.Count == 0 ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationRange)
+            .Check(input.Count is > 0 and <= MaxLines, "lines", input.Count == 0 ? SharedErrorCodes.ValidationRequired : SharedErrorCodes.ValidationRange)
             .ThrowIfInvalid();
         if (await db.Set<JournalTemplate>().AnyAsync(x => x.Name == name && x.Id != self, ct).ConfigureAwait(false))
-            throw Fail.Field("name", ErrorCodes.TemplateNameTaken, name!);
+            throw Fail.Field("name", AccountingErrorCodes.TemplateNameTaken, name!);
         var decimals = await engine.CurrencyDecimalsAsync(ct).ConfigureAwait(false);
         var accounts = await db.Set<Account>().AsNoTracking().Select(a => new { a.Id, a.PublicId }).ToDictionaryAsync(a => a.PublicId, a => a.Id, ct).ConfigureAwait(false);
         var centres = await db.Set<CostCentre>().AsNoTracking().Select(c => new { c.Id, c.PublicId }).ToDictionaryAsync(c => c.PublicId, c => c.Id, ct).ConfigureAwait(false);
@@ -147,24 +143,24 @@ public sealed class JournalTemplateService(IAppDbContext db, MasterDataSupport s
             var l = input[i];
             var field = $"lines[{i}]";
             var accountId = tokens.Decode<Account>(l.AccountId) is Guid g && accounts.TryGetValue(g, out var a) ? a
-                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? ErrorCodes.ValidationRequired : ErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
-            if (!Money.IsValidAmount(l.Debit, decimals)) throw Fail.Field(field + ".debit", ErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
-            if (!Money.IsValidAmount(l.Credit, decimals) || (l.Debit > 0 && l.Credit > 0)) throw Fail.Field(field + ".credit", ErrorCodes.ValidationRange, new FieldRef(field + ".credit"));
+                : throw Fail.Field(field + ".accountId", string.IsNullOrEmpty(l.AccountId) ? SharedErrorCodes.ValidationRequired : SharedErrorCodes.ValidationFormat, new FieldRef(field + ".accountId"));
+            if (!Money.IsValidAmount(l.Debit, decimals)) throw Fail.Field(field + ".debit", SharedErrorCodes.ValidationRange, new FieldRef(field + ".debit"));
+            if (!Money.IsValidAmount(l.Credit, decimals) || (l.Debit > 0 && l.Credit > 0)) throw Fail.Field(field + ".credit", SharedErrorCodes.ValidationRange, new FieldRef(field + ".credit"));
             long? centreId = null;
             if (!string.IsNullOrEmpty(l.CostCentreId))
                 centreId = tokens.Decode<CostCentre>(l.CostCentreId) is Guid cg && centres.TryGetValue(cg, out var c) ? c
-                    : throw Fail.Field(field + ".costCentreId", ErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
+                    : throw Fail.Field(field + ".costCentreId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".costCentreId"));
             var note = TextNormalizer.CleanText(l.Note);
-            if (note is { Length: > 500 }) throw Fail.Field(field + ".note", ErrorCodes.ValidationRange, new FieldRef(field + ".note"));
+            if (note is { Length: > 500 }) throw Fail.Field(field + ".note", SharedErrorCodes.ValidationRange, new FieldRef(field + ".note"));
             var lineReference = TextNormalizer.CleanText(l.Reference);
-            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", ErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
+            if (lineReference is { Length: > DirectService.Accounting.Contracts.Posting.PostingRules.ReferenceMax }) throw Fail.Field(field + ".reference", SharedErrorCodes.ValidationRange, new FieldRef(field + ".reference"));
             long? taxCodeId = null, taxAccountId = null;
             if (!string.IsNullOrEmpty(l.TaxCodeId))
                 taxCodeId = tokens.Decode<TaxCode>(l.TaxCodeId) is Guid tg && taxCodes.TryGetValue(tg, out var tc) ? tc
-                    : throw Fail.Field(field + ".taxCodeId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
+                    : throw Fail.Field(field + ".taxCodeId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxCodeId"));
             if (taxCodeId is not null && !string.IsNullOrEmpty(l.TaxAccountId))
                 taxAccountId = tokens.Decode<Account>(l.TaxAccountId) is Guid tag && accounts.TryGetValue(tag, out var ta) ? ta
-                    : throw Fail.Field(field + ".taxAccountId", ErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
+                    : throw Fail.Field(field + ".taxAccountId", SharedErrorCodes.ValidationFormat, new FieldRef(field + ".taxAccountId"));
             lines.Add(new TemplateLine(accountId, centreId, note, l.Debit, l.Credit, lineReference, taxCodeId, taxAccountId));
         }
         t.Name = name!;

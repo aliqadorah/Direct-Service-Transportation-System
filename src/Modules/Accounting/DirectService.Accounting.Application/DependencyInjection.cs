@@ -20,6 +20,7 @@ public static class DependencyInjection
     public static IServiceCollection AddAccountingApplication(this IServiceCollection services)
     {
         services.AddScoped<PostingEngine>();
+        services.AddScoped<IPostingReadiness>(sp => sp.GetRequiredService<PostingEngine>());   // setup steps and dashboard (Stage 3 session 6c)
         services.AddScoped<IAccountingPosting, AccountingPostingAdapter>();
         services.AddSingleton<IPostingKeyProvider, AccountingPostingKeyProvider>();
 
@@ -47,6 +48,10 @@ public static class DependencyInjection
         services.AddScoped<JournalDraftService>();
         services.AddScoped<JournalExportService>();
         services.AddScoped<JournalImportService>();
+
+        // Tax codes and journal templates (Stage 3 session 6c).
+        services.AddScoped<TaxCodeService>();
+        services.AddScoped<JournalTemplateService>();
         return services;
     }
 
